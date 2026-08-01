@@ -538,7 +538,10 @@
         <div class="workspace">
           <div class="panel">
             <h2>인보이스 자동인식</h2>
-            <p class="sub">파일명으로 거래처(갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일)를 자동 인식해 품목을 추출합니다. 스캔본 PDF(갈리아노·다니엘·스타일)는 브라우저 안에서 OCR로 텍스트를 읽습니다 — 처음 한 번은 OCR 엔진을 불러오느라 시간이 조금 걸립니다.</p>
+            <p class="sub">파일명으로 거래처(갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일)를 자동 인식해 품목을 추출합니다. 스캔본 PDF(갈리아노·다니엘·스타일)는 브라우저 안에서 OCR로 텍스트를 읽습니다.</p>
+            <div class="status-banner status-warn" style="margin-bottom:16px;">
+              <div><strong>스캔본(OCR) 문서는 페이지당 1~5분 이상 걸릴 수 있습니다.</strong> 스캔 방식에 따라 이미지를 해독하는 단계 자체가 원래 무겁습니다 — 진행 표시줄이 같은 페이지에 멈춰 있어도 멈춘 게 아니니 창을 닫지 말고 기다려주세요. 텍스트가 PDF에 이미 있는 베네레·비니·쿠미니·그루포킴은 몇 초 안에 끝납니다.</div>
+            </div>
 
             <div class="dropzone" id="invcDrop" tabindex="0" role="button" aria-label="인보이스 파일 선택">
               <div class="ic">&#128193;</div>
@@ -1785,14 +1788,57 @@ else if (typeof exports === 'object')
       document.getElementById('invcProgressLabel').textContent = '';
     }
 
+    function looksLikeSlowScanFormat(buf){
+      // 문서 안에 JBIG2Decode 필터가 있으면 pdf.js의 순수 자바스크립트 디코더가
+      // 페이지 하나 푸는 데도 수 분씩 걸릴 수 있다 (pdf.js의 알려진 성능 이슈,
+      // 이 도구의 버그가 아님). 시작 전에 미리 감지해서 예상 시간을 알려준다.
+      var bytes = new Uint8Array(buf);
+      var needle = 'JBIG2Decode';
+      var nlen = needle.length;
+      var limit = bytes.length - nlen;
+      outer:
+      for(var i=0; i<limit; i++){
+        if(bytes[i] !== 74 /* 'J' */) continue;
+        for(var j=1; j<nlen; j++){ if(bytes[i+j] !== needle.charCodeAt(j)) continue outer; }
+        return true;
+      }
+      return false;
+    }
+
+    var OCR_PAGE_TIMEOUT_MS = 150000; // 스캔 압축 방식에 따라 정말 오래 걸리는 페이지가 있어, 무한정 멈추지 않도록 상한을 둔다.
+
+    function renderPageWithTimeout(page, viewport, ctx, timeoutMs){
+      return new Promise(function(resolve, reject){
+        var renderTask = page.render({canvasContext:ctx, viewport:viewport});
+        var timedOut = false;
+        var timer = setTimeout(function(){
+          timedOut = true;
+          try{ renderTask.cancel(); }catch(e){}
+          reject(new Error('RENDER_TIMEOUT'));
+        }, timeoutMs);
+        renderTask.promise.then(function(){
+          if(timedOut) return;
+          clearTimeout(timer);
+          resolve();
+        }, function(err){
+          clearTimeout(timer);
+          if(!timedOut) reject(err);
+        });
+      });
+    }
+
     async function extractPdfPagesLines(file, ocrNeeded, progressCb){
       var buf = await file.arrayBuffer();
+      // pdfjsLib.getDocument({data:buf})는 buf를 워커로 넘기면서 detach시키므로,
+      // buf의 원본 바이트가 필요한 검사는 반드시 그 전에 끝내야 한다.
+      var isSlowFormat = ocrNeeded ? looksLikeSlowScanFormat(buf) : false;
       var pdfDoc = await pdfjsLib.getDocument({data:buf}).promise;
       var pagesLines = [];
+      var timedOutPages = [];
       if(ocrNeeded){
         var worker = await getOcrWorker();
         for(var p=1; p<=pdfDoc.numPages; p++){
-          if(progressCb) progressCb(p, pdfDoc.numPages);
+          if(progressCb) progressCb(p, pdfDoc.numPages, isSlowFormat);
           var page = await pdfDoc.getPage(p);
           var baseViewport = page.getViewport({scale: 300/72});
           var OCR_MAX_DIM = 2000;
@@ -1802,9 +1848,14 @@ else if (typeof exports === 'object')
           var canvas = document.createElement('canvas');
           canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
           var ctx = canvas.getContext('2d');
-          await page.render({canvasContext:ctx, viewport:viewport}).promise;
-          var res = await worker.recognize(canvas);
-          pagesLines.push(res.data.text.split('\n'));
+          try{
+            await renderPageWithTimeout(page, viewport, ctx, OCR_PAGE_TIMEOUT_MS);
+            var res = await worker.recognize(canvas);
+            pagesLines.push(res.data.text.split('\n'));
+          }catch(err){
+            timedOutPages.push(p);
+            pagesLines.push([]);
+          }
         }
       } else {
         for(var p2=1; p2<=pdfDoc.numPages; p2++){
@@ -1813,7 +1864,7 @@ else if (typeof exports === 'object')
           pagesLines.push(groupTextIntoLines(tc.items));
         }
       }
-      return pagesLines;
+      return {pagesLines: pagesLines, timedOutPages: timedOutPages};
     }
 
     async function processOne(entry, idx, total){
@@ -1828,9 +1879,12 @@ else if (typeof exports === 'object')
         var blocks = parseCuminiMulti(aoa, stem);
         return blocks.map(function(b){ return {title: cfg.label + ' ' + b.label, items:b.items, vendor:vendorKey, source:file.name}; });
       }
-      var pagesLines = await extractPdfPagesLines(file, !!cfg.ocr, function(p, n){
-        setProgress(Math.round(((idx + p/n)/total)*100), '[' + (idx+1) + '/' + total + '] ' + file.name + (cfg.ocr ? (' - OCR 처리 중 ' + p + '/' + n + '페이지') : ''));
+      var extracted = await extractPdfPagesLines(file, !!cfg.ocr, function(p, n, isSlowFormat){
+        var label = '[' + (idx+1) + '/' + total + '] ' + file.name + (cfg.ocr ? (' - OCR 처리 중 ' + p + '/' + n + '페이지') : '');
+        if(isSlowFormat) label += ' (스캔 압축 방식 특성상 이 페이지는 몇 분 이상 걸릴 수 있습니다 — 멈춘 것처럼 보여도 계속 처리 중입니다)';
+        setProgress(Math.round(((idx + p/n)/total)*100), label);
       });
+      var pagesLines = extracted.pagesLines;
       var items;
       if(vendorKey === '갈리아노') items = parseGaliano(pagesLines);
       else if(vendorKey === '베네레') items = parseVenere(pagesLines);
@@ -1839,6 +1893,9 @@ else if (typeof exports === 'object')
       else if(vendorKey === '다니엘') items = parseDaniel(pagesLines);
       else items = parseGruppoKim(pagesLines);
       var stem2 = file.name.replace(/\.[^.]+$/, '');
+      if(extracted.timedOutPages.length){
+        invcSkipped.push(file.name + ' — ' + extracted.timedOutPages.join(', ') + '페이지는 처리 시간이 너무 오래 걸려 건너뛰었습니다 (스캔 압축 방식 문제, 해당 페이지 품목은 빠질 수 있습니다)');
+      }
       return [{title: cfg.label + ' ' + stem2, items:items, vendor:vendorKey, source:file.name}];
     }
 
@@ -1867,7 +1924,8 @@ else if (typeof exports === 'object')
         document.getElementById('invcRun').disabled = false;
         invcResults = allResults;
         if(allResults.length === 0){
-          banner(statusEl, 'err', '추출된 품목이 없습니다', '문서 상태나 거래처 선택을 확인해주세요.');
+          var reason = invcSkipped.length ? invcSkipped.join(' / ') : '문서 상태나 거래처 선택을 확인해주세요.';
+          banner(statusEl, 'err', '추출된 품목이 없습니다', reason);
           document.getElementById('invcResultPanel').style.display = 'none';
           return;
         }
