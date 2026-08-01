@@ -143,6 +143,8 @@
   .chip-matched{ background:var(--success-soft); color:var(--success); }
   .chip-ambiguous{ background:var(--warning-soft); color:var(--warning); }
   .chip-soldout{ background:var(--surface-2); color:var(--ink-muted); }
+  .chip-shortage{ background:var(--danger-soft); color:var(--danger); }
+  .chip-excess{ background:var(--warning-soft); color:var(--warning); }
 
   .sidebar-foot{
     margin-top:auto; padding:10px 10px 2px; font-size:11.5px; color:var(--ink-muted);
@@ -376,6 +378,7 @@
       <span class="nav-group-label">재고 · 발주</span>
       <button class="nav-item" data-nav="inventory"><span class="ic">&#8942;</span>재고 세로변환<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="sabangEcount"><span class="ic">&#8942;</span>사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span></button>
+      <button class="nav-item" data-nav="stocktake"><span class="ic">&#8942;</span>재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span></button>
     </nav>
 
     <nav class="nav-group">
@@ -429,6 +432,11 @@
             <div class="tool-card-top"><div class="ic">&#8618;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>인보이스 자동인식</h3>
             <p>갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일 인보이스에서 거래처를 자동 인식하고 품목을 추출합니다. 스캔본은 브라우저 안에서 OCR로 처리합니다.</p>
+          </button>
+          <button class="tool-card" data-nav="stocktake">
+            <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
+            <h3>재고조사 (바코드 실사)</h3>
+            <p>기준 재고 엑셀을 올리고 바코드 스캐너로 스캔해 실사수량을 채웁니다. 여러 명이 나눠 스캔한 뒤 결과 파일을 합쳐 최종 재고조사표를 만듭니다.</p>
           </button>
         </div>
 
@@ -528,6 +536,115 @@
             <div class="table-scroll"><table class="data" id="seTable"></table></div>
             <div class="btn-row" style="margin-top:14px;">
               <button class="btn btn-primary" id="seDownload">이카운트 매칭완료 파일 다운로드</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ INVENTORY STOCKTAKE (barcode scan + merge) ============ -->
+      <section data-view="stocktake">
+        <div class="workspace">
+          <div class="panel">
+            <h2>재고조사 (바코드 실사)</h2>
+            <p class="sub">기준 재고 엑셀을 올리고 USB·블루투스 바코드 스캐너로 스캔하면 실사수량이 자동으로 채워집니다. 여러 명이 구역을 나눠서 각자 스캔한 뒤, <strong>"2. 결과 병합"</strong> 탭에서 각자 다운로드한 스캔결과 파일들을 합쳐 최종 재고조사표를 만드세요. 모든 처리는 이 브라우저 안에서만 이뤄지고 파일은 서버로 전송되지 않습니다.</p>
+
+            <div class="tabs" id="stTabs">
+              <button class="tab-btn active" data-st-tab="scan">1. 스캔하기</button>
+              <button class="tab-btn" data-st-tab="merge">2. 결과 병합</button>
+            </div>
+
+            <!-- ---- SCAN TAB ---- -->
+            <div data-st-panel="scan">
+              <div id="stScanSetup">
+                <div class="dropzone" id="stBaseDrop" tabindex="0" role="button" aria-label="기준 재고 엑셀 선택">
+                  <div class="ic">&#128193;</div>
+                  <div><strong>기준 재고 엑셀을 끌어놓거나 클릭해서 선택하세요</strong></div>
+                  <div style="font-size:12.5px;margin-top:4px;">.xlsx · 바코드/품목명/기존수량 열이 있는 파일 (첫 번째 행이 헤더)</div>
+                  <input type="file" id="stBaseFile" accept=".xlsx" />
+                </div>
+                <div id="stBaseInfo"></div>
+                <div id="stMapping"></div>
+              </div>
+
+              <div id="stScanWorkspace" style="display:none;">
+                <div class="stat-row" id="stStats"></div>
+
+                <div class="dz-grid">
+                  <div>
+                    <div class="field">
+                      <label>바코드 스캔 (스캐너로 찍으면 자동 입력됩니다)</label>
+                      <input type="text" class="textinput" id="stBarcodeInput" placeholder="여기에 스캔..." autocomplete="off" style="font-size:20px;text-align:center;font-weight:700;padding:14px;" />
+                    </div>
+                    <div class="dz-grid" style="margin-top:10px;">
+                      <div class="field"><label>수량</label><input type="number" class="textinput" id="stQtyInput" value="1" min="0.01" step="1" /></div>
+                      <div class="field"><label>담당자</label><input type="text" class="textinput" id="stCounterInput" placeholder="이름" /></div>
+                    </div>
+                    <div class="btn-row" style="margin-top:12px;">
+                      <button class="btn btn-primary" id="stDownloadScan">스캔결과 다운로드</button>
+                      <button class="btn" id="stNewBase">다른 기준 파일로 다시 시작</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label style="font-size:12.5px;font-weight:600;color:var(--ink-muted);">최근 스캔 기록</label>
+                    <div class="table-scroll" style="max-height:280px;margin-top:6px;">
+                      <table class="data" id="stScanFeedTable"><tbody></tbody></table>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="section-head" style="margin:24px 0 10px;">
+                  <h2 style="font-size:15px;">실시간 현황</h2>
+                  <div class="btn-row">
+                    <select class="select" id="stFilter">
+                      <option value="all">전체</option>
+                      <option value="unscanned">미스캔</option>
+                      <option value="shortage">부족</option>
+                      <option value="excess">과다</option>
+                      <option value="matched">일치</option>
+                      <option value="unregistered">미등록</option>
+                    </select>
+                    <input type="text" class="textinput" id="stSearch" placeholder="바코드 또는 품목명 검색" style="width:220px;" />
+                  </div>
+                </div>
+                <div class="table-scroll"><table class="data" id="stLiveTable"></table></div>
+              </div>
+            </div>
+
+            <!-- ---- MERGE TAB ---- -->
+            <div data-st-panel="merge" style="display:none;">
+              <p class="sub">기준 재고 엑셀 1개와, 담당자들이 스캔 후 다운로드한 <strong>스캔결과 파일들</strong>을 함께 올리면 하나의 최종 재고조사표로 합쳐줍니다.</p>
+              <div class="dz-grid">
+                <div class="dropzone" id="stMergeBaseDrop" tabindex="0" role="button" aria-label="기준 재고 엑셀 선택">
+                  <div class="ic">&#128193;</div>
+                  <div><strong>1. 기준 재고 엑셀</strong></div>
+                  <div style="font-size:12.5px;margin-top:4px;">.xlsx</div>
+                  <input type="file" id="stMergeBaseFile" accept=".xlsx" />
+                </div>
+                <div class="dropzone" id="stMergeScansDrop" tabindex="0" role="button" aria-label="스캔결과 파일 선택">
+                  <div class="ic">&#128193;</div>
+                  <div><strong>2. 스캔결과 파일들 (여러 명 분, 여러 개 선택 가능)</strong></div>
+                  <div style="font-size:12.5px;margin-top:4px;">.xlsx · 여러 파일 동시 선택 가능</div>
+                  <input type="file" id="stMergeScansFile" accept=".xlsx" multiple />
+                </div>
+              </div>
+              <div id="stMergeBaseInfo"></div>
+              <div id="stMergeMapping"></div>
+              <div id="stMergeFileList" style="margin-top:10px;"></div>
+              <div id="stMergeStatus"></div>
+              <div class="btn-row" style="margin-top:14px;">
+                <button class="btn btn-primary" id="stMergeRun" disabled>병합 실행</button>
+                <button class="btn" id="stMergeReset">다시 시작</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" id="stMergeResultPanel" style="display:none;">
+            <h2>재고조사 결과</h2>
+            <p class="sub">부족·과다·미등록 항목이 색으로 표시됩니다.</p>
+            <div class="stat-row" id="stMergeStats"></div>
+            <div class="table-scroll"><table class="data" id="stMergeTable"></table></div>
+            <div class="btn-row" style="margin-top:14px;">
+              <button class="btn btn-primary" id="stMergeDownload">엑셀로 다운로드</button>
             </div>
           </div>
         </div>
@@ -972,7 +1089,7 @@ else if (typeof exports === 'object')
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', sabangEcount:'사방넷-이카운트 매칭',
-    invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
+    stocktake:'재고조사 (바코드 실사)', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
   };
 
   function closeDrawer(){
@@ -2623,6 +2740,595 @@ else if (typeof exports === 'object')
       }, 20);
     });
     document.getElementById("seReset").addEventListener("click", seReset);
+  })();
+
+  /* =========================================================
+     TOOL 6: 재고조사 (바코드 실사 스캔 + 결과 병합, 클라이언트 전용)
+     ========================================================= */
+  (function(){
+    var ST_BARCODE_HINTS = ['바코드','barcode','상품코드','제품코드','품목코드','code','sku'];
+    var ST_NAME_HINTS = ['품명','품목명','제품명','상품명','name','item'];
+    var ST_QTY_HINTS = ['수량','재고','기존수량','전산수량','qty','quantity','stock'];
+
+    function stGuessCol(headers, hints){
+      for(var i=0;i<headers.length;i++){
+        var low = String(headers[i]).trim().toLowerCase();
+        for(var j=0;j<hints.length;j++){
+          if(low.indexOf(hints[j].toLowerCase()) !== -1) return headers[i];
+        }
+      }
+      return null;
+    }
+
+    function stBarcodeStr(v){
+      if(v === null || v === undefined) return '';
+      if(typeof v === 'number') return String(v);
+      var s = String(v).trim();
+      if(/^\d+\.0$/.test(s)) s = s.slice(0, -2);
+      return s;
+    }
+
+    function stReadWorkbook(file){
+      return new Promise(function(resolve, reject){
+        var reader = new FileReader();
+        reader.onload = function(e){
+          try{ resolve(XLSX.read(e.target.result, {type:'array'})); }
+          catch(err){ reject(err); }
+        };
+        reader.onerror = function(){ reject(new Error('파일을 읽을 수 없습니다.')); };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function stSheetHeaders(ws){
+      var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+      var headerRow = aoa[0] || [];
+      var headers = [];
+      headerRow.forEach(function(h){
+        if(h === null || h === undefined) return;
+        var t = String(h).trim();
+        if(t && headers.indexOf(t) === -1) headers.push(t);
+      });
+      return headers;
+    }
+
+    function stSheetRows(ws){
+      return XLSX.utils.sheet_to_json(ws, {defval:null, raw:true});
+    }
+
+    function stBuildItems(rows, barcodeCol, nameCol, qtyCol, extraCols){
+      var items = {}; var order = 0; var skipped = 0;
+      rows.forEach(function(row){
+        var barcode = stBarcodeStr(row[barcodeCol]);
+        if(!barcode){ skipped++; return; }
+        var name = nameCol ? (row[nameCol]===null||row[nameCol]===undefined ? '' : String(row[nameCol]).trim()) : '';
+        var qtyRaw = qtyCol ? row[qtyCol] : null;
+        var qty = 0;
+        if(qtyRaw !== null && qtyRaw !== undefined && String(qtyRaw).trim() !== ''){
+          var n = safeNumber(qtyRaw);
+          qty = n === null ? 0 : n;
+        }
+        var extra = {};
+        extraCols.forEach(function(c){
+          var v = row[c];
+          extra[c] = (v===null||v===undefined) ? '' : String(v).trim();
+        });
+        if(items[barcode]){
+          items[barcode].expectedQty += qty;
+        } else {
+          items[barcode] = {barcode:barcode, name:name, expectedQty:qty, extra:extra, order:order++};
+        }
+      });
+      return {items:items, skipped:skipped};
+    }
+
+    // shared base-file uploader UI (used by both scan setup & merge tab)
+    function stMountBaseUploader(cfg){
+      var dz = document.getElementById(cfg.dropId);
+      var infoEl = document.getElementById(cfg.infoElId);
+      var mapEl = document.getElementById(cfg.mappingElId);
+      var workbook = null, file = null;
+
+      function handleFile(f){
+        file = f;
+        infoEl.innerHTML = ''; mapEl.innerHTML = '';
+        stReadWorkbook(f).then(function(wb){
+          workbook = wb;
+          dz.classList.add('has-file');
+          renderMapping(wb.SheetNames[0]);
+        }).catch(function(err){
+          banner(infoEl, 'err', '엑셀 파일을 읽을 수 없습니다', String(err.message||err));
+        });
+      }
+      setupDropzone(cfg.dropId, cfg.fileInputId, '.xlsx', handleFile);
+
+      function renderMapping(sheetName){
+        mapEl.innerHTML = '';
+        var ws = workbook.Sheets[sheetName];
+        var headers = stSheetHeaders(ws);
+        var rows = stSheetRows(ws);
+
+        var wrap = el('div', {style:'margin-top:14px;'});
+
+        if(workbook.SheetNames.length > 1){
+          var sheetField = el('div', {class:'field', style:'max-width:260px;margin-bottom:12px;'});
+          sheetField.appendChild(txt('label', null, '시트 선택'));
+          var sel = el('select', {class:'select'});
+          workbook.SheetNames.forEach(function(sn){
+            var o = el('option', {value:sn}, [document.createTextNode(sn)]);
+            if(sn===sheetName) o.setAttribute('selected','selected');
+            sel.appendChild(o);
+          });
+          sel.addEventListener('change', function(){ renderMapping(sel.value); });
+          sheetField.appendChild(sel);
+          wrap.appendChild(sheetField);
+        }
+
+        var grid = el('div', {style:'display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;'});
+        function colSelect(id, label, hints, allowEmpty){
+          var f = el('div', {class:'field'});
+          f.appendChild(txt('label', null, label));
+          var s = el('select', {class:'select', id:id});
+          if(allowEmpty) s.appendChild(el('option', {value:''}, [document.createTextNode('(선택 안 함)')]));
+          var guess = stGuessCol(headers, hints);
+          headers.forEach(function(h){
+            var o = el('option', {value:h}, [document.createTextNode(h)]);
+            if(h === guess) o.setAttribute('selected','selected');
+            s.appendChild(o);
+          });
+          f.appendChild(s);
+          return f;
+        }
+        grid.appendChild(colSelect('stCol_'+cfg.dropId+'_barcode', '바코드 열 (필수)', ST_BARCODE_HINTS, false));
+        grid.appendChild(colSelect('stCol_'+cfg.dropId+'_name', '품목명 열', ST_NAME_HINTS, true));
+        grid.appendChild(colSelect('stCol_'+cfg.dropId+'_qty', '기존(기준) 수량 열', ST_QTY_HINTS, true));
+        wrap.appendChild(grid);
+
+        var previewWrap = el('div', {class:'table-scroll', style:'margin-top:12px;max-height:220px;'});
+        var table = el('table', {class:'data'});
+        var thead = el('thead'); var htr = el('tr');
+        headers.forEach(function(h){ htr.appendChild(el('th', null, [document.createTextNode(h)])); });
+        thead.appendChild(htr); table.appendChild(thead);
+        var tbody = el('tbody');
+        rows.slice(0,5).forEach(function(r){
+          var tr = el('tr');
+          headers.forEach(function(h){
+            var v = r[h]; tr.appendChild(el('td', null, [document.createTextNode(v===null||v===undefined?'':String(v))]));
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        previewWrap.appendChild(table);
+        wrap.appendChild(previewWrap);
+
+        var confirmRow = el('div', {class:'btn-row', style:'margin-top:14px;'});
+        var confirmBtn = el('button', {class:'btn btn-primary'}, [document.createTextNode(cfg.confirmLabel)]);
+        confirmBtn.addEventListener('click', function(){
+          var barcodeCol = document.getElementById('stCol_'+cfg.dropId+'_barcode').value;
+          var nameColV = document.getElementById('stCol_'+cfg.dropId+'_name').value || null;
+          var qtyColV = document.getElementById('stCol_'+cfg.dropId+'_qty').value || null;
+          if(!barcodeCol){ banner(infoEl, 'err', '바코드 열을 선택하세요', ''); return; }
+          var extraCols = headers.filter(function(h){ return h!==barcodeCol && h!==nameColV && h!==qtyColV; });
+          var built = stBuildItems(rows, barcodeCol, nameColV, qtyColV, extraCols);
+          cfg.onConfirm(built.items, {
+            fileName: file.name, sheetName: sheetName, headers: headers,
+            barcodeCol: barcodeCol, nameCol: nameColV, qtyCol: qtyColV, extraCols: extraCols, skipped: built.skipped
+          });
+        });
+        confirmRow.appendChild(confirmBtn);
+        wrap.appendChild(confirmRow);
+        mapEl.appendChild(wrap);
+
+        var pill = el('div', {class:'file-pill', style:'margin-top:10px;'});
+        pill.appendChild(document.createTextNode('📄 ' + file.name + '  ·  ' + fmtBytes(file.size)));
+        infoEl.innerHTML = ''; infoEl.appendChild(pill);
+      }
+    }
+
+    /* ---------------- SCAN state ---------------- */
+    var stBaseItems = null;
+    var stCounts = {};
+    var stScanOrderCounter = 0;
+    var stUnregisteredOrder = {};
+
+    stMountBaseUploader({
+      dropId: 'stBaseDrop', fileInputId: 'stBaseFile',
+      infoElId: 'stBaseInfo', mappingElId: 'stMapping',
+      confirmLabel: '스캔 시작',
+      onConfirm: function(items, meta){
+        stBaseItems = items;
+        stCounts = {}; stUnregisteredOrder = {};
+        document.getElementById('stScanSetup').style.display = 'none';
+        document.getElementById('stScanWorkspace').style.display = 'block';
+        document.getElementById('stScanFeedTable').querySelector('tbody') || document.getElementById('stScanFeedTable').appendChild(el('tbody'));
+        document.getElementById('stScanFeedTable').querySelector('tbody').innerHTML = '';
+        var counter = localStorage.getItem('stocktake_counter_name') || '';
+        document.getElementById('stCounterInput').value = counter;
+        renderStStats(); renderStLiveTable();
+        document.getElementById('stBarcodeInput').focus();
+      }
+    });
+
+    document.getElementById('stNewBase').addEventListener('click', function(){
+      stBaseItems = null; stCounts = {}; stUnregisteredOrder = {};
+      document.getElementById('stBaseFile').value = '';
+      document.getElementById('stBaseInfo').innerHTML = '';
+      document.getElementById('stMapping').innerHTML = '';
+      document.getElementById('stBaseDrop').classList.remove('has-file');
+      document.getElementById('stScanWorkspace').style.display = 'none';
+      document.getElementById('stScanSetup').style.display = 'block';
+    });
+
+    document.getElementById('stCounterInput').addEventListener('change', function(e){
+      localStorage.setItem('stocktake_counter_name', e.target.value.trim());
+    });
+
+    function stStatusOf(expected, counted, isUnregistered){
+      if(isUnregistered) return {tag:'미등록', chip:'chip-soldout'};
+      var diff = counted - expected;
+      if(diff === 0) return {tag:'일치', chip:'chip-matched'};
+      if(diff > 0) return {tag:'과다', chip:'chip-excess'};
+      return {tag:'부족', chip:'chip-shortage'};
+    }
+
+    function stStatCard(n,l){
+      var s = el('div',{class:'stat'});
+      s.appendChild(el('div',{class:'n tabular'},[document.createTextNode(n)]));
+      s.appendChild(el('div',{class:'l'},[document.createTextNode(l)]));
+      return s;
+    }
+
+    function renderStStats(){
+      var totalItems = Object.keys(stBaseItems).length + Object.keys(stUnregisteredOrder).length;
+      var scannedItems = 0, totalExpected = 0, totalCounted = 0;
+      Object.keys(stBaseItems).forEach(function(bc){ totalExpected += stBaseItems[bc].expectedQty; });
+      Object.keys(stCounts).forEach(function(bc){
+        if(stCounts[bc].qty > 0) scannedItems++;
+        totalCounted += stCounts[bc].qty;
+      });
+      var wrap = document.getElementById('stStats');
+      wrap.innerHTML = '';
+      wrap.appendChild(stStatCard(String(totalItems), '총 품목 수'));
+      wrap.appendChild(stStatCard(String(scannedItems), '스캔 완료 품목'));
+      wrap.appendChild(stStatCard(String(totalExpected), '기준 총수량'));
+      wrap.appendChild(stStatCard(String(totalCounted), '실사 총수량'));
+    }
+
+    function stAllRows(){
+      var rows = [];
+      Object.keys(stBaseItems).forEach(function(bc){
+        var it = stBaseItems[bc];
+        var counted = stCounts[bc] ? stCounts[bc].qty : 0;
+        rows.push({barcode:bc, name:it.name, expectedQty:it.expectedQty, counted:counted, isUnregistered:false, order:it.order});
+      });
+      Object.keys(stUnregisteredOrder).forEach(function(bc){
+        if(stBaseItems[bc]) return;
+        var counted = stCounts[bc] ? stCounts[bc].qty : 0;
+        rows.push({barcode:bc, name:'(미등록 품목)', expectedQty:0, counted:counted, isUnregistered:true, order: 1e9 + stUnregisteredOrder[bc]});
+      });
+      rows.sort(function(a,b){ return a.order - b.order; });
+      return rows;
+    }
+
+    function renderStLiveTable(){
+      var filter = document.getElementById('stFilter').value;
+      var q = document.getElementById('stSearch').value.trim().toLowerCase();
+      var rows = stAllRows().filter(function(r){
+        var diff = r.counted - r.expectedQty;
+        if(q && r.barcode.toLowerCase().indexOf(q)===-1 && (r.name||'').toLowerCase().indexOf(q)===-1) return false;
+        if(filter==='unscanned') return r.counted===0;
+        if(filter==='shortage') return !r.isUnregistered && diff<0;
+        if(filter==='excess') return !r.isUnregistered && diff>0;
+        if(filter==='matched') return !r.isUnregistered && diff===0;
+        if(filter==='unregistered') return r.isUnregistered;
+        return true;
+      });
+
+      var table = document.getElementById('stLiveTable');
+      table.innerHTML = '';
+      var thead = el('thead'); var htr = el('tr');
+      ['바코드','품목명','기준','실사','차이','상태'].forEach(function(c, idx){
+        htr.appendChild(el('th', (idx>=2&&idx<=4)?{class:'num'}:null, [document.createTextNode(c)]));
+      });
+      thead.appendChild(htr); table.appendChild(thead);
+      var tbody = el('tbody');
+      rows.slice(0,500).forEach(function(r){
+        var diff = r.counted - r.expectedQty;
+        var st = stStatusOf(r.expectedQty, r.counted, r.isUnregistered);
+        var tr = el('tr');
+        tr.appendChild(el('td', null, [document.createTextNode(r.barcode)]));
+        tr.appendChild(el('td', null, [document.createTextNode(r.name||'')]));
+        tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode(String(r.expectedQty))]));
+        tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode(String(r.counted))]));
+        tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode(String(diff))]));
+        var tdStatus = el('td');
+        tdStatus.appendChild(el('span', {class:'chip '+st.chip}, [document.createTextNode(st.tag)]));
+        tr.appendChild(tdStatus);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      if(rows.length > 500){
+        var moreRow = el('div', {style:'padding:8px 12px;color:var(--ink-muted);font-size:12px;'});
+        moreRow.textContent = '표시는 500행까지만 됩니다. 필터나 검색으로 좁혀서 확인하세요.';
+        table.parentNode.appendChild(moreRow);
+      }
+    }
+
+    document.getElementById('stFilter').addEventListener('change', renderStLiveTable);
+    var stSearchDebounce;
+    document.getElementById('stSearch').addEventListener('input', function(){
+      clearTimeout(stSearchDebounce);
+      stSearchDebounce = setTimeout(renderStLiveTable, 250);
+    });
+
+    function stAddFeedRow(r){
+      var tbody = document.getElementById('stScanFeedTable').querySelector('tbody');
+      var tr = el('tr');
+      var icon = r.found ? '✅' : '⚠️';
+      tr.appendChild(el('td', null, [document.createTextNode(icon + ' ' + (r.name||r.barcode))]));
+      tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode('+'+r.qty)]));
+      tr.appendChild(el('td', null, [document.createTextNode(r.time)]));
+      if(!r.found) tr.style.background = 'var(--danger-soft)';
+      tbody.insertBefore(tr, tbody.firstChild);
+      while(tbody.children.length > 100) tbody.removeChild(tbody.lastChild);
+    }
+
+    var stBarcodeInput = document.getElementById('stBarcodeInput');
+    stBarcodeInput.addEventListener('keydown', function(e){
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      if(!stBaseItems) return;
+      var raw = stBarcodeInput.value.trim();
+      if(!raw) return;
+      var barcode = stBarcodeStr(raw);
+      var qty = parseFloat(document.getElementById('stQtyInput').value) || 1;
+      var found = !!stBaseItems[barcode];
+      if(!found && stUnregisteredOrder[barcode] === undefined){
+        stUnregisteredOrder[barcode] = stScanOrderCounter++;
+      }
+      if(!stCounts[barcode]) stCounts[barcode] = {qty:0, lastAt:null};
+      stCounts[barcode].qty += qty;
+      stCounts[barcode].lastAt = new Date();
+      var name = found ? stBaseItems[barcode].name : '(미등록 품목)';
+      var d = stCounts[barcode].lastAt;
+      function p(n){ return (n<10?'0':'')+n; }
+      var timeStr = p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+      stAddFeedRow({barcode:barcode, name:name, qty:qty, found:found, time:timeStr});
+      stBarcodeInput.value = '';
+      renderStStats(); renderStLiveTable();
+      stBarcodeInput.focus();
+    });
+
+    document.getElementById('stDownloadScan').addEventListener('click', function(){
+      if(!stBaseItems) return;
+      var counter = document.getElementById('stCounterInput').value.trim();
+      var aoa = [['바코드','품목명','스캔수량','담당자','마지막스캔시각']];
+      var barcodes = Object.keys(stCounts).filter(function(bc){ return stCounts[bc].qty > 0; });
+      if(barcodes.length === 0){
+        alert('아직 스캔한 항목이 없습니다.');
+        return;
+      }
+      barcodes.forEach(function(bc){
+        var name = stBaseItems[bc] ? stBaseItems[bc].name : '(미등록 품목)';
+        var c = stCounts[bc];
+        var d = c.lastAt;
+        function p(n){ return (n<10?'0':'')+n; }
+        var ts = d ? (d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())) : '';
+        aoa.push([bc, name, c.qty, counter, ts]);
+      });
+      var wb = XLSX.utils.book_new();
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, '스캔결과');
+      var fname = '스캔결과_' + (counter || '담당자') + '_' + timestamp() + '.xlsx';
+      var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+      downloadBlob(new Blob([wbout], {type:'application/octet-stream'}), fname);
+    });
+
+    /* ---------------- Tab switching ---------------- */
+    document.querySelectorAll('#stTabs .tab-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelectorAll('#stTabs .tab-btn').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        var target = btn.getAttribute('data-st-tab');
+        document.querySelectorAll('[data-st-panel]').forEach(function(p){
+          p.style.display = (p.getAttribute('data-st-panel') === target) ? 'block' : 'none';
+        });
+      });
+    });
+
+    /* ---------------- MERGE state ---------------- */
+    var stMergeBaseItems = null, stMergeBaseMeta = null;
+    var stMergeFiles = [];
+    var stMergeResultRows = null;
+
+    stMountBaseUploader({
+      dropId: 'stMergeBaseDrop', fileInputId: 'stMergeBaseFile',
+      infoElId: 'stMergeBaseInfo', mappingElId: 'stMergeMapping',
+      confirmLabel: '기준 재고 확정',
+      onConfirm: function(items, meta){
+        stMergeBaseItems = items; stMergeBaseMeta = meta;
+        stCheckMergeReady();
+      }
+    });
+
+    (function wireMergeScansDropzone(){
+      var dz = document.getElementById('stMergeScansDrop');
+      var input = document.getElementById('stMergeScansFile');
+      function addFiles(fileList){
+        Array.prototype.forEach.call(fileList, function(f){ stMergeFiles.push({file:f, name:f.name}); });
+        renderMergeFileList();
+        stCheckMergeReady();
+      }
+      dz.addEventListener('click', function(){ input.click(); });
+      dz.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); input.click(); } });
+      ['dragenter','dragover'].forEach(function(evt){ dz.addEventListener(evt, function(e){ e.preventDefault(); dz.classList.add('drag'); }); });
+      ['dragleave','drop'].forEach(function(evt){ dz.addEventListener(evt, function(e){ e.preventDefault(); dz.classList.remove('drag'); }); });
+      dz.addEventListener('drop', function(e){ if(e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+      input.addEventListener('change', function(){ if(input.files.length){ addFiles(input.files); input.value=''; } });
+    })();
+
+    function renderMergeFileList(){
+      var wrap = document.getElementById('stMergeFileList');
+      wrap.innerHTML = '';
+      stMergeFiles.forEach(function(entry, idx){
+        var pill = el('div', {class:'file-pill', style:'margin:0 8px 8px 0;'});
+        pill.appendChild(document.createTextNode('📄 ' + entry.name));
+        var closeBtn = el('button', {title:'제거'}, [document.createTextNode('✕')]);
+        closeBtn.addEventListener('click', function(){
+          stMergeFiles.splice(idx,1); renderMergeFileList(); stCheckMergeReady();
+        });
+        pill.appendChild(closeBtn);
+        wrap.appendChild(pill);
+      });
+    }
+
+    function stCheckMergeReady(){
+      document.getElementById('stMergeRun').disabled = !(stMergeBaseItems && stMergeFiles.length>0);
+    }
+
+    document.getElementById('stMergeReset').addEventListener('click', function(){
+      stMergeBaseItems = null; stMergeBaseMeta = null; stMergeFiles = []; stMergeResultRows = null;
+      document.getElementById('stMergeBaseFile').value = '';
+      document.getElementById('stMergeScansFile').value = '';
+      document.getElementById('stMergeBaseInfo').innerHTML = '';
+      document.getElementById('stMergeMapping').innerHTML = '';
+      document.getElementById('stMergeBaseDrop').classList.remove('has-file');
+      document.getElementById('stMergeFileList').innerHTML = '';
+      document.getElementById('stMergeStatus').innerHTML = '';
+      document.getElementById('stMergeResultPanel').style.display = 'none';
+      stCheckMergeReady();
+    });
+
+    document.getElementById('stMergeRun').addEventListener('click', function(){
+      if(!stMergeBaseItems || stMergeFiles.length===0) return;
+      var statusEl = document.getElementById('stMergeStatus');
+      statusEl.innerHTML = '';
+      var counted = {};
+      var readPromises = stMergeFiles.map(function(entry){
+        return stReadWorkbook(entry.file).then(function(wb){
+          var sheetName = wb.SheetNames.indexOf('스캔결과') !== -1 ? '스캔결과' : wb.SheetNames[0];
+          var ws = wb.Sheets[sheetName];
+          var headers = stSheetHeaders(ws);
+          var rows = stSheetRows(ws);
+          var bcCol = stGuessCol(headers, ST_BARCODE_HINTS) || headers[0];
+          var qtyCol = stGuessCol(headers, ['스캔수량','실사수량','수량','qty']) || headers[2];
+          var tsCol = stGuessCol(headers, ['마지막스캔시각','스캔시각','시각','time']);
+          rows.forEach(function(row){
+            var bc = stBarcodeStr(row[bcCol]);
+            if(!bc) return;
+            var q = safeNumber(row[qtyCol]);
+            if(q === null) return;
+            if(!counted[bc]) counted[bc] = {qty:0, lastAt:''};
+            counted[bc].qty += q;
+            if(tsCol && row[tsCol]) counted[bc].lastAt = String(row[tsCol]);
+          });
+        }).catch(function(err){
+          banner(statusEl, 'warn', entry.name + ' 파일을 읽지 못했습니다', String(err.message||err));
+        });
+      });
+
+      Promise.all(readPromises).then(function(){
+        var rows = [];
+        Object.keys(stMergeBaseItems).forEach(function(bc){
+          var it = stMergeBaseItems[bc];
+          var c = counted[bc];
+          rows.push({
+            barcode:bc, name:it.name, extra:it.extra, expectedQty:it.expectedQty,
+            countedQty: c?c.qty:0, lastAt: c?c.lastAt:'', isUnregistered:false, order:it.order
+          });
+          if(c) delete counted[bc];
+        });
+        var order = 1e9;
+        Object.keys(counted).forEach(function(bc){
+          rows.push({
+            barcode:bc, name:'(미등록 품목)', extra:{}, expectedQty:0,
+            countedQty: counted[bc].qty, lastAt: counted[bc].lastAt, isUnregistered:true, order:order++
+          });
+        });
+
+        var statusOrder = {'부족':0,'과다':1,'미등록(엑셀에없음)':2,'일치':3};
+        rows.forEach(function(r){
+          var diff = r.countedQty - r.expectedQty;
+          r.diff = diff;
+          if(r.isUnregistered) r.status = '미등록(엑셀에없음)';
+          else if(diff===0) r.status = '일치';
+          else if(diff>0) r.status = '과다';
+          else r.status = '부족';
+        });
+        rows.sort(function(a,b){
+          var sa = statusOrder[a.status], sb = statusOrder[b.status];
+          if(sa !== sb) return sa - sb;
+          return a.barcode < b.barcode ? -1 : (a.barcode > b.barcode ? 1 : 0);
+        });
+
+        stMergeResultRows = rows;
+        banner(statusEl, 'ok', '병합 완료', rows.length + '개 품목 · 스캔결과 파일 ' + stMergeFiles.length + '개 반영');
+        renderMergeResult(rows);
+      });
+    });
+
+    function renderMergeResult(rows){
+      var panel = document.getElementById('stMergeResultPanel');
+      panel.style.display = 'block';
+      var totalExpected = 0, totalCounted = 0, shortageCnt=0, excessCnt=0, unregCnt=0;
+      rows.forEach(function(r){
+        totalExpected += r.expectedQty; totalCounted += r.countedQty;
+        if(r.status==='부족') shortageCnt++;
+        if(r.status==='과다') excessCnt++;
+        if(r.isUnregistered) unregCnt++;
+      });
+      var stats = document.getElementById('stMergeStats');
+      stats.innerHTML = '';
+      stats.appendChild(stStatCard(String(rows.length), '총 품목'));
+      stats.appendChild(stStatCard(String(totalExpected), '기준 총수량'));
+      stats.appendChild(stStatCard(String(totalCounted), '실사 총수량'));
+      stats.appendChild(stStatCard(String(shortageCnt), '부족 품목'));
+      stats.appendChild(stStatCard(String(excessCnt), '과다 품목'));
+      stats.appendChild(stStatCard(String(unregCnt), '미등록 품목'));
+
+      var extraCols = (stMergeBaseMeta && stMergeBaseMeta.extraCols) || [];
+      var table = document.getElementById('stMergeTable');
+      table.innerHTML = '';
+      var headerCols = ['바코드','품목명'].concat(extraCols).concat(['기준수량(엑셀)','실사수량(스캔)','차이','상태']);
+      var thead = el('thead'); var htr = el('tr');
+      headerCols.forEach(function(c){ htr.appendChild(el('th', null, [document.createTextNode(c)])); });
+      thead.appendChild(htr); table.appendChild(thead);
+      var tbody = el('tbody');
+      var chipMap = {'부족':'chip-shortage','과다':'chip-excess','일치':'chip-matched','미등록(엑셀에없음)':'chip-soldout'};
+      rows.slice(0,500).forEach(function(r){
+        var tr = el('tr');
+        tr.appendChild(el('td', null, [document.createTextNode(r.barcode)]));
+        tr.appendChild(el('td', null, [document.createTextNode(r.name||'')]));
+        extraCols.forEach(function(c){ tr.appendChild(el('td', null, [document.createTextNode((r.extra&&r.extra[c])||'')])); });
+        tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode(String(r.expectedQty))]));
+        tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode(String(r.countedQty))]));
+        tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode(String(r.diff))]));
+        var tdStatus = el('td');
+        tdStatus.appendChild(el('span', {class:'chip '+(chipMap[r.status]||'chip-soldout')}, [document.createTextNode(r.status)]));
+        tr.appendChild(tdStatus);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+    }
+
+    document.getElementById('stMergeDownload').addEventListener('click', function(){
+      if(!stMergeResultRows) return;
+      var extraCols = (stMergeBaseMeta && stMergeBaseMeta.extraCols) || [];
+      var headerCols = ['바코드','품목명'].concat(extraCols).concat(['기준수량(엑셀)','실사수량(스캔)','차이','상태','마지막스캔시각']);
+      var aoa = [headerCols];
+      stMergeResultRows.forEach(function(r){
+        var row = [r.barcode, r.name];
+        extraCols.forEach(function(c){ row.push((r.extra&&r.extra[c])||''); });
+        row.push(r.expectedQty, r.countedQty, r.diff, r.status, r.lastAt||'');
+        aoa.push(row);
+      });
+      var wb = XLSX.utils.book_new();
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, '재고조사결과');
+      var fname = '재고조사결과_' + timestamp() + '.xlsx';
+      var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+      downloadBlob(new Blob([wbout], {type:'application/octet-stream'}), fname);
+    });
   })();
 
 })();
