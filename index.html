@@ -2592,6 +2592,35 @@ else if (typeof exports === 'object')
       });
       return report;
     }
+    function stripCalcChain(order, files){
+      // We insert/move formula cells directly in the XML without touching xl/calcChain.xml,
+      // so its cached calculation order goes stale and Excel flags the file as needing repair.
+      // Dropping it (and its two references) is the standard fix - Excel rebuilds it on open.
+      var calcPath = 'xl/calcChain.xml';
+      if (!files[calcPath]) return { order: order, files: files };
+      var newOrder = order.filter(function(n){ return n !== calcPath; });
+      var newFiles = Object.assign({}, files);
+      delete newFiles[calcPath];
+      var ctPath = '[Content_Types].xml';
+      if (newFiles[ctPath]) {
+        var ct = toText(newFiles[ctPath]).replace(/<Override[^>]*calcChain[^>]*\/>/, '');
+        newFiles[ctPath] = new TextEncoder().encode(ct);
+      }
+      var relsPath = 'xl/_rels/workbook.xml.rels';
+      if (newFiles[relsPath]) {
+        var rels = toText(newFiles[relsPath]).replace(/<Relationship[^>]*calcChain[^>]*\/>/, '');
+        newFiles[relsPath] = new TextEncoder().encode(rels);
+      }
+      var wbPath = 'xl/workbook.xml';
+      if (newFiles[wbPath]) {
+        var wb = toText(newFiles[wbPath]);
+        wb = /<calcPr\b[^>]*fullCalcOnLoad/.test(wb)
+          ? wb
+          : wb.replace(/<calcPr\b([^>]*?)\/>/, '<calcPr$1 fullCalcOnLoad="1"/>');
+        newFiles[wbPath] = new TextEncoder().encode(wb);
+      }
+      return { order: newOrder, files: newFiles };
+    }
     async function buildInvoiceTemplateFile(invoices){
       var templateBuf = b64ToBytes(INVOICE_TEMPLATE_B64).buffer;
       var zip = await readZipSE(templateBuf);
@@ -2610,7 +2639,8 @@ else if (typeof exports === 'object')
       if (serialized.indexOf('<?xml') !== 0) serialized = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + serialized;
       var newFiles = Object.assign({}, zip.files);
       newFiles[sheetPath] = new TextEncoder().encode(serialized);
-      var outBytes = writeZipSE(zip.order, newFiles);
+      var cleaned = stripCalcChain(zip.order, newFiles);
+      var outBytes = writeZipSE(cleaned.order, cleaned.files);
       return { bytes: outBytes, report: report };
     }
 
