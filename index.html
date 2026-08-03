@@ -2983,10 +2983,11 @@ else if (typeof exports === 'object')
     var ST_QTY_HINTS = ['수량','재고','기존수량','전산수량','qty','quantity','stock'];
 
     function stGuessCol(headers, hints){
-      for(var i=0;i<headers.length;i++){
-        var low = String(headers[i]).trim().toLowerCase();
-        for(var j=0;j<hints.length;j++){
-          if(low.indexOf(hints[j].toLowerCase()) !== -1) return headers[i];
+      for(var j=0;j<hints.length;j++){
+        var hint = hints[j].toLowerCase();
+        for(var i=0;i<headers.length;i++){
+          var low = String(headers[i]).trim().toLowerCase();
+          if(low.indexOf(hint) !== -1) return headers[i];
         }
       }
       return null;
@@ -3012,20 +3013,60 @@ else if (typeof exports === 'object')
       });
     }
 
+    function stDetectHeaderRow(aoa){
+      var maxRows = Math.min(aoa.length, 20);
+      var allHints = ST_BARCODE_HINTS.concat(ST_NAME_HINTS, ST_QTY_HINTS);
+      var best = 0, bestScore = -1;
+      for(var r=0; r<maxRows; r++){
+        var row = aoa[r] || [];
+        var hasBarcodeHint = false, score = 0;
+        for(var c=0; c<row.length; c++){
+          var v = row[c];
+          if(v === null || v === undefined) continue;
+          var low = String(v).trim().toLowerCase();
+          if(!low) continue;
+          for(var j=0;j<allHints.length;j++){
+            if(low.indexOf(allHints[j].toLowerCase()) !== -1){
+              score++;
+              if(ST_BARCODE_HINTS.indexOf(allHints[j]) !== -1) hasBarcodeHint = true;
+              break;
+            }
+          }
+        }
+        if(hasBarcodeHint && score > bestScore){ bestScore = score; best = r; }
+      }
+      return best;
+    }
+
     function stSheetHeaders(ws){
       var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
-      var headerRow = aoa[0] || [];
+      var headerRowIdx = stDetectHeaderRow(aoa);
+      var headerRow = aoa[headerRowIdx] || [];
       var headers = [];
       headerRow.forEach(function(h){
         if(h === null || h === undefined) return;
         var t = String(h).trim();
         if(t && headers.indexOf(t) === -1) headers.push(t);
       });
-      return headers;
+      return {headers: headers, headerRowIdx: headerRowIdx};
     }
 
-    function stSheetRows(ws){
-      return XLSX.utils.sheet_to_json(ws, {defval:null, raw:true});
+    function stSheetRows(ws, headerRowIdx){
+      var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+      var headerRow = aoa[headerRowIdx] || [];
+      var rows = [];
+      for(var r = headerRowIdx+1; r < aoa.length; r++){
+        var rawRow = aoa[r] || [];
+        var obj = {};
+        headerRow.forEach(function(h, c){
+          if(h === null || h === undefined) return;
+          var t = String(h).trim();
+          if(!t || (t in obj)) return;
+          obj[t] = rawRow[c] !== undefined ? rawRow[c] : null;
+        });
+        rows.push(obj);
+      }
+      return rows;
     }
 
     function stBuildItems(rows, barcodeCol, nameCol, qtyCol, extraCols){
@@ -3077,8 +3118,9 @@ else if (typeof exports === 'object')
       function renderMapping(sheetName){
         mapEl.innerHTML = '';
         var ws = workbook.Sheets[sheetName];
-        var headers = stSheetHeaders(ws);
-        var rows = stSheetRows(ws);
+        var headerInfo = stSheetHeaders(ws);
+        var headers = headerInfo.headers;
+        var rows = stSheetRows(ws, headerInfo.headerRowIdx);
 
         var wrap = el('div', {style:'margin-top:14px;'});
 
@@ -3440,8 +3482,9 @@ else if (typeof exports === 'object')
         return stReadWorkbook(entry.file).then(function(wb){
           var sheetName = wb.SheetNames.indexOf('스캔결과') !== -1 ? '스캔결과' : wb.SheetNames[0];
           var ws = wb.Sheets[sheetName];
-          var headers = stSheetHeaders(ws);
-          var rows = stSheetRows(ws);
+          var headerInfo = stSheetHeaders(ws);
+          var headers = headerInfo.headers;
+          var rows = stSheetRows(ws, headerInfo.headerRowIdx);
           var bcCol = stGuessCol(headers, ST_BARCODE_HINTS) || headers[0];
           var qtyCol = stGuessCol(headers, ['스캔수량','실사수량','수량','qty']) || headers[2];
           var tsCol = stGuessCol(headers, ['마지막스캔시각','스캔시각','시각','time']);
