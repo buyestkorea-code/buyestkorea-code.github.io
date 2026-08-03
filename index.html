@@ -2155,20 +2155,26 @@ else if (typeof exports === 'object')
     }
     function getOcrWorker(onLog){
       if(!ocrWorkerPromise){
-        ocrWorkerPromise = (function(){
+        ocrWorkerPromise = (async function(){
           var coreSrc = document.getElementById('tessCoreSrc').textContent;
           var langB64 = document.getElementById('tessLangB64').textContent;
           var workerSrc = document.getElementById('tessWorkerSrc').textContent;
           var combined = buildWorkerShim(coreSrc, langB64) + '\n' + workerSrc;
           var blob = new Blob([combined], {type:'text/javascript'});
           var workerUrl = URL.createObjectURL(blob);
-          return Tesseract.createWorker('eng', 1, {
+          var worker = await Tesseract.createWorker('eng', 1, {
             workerPath: workerUrl,
             corePath: 'local-core',
             langPath: 'local-lang',
             cacheMethod: 'none',
             logger: onLog || function(){}
           });
+          // 원본 데스크톱 프로그램은 `tesseract --psm 6`(균일한 텍스트 블록으로 가정,
+          // 위→아래 한 줄씩 읽기)으로 인보이스를 인식했다. 이 설정 없이 기본 자동
+          // 페이지분석(PSM 3)을 쓰면 표 레이아웃 중간에서 줄을 잘못 나누거나 건너뛰어
+          // 품목이 누락되는 경우가 많아, 반드시 동일하게 맞춰준다.
+          await worker.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
+          return worker;
         })();
       }
       return ocrWorkerPromise;
@@ -2297,7 +2303,12 @@ else if (typeof exports === 'object')
           if(progressCb) progressCb(p, pdfDoc.numPages, isSlowFormat);
           var page = await pdfDoc.getPage(p);
           var baseViewport = page.getViewport({scale: 300/72});
-          var OCR_MAX_DIM = 2000;
+          // A4/Letter at true 300dpi (matching the original desktop tool's OCR resolution)
+          // is ~2480-3510px on the long side. The previous 2000px cap silently downscaled
+          // every normal invoice page to ~170-200dpi before OCR, which is a real source of
+          // missed/misread characters on small table text. Raised so standard pages OCR at
+          // the intended full 300dpi; still capped to guard against pathological page sizes.
+          var OCR_MAX_DIM = 3600;
           var longSide = Math.max(baseViewport.width, baseViewport.height);
           var scaleFactor = (300/72) * Math.min(1, OCR_MAX_DIM / longSide);
           var viewport = page.getViewport({scale: scaleFactor});
@@ -3275,6 +3286,23 @@ else if (typeof exports === 'object')
     var stCounts = {};
     var stScanOrderCounter = 0;
     var stUnregisteredOrder = {};
+    var stScanEvents = []; // {id, barcode, qty, time, found, cancelled} - kept so a mis-scan can be undone individually
+    var stScanEventIdCounter = 0;
+
+    function stRecountFromEvents(){
+      stCounts = {};
+      stUnregisteredOrder = {};
+      stScanOrderCounter = 0;
+      stScanEvents.forEach(function(ev){
+        if(ev.cancelled) return;
+        if(!ev.found && stUnregisteredOrder[ev.barcode] === undefined){
+          stUnregisteredOrder[ev.barcode] = stScanOrderCounter++;
+        }
+        if(!stCounts[ev.barcode]) stCounts[ev.barcode] = {qty:0, lastAt:null};
+        stCounts[ev.barcode].qty += ev.qty;
+        stCounts[ev.barcode].lastAt = ev.time;
+      });
+    }
 
     stMountBaseUploader({
       dropId: 'stBaseDrop', fileInputId: 'stBaseFile',
@@ -3283,7 +3311,7 @@ else if (typeof exports === 'object')
       onConfirm: function(items, meta){
         stBaseItems = items;
         stBaseMeta = meta;
-        stCounts = {}; stUnregisteredOrder = {};
+        stCounts = {}; stUnregisteredOrder = {}; stScanEvents = []; stScanEventIdCounter = 0;
         document.getElementById('stScanSetup').style.display = 'none';
         document.getElementById('stScanWorkspace').style.display = 'block';
         document.getElementById('stScanFeedTable').querySelector('tbody') || document.getElementById('stScanFeedTable').appendChild(el('tbody'));
@@ -3296,7 +3324,7 @@ else if (typeof exports === 'object')
     });
 
     document.getElementById('stNewBase').addEventListener('click', function(){
-      stBaseItems = null; stBaseMeta = null; stCounts = {}; stUnregisteredOrder = {};
+      stBaseItems = null; stBaseMeta = null; stCounts = {}; stUnregisteredOrder = {}; stScanEvents = []; stScanEventIdCounter = 0;
       document.getElementById('stBaseFile').value = '';
       document.getElementById('stBaseInfo').innerHTML = '';
       document.getElementById('stMapping').innerHTML = '';
@@ -3410,6 +3438,15 @@ else if (typeof exports === 'object')
       stSearchDebounce = setTimeout(renderStLiveTable, 250);
     });
 
+    function stCancelScanEvent(eventId, tr){
+      var ev = stScanEvents.filter(function(e){ return e.id === eventId; })[0];
+      if(!ev || ev.cancelled) return;
+      ev.cancelled = true;
+      tr.parentNode.removeChild(tr);
+      stRecountFromEvents();
+      renderStStats(); renderStLiveTable();
+    }
+
     function stAddFeedRow(r){
       var tbody = document.getElementById('stScanFeedTable').querySelector('tbody');
       var tr = el('tr');
@@ -3417,6 +3454,11 @@ else if (typeof exports === 'object')
       tr.appendChild(el('td', null, [document.createTextNode(icon + ' ' + (r.name||r.barcode))]));
       tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode('+'+r.qty)]));
       tr.appendChild(el('td', null, [document.createTextNode(r.time)]));
+      var tdCancel = el('td');
+      var cancelBtn = el('button', {class:'row-del', title:'이 스캔 취소'}, [document.createTextNode('✕')]);
+      cancelBtn.addEventListener('click', function(){ stCancelScanEvent(r.id, tr); });
+      tdCancel.appendChild(cancelBtn);
+      tr.appendChild(tdCancel);
       if(!r.found) tr.style.background = 'var(--danger-soft)';
       tbody.insertBefore(tr, tbody.firstChild);
       while(tbody.children.length > 100) tbody.removeChild(tbody.lastChild);
@@ -3432,17 +3474,14 @@ else if (typeof exports === 'object')
       var barcode = stBarcodeStr(raw);
       var qty = parseFloat(document.getElementById('stQtyInput').value) || 1;
       var found = !!stBaseItems[barcode];
-      if(!found && stUnregisteredOrder[barcode] === undefined){
-        stUnregisteredOrder[barcode] = stScanOrderCounter++;
-      }
-      if(!stCounts[barcode]) stCounts[barcode] = {qty:0, lastAt:null};
-      stCounts[barcode].qty += qty;
-      stCounts[barcode].lastAt = new Date();
+      var now = new Date();
+      var ev = {id: stScanEventIdCounter++, barcode:barcode, qty:qty, time:now, found:found, cancelled:false};
+      stScanEvents.push(ev);
+      stRecountFromEvents();
       var name = found ? stBaseItems[barcode].name : '(미등록 품목)';
-      var d = stCounts[barcode].lastAt;
       function p(n){ return (n<10?'0':'')+n; }
-      var timeStr = p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
-      stAddFeedRow({barcode:barcode, name:name, qty:qty, found:found, time:timeStr});
+      var timeStr = p(now.getHours())+':'+p(now.getMinutes())+':'+p(now.getSeconds());
+      stAddFeedRow({id: ev.id, barcode:barcode, name:name, qty:qty, found:found, time:timeStr});
       stBarcodeInput.value = '';
       renderStStats(); renderStLiveTable();
       stBarcodeInput.focus();
