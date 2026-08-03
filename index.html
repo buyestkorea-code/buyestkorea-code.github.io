@@ -372,6 +372,7 @@
       <button class="nav-item" data-nav="inventory"><span class="ic">&#8942;</span>재고 세로변환<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="sabangEcount"><span class="ic">&#8942;</span>사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stocktake"><span class="ic">&#8942;</span>재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span></button>
+      <button class="nav-item" data-nav="orderStock"><span class="ic">&#8942;</span>사방넷 주문서-재고 매칭<span class="chip chip-ready">사용가능</span></button>
     </nav>
 
     <nav class="nav-group">
@@ -430,6 +431,11 @@
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>재고조사 (바코드 실사)</h3>
             <p>기준 재고 엑셀을 올리고 바코드 스캐너로 스캔하면 옆에서 바로 재고 현황을 확인하고, 최종 결과를 바로 다운로드할 수 있습니다.</p>
+          </button>
+          <button class="tool-card" data-nav="orderStock">
+            <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
+            <h3>사방넷 주문서-재고 매칭</h3>
+            <p>사방넷 주문서의 상품명·쇼핑몰 표기를 정리하고, 상품코드·사이즈를 뽑아 현재 재고장과 매칭해 재고 위치를 찾아줍니다.</p>
           </button>
         </div>
 
@@ -594,6 +600,55 @@
                 </div>
                 <div class="table-scroll"><table class="data" id="stLiveTable"></table></div>
               </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SABANGNET ORDER TRANSFORM + STOCK MATCH ============ -->
+      <section data-view="orderStock">
+        <div class="workspace">
+          <div class="panel">
+            <h2>사방넷 주문서 변환 + 재고 매칭</h2>
+            <p class="sub">변환 규칙 — 상품명: [ ] 안의 내용 전체 삭제 · 쇼핑몰: ( ) 문자만 삭제 · 사이즈 없으면 TU · 비교코드: 상품코드_사이즈 · 재고장 품목명이 접두어_상품코드_사이즈 형태면 접두어는 비교에서 제외하고 재고위치에만 표시합니다.</p>
+
+            <div class="dz-grid">
+              <div class="dropzone" id="osOrderDrop" tabindex="0" role="button" aria-label="사방넷 주문서 선택">
+                <div class="ic">&#128193;</div>
+                <div><strong>1. 사방넷 주문서</strong></div>
+                <div style="font-size:12.5px;margin-top:4px;">.xlsx · 상품명/쇼핑몰/사이즈 열이 있는 파일</div>
+                <input type="file" id="osOrderFile" accept=".xlsx,.xls" />
+              </div>
+              <div class="dropzone" id="osStockDrop" tabindex="0" role="button" aria-label="현재 재고장 선택">
+                <div class="ic">&#128193;</div>
+                <div><strong>2. 현재 재고장</strong></div>
+                <div style="font-size:12.5px;margin-top:4px;">.xlsx · 여러 시트 가능 · 시트별로 품목명/재고량 열이 있는 헤더 행을 자동 인식</div>
+                <input type="file" id="osStockFile" accept=".xlsx,.xls" />
+              </div>
+            </div>
+
+            <div id="osOrderInfo"></div>
+            <div id="osStockInfo"></div>
+            <div id="osStatus"></div>
+
+            <div class="btn-row" style="margin-top:14px;">
+              <button class="btn" id="osTransform" disabled>주문서 변환만 다운로드</button>
+              <button class="btn btn-primary" id="osMatch" disabled>재고 매칭 시작</button>
+            </div>
+
+            <label style="font-size:12.5px;font-weight:600;color:var(--ink-muted);display:block;margin-top:16px;">진행 로그</label>
+            <div class="table-scroll" style="max-height:200px;margin-top:6px;">
+              <pre class="raw" id="osLog" style="margin:0;min-height:60px;"></pre>
+            </div>
+          </div>
+
+          <div class="panel" id="osResultPanel" style="display:none;">
+            <h2>매칭 결과</h2>
+            <p class="sub">매칭맞음·매칭없음 항목이 색으로 표시됩니다.</p>
+            <div class="stat-row" id="osStats"></div>
+            <div class="table-scroll"><table class="data" id="osTable"></table></div>
+            <div class="btn-row" style="margin-top:14px;">
+              <button class="btn btn-primary" id="osDownloadMatch">매칭 결과 다운로드</button>
+            </div>
           </div>
         </div>
       </section>
@@ -3381,6 +3436,339 @@ else if (typeof exports === 'object')
       var fname = '재고조사결과_' + (counter ? counter + '_' : '') + timestamp() + '.xlsx';
       var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
       downloadBlob(new Blob([wbout], {type:'application/octet-stream'}), fname);
+    });
+  })();
+
+  /* =========================================================
+     TOOL 7: 사방넷 주문서 변환 + 재고 매칭
+     ========================================================= */
+  (function(){
+    function osNormalizeHeader(v){
+      if(v===null||v===undefined) return '';
+      return String(v).replace(/\s+/g,'').toLowerCase();
+    }
+    function osFindColumn(headerRow, candidates){
+      var normalized = {};
+      headerRow.forEach(function(h,i){ if(h!==null&&h!==undefined&&normalized[osNormalizeHeader(h)]===undefined) normalized[osNormalizeHeader(h)] = i; });
+      for(var i=0;i<candidates.length;i++){
+        var cn = osNormalizeHeader(candidates[i]);
+        if(normalized[cn] !== undefined) return normalized[cn];
+      }
+      return null;
+    }
+    function osCleanProductName(value){
+      var text = (value===null||value===undefined) ? '' : String(value);
+      text = text.replace(/\[[^\]]*\]/g, '');
+      text = text.replace(/\s+/g, ' ').trim();
+      return text;
+    }
+    function osCleanMallName(value){
+      var text = (value===null||value===undefined) ? '' : String(value);
+      return text.replace(/[()]/g, '').trim();
+    }
+    var OS_TU_VALUES = {'':1,'단품':1,'단일상품':1,'FREE':1,'FREE SIZE':1,'FREESIZE':1,'ONE SIZE':1,'ONESIZE':1,'OS':1,'TU':1};
+    function osNormalizeSize(value){
+      if(value===null||value===undefined) return 'TU';
+      var text = String(value).trim();
+      if(!text) return 'TU';
+      text = text.replace(/\n/g,' ').replace(/\r/g,' ');
+      text = text.replace(/^\s*사이즈\s*[:：-]?\s*/i, '');
+      if(text.indexOf(':') !== -1){
+        var parts = text.split(':');
+        text = parts[parts.length-1].trim();
+      }
+      text = text.replace(/\s+/g,' ').trim().toUpperCase();
+      return OS_TU_VALUES[text] ? 'TU' : text;
+    }
+    function osIsTailCodeToken(tok){
+      tok = String(tok).trim();
+      if(!tok) return false;
+      if(/[가-힣]/.test(tok)) return false;
+      return /^[A-Za-z0-9][A-Za-z0-9./_+-]*$/.test(tok);
+    }
+    function osExtractProductCode(productName){
+      if(!productName) return '';
+      var text = osCleanProductName(productName);
+      var tokens = text.split(/\s+/).filter(Boolean);
+      var collected = [], hasDigit = false;
+      for(var i=tokens.length-1; i>=0; i--){
+        var tok = tokens[i];
+        if(osIsTailCodeToken(tok)){
+          collected.push(tok);
+          if(/\d/.test(tok)) hasDigit = true;
+        } else if(collected.length){ break; }
+      }
+      collected.reverse();
+      if(!collected.length || !hasDigit) return '';
+      return collected.join(' ').trim();
+    }
+    function osToNumber(value){
+      if(value===null||value===undefined) return 0;
+      var text = String(value).trim().replace(/,/g,'');
+      if(!text) return 0;
+      var n = parseFloat(text);
+      return isNaN(n) ? 0 : n;
+    }
+    function osSplitStockCode(rawName){
+      var text = String(rawName).trim();
+      var underscoreCount = (text.match(/_/g)||[]).length;
+      if(underscoreCount >= 2){
+        var idx = text.indexOf('_');
+        return {prefix: text.slice(0,idx).trim(), compareKey: text.slice(idx+1).trim()};
+      }
+      return {prefix:'', compareKey:text};
+    }
+    function osDefaultLocation(sheetName){
+      var n = osNormalizeHeader(sheetName);
+      if(n === osNormalizeHeader('본사본사본사')) return '본';
+      if(n === osNormalizeHeader('아난티')) return '아';
+      if(n === osNormalizeHeader('대백프라자')) return '대';
+      return sheetName;
+    }
+    function osDetectHeaderRow(previewRows, requiredHeaders){
+      var maxRows = Math.min(10, previewRows.length);
+      for(var r=0;r<maxRows;r++){
+        var row = previewRows[r] || [];
+        var normSet = {};
+        row.forEach(function(v){ normSet[osNormalizeHeader(v)] = true; });
+        var allFound = requiredHeaders.every(function(h){ return normSet[osNormalizeHeader(h)]; });
+        if(allFound) return r;
+      }
+      throw new Error('헤더행을 찾지 못했습니다: ' + requiredHeaders.join(', '));
+    }
+    function osLoadStockMap(workbook, logFn){
+      var compareMap = {};
+      workbook.SheetNames.forEach(function(sheetName){
+        var ws = workbook.Sheets[sheetName];
+        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        var headerIdx = osDetectHeaderRow(aoa.slice(0,10), ['품목명','재고량']);
+        var headerRow = aoa[headerIdx] || [];
+        var colName = osFindColumn(headerRow, ['품목명']);
+        var colQty = osFindColumn(headerRow, ['재고량']);
+        if(colName===null || colQty===null) return;
+        if(logFn) logFn('재고장 읽는 중: ' + sheetName + ' / 행수=' + Math.max(0, aoa.length - headerIdx - 1));
+        for(var r=headerIdx+1; r<aoa.length; r++){
+          var row = aoa[r] || [];
+          var rawName = row[colName]; rawName = (rawName===null||rawName===undefined) ? '' : String(rawName).trim();
+          if(!rawName) continue;
+          var qty = osToNumber(row[colQty]);
+          if(qty <= 0) continue;
+          var split = osSplitStockCode(rawName);
+          if(!split.compareKey) continue;
+          var location = split.prefix || osDefaultLocation(sheetName);
+          var item = {sheet:sheetName, rawName:rawName, prefix:split.prefix, location:location, qty:qty};
+          if(!compareMap[split.compareKey]) compareMap[split.compareKey] = [];
+          compareMap[split.compareKey].push(item);
+        }
+      });
+      return compareMap;
+    }
+    function osTransformOrderAoa(orderAoa){
+      var headerRow = orderAoa[0] || [];
+      var colProduct = osFindColumn(headerRow, ['상품명']);
+      var colMall = osFindColumn(headerRow, ['쇼핑몰']);
+      if(colProduct===null) throw new Error("주문서에서 '상품명' 컬럼을 찾지 못했습니다.");
+      if(colMall===null) throw new Error("주문서에서 '쇼핑몰' 컬럼을 찾지 못했습니다.");
+      var out = [headerRow.slice()];
+      for(var r=1;r<orderAoa.length;r++){
+        var row = (orderAoa[r]||[]).slice();
+        row[colProduct] = osCleanProductName(row[colProduct]);
+        row[colMall] = osCleanMallName(row[colMall]);
+        out.push(row);
+      }
+      return out;
+    }
+    function osMatchOrderWithStock(orderAoa, stockMap, logFn){
+      var headerRow = orderAoa[0] || [];
+      var colProduct = osFindColumn(headerRow, ['상품명']);
+      var colSize = osFindColumn(headerRow, ['사이즈']);
+      var colMall = osFindColumn(headerRow, ['쇼핑몰']);
+      if(colProduct===null) throw new Error("주문서에서 '상품명' 컬럼을 찾지 못했습니다.");
+      if(colSize===null) throw new Error("주문서에서 '사이즈' 컬럼을 찾지 못했습니다.");
+      if(colMall===null) throw new Error("주문서에서 '쇼핑몰' 컬럼을 찾지 못했습니다.");
+
+      var newHeader = headerRow.slice().concat(['추출상품코드','정리사이즈','비교코드','매칭결과','재고위치','재고원본']);
+      var resultRows = [newHeader];
+      var matchedRows = [newHeader.slice()];
+      var unmatchedRows = [newHeader.slice()];
+
+      for(var r=1; r<orderAoa.length; r++){
+        var row = (orderAoa[r] || []).slice();
+        row[colProduct] = osCleanProductName(row[colProduct]);
+        row[colMall] = osCleanMallName(row[colMall]);
+
+        var code = osExtractProductCode(row[colProduct]);
+        var sizeNorm = osNormalizeSize(row[colSize]);
+        var compareCode = code ? (code + '_' + sizeNorm) : '';
+        var matches = compareCode ? (stockMap[compareCode] || []) : [];
+
+        var matchResult, locationText, rawText;
+        if(matches.length){
+          var seenLoc = {}, seenRaw = {};
+          var uniqueLocations = [], uniqueRawNames = [];
+          matches.forEach(function(m){
+            if(!seenLoc[m.location]){ uniqueLocations.push(m.location); seenLoc[m.location]=true; }
+            if(!seenRaw[m.rawName]){ uniqueRawNames.push(m.rawName); seenRaw[m.rawName]=true; }
+          });
+          matchResult = '매칭맞음';
+          locationText = uniqueLocations.join(',');
+          rawText = uniqueRawNames.join(' | ');
+        } else {
+          matchResult = '매칭없음'; locationText = ''; rawText = '';
+        }
+
+        var newRow = row.concat([code, sizeNorm, compareCode, matchResult, locationText, rawText]);
+        resultRows.push(newRow);
+        (matchResult === '매칭맞음' ? matchedRows : unmatchedRows).push(newRow);
+        if(logFn && r % 50 === 0) logFn('주문 매칭 진행: ' + r + ' / ' + (orderAoa.length-1));
+      }
+      return {header: newHeader, result: resultRows, matched: matchedRows, unmatched: unmatchedRows};
+    }
+
+    /* ---------------- UI wiring ---------------- */
+    var osOrderWorkbook = null, osOrderAoa = null, osOrderFileName = '';
+    var osStockWorkbook = null, osStockFileName = '';
+    var osMatchOutput = null;
+
+    function osLog(msg){
+      var box = document.getElementById('osLog');
+      box.textContent += (box.textContent ? '\n' : '') + msg;
+      box.parentNode.scrollTop = box.parentNode.scrollHeight;
+    }
+    function osBaseName(name){ return name.replace(/\.[^.]+$/, ''); }
+    function osUpdateButtons(){
+      document.getElementById('osTransform').disabled = !osOrderAoa;
+      document.getElementById('osMatch').disabled = !(osOrderAoa && osStockWorkbook);
+    }
+
+    function osReadWorkbook(file){
+      return new Promise(function(resolve, reject){
+        var reader = new FileReader();
+        reader.onload = function(e){ try{ resolve(XLSX.read(e.target.result, {type:'array'})); } catch(err){ reject(err); } };
+        reader.onerror = function(){ reject(new Error('파일을 읽을 수 없습니다.')); };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    setupDropzone('osOrderDrop', 'osOrderFile', '.xlsx,.xls', function(file){
+      osReadWorkbook(file).then(function(wb){
+        osOrderWorkbook = wb;
+        osOrderFileName = file.name;
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        osOrderAoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        document.getElementById('osOrderDrop').classList.add('has-file');
+        var info = document.getElementById('osOrderInfo'); info.innerHTML = '';
+        var pill = el('div', {class:'file-pill', style:'margin-top:10px;'});
+        pill.appendChild(document.createTextNode('📄 ' + file.name + '  ·  ' + fmtBytes(file.size)));
+        info.appendChild(pill);
+        osLog('사방넷 주문서 선택: ' + file.name);
+        osUpdateButtons();
+      }).catch(function(err){
+        banner(document.getElementById('osOrderInfo'), 'err', '주문서를 읽을 수 없습니다', String(err.message||err));
+      });
+    });
+
+    setupDropzone('osStockDrop', 'osStockFile', '.xlsx,.xls', function(file){
+      osReadWorkbook(file).then(function(wb){
+        osStockWorkbook = wb;
+        osStockFileName = file.name;
+        document.getElementById('osStockDrop').classList.add('has-file');
+        var info = document.getElementById('osStockInfo'); info.innerHTML = '';
+        var pill = el('div', {class:'file-pill', style:'margin-top:10px;'});
+        pill.appendChild(document.createTextNode('📄 ' + file.name + '  ·  ' + fmtBytes(file.size) + '  ·  시트 ' + wb.SheetNames.length + '개'));
+        info.appendChild(pill);
+        osLog('재고장 선택: ' + file.name);
+        osUpdateButtons();
+      }).catch(function(err){
+        banner(document.getElementById('osStockInfo'), 'err', '재고장을 읽을 수 없습니다', String(err.message||err));
+      });
+    });
+
+    document.getElementById('osTransform').addEventListener('click', function(){
+      if(!osOrderAoa) return;
+      try{
+        var transformed = osTransformOrderAoa(osOrderAoa);
+        var wb = XLSX.utils.book_new();
+        var ws = XLSX.utils.aoa_to_sheet(transformed);
+        XLSX.utils.book_append_sheet(wb, ws, osOrderWorkbook.SheetNames[0]);
+        var fname = osBaseName(osOrderFileName) + '_변환완료_' + timestamp() + '.xlsx';
+        var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+        downloadBlob(new Blob([wbout], {type:'application/octet-stream'}), fname);
+        osLog('주문서 변환 완료: ' + fname);
+      }catch(err){
+        osLog('[오류] 주문서 변환 실패: ' + (err.message||err));
+        banner(document.getElementById('osStatus'), 'err', '주문서 변환 실패', String(err.message||err));
+      }
+    });
+
+    document.getElementById('osMatch').addEventListener('click', function(){
+      if(!osOrderAoa || !osStockWorkbook) return;
+      var statusEl = document.getElementById('osStatus');
+      statusEl.innerHTML = '';
+      document.getElementById('osMatch').disabled = true;
+      try{
+        osLog('재고장 인덱스 생성 시작...');
+        var stockMap = osLoadStockMap(osStockWorkbook, osLog);
+        osLog('재고장 인덱스 생성 완료: ' + Object.keys(stockMap).length + '개 코드');
+        var out = osMatchOrderWithStock(osOrderAoa, stockMap, osLog);
+        osMatchOutput = out;
+        osLog('매칭 완료: 결과 ' + (out.result.length-1) + '행 · 매칭맞음 ' + (out.matched.length-1) + '행 · 매칭없음 ' + (out.unmatched.length-1) + '행');
+        renderOsResult(out);
+        banner(statusEl, 'ok', '매칭 완료', (out.result.length-1) + '개 품목 중 ' + (out.matched.length-1) + '개 매칭됨');
+      }catch(err){
+        osLog('[오류] 매칭 실패: ' + (err.message||err));
+        banner(statusEl, 'err', '매칭 실패', String(err.message||err));
+      }finally{
+        document.getElementById('osMatch').disabled = false;
+      }
+    });
+
+    function renderOsResult(out){
+      var panel = document.getElementById('osResultPanel');
+      panel.style.display = 'block';
+      var total = out.result.length-1, matchedN = out.matched.length-1, unmatchedN = out.unmatched.length-1;
+      var stats = document.getElementById('osStats'); stats.innerHTML = '';
+      function stat(n,l){ var s=el('div',{class:'stat'}); s.appendChild(el('div',{class:'n tabular'},[document.createTextNode(n)])); s.appendChild(el('div',{class:'l'},[document.createTextNode(l)])); return s; }
+      stats.appendChild(stat(String(total), '총 주문 건수'));
+      stats.appendChild(stat(String(matchedN), '매칭맞음'));
+      stats.appendChild(stat(String(unmatchedN), '매칭없음'));
+
+      var table = document.getElementById('osTable');
+      table.innerHTML = '';
+      var header = out.header;
+      var thead = el('thead'); var htr = el('tr');
+      header.forEach(function(h){ htr.appendChild(el('th', null, [document.createTextNode(h===null||h===undefined?'':String(h))])); });
+      thead.appendChild(htr); table.appendChild(thead);
+      var tbody = el('tbody');
+      var showLimit = 1000;
+      var matchColIdx = header.length - 3; // 매칭결과 column
+      out.result.slice(1, 1+showLimit).forEach(function(row){
+        var tr = el('tr');
+        header.forEach(function(_, c){
+          var v = row[c];
+          tr.appendChild(el('td', null, [document.createTextNode(v===null||v===undefined?'':String(v))]));
+        });
+        if(row[matchColIdx] === '매칭없음') tr.style.background = 'var(--danger-soft)';
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      if(total > showLimit){
+        var note = el('div', {style:'padding:8px 12px;color:var(--ink-muted);font-size:12px;'});
+        note.textContent = '미리보기는 ' + showLimit.toLocaleString('ko-KR') + '행까지만 표시됩니다. 전체 ' + total.toLocaleString('ko-KR') + '행은 다운로드 파일에 모두 포함됩니다.';
+        table.parentNode.parentNode.insertBefore(note, table.parentNode.nextSibling);
+      }
+    }
+
+    document.getElementById('osDownloadMatch').addEventListener('click', function(){
+      if(!osMatchOutput) return;
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(osMatchOutput.result), '결과');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(osMatchOutput.matched), '매칭맞음');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(osMatchOutput.unmatched), '매칭없음');
+      var fname = osBaseName(osOrderFileName) + '_재고매칭완료_' + timestamp() + '.xlsx';
+      var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+      downloadBlob(new Blob([wbout], {type:'application/octet-stream'}), fname);
+      osLog('매칭 결과 다운로드: ' + fname);
     });
   })();
 
