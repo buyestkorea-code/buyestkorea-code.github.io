@@ -2316,6 +2316,28 @@ else if (typeof exports === 'object')
       });
     }
 
+    function withTimeout(promise, ms, label){
+      return new Promise(function(resolve, reject){
+        var done = false;
+        var timer = setTimeout(function(){
+          if(done) return;
+          done = true;
+          reject(new Error(label + '_TIMEOUT'));
+        }, ms);
+        promise.then(function(v){
+          if(done) return;
+          done = true;
+          clearTimeout(timer);
+          resolve(v);
+        }, function(err){
+          if(done) return;
+          done = true;
+          clearTimeout(timer);
+          reject(err);
+        });
+      });
+    }
+
     async function extractPdfPagesLines(file, ocrNeeded, progressCb){
       var buf = await file.arrayBuffer();
       // pdfjsLib.getDocument({data:buf})는 buf를 워커로 넘기면서 detach시키므로,
@@ -2323,7 +2345,7 @@ else if (typeof exports === 'object')
       var isSlowFormat = ocrNeeded ? looksLikeSlowScanFormat(buf) : false;
       var pdfDoc = await pdfjsLib.getDocument({data:buf}).promise;
       var pagesLines = [];
-      var timedOutPages = [];
+      var timedOutPages = []; // {page, reason}
       if(ocrNeeded){
         var worker = await getOcrWorker();
         for(var p=1; p<=pdfDoc.numPages; p++){
@@ -2345,10 +2367,12 @@ else if (typeof exports === 'object')
           var ctx = canvas.getContext('2d');
           try{
             await renderPageWithTimeout(page, viewport, ctx, OCR_PAGE_TIMEOUT_MS);
-            var res = await worker.recognize(canvas);
+            // recognize()는 그동안 자체 시간제한이 없어서 여기서 멈추면 페이지가 통째로
+            // 무한정 걸릴 수 있었다. render와 동일한 상한을 씌운다.
+            var res = await withTimeout(worker.recognize(canvas), OCR_PAGE_TIMEOUT_MS, 'RECOGNIZE');
             pagesLines.push(res.data.text.split('\n'));
           }catch(err){
-            timedOutPages.push(p);
+            timedOutPages.push({page:p, reason: String(err && err.message || err)});
             pagesLines.push([]);
           }
         }
@@ -2389,7 +2413,8 @@ else if (typeof exports === 'object')
       else items = parseGruppoKim(pagesLines);
       var stem2 = file.name.replace(/\.[^.]+$/, '');
       if(extracted.timedOutPages.length){
-        invcSkipped.push(file.name + ' — ' + extracted.timedOutPages.join(', ') + '페이지는 처리 시간이 너무 오래 걸려 건너뛰었습니다 (스캔 압축 방식 문제, 해당 페이지 품목은 빠질 수 있습니다)');
+        var pageDetails = extracted.timedOutPages.map(function(t){ return t.page + '페이지(' + t.reason + ')'; }).join(', ');
+        invcSkipped.push(file.name + ' — ' + pageDetails + ' 처리 중 실패해 건너뛰었습니다 (해당 페이지 품목은 빠질 수 있습니다)');
       }
       return [{title: cfg.label + ' ' + stem2, items:items, vendor:vendorKey, source:file.name}];
     }
