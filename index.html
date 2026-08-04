@@ -2423,7 +2423,7 @@ else if (typeof exports === 'object')
         var allLines = [];
         pagesLines.forEach(function(pl){ pl.forEach(function(l){ if(l.trim()) allLines.push(l.trim()); }); });
         var joined = allLines.join(' / ');
-        ocrSample = allLines.length ? (joined.length > 400 ? joined.slice(0,400) + '...' : joined) : '(추출된 텍스트가 전혀 없음 - 빈 페이지로 인식됨)';
+        ocrSample = allLines.length ? (joined.length > 4000 ? joined.slice(0,4000) + '...' : joined) : '(추출된 텍스트가 전혀 없음 - 빈 페이지로 인식됨)';
       }
       return [{title: cfg.label + ' ' + stem2, items:items, vendor:vendorKey, source:file.name, ocrSample:ocrSample}];
     }
