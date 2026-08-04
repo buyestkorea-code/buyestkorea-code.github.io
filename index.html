@@ -660,7 +660,7 @@
             <h2>인보이스 자동인식</h2>
             <p class="sub">파일명으로 거래처(갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일)를 자동 인식해 품목을 추출합니다. 스캔본 PDF(갈리아노·다니엘·스타일)는 브라우저 안에서 OCR로 텍스트를 읽습니다.</p>
             <div class="status-banner status-warn" style="margin-bottom:16px;">
-              <div><strong>스캔본(OCR) 문서는 페이지당 1~5분 이상 걸릴 수 있습니다.</strong> 스캔 방식에 따라 이미지를 해독하는 단계 자체가 원래 무겁습니다 — 진행 표시줄이 같은 페이지에 멈춰 있어도 멈춘 게 아니니 창을 닫지 말고 기다려주세요. 텍스트가 PDF에 이미 있는 베네레·비니·쿠미니·그루포킴은 몇 초 안에 끝납니다.</div>
+              <div><strong>스캔본(OCR) 문서는 페이지당 1~5분 이상 걸릴 수 있습니다.</strong> 스캔 방식에 따라 이미지를 해독하는 단계 자체가 원래 무겁습니다 — 진행 표시줄이 같은 페이지에 멈춰 있어도 멈춘 게 아니니 창을 닫지 말고 기다려주세요. 텍스트가 PDF에 이미 있는 베네레·비니·쿠미니·그루포킴은 몇 초 안에 끝납니다.<br><strong>인식 중에는 이 탭을 다른 탭으로 전환하거나 최소화하지 마세요.</strong> 브라우저는 화면에 보이지 않는 탭의 처리 속도를 크게 늦추기 때문에, 창을 백그라운드에 두면 시간이 훨씬 오래 걸리거나 시간 초과로 품목을 놓칠 수 있습니다.</div>
             </div>
 
             <div class="dropzone" id="invcDrop" tabindex="0" role="button" aria-label="인보이스 파일 선택">
@@ -2330,12 +2330,13 @@ else if (typeof exports === 'object')
           if(progressCb) progressCb(p, pdfDoc.numPages, isSlowFormat);
           var page = await pdfDoc.getPage(p);
           var baseViewport = page.getViewport({scale: 300/72});
-          // A4/Letter at true 300dpi (matching the original desktop tool's OCR resolution)
-          // is ~2480-3510px on the long side. The previous 2000px cap silently downscaled
-          // every normal invoice page to ~170-200dpi before OCR, which is a real source of
-          // missed/misread characters on small table text. Raised so standard pages OCR at
-          // the intended full 300dpi; still capped to guard against pathological page sizes.
-          var OCR_MAX_DIM = 3600;
+          // NOTE: this was briefly raised to 3600 (to stop silently downscaling normal
+          // A4/Letter pages below the original tool's 300dpi) but that made rendering some
+          // real scanned invoices dramatically slower - slow enough to blow through the
+          // per-page timeout and return zero items instead of just being lower quality.
+          // Reverted to the known-safe value; revisit with a smarter cap (e.g. based on
+          // measured render time) rather than raising this blindly again.
+          var OCR_MAX_DIM = 2000;
           var longSide = Math.max(baseViewport.width, baseViewport.height);
           var scaleFactor = (300/72) * Math.min(1, OCR_MAX_DIM / longSide);
           var viewport = page.getViewport({scale: scaleFactor});
