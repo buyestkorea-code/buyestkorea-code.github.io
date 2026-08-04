@@ -2416,7 +2416,16 @@ else if (typeof exports === 'object')
         var pageDetails = extracted.timedOutPages.map(function(t){ return t.page + '페이지(' + t.reason + ')'; }).join(', ');
         invcSkipped.push(file.name + ' — ' + pageDetails + ' 처리 중 실패해 건너뛰었습니다 (해당 페이지 품목은 빠질 수 있습니다)');
       }
-      return [{title: cfg.label + ' ' + stem2, items:items, vendor:vendorKey, source:file.name}];
+      var ocrSample = null;
+      if(cfg.ocr && (!items || items.length === 0)){
+        // 품목이 0개일 때 원인 파악용: 실제로 OCR이 어떤 텍스트를 읽어냈는지 그대로 보여준다
+        // (완전히 빈 화면을 읽었는지, 글자는 읽었는데 정규식과 안 맞는 형식인지 구분하기 위함).
+        var allLines = [];
+        pagesLines.forEach(function(pl){ pl.forEach(function(l){ if(l.trim()) allLines.push(l.trim()); }); });
+        var joined = allLines.join(' / ');
+        ocrSample = allLines.length ? (joined.length > 400 ? joined.slice(0,400) + '...' : joined) : '(추출된 텍스트가 전혀 없음 - 빈 페이지로 인식됨)';
+      }
+      return [{title: cfg.label + ' ' + stem2, items:items, vendor:vendorKey, source:file.name, ocrSample:ocrSample}];
     }
 
     document.getElementById('invcRun').addEventListener('click', async function(){
@@ -2436,7 +2445,11 @@ else if (typeof exports === 'object')
         for(var i=0;i<toProcess.length;i++){
           var groups = await processOne(toProcess[i], i, toProcess.length);
           groups.forEach(function(g){
-            if(!g.items || g.items.length === 0){ invcSkipped.push(g.source + ' (' + g.title + ') - 품목을 추출하지 못함'); }
+            if(!g.items || g.items.length === 0){
+              var msg = g.source + ' (' + g.title + ') - 품목을 추출하지 못함';
+              if(g.ocrSample) msg += ' | 인식된 텍스트: ' + g.ocrSample;
+              invcSkipped.push(msg);
+            }
             else allResults.push(g);
           });
         }
