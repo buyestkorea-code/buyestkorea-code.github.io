@@ -2008,15 +2008,27 @@ else if (typeof exports === 'object')
       return items;
     }
 
-    var STYLE_PAT = /^(\S+)\s+(.+?)\s*\(MADE IN ([A-Z]+)\)[^\d]{0,10}(\d[\d,]*)\s+([\d,.]+)\s+([\d,.]+)\s*$/;
+    // 국가명은 UNITED KINGDOM처럼 두 단어일 수 있어 공백 포함 허용.
+    // MADE IN 이후: 수량/단가 사이에 OCR 잡음(스캔 표 경계선 등으로 생긴 떠있는 "." 같은 글자)이
+    // 낄 수 있다고 보고 건너뛰되, 반드시 공백으로 시작하게 해서 "148.28"(수량 없이 단가만 있는 줄)의
+    // 소수점을 수량/단가 경계로 잘못 쪼개는 일이 없게 한다. 금액(합계)란은 실제로 쓰지 않는 값이라
+    // "$", 줄끝에 붙는 "|" 등 OCR 잡음이 있어도 줄 전체 매칭이 깨지지 않도록 뒤는 검증하지 않는다.
+    // 수량 뒤에 (?!\.\d)를 둬서, "258.62"처럼 수량 없이 단가만 있는 줄에서 그 정수부(258)를
+    // 수량으로 잘못 집어먹는 일을 막는다 (수량이 정말 없으면 STYLE_PAT_NOQTY로 넘어간다).
+    var STYLE_PAT = /^(\S+)\s+(.+?)\s*\(MADE IN ([A-Z]+(?:\s[A-Z]+)*)\)[^\d]{0,10}(\d[\d,]*)(?!\.\d)\s[^\d]{0,9}([\d,.]+)\b.*$/;
+    // 수량 칸이 OCR에서 통째로 빠져 단가/금액 두 숫자만 남는 줄에 대한 예비 패턴.
+    // 금액을 단가로 나눠 수량을 역산한다 (parseStyle에서 나눗셈이 정수에 가까울 때만 사용).
+    var STYLE_PAT_NOQTY = /^(\S+)\s+(.+?)\s*\(MADE IN ([A-Z]+(?:\s[A-Z]+)*)\)[^\d]{0,10}([\d,.]+)\s+([\d,.]+)\s*$/;
     var STYLE_CATEGORY_WORDS = [
-      'SCIARPA','FOULARD','GIUBBOTTO','GIACCA','CAPPOTTO','GONNA','PANTALONE','PANTALONI','VESTITO','ABITO',
-      'CAPPELLO','GUANTI','STIVALI','SCARPE','SANDALI','CALZE','CALZINI','MAGLIA','MAGLIONE','CAMICIA','CAMICETTA',
-      'FELPA','GILET','BORSA','ZAINO','CINTURA','COSTUME','TUTA','PARKA','TRENCH','BERMUDA','CANOTTA','PIGIAMA',
-      'ACCAPPATOIO','PORTAFOGLIO',
-      'SCARF','JACKET','COAT','SKIRT','PANTS','TROUSERS','DRESS','HAT','GLOVES','BOOTS','SHOES','SANDALS','SOCKS',
-      'SWEATER','SHIRT','BLOUSE','HOODIE','VEST','BAG','BACKPACK','BELT','SWIMSUIT','JUMPSUIT','SHORTS','TANK',
-      'TOP','PAJAMA','ROBE','WALLET','POUCH','SNEAKERS','LOAFERS','TSHIRT'
+      'SCIARPA','SCIARPE','FOULARD','GIUBBOTTO','GIUBBOTTI','GIUBBINI','GIACCA','GIACCHE','CAPPOTTO','CAPPOTTI',
+      'GONNA','GONNE','PANTALONE','PANTALONI','VESTITO','ABITO','CAPPELLO','CAPPELLI','GUANTI','STIVALI','SCARPE',
+      'SANDALI','CALZE','CALZINI','MAGLIA','MAGLIONE','MAGLIONI','CAMICIA','CAMICIE','CAMICETTA','STOLA','STOLE',
+      'FELPA','FELPE','GILET','BORSA','BORSE','ZAINO','ZAINI','CINTURA','CINTURE','COSTUME','TUTA','PARKA','TRENCH',
+      'BERMUDA','CANOTTA','PIGIAMA','ACCAPPATOIO','PORTAFOGLIO','PORTAFOGLI',
+      'SCARF','SCARVES','JACKET','JACKETS','COAT','COATS','SKIRT','SKIRTS','PANTS','TROUSERS','DRESS','DRESSES',
+      'HAT','HATS','GLOVES','BOOTS','SHOES','SANDALS','SOCKS','SWEATER','SWEATERS','SHIRT','SHIRTS','BLOUSE',
+      'HOODIE','VEST','BAG','BAGS','BACKPACK','BELT','BELTS','SWIMSUIT','JUMPSUIT','SHORTS','TANK','TOP','PAJAMA',
+      'ROBE','WALLET','WALLETS','POUCH','SNEAKERS','LOAFERS','TSHIRT'
     ];
     function styleFindCategorySplit(desc){
       var tokens = desc.split(/\s+/).filter(Boolean);
@@ -2030,12 +2042,27 @@ else if (typeof exports === 'object')
       var items = [];
       pagesLines.forEach(function(lines){
         lines.forEach(function(line){
-          var m = STYLE_PAT.exec(cleanStyleLine(line.trim()));
+          var cleaned = cleanStyleLine(line.trim());
+          var m = STYLE_PAT.exec(cleaned);
           if(m){
             var desc = m[2].trim();
             var colourPrefix = styleFindCategorySplit(desc);
             var model = m[1].trim() + (colourPrefix ? ' ' + colourPrefix : '');
             items.push({model:model, name:desc, qty:parseInt(m[4].replace(/,/g,''),10), unitPrice:numUs(m[5]), note:m[3], brand:''});
+            return;
+          }
+          var m2 = STYLE_PAT_NOQTY.exec(cleaned);
+          if(m2){
+            var price2 = numUs(m2[4]), amount2 = numUs(m2[5]);
+            if(price2 > 0){
+              var qtyGuess = Math.round(amount2/price2);
+              if(qtyGuess > 0 && Math.abs(qtyGuess*price2 - amount2) < 0.5){
+                var desc2 = m2[2].trim();
+                var colourPrefix2 = styleFindCategorySplit(desc2);
+                var model2 = m2[1].trim() + (colourPrefix2 ? ' ' + colourPrefix2 : '');
+                items.push({model:model2, name:desc2, qty:qtyGuess, unitPrice:price2, note:m2[3], brand:''});
+              }
+            }
           }
         });
       });
