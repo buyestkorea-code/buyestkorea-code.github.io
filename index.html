@@ -2071,17 +2071,20 @@ else if (typeof exports === 'object')
           if(!line){ i++; continue; }
           var item = styleTryMatch(cleanStyleLine(line));
           if(item){ items.push(item); i++; continue; }
-          // 표를 스캔한 OCR은 긴 상품명이 있는 줄을 물리적으로 두 줄로 잘라버리는 경우가
-          // 흔하다 (예: "...(MADE IN CHINA)" 까지 한 줄, 수량/단가/금액이 다음 줄로).
-          // 한 줄로 안 되면 바로 다음 줄과 합쳐서 한 번 더 시도한다.
-          if(i+1 < lines.length){
-            var nextLine = lines[i+1].trim();
-            if(nextLine){
-              var combined = cleanStyleLine(line + ' ' + nextLine);
-              var item2 = styleTryMatch(combined);
-              if(item2){ items.push(item2); i += 2; continue; }
-            }
+          // 표를 스캔한 OCR은 긴 상품명이 있는 줄을 물리적으로 여러 줄로 잘라버리는 경우가
+          // 흔하다 (예: "...(MADE IN CHINA)" 까지 한 줄, 수량/단가/금액이 다음 줄, 또는
+          // 그마저 더 잘게 쪼개지는 경우). 한 줄로 안 되면 뒤따르는 줄을 1~3개까지
+          // 순서대로 이어붙여가며 다시 시도한다.
+          var found = false;
+          var acc = line;
+          for(var joinCount=1; joinCount<=3 && i+joinCount<lines.length; joinCount++){
+            var nextLine = lines[i+joinCount].trim();
+            if(!nextLine) continue;
+            acc = acc + ' ' + nextLine;
+            var itemJoined = styleTryMatch(cleanStyleLine(acc));
+            if(itemJoined){ items.push(itemJoined); i += joinCount + 1; found = true; break; }
           }
+          if(found) continue;
           i++;
         }
       });
@@ -2441,7 +2444,9 @@ else if (typeof exports === 'object')
         // (완전히 빈 화면을 읽었는지, 글자는 읽었는데 정규식과 안 맞는 형식인지 구분하기 위함).
         var allLines = [];
         pagesLines.forEach(function(pl){ pl.forEach(function(l){ if(l.trim()) allLines.push(l.trim()); }); });
-        var joined = allLines.join(' / ');
+        // 줄 경계를 " / "처럼 애매한 문자 대신 명확한 표시로 구분해서, 실제 OCR이 어디서
+        // 줄을 끊었는지(단어 중간에 줄바꿈이 생기는지) 그대로 보이게 한다.
+        var joined = allLines.join('⏎');
         ocrSample = allLines.length ? (joined.length > 4000 ? joined.slice(0,4000) + '...' : joined) : '(추출된 텍스트가 전혀 없음 - 빈 페이지로 인식됨)';
       }
       return [{title: cfg.label + ' ' + stem2, items:items, vendor:vendorKey, source:file.name, ocrSample:ocrSample}];
