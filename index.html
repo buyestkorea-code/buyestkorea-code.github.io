@@ -371,6 +371,7 @@
       <span class="nav-group-label">재고 · 발주</span>
       <button class="nav-item" data-nav="inventory"><span class="ic">&#8942;</span>재고 세로변환<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="sabangEcount"><span class="ic">&#8942;</span>사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span></button>
+      <button class="nav-item" data-nav="stockMove"><span class="ic">&#8942;</span>사방넷 재고변동매칭 (MD팀)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stocktake"><span class="ic">&#8942;</span>재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="orderStock"><span class="ic">&#8942;</span>사방넷 주문서-재고 매칭<span class="chip chip-ready">사용가능</span></button>
     </nav>
@@ -421,6 +422,11 @@
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>사방넷-이카운트 매칭</h3>
             <p>사방넷 상품대량수정 엑셀과 이카운트 품목등록 엑셀을 품번 기준으로 매칭해 브랜드·품번·옵션·원산지·판매가를 채워 넣습니다.</p>
+          </button>
+          <button class="tool-card" data-nav="stockMove">
+            <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
+            <h3>사방넷 재고변동매칭 (MD팀)</h3>
+            <p>이카운트 재고변동표의 잔량을 품목명·규격 기준으로 사방넷 단품대량수정 엑셀과 매칭해, 변동이 있는 품목만 가상재고를 갱신한 파일로 내려받습니다.</p>
           </button>
           <button class="tool-card" data-nav="invoice">
             <div class="tool-card-top"><div class="ic">&#8618;</div><span class="chip chip-ready">사용가능</span></div>
@@ -535,6 +541,48 @@
             <div class="table-scroll"><table class="data" id="seTable"></table></div>
             <div class="btn-row" style="margin-top:14px;">
               <button class="btn btn-primary" id="seDownload">이카운트 매칭완료 파일 다운로드</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SABANGNET STOCK-MOVEMENT MATCHING (MD팀) ============ -->
+      <section data-view="stockMove">
+        <div class="workspace">
+          <div class="panel">
+            <h2>사방넷 재고변동매칭 (MD팀)</h2>
+            <p class="sub">이카운트 재고변동표와 사방넷 단품대량수정 엑셀을 올리면, 품목명 끝의 모델코드와 규격을 기준으로 자동 매칭해 이카운트 잔량을 사방넷 가상재고(F열)에 반영합니다. 실제 값이 바뀌는 품목만 골라 다운로드 파일에 담기 때문에, 사방넷 전체업로드에 그대로 쓸 수 있습니다.</p>
+
+            <div class="dz-grid">
+              <div class="dropzone" id="rvmSabangDrop" tabindex="0" role="button" aria-label="사방넷 파일 선택">
+                <div class="ic">&#128193;</div>
+                <div><strong id="rvmSabangTitle">1. 사방넷단품대량수정 엑셀을 올려주세요</strong></div>
+                <div class="status-line" id="rvmSabangDetail" style="margin-top:4px;">클릭하거나 파일을 끌어다 놓으세요 (수만 행이면 읽는 데 10초 정도 걸릴 수 있습니다)</div>
+                <input type="file" id="rvmSabangFile" accept=".xlsx" />
+              </div>
+              <div class="dropzone" id="rvmEcountDrop" tabindex="0" role="button" aria-label="이카운트 재고변동표 선택">
+                <div class="ic">&#128193;</div>
+                <div><strong id="rvmEcountTitle">2. 이카운트 재고변동표 엑셀을 올려주세요</strong></div>
+                <div class="status-line" id="rvmEcountDetail" style="margin-top:4px;">클릭하거나 파일을 끌어다 놓으세요</div>
+                <input type="file" id="rvmEcountFile" accept=".xlsx" />
+              </div>
+            </div>
+
+            <div id="rvmStatusWrap" style="margin-top:12px;"><span class="status-line" id="rvmStatus"></span></div>
+
+            <div class="btn-row" style="margin-top:14px;">
+              <button class="btn btn-primary" id="rvmRun" disabled>매칭 실행</button>
+              <button class="btn" id="rvmReset">다른 파일 선택</button>
+            </div>
+          </div>
+
+          <div class="panel" id="rvmResultPanel" style="display:none;">
+            <h2>매칭 결과</h2>
+            <p class="sub">"반영예정"만 다운로드 파일에 포함됩니다. 규격 불일치·중복·상품 없음 항목은 표에서 확인 후 수동으로 처리해주세요.</p>
+            <div class="stat-row" id="rvmStats"></div>
+            <div class="table-scroll"><table class="data" id="rvmTable"></table></div>
+            <div class="btn-row" style="margin-top:14px;">
+              <button class="btn btn-primary" id="rvmDownload">변동분만 다운로드</button>
             </div>
           </div>
         </div>
@@ -1093,7 +1141,8 @@ else if (typeof exports === 'object')
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', sabangEcount:'사방넷-이카운트 매칭',
-    stocktake:'재고조사 (바코드 실사)', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
+    stockMove:'사방넷 재고변동매칭 (MD팀)', stocktake:'재고조사 (바코드 실사)',
+    orderStock:'사방넷 주문서-재고 매칭', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
   };
 
   function closeDrawer(){
@@ -3143,6 +3192,325 @@ else if (typeof exports === 'object')
       }, 20);
     });
     document.getElementById("seReset").addEventListener("click", seReset);
+  })();
+
+  /* =========================================================
+     TOOL 6: 사방넷 재고변동매칭 (MD팀)
+     이카운트 재고변동표의 잔량을 사방넷 단품대량수정 엑셀의 가상재고(F열)에 반영한다.
+     매칭 기준: 이카운트 품목명 끝부분(모델코드)과 사방넷 상품명 끝부분이 얼마나 겹치는 토큰까지
+     일치하는지로 상품을 찾고(설명 앞부분 표기가 서로 달라도 끝의 모델코드는 같다는 점을 이용),
+     그 후보 안에서 이카운트 규격 = 사방넷 옵션상세명칭(공백=TU)으로 정확한 옵션(사이즈) 행을 고른다.
+     ========================================================= */
+  (function(){
+    var state = { sabangAoa:null, sabangFileName:'', sabangHeaderIdx:-1, sabangDataStart:-1, sabangCol:{}, ecount:null, results:null, stats:null };
+
+    function rvmSetStatus(msg, isErr){
+      var s = document.getElementById('rvmStatus');
+      s.textContent = msg || '';
+      s.classList.toggle('err', !!isErr);
+    }
+    function rvmMarkDropzone(which, filename, detail, ok){
+      var prefix = which === 'sabang' ? 'rvmSabang' : 'rvmEcount';
+      document.getElementById(prefix + 'Drop').classList.toggle('has-file', !!ok);
+      document.getElementById(prefix + 'Title').textContent = filename;
+      var d = document.getElementById(prefix + 'Detail');
+      d.textContent = detail;
+      d.classList.toggle('err', !ok);
+    }
+    function rvmUpdateRunButton(){
+      document.getElementById('rvmRun').disabled = !(state.sabangAoa && state.ecount);
+    }
+    function rvmFindHeaderRowIdx(aoa, matchFn){
+      for(var i=0;i<aoa.length;i++){ if(aoa[i] && matchFn(aoa[i])) return i; }
+      return -1;
+    }
+    function rvmHeaderColMap(headerRow){
+      var col = {};
+      headerRow.forEach(function(v,i){
+        if(v === null || v === undefined) return;
+        var key = String(v).split('\n')[0].trim();
+        if(key && !(key in col)) col[key] = i;
+      });
+      return col;
+    }
+
+    async function handleRvmSabangFile(file){
+      rvmSetStatus('사방넷 파일 읽는 중… (품목 수가 많으면 10초 정도 걸릴 수 있습니다)');
+      try{
+        var buf = await file.arrayBuffer();
+        var wb = XLSX.read(buf, {type:'array'});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        var hIdx = rvmFindHeaderRowIdx(aoa, function(r){ return r[0] && String(r[0]).indexOf('사방넷상품코드') !== -1; });
+        if(hIdx === -1) throw new Error('헤더 행("사방넷상품코드")을 찾을 수 없습니다.');
+        var col = rvmHeaderColMap(aoa[hIdx]);
+        ['상품명','옵션상세명칭','가상재고'].forEach(function(need){
+          if(!(need in col)) throw new Error('"' + need + '" 열을 찾을 수 없습니다.');
+        });
+        var dataStart = -1;
+        for(var r = hIdx+1; r < aoa.length; r++){
+          var v0 = aoa[r] && aoa[r][col['사방넷상품코드']];
+          if(v0 && /^\d+-\d+$/.test(String(v0).trim())){ dataStart = r; break; }
+        }
+        if(dataStart === -1) throw new Error('상품 데이터 행을 찾을 수 없습니다.');
+
+        state.sabangAoa = aoa;
+        state.sabangFileName = file.name;
+        state.sabangHeaderIdx = hIdx;
+        state.sabangDataStart = dataStart;
+        state.sabangCol = col;
+        rvmMarkDropzone('sabang', file.name, '상품 행 ' + (aoa.length - dataStart).toLocaleString('ko-KR') + '개 인식', true);
+      }catch(e){
+        state.sabangAoa = null;
+        rvmMarkDropzone('sabang', file.name, '읽기 실패: ' + (e.message||e), false);
+      }
+      rvmUpdateRunButton();
+      rvmSetStatus('');
+    }
+
+    async function handleRvmEcountFile(file){
+      rvmSetStatus('이카운트 파일 읽는 중…');
+      try{
+        var buf = await file.arrayBuffer();
+        var wb = XLSX.read(buf, {type:'array'});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        var hIdx = rvmFindHeaderRowIdx(aoa, function(r){ return r[0] === '품목코드'; });
+        if(hIdx === -1) throw new Error('헤더 행("품목코드")을 찾을 수 없습니다.');
+        var col = rvmHeaderColMap(aoa[hIdx]);
+        ['품목코드','품목명','규격','잔량'].forEach(function(need){
+          if(!(need in col)) throw new Error('"' + need + '" 열을 찾을 수 없습니다.');
+        });
+        var items = [];
+        for(var r = hIdx+1; r < aoa.length; r++){
+          var row = aoa[r];
+          var code = row && row[col['품목코드']];
+          if(!code || !/^\d+$/.test(String(code).trim())) continue;
+          items.push({
+            code: String(code).trim(),
+            name: String(row[col['품목명']]||'').trim(),
+            spec: row[col['규격']]==null ? '' : String(row[col['규격']]).trim(),
+            remain: row[col['잔량']]==null ? 0 : (Number(row[col['잔량']]) || 0)
+          });
+        }
+        if(items.length === 0) throw new Error('인식된 품목이 없습니다.');
+        state.ecount = { items: items };
+        rvmMarkDropzone('ecount', file.name, '품목 ' + items.length + '행 인식', true);
+      }catch(e){
+        state.ecount = null;
+        rvmMarkDropzone('ecount', file.name, '읽기 실패: ' + (e.message||e), false);
+      }
+      rvmUpdateRunButton();
+      rvmSetStatus('');
+    }
+
+    function rvmSpecsMatch(ecSpec, sbSpec){
+      var e = (ecSpec||'').trim().toUpperCase();
+      var s = (sbSpec===null||sbSpec===undefined ? '' : String(sbSpec)).trim().toUpperCase();
+      if(e === s) return true;
+      if(e === 'TU' && s === '') return true;
+      return false;
+    }
+    function rvmCommonTrailingTokens(aToks, bToks){
+      var i=aToks.length-1, j=bToks.length-1, n=0;
+      while(i>=0 && j>=0 && aToks[i]===bToks[j]){ n++; i--; j--; }
+      return n;
+    }
+
+    function runRvmMatching(){
+      var aoa = state.sabangAoa, col = state.sabangCol, dataStart = state.sabangDataStart;
+      var nameGroups = {};
+      for(var r = dataStart; r < aoa.length; r++){
+        var row = aoa[r];
+        var code0 = row && row[col['사방넷상품코드']];
+        if(!code0 || !/^\d+-\d+$/.test(String(code0).trim())) continue;
+        var name = String(row[col['상품명']]||'').trim();
+        if(!name) continue;
+        if(!nameGroups[name]) nameGroups[name] = [];
+        nameGroups[name].push(r);
+      }
+      var lastTokenMap = {};
+      Object.keys(nameGroups).forEach(function(name){
+        var toks = name.split(/\s+/);
+        var last = toks[toks.length-1];
+        if(!lastTokenMap[last]) lastTokenMap[last] = [];
+        lastTokenMap[last].push(name);
+      });
+
+      var results = [];
+      var stats = {changed:0, noChange:0, specMismatch:0, ambiguous:0, notFound:0};
+      state.ecount.items.forEach(function(it){
+        var toks = it.name.split(/\s+/);
+        var last = toks[toks.length-1];
+        var candNames = lastTokenMap[last] || [];
+        if(candNames.length === 0){ stats.notFound++; results.push({item:it, status:'notFound'}); return; }
+        var best = [], bestLen = 0;
+        candNames.forEach(function(cn){
+          var n = rvmCommonTrailingTokens(toks, cn.split(/\s+/));
+          if(n > bestLen){ bestLen = n; best = [cn]; }
+          else if(n === bestLen && n > 0){ best.push(cn); }
+        });
+        if(bestLen === 0){ stats.notFound++; results.push({item:it, status:'notFound'}); return; }
+        if(best.length > 1){ stats.ambiguous++; results.push({item:it, status:'ambiguous', sbName:best.join(' / ')}); return; }
+        var rows = nameGroups[best[0]];
+        var specRows = rows.filter(function(ri){ return rvmSpecsMatch(it.spec, aoa[ri][col['옵션상세명칭']]); });
+        if(specRows.length === 0){ stats.specMismatch++; results.push({item:it, status:'specMismatch', sbName:best[0]}); return; }
+        if(specRows.length > 1){ stats.ambiguous++; results.push({item:it, status:'ambiguous', sbName:best[0]}); return; }
+        var ri = specRows[0];
+        var curStock = aoa[ri][col['가상재고']];
+        var curNum = curStock==null ? 0 : (Number(curStock) || 0);
+        if(curNum === it.remain){ stats.noChange++; results.push({item:it, status:'noChange', sbRowIdx:ri, sbName:best[0], curStock:curNum}); }
+        else { stats.changed++; results.push({item:it, status:'changed', sbRowIdx:ri, sbName:best[0], curStock:curNum, newStock:it.remain}); }
+      });
+
+      state.results = results;
+      state.stats = stats;
+      renderRvmResults(results, stats);
+    }
+
+    var RVM_STATUS_LABEL = {
+      changed: '반영예정', noChange: '변동없음', specMismatch: '규격 불일치', ambiguous: '중복(수동확인)', notFound: '상품 없음'
+    };
+    var RVM_STATUS_CHIP = {
+      changed: 'chip-matched', noChange: 'chip-soldout', specMismatch: 'chip-ambiguous', ambiguous: 'chip-ambiguous', notFound: 'chip-shortage'
+    };
+
+    function renderRvmResults(results, stats){
+      document.getElementById('rvmResultPanel').style.display = 'block';
+      var statsEl = document.getElementById('rvmStats');
+      statsEl.innerHTML = '';
+      function statCard(n, l, colorVar){
+        var s = el('div', {class:'stat'});
+        var nEl = el('div', {class:'n tabular'}, [document.createTextNode(n)]);
+        if(colorVar) nEl.style.color = colorVar;
+        s.appendChild(nEl);
+        s.appendChild(el('div', {class:'l'}, [document.createTextNode(l)]));
+        return s;
+      }
+      statsEl.appendChild(statCard(stats.changed.toLocaleString('ko-KR'), '반영예정 (가상재고 변경)', 'var(--success)'));
+      statsEl.appendChild(statCard(stats.noChange.toLocaleString('ko-KR'), '매칭됨 · 변동없음', 'var(--ink-muted)'));
+      statsEl.appendChild(statCard(stats.specMismatch.toLocaleString('ko-KR'), '규격 불일치', 'var(--warning)'));
+      statsEl.appendChild(statCard(stats.ambiguous.toLocaleString('ko-KR'), '중복(수동확인)', 'var(--warning)'));
+      statsEl.appendChild(statCard(stats.notFound.toLocaleString('ko-KR'), '사방넷에 상품 없음', 'var(--danger)'));
+
+      var table = document.getElementById('rvmTable');
+      table.innerHTML = '';
+      var cols = ['품목명','규격','상태','사방넷 상품명','기존 가상재고','신규 값(잔량)'];
+      var thead = el('thead');
+      var htr = el('tr');
+      cols.forEach(function(c){
+        var attrs = (c === '규격' || c === '기존 가상재고' || c === '신규 값(잔량)') ? {class:'num'} : null;
+        htr.appendChild(el('th', attrs, [document.createTextNode(c)]));
+      });
+      thead.appendChild(htr); table.appendChild(thead);
+
+      var tbody = el('tbody');
+      function td(v, num){ return el('td', num?{class:'num tabular'}:null, [document.createTextNode(v===null||v===undefined?'':String(v))]); }
+      // 반영예정을 맨 위로, 그다음 확인이 필요한 항목, 변동없음은 맨 아래로.
+      var order = {changed:0, ambiguous:1, specMismatch:2, notFound:3, noChange:4};
+      var sorted = results.slice().sort(function(a,b){ return order[a.status]-order[b.status]; });
+      sorted.forEach(function(r){
+        var tr = el('tr');
+        tr.appendChild(td(r.item.name));
+        tr.appendChild(td(r.item.spec, true));
+        var statusTd = el('td');
+        statusTd.appendChild(el('span', {class:'chip ' + RVM_STATUS_CHIP[r.status]}, [document.createTextNode(RVM_STATUS_LABEL[r.status])]));
+        tr.appendChild(statusTd);
+        tr.appendChild(td(r.sbName || ''));
+        tr.appendChild(td(r.curStock === undefined ? '' : r.curStock, true));
+        tr.appendChild(td(r.status === 'changed' ? r.newStock : (r.status === 'noChange' ? r.item.remain : ''), true));
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+    }
+
+    function buildRvmOutputAoa(){
+      var aoa = state.sabangAoa, col = state.sabangCol, dataStart = state.sabangDataStart;
+      var headRows = aoa.slice(0, dataStart);
+      var changedRows = state.results.filter(function(r){ return r.status === 'changed'; }).map(function(r){
+        var row = aoa[r.sbRowIdx].slice();
+        row[col['가상재고']] = r.newStock;
+        return row;
+      });
+      return headRows.concat(changedRows);
+    }
+    function buildRvmResultCsv(changed){
+      var aoa = [['품목명','규격','사방넷 상품명','기존 가상재고','신규 값(잔량)']];
+      changed.forEach(function(r){
+        aoa.push([r.item.name, r.item.spec, r.sbName, r.curStock, r.newStock]);
+      });
+      return aoaToCsv(aoa);
+    }
+    function downloadRvmResult(){
+      var changed = (state.results||[]).filter(function(r){ return r.status === 'changed'; });
+      if(changed.length === 0){ rvmSetStatus('반영할 변동 건이 없습니다.', true); return; }
+      try{
+        var outAoa = buildRvmOutputAoa();
+        var ws = XLSX.utils.aoa_to_sheet(outAoa);
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '사방넷단품대량수정');
+        var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+        var blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        deliverFile({
+          baseName: '사방넷_재고변동매칭완료_' + timestamp(),
+          xlsxBlob: blob,
+          csvText: buildRvmResultCsv(changed)
+        }, function(type, title, msg){
+          rvmSetStatus(title + (msg ? ' — ' + msg : ''), type === 'err');
+        });
+      }catch(e){
+        rvmSetStatus('다운로드 파일 생성 중 오류: ' + (e.message||e), true);
+      }
+    }
+
+    function rvmReset(){
+      state.sabangAoa = null; state.ecount = null; state.results = null; state.stats = null;
+      rvmMarkDropzone('sabang', '1. 사방넷단품대량수정 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요 (수만 행이면 읽는 데 10초 정도 걸릴 수 있습니다)', false);
+      document.getElementById('rvmSabangDrop').classList.remove('has-file');
+      rvmMarkDropzone('ecount', '2. 이카운트 재고변동표 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요', false);
+      document.getElementById('rvmEcountDrop').classList.remove('has-file');
+      document.getElementById('rvmSabangFile').value = '';
+      document.getElementById('rvmEcountFile').value = '';
+      document.getElementById('rvmResultPanel').style.display = 'none';
+      rvmSetStatus('');
+      rvmUpdateRunButton();
+    }
+
+    function wireDropzoneRVM(id, inputSelector, onFile){
+      var dz = document.getElementById(id);
+      var input = dz.querySelector(inputSelector);
+      dz.addEventListener('click', function(){ input.click(); });
+      dz.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); input.click(); } });
+      input.addEventListener('change', function(){ if(input.files[0]) onFile(input.files[0]); });
+      dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('drag'); });
+      dz.addEventListener('dragleave', function(){ dz.classList.remove('drag'); });
+      dz.addEventListener('drop', function(e){
+        e.preventDefault();
+        dz.classList.remove('drag');
+        if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+      });
+    }
+
+    wireDropzoneRVM('rvmSabangDrop', 'input[type="file"]', handleRvmSabangFile);
+    wireDropzoneRVM('rvmEcountDrop', 'input[type="file"]', handleRvmEcountFile);
+    document.getElementById('rvmRun').addEventListener('click', function(){
+      rvmSetStatus('매칭 실행 중…');
+      setTimeout(function(){
+        try{ runRvmMatching(); rvmSetStatus(''); }
+        catch(e){ rvmSetStatus('매칭 중 오류: ' + (e.message||e), true); }
+      }, 20);
+    });
+    document.getElementById('rvmDownload').addEventListener('click', function(){
+      var btn = document.getElementById('rvmDownload');
+      btn.disabled = true;
+      rvmSetStatus('다운로드 파일 만드는 중…');
+      setTimeout(function(){
+        downloadRvmResult();
+        btn.disabled = false;
+        if(!document.getElementById('rvmStatus').classList.contains('err')) rvmSetStatus('');
+      }, 20);
+    });
+    document.getElementById('rvmReset').addEventListener('click', rvmReset);
   })();
 
   /* =========================================================
