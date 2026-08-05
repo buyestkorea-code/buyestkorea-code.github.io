@@ -578,12 +578,14 @@
 
           <div class="panel" id="rvmResultPanel" style="display:none;">
             <h2>매칭 결과</h2>
-            <p class="sub">"반영예정"만 다운로드 파일에 포함됩니다. 규격 불일치·중복·상품 없음 항목은 표에서 확인 후 수동으로 처리해주세요.</p>
+            <p class="sub">"반영예정"만 다운로드 파일에 포함됩니다. 규격 불일치·중복·상품 없음 항목은 표에서 확인 후 수동으로 처리해주세요. "현재값 다운로드"는 같은 품목들의 반영 전(현재) 가상재고를 담아서, 전체업로드 후 문제가 생기면 되돌릴 때 쓸 수 있습니다.</p>
             <div class="stat-row" id="rvmStats"></div>
             <div class="table-scroll"><table class="data" id="rvmTable"></table></div>
             <div class="btn-row" style="margin-top:14px;">
-              <button class="btn btn-primary" id="rvmDownload">변동분만 다운로드</button>
+              <button class="btn btn-primary" id="rvmDownload">변동분만 다운로드 (신규 값)</button>
+              <button class="btn" id="rvmDownloadCurrent">현재값 다운로드 (반영 전, 백업용)</button>
             </div>
+            <div class="status-line" id="rvmDownloadStatus" style="margin-top:8px;"></div>
           </div>
         </div>
       </section>
@@ -3425,28 +3427,39 @@ else if (typeof exports === 'object')
       table.appendChild(tbody);
     }
 
-    function buildRvmOutputAoa(){
+    function rvmSetDownloadStatus(msg, isErr){
+      var s = document.getElementById('rvmDownloadStatus');
+      s.textContent = msg || '';
+      s.classList.toggle('err', !!isErr);
+    }
+    function rvmChangedRows(){
+      return (state.results||[]).filter(function(r){ return r.status === 'changed'; });
+    }
+    // valueKey: 'newStock'(반영예정 값) 또는 'curStock'(반영 전 현재 값, 백업용) 중 어느 쪽을
+    // 가상재고 칸에 넣을지 고른다. 두 다운로드 모두 같은 행(반영예정 6건 등)을 대상으로 하므로,
+    // "현재값" 파일을 그대로 재업로드하면 "변동분만" 업로드를 취소(롤백)할 수 있다.
+    function buildRvmOutputAoa(changed, valueKey){
       var aoa = state.sabangAoa, col = state.sabangCol, dataStart = state.sabangDataStart;
       var headRows = aoa.slice(0, dataStart);
-      var changedRows = state.results.filter(function(r){ return r.status === 'changed'; }).map(function(r){
+      var rows = changed.map(function(r){
         var row = aoa[r.sbRowIdx].slice();
-        row[col['가상재고']] = r.newStock;
+        row[col['가상재고']] = r[valueKey];
         return row;
       });
-      return headRows.concat(changedRows);
+      return headRows.concat(rows);
     }
-    function buildRvmResultCsv(changed){
-      var aoa = [['품목명','규격','사방넷 상품명','기존 가상재고','신규 값(잔량)']];
+    function buildRvmResultCsv(changed, valueKey, valueLabel){
+      var aoa = [['품목명','규격','사방넷 상품명', valueLabel]];
       changed.forEach(function(r){
-        aoa.push([r.item.name, r.item.spec, r.sbName, r.curStock, r.newStock]);
+        aoa.push([r.item.name, r.item.spec, r.sbName, r[valueKey]]);
       });
       return aoaToCsv(aoa);
     }
     function downloadRvmResult(){
-      var changed = (state.results||[]).filter(function(r){ return r.status === 'changed'; });
-      if(changed.length === 0){ rvmSetStatus('반영할 변동 건이 없습니다.', true); return; }
+      var changed = rvmChangedRows();
+      if(changed.length === 0){ rvmSetDownloadStatus('반영할 변동 건이 없습니다.', true); return; }
       try{
-        var outAoa = buildRvmOutputAoa();
+        var outAoa = buildRvmOutputAoa(changed, 'newStock');
         var ws = XLSX.utils.aoa_to_sheet(outAoa);
         var wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '사방넷단품대량수정');
@@ -3455,12 +3468,33 @@ else if (typeof exports === 'object')
         deliverFile({
           baseName: '사방넷_재고변동매칭완료_' + timestamp(),
           xlsxBlob: blob,
-          csvText: buildRvmResultCsv(changed)
+          csvText: buildRvmResultCsv(changed, 'newStock', '신규 값(잔량)')
         }, function(type, title, msg){
-          rvmSetStatus(title + (msg ? ' — ' + msg : ''), type === 'err');
+          rvmSetDownloadStatus(title + (msg ? ' — ' + msg : ''), type === 'err');
         });
       }catch(e){
-        rvmSetStatus('다운로드 파일 생성 중 오류: ' + (e.message||e), true);
+        rvmSetDownloadStatus('다운로드 파일 생성 중 오류: ' + (e.message||e), true);
+      }
+    }
+    function downloadRvmCurrentResult(){
+      var changed = rvmChangedRows();
+      if(changed.length === 0){ rvmSetDownloadStatus('반영 예정 건이 없어 백업할 항목이 없습니다.', true); return; }
+      try{
+        var outAoa = buildRvmOutputAoa(changed, 'curStock');
+        var ws = XLSX.utils.aoa_to_sheet(outAoa);
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '사방넷단품대량수정');
+        var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+        var blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        deliverFile({
+          baseName: '사방넷_재고변동매칭_반영전백업_' + timestamp(),
+          xlsxBlob: blob,
+          csvText: buildRvmResultCsv(changed, 'curStock', '현재(반영 전) 가상재고')
+        }, function(type, title, msg){
+          rvmSetDownloadStatus(title + (msg ? ' — ' + msg : ''), type === 'err');
+        });
+      }catch(e){
+        rvmSetDownloadStatus('다운로드 파일 생성 중 오류: ' + (e.message||e), true);
       }
     }
 
@@ -3474,6 +3508,7 @@ else if (typeof exports === 'object')
       document.getElementById('rvmEcountFile').value = '';
       document.getElementById('rvmResultPanel').style.display = 'none';
       rvmSetStatus('');
+      rvmSetDownloadStatus('');
       rvmUpdateRunButton();
     }
 
@@ -3504,11 +3539,19 @@ else if (typeof exports === 'object')
     document.getElementById('rvmDownload').addEventListener('click', function(){
       var btn = document.getElementById('rvmDownload');
       btn.disabled = true;
-      rvmSetStatus('다운로드 파일 만드는 중…');
+      rvmSetDownloadStatus('다운로드 파일 만드는 중…');
       setTimeout(function(){
         downloadRvmResult();
         btn.disabled = false;
-        if(!document.getElementById('rvmStatus').classList.contains('err')) rvmSetStatus('');
+      }, 20);
+    });
+    document.getElementById('rvmDownloadCurrent').addEventListener('click', function(){
+      var btn = document.getElementById('rvmDownloadCurrent');
+      btn.disabled = true;
+      rvmSetDownloadStatus('다운로드 파일 만드는 중…');
+      setTimeout(function(){
+        downloadRvmCurrentResult();
+        btn.disabled = false;
       }, 20);
     });
     document.getElementById('rvmReset').addEventListener('click', rvmReset);
