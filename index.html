@@ -624,6 +624,7 @@
                       <button class="btn btn-primary" id="stDownloadScan">최종 결과 다운로드</button>
                       <button class="btn" id="stNewBase">다른 기준 파일로 다시 시작</button>
                     </div>
+                    <div class="status-line" id="stDownloadStatus" style="margin-top:8px;"></div>
                   </div>
                   <div>
                     <label style="font-size:12.5px;font-weight:600;color:var(--ink-muted);">최근 스캔 기록</label>
@@ -4049,9 +4050,20 @@ else if (typeof exports === 'object')
       var wb = XLSX.utils.book_new();
       var ws = XLSX.utils.aoa_to_sheet(aoa);
       XLSX.utils.book_append_sheet(wb, ws, '재고조사결과');
-      var fname = '재고조사결과_' + (counter ? counter + '_' : '') + timestamp() + '.xlsx';
+      var baseName = '재고조사결과_' + (counter ? counter + '_' : '') + timestamp();
       var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-      downloadBlob(new Blob([wbout], {type:'application/octet-stream'}), fname);
+      var blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      var statusEl = document.getElementById('stDownloadStatus');
+      statusEl.textContent = '다운로드 파일 만드는 중…';
+      statusEl.classList.remove('err');
+      deliverFile({
+        baseName: baseName,
+        xlsxBlob: blob,
+        csvText: aoaToCsv(aoa)
+      }, function(type, title, msg){
+        statusEl.textContent = title + (msg ? ' — ' + msg : '');
+        statusEl.classList.toggle('err', type === 'err');
+      });
     });
   })();
 
@@ -4307,10 +4319,17 @@ else if (typeof exports === 'object')
         var wb = XLSX.utils.book_new();
         var ws = XLSX.utils.aoa_to_sheet(transformed);
         XLSX.utils.book_append_sheet(wb, ws, osOrderWorkbook.SheetNames[0]);
-        var fname = osBaseName(osOrderFileName) + '_변환완료_' + timestamp() + '.xlsx';
+        var baseName = osBaseName(osOrderFileName) + '_변환완료_' + timestamp();
         var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-        downloadBlob(new Blob([wbout], {type:'application/octet-stream'}), fname);
-        osLog('주문서 변환 완료: ' + fname);
+        var blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        deliverFile({
+          baseName: baseName,
+          xlsxBlob: blob,
+          csvText: aoaToCsv(transformed)
+        }, function(type, title, msg){
+          banner(document.getElementById('osStatus'), type, title, msg);
+        });
+        osLog('주문서 변환 완료: ' + baseName + '.xlsx');
       }catch(err){
         osLog('[오류] 주문서 변환 실패: ' + (err.message||err));
         banner(document.getElementById('osStatus'), 'err', '주문서 변환 실패', String(err.message||err));
@@ -4381,10 +4400,17 @@ else if (typeof exports === 'object')
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(osMatchOutput.result), '결과');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(osMatchOutput.matched), '매칭맞음');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(osMatchOutput.unmatched), '매칭없음');
-      var fname = osBaseName(osOrderFileName) + '_재고매칭완료_' + timestamp() + '.xlsx';
+      var baseName = osBaseName(osOrderFileName) + '_재고매칭완료_' + timestamp();
       var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-      downloadBlob(new Blob([wbout], {type:'application/octet-stream'}), fname);
-      osLog('매칭 결과 다운로드: ' + fname);
+      var blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      deliverFile({
+        baseName: baseName,
+        xlsxBlob: blob,
+        csvText: aoaToCsv(osMatchOutput.result)
+      }, function(type, title, msg){
+        banner(document.getElementById('osStatus'), type, title, msg);
+      });
+      osLog('매칭 결과 다운로드: ' + baseName + '.xlsx');
     });
   })();
 
