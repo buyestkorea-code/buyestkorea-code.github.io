@@ -374,7 +374,7 @@
       <button class="nav-item" data-nav="stockMove"><span class="ic">&#8942;</span>사방넷 재고변동매칭 (MD팀)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="icm"><span class="ic">&#8942;</span>이카운트 -송장 재고매칭 (CS)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stocktake"><span class="ic">&#8942;</span>재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="orderStock"><span class="ic">&#8942;</span>사방넷 주문서-재고 매칭<span class="chip chip-ready">사용가능</span></button>
+      <button class="nav-item" data-nav="orderStock"><span class="ic">&#8942;</span>주문서 창고위치찾기<span class="chip chip-ready">사용가능</span></button>
     </nav>
 
     <nav class="nav-group">
@@ -446,7 +446,7 @@
           </button>
           <button class="tool-card" data-nav="orderStock">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
-            <h3>사방넷 주문서-재고 매칭</h3>
+            <h3>주문서 창고위치찾기</h3>
             <p>사방넷 주문서의 상품명·쇼핑몰 표기를 정리하고, 상품코드·사이즈를 뽑아 현재 재고장과 매칭해 재고 위치를 찾아줍니다.</p>
           </button>
         </div>
@@ -709,7 +709,7 @@
       <section data-view="orderStock">
         <div class="workspace">
           <div class="panel">
-            <h2>사방넷 주문서 변환 + 재고 매칭</h2>
+            <h2>주문서 창고위치찾기</h2>
             <p class="sub">변환 규칙 — 상품명: [ ] 안의 내용 전체 삭제 · 쇼핑몰: ( ) 문자만 삭제 · 사이즈 없으면 TU · 비교코드: 상품코드_사이즈 · 재고장 품목명이 접두어_상품코드_사이즈 형태면 접두어는 비교에서 제외하고 재고위치에만 표시합니다.</p>
 
             <div class="dz-grid">
@@ -1194,7 +1194,7 @@ else if (typeof exports === 'object')
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', sabangEcount:'사방넷-이카운트 매칭',
     stockMove:'사방넷 재고변동매칭 (MD팀)', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
-    orderStock:'사방넷 주문서-재고 매칭', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
   };
 
   function closeDrawer(){
