@@ -371,7 +371,7 @@
       <span class="nav-group-label">재고 · 발주</span>
       <button class="nav-item" data-nav="inventory"><span class="ic">&#8942;</span>재고 세로변환<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="sabangEcount"><span class="ic">&#8942;</span>사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="stockMove"><span class="ic">&#8942;</span>사방넷 재고변동매칭 (MD팀)<span class="chip chip-ready">사용가능</span></button>
+      <button class="nav-item" data-nav="stockMove"><span class="ic">&#8942;</span>MD 품절<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="icm"><span class="ic">&#8942;</span>이카운트 -송장 재고매칭 (CS)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stocktake"><span class="ic">&#8942;</span>재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="orderStock"><span class="ic">&#8942;</span>주문서 창고위치찾기<span class="chip chip-ready">사용가능</span></button>
@@ -426,7 +426,7 @@
           </button>
           <button class="tool-card" data-nav="stockMove">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
-            <h3>사방넷 재고변동매칭 (MD팀)</h3>
+            <h3>MD 품절</h3>
             <p>이카운트 재고변동표의 잔량을 품목명·규격 기준으로 사방넷 단품대량수정 엑셀과 매칭해, 변동이 있는 품목만 가상재고를 갱신한 파일로 내려받습니다.</p>
           </button>
           <button class="tool-card" data-nav="icm">
@@ -556,7 +556,7 @@
       <section data-view="stockMove">
         <div class="workspace">
           <div class="panel">
-            <h2>사방넷 재고변동매칭 (MD팀)</h2>
+            <h2>MD 품절</h2>
             <p class="sub">이카운트 재고변동표와 사방넷 단품대량수정 엑셀을 올리면, 품목명 끝의 모델코드와 규격을 기준으로 자동 매칭해 이카운트 잔량을 사방넷 가상재고(F열)에 반영합니다. 실제 값이 바뀌는 품목만 골라 다운로드 파일에 담기 때문에, 사방넷 전체업로드에 그대로 쓸 수 있습니다.</p>
 
             <div class="dz-grid">
@@ -1193,7 +1193,7 @@ else if (typeof exports === 'object')
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', sabangEcount:'사방넷-이카운트 매칭',
-    stockMove:'사방넷 재고변동매칭 (MD팀)', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
+    stockMove:'MD 품절', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
     orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
   };
 
@@ -3287,7 +3287,7 @@ else if (typeof exports === 'object')
   })();
 
   /* =========================================================
-     TOOL 6: 사방넷 재고변동매칭 (MD팀)
+     TOOL 6: MD 품절
      이카운트 재고변동표의 잔량을 사방넷 단품대량수정 엑셀의 가상재고(F열)에 반영한다.
      매칭 기준: 이카운트 품목명 끝부분(모델코드)과 사방넷 상품명 끝부분이 얼마나 겹치는 토큰까지
      일치하는지로 상품을 찾고(설명 앞부분 표기가 서로 달라도 끝의 모델코드는 같다는 점을 이용),
