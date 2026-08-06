@@ -1210,7 +1210,12 @@ else if (typeof exports === 'object')
   });
   scrim.addEventListener('click', closeDrawer);
 
-  function showView(name, roadmapTarget){
+  var VALID_VIEWS = {};
+  document.querySelectorAll('[data-view]').forEach(function(el){ VALID_VIEWS[el.getAttribute('data-view')] = true; });
+
+  // pushHash=false는 뒤로/앞으로가기(hashchange)로 인한 호출임을 뜻한다 - 이때는 주소 해시를
+  // 다시 쓰지 않는다(그렇게 하면 새 기록이 또 쌓여 뒤로가기가 제자리에서 맴돈다).
+  function showView(name, roadmapTarget, pushHash){
     document.querySelectorAll('[data-view]').forEach(function(el){
       el.classList.toggle('active', el.getAttribute('data-view') === name);
     });
@@ -1230,6 +1235,10 @@ else if (typeof exports === 'object')
         }
       }, 60);
     }
+    if(pushHash !== false){
+      var newHash = name + (roadmapTarget ? ':' + roadmapTarget : '');
+      if(location.hash.slice(1) !== newHash) location.hash = newHash;
+    }
   }
 
   document.querySelectorAll('[data-nav]').forEach(function(el){
@@ -1237,6 +1246,24 @@ else if (typeof exports === 'object')
       showView(el.getAttribute('data-nav'), el.getAttribute('data-roadmap-target'));
     });
   });
+
+  // 화면 전환마다 주소 해시(#보기이름)를 남겨서, 브라우저 뒤로/앞으로가기가 이 페이지를
+  // 완전히 벗어나지 않고 방금 전에 보던 도구 화면으로 돌아가게 한다.
+  window.addEventListener('hashchange', function(){
+    var raw = location.hash.slice(1);
+    var parts = raw.split(':');
+    var name = parts[0] || 'dashboard';
+    var roadmapTarget = parts[1] || null;
+    if(VALID_VIEWS[name]) showView(name, roadmapTarget, false);
+  });
+  (function(){
+    var raw = location.hash.slice(1);
+    if(!raw) return;
+    var parts = raw.split(':');
+    var name = parts[0];
+    var roadmapTarget = parts[1] || null;
+    if(VALID_VIEWS[name] && name !== 'dashboard') showView(name, roadmapTarget, false);
+  })();
 
   /* ---------------- Shared helpers ---------------- */
   function el(tag, attrs, children){
