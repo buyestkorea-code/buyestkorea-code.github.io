@@ -372,6 +372,7 @@
       <button class="nav-item" data-nav="inventory"><span class="ic">&#8942;</span>재고 세로변환<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="sabangEcount"><span class="ic">&#8942;</span>사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stockMove"><span class="ic">&#8942;</span>사방넷 재고변동매칭 (MD팀)<span class="chip chip-ready">사용가능</span></button>
+      <button class="nav-item" data-nav="icm"><span class="ic">&#8942;</span>이카운트 -송장 재고매칭 (CS)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stocktake"><span class="ic">&#8942;</span>재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="orderStock"><span class="ic">&#8942;</span>사방넷 주문서-재고 매칭<span class="chip chip-ready">사용가능</span></button>
     </nav>
@@ -427,6 +428,11 @@
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>사방넷 재고변동매칭 (MD팀)</h3>
             <p>이카운트 재고변동표의 잔량을 품목명·규격 기준으로 사방넷 단품대량수정 엑셀과 매칭해, 변동이 있는 품목만 가상재고를 갱신한 파일로 내려받습니다.</p>
+          </button>
+          <button class="tool-card" data-nav="icm">
+            <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
+            <h3>이카운트 -송장 재고매칭 (CS)</h3>
+            <p>송장 엑셀의 상품명·사이즈를 이카운트 재고현황과 매칭해 이카운트 품목코드를 자동으로 채워 넣습니다. 서식은 그대로 유지됩니다.</p>
           </button>
           <button class="tool-card" data-nav="invoice">
             <div class="tool-card-top"><div class="ic">&#8618;</div><span class="chip chip-ready">사용가능</span></div>
@@ -586,6 +592,49 @@
               <button class="btn" id="rvmDownloadCurrent">현재값 다운로드 (반영 전, 백업용)</button>
             </div>
             <div class="status-line" id="rvmDownloadStatus" style="margin-top:8px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ECOUNT CODE MATCHING FOR INVOICE (CS) ============ -->
+      <section data-view="icm">
+        <div class="workspace">
+          <div class="panel">
+            <h2>이카운트 -송장 재고매칭 (CS)</h2>
+            <p class="sub">송장 엑셀과 이카운트 재고현황 엑셀을 올리면, J열 헤더가 "상품명"인 시트에서 상품명·사이즈를 이카운트 재고현황과 매칭해 J열 바로 오른쪽에 "이카운트품목코드" 열을 새로 만들어 채워 넣습니다. 그 외 시트나 서식은 그대로 유지됩니다. 매칭 실패는 대부분 프로그램 오류가 아니라 해당 사이즈·색상 재고가 없거나 이카운트에 아직 등록되지 않은 상품이라서입니다.</p>
+
+            <div class="dz-grid">
+              <div class="dropzone" id="icmInvoiceDrop" tabindex="0" role="button" aria-label="송장 파일 선택">
+                <div class="ic">&#128193;</div>
+                <div><strong id="icmInvoiceTitle">1. 송장 엑셀을 올려주세요</strong></div>
+                <div class="status-line" id="icmInvoiceDetail" style="margin-top:4px;">클릭하거나 파일을 끌어다 놓으세요 (여러 시트 가능, J열 헤더가 "상품명"인 시트만 처리)</div>
+                <input type="file" id="icmInvoiceFile" accept=".xlsx" />
+              </div>
+              <div class="dropzone" id="icmStockDrop" tabindex="0" role="button" aria-label="이카운트 재고현황 파일 선택">
+                <div class="ic">&#128193;</div>
+                <div><strong id="icmStockTitle">2. 이카운트 재고현황 엑셀을 올려주세요</strong></div>
+                <div class="status-line" id="icmStockDetail" style="margin-top:4px;">클릭하거나 파일을 끌어다 놓으세요 (첫 번째 시트, 1~2행 헤더, 3행부터 데이터)</div>
+                <input type="file" id="icmStockFile" accept=".xlsx" />
+              </div>
+            </div>
+
+            <div id="icmStatusWrap" style="margin-top:12px;"><span class="status-line" id="icmStatus"></span></div>
+
+            <div class="btn-row" style="margin-top:14px;">
+              <button class="btn btn-primary" id="icmRun" disabled>매칭 실행</button>
+              <button class="btn" id="icmReset">다른 파일 선택</button>
+            </div>
+          </div>
+
+          <div class="panel" id="icmResultPanel" style="display:none;">
+            <h2>매칭 결과</h2>
+            <p class="sub">정확매칭·유사매칭 품목에는 이카운트 품목코드를 채운 송장 파일을 내려받을 수 있습니다. 복수후보·매칭실패 항목은 아래 표에서 확인 후 수동으로 처리해주세요.</p>
+            <div class="stat-row" id="icmStats"></div>
+            <div class="table-scroll"><table class="data" id="icmTable"></table></div>
+            <div class="btn-row" style="margin-top:14px;">
+              <button class="btn btn-primary" id="icmDownload">품목코드 채운 송장 다운로드</button>
+            </div>
+            <div class="status-line" id="icmDownloadStatus" style="margin-top:8px;"></div>
           </div>
         </div>
       </section>
@@ -1144,7 +1193,7 @@ else if (typeof exports === 'object')
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', sabangEcount:'사방넷-이카운트 매칭',
-    stockMove:'사방넷 재고변동매칭 (MD팀)', stocktake:'재고조사 (바코드 실사)',
+    stockMove:'사방넷 재고변동매칭 (MD팀)', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
     orderStock:'사방넷 주문서-재고 매칭', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
   };
 
@@ -1514,7 +1563,14 @@ else if (typeof exports === 'object')
       var rid = sheetEls[j].getAttribute("r:id") ||
         sheetEls[j].getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
       var target = relMap[rid];
-      if (target) target = "xl/" + target.replace(/^\.?\//, "");
+      if (target) {
+        // Excel writes relative targets ("worksheets/sheet1.xml"), but some writers
+        // (e.g. openpyxl) write package-absolute targets ("/xl/worksheets/sheet1.xml").
+        // Strip any leading "./" or "/" first, then only add the "xl/" prefix if it
+        // isn't already there - otherwise an absolute target doubles up to "xl/xl/...".
+        target = target.replace(/^\.?\//, "");
+        if (target.indexOf("xl/") !== 0) target = "xl/" + target;
+      }
       sheets[name] = target;
     }
     return sheets;
@@ -3555,6 +3611,388 @@ else if (typeof exports === 'object')
       }, 20);
     });
     document.getElementById('rvmReset').addEventListener('click', rvmReset);
+  })();
+
+  /* =========================================================
+     TOOL 6b: 이카운트 -송장 재고매칭 (CS)
+     송장 엑셀(J열=상품명, K열=사이즈)과 이카운트 재고현황 엑셀(A열=품목코드, B열="품목명[규격]")을
+     매칭해 송장 J열 바로 오른쪽에 "이카운트품목코드" 열을 새로 끼워 넣는다.
+     서식을 그대로 보존해야 해서(색상 강조 등) 송장 파일은 SheetJS가 아니라 zip/xml을 직접
+     읽고 쓰는 surgical 엔진(위쪽 SHARED 섹션의 loadWorkbookSE 등)을 그대로 재사용한다.
+     매칭 로직은 실제 운영 중인 파이썬 프로토타입(match_ecount_code.py)을 그대로 이식한 것이다.
+     ========================================================= */
+  (function(){
+    var state = { invoice:null, stock:null, stats:null, issues:null };
+
+    function icmSetStatus(msg, isErr){
+      var s = document.getElementById('icmStatus');
+      s.textContent = msg || '';
+      s.classList.toggle('err', !!isErr);
+    }
+    function icmSetDownloadStatus(msg, isErr){
+      var s = document.getElementById('icmDownloadStatus');
+      s.textContent = msg || '';
+      s.classList.toggle('err', !!isErr);
+    }
+    function icmMarkDropzone(which, filename, detail, ok){
+      var prefix = which === 'invoice' ? 'icmInvoice' : 'icmStock';
+      document.getElementById(prefix + 'Drop').classList.toggle('has-file', !!ok);
+      document.getElementById(prefix + 'Title').textContent = filename;
+      var d = document.getElementById(prefix + 'Detail');
+      d.textContent = detail;
+      d.classList.toggle('err', !ok);
+    }
+    function icmUpdateRunButton(){
+      document.getElementById('icmRun').disabled = !(state.invoice && state.stock);
+    }
+
+    // ---------------- 매칭 로직 (match_ecount_code.py 포팅) ----------------
+    var ICM_QTY_SUFFIX_RE = /\[\s*수량\s*\d+\s*개\s*\]/g;
+    var ICM_COLLAB_PREFIX_RE = /^\[[^\]]*\]\s*\d+\)\s*/;
+    var ICM_SIZE_TAIL_RE = /\[([^\]]*)\]\s*$/;
+    var ICM_CODE_TOKEN_RE = /[0-9]|[A-Za-z]{2,}/;
+
+    function icmNormalizeText(v){
+      if(v === null || v === undefined) return '';
+      var text = String(v).replace(/\t/g, ' ');
+      text = text.replace(/\s+/g, ' ');
+      return text.trim();
+    }
+    function icmNormalizeSize(v){
+      if(v === null || v === undefined) return '';
+      if(typeof v === 'number' && Number.isInteger(v)) v = String(v);
+      var text = icmNormalizeText(v);
+      text = text.replace(/\(/g, ' ').replace(/\)/g, ' ');
+      text = text.replace(/\s+/g, ' ').trim();
+      return text;
+    }
+    function icmCleanProductName(v){
+      var text = icmNormalizeText(v);
+      text = text.replace(ICM_QTY_SUFFIX_RE, '');
+      text = text.replace(ICM_COLLAB_PREFIX_RE, '');
+      text = text.replace(/\s+/g, ' ').trim();
+      return text;
+    }
+    function icmCodeTokens(name){
+      return icmCleanProductName(name).split(' ').filter(function(t){ return t && ICM_CODE_TOKEN_RE.test(t); });
+    }
+    function icmTokenMatches(token, base, baseWords){
+      if(base.indexOf(token) !== -1) return true;
+      return baseWords.some(function(w){ return w.length >= 3 && token.indexOf(w) !== -1; });
+    }
+    function icmBuildStockIndex(stockAoa){
+      var exactLookup = {};
+      var fuzzyIndex = [];
+      for(var r = 2; r < stockAoa.length; r++){
+        var row = stockAoa[r];
+        if(!row) continue;
+        var code = row[0], name = row[1];
+        if(code === null || code === undefined || code === '' || name === null || name === undefined || name === '') continue;
+        code = icmNormalizeText(code);
+        name = icmNormalizeText(name);
+        if(!code || !name) continue;
+        if(!(name in exactLookup)) exactLookup[name] = code;
+        var m = ICM_SIZE_TAIL_RE.exec(name);
+        if(m){
+          var base = name.slice(0, m.index).trim();
+          var size = icmNormalizeSize(m[1]);
+          fuzzyIndex.push({code:code, base:base, size:size});
+        }
+      }
+      return {exactLookup:exactLookup, fuzzyIndex:fuzzyIndex};
+    }
+    function icmFindCode(name, size, exactLookup, fuzzyIndex){
+      var key = icmCleanProductName(name) + ' [' + icmNormalizeSize(size) + ']';
+      if(key in exactLookup) return {code:exactLookup[key], status:'정확매칭', candidates:[]};
+      var tokens = icmCodeTokens(name);
+      var sizeNorm = icmNormalizeSize(size);
+      var candidates = [];
+      fuzzyIndex.forEach(function(entry){
+        if(entry.size !== sizeNorm) return;
+        var baseWords = entry.base.split(' ');
+        if(tokens.length > 0 && tokens.every(function(t){ return icmTokenMatches(t, entry.base, baseWords); })){
+          candidates.push(entry);
+        }
+      });
+      if(candidates.length === 1) return {code:candidates[0].code, status:'유사매칭', candidates:[]};
+      if(candidates.length > 1) return {code:null, status:'복수후보(수동확인)', candidates:candidates};
+      return {code:null, status:'매칭실패(재고없음/미등록)', candidates:[]};
+    }
+
+    // ---------------- 파일 읽기 ----------------
+    async function handleIcmInvoiceFile(file){
+      icmSetStatus('송장 파일 읽는 중…');
+      try{
+        var buf = await file.arrayBuffer();
+        var wb = await loadWorkbookSE(buf);
+        var sheetNames = Object.keys(wb.sheetMap);
+        var parsedSheets = {};
+        sheetNames.forEach(function(name){
+          var path = wb.sheetMap[name];
+          var xml = toText(wb.zip.files[path]);
+          var parsed = parseSheetSE(xml, wb.sharedStrings);
+          var headerVal = parsed.rows[1] ? parsed.rows[1][10] : null;
+          var isTarget = icmNormalizeText(headerVal) === '상품명';
+          parsedSheets[name] = {path:path, doc:parsed.doc, rows:parsed.rows, isTarget:isTarget};
+        });
+        var targetCount = sheetNames.filter(function(n){ return parsedSheets[n].isTarget; }).length;
+        if(targetCount === 0) throw new Error('J열 헤더가 "상품명"인 시트를 찾을 수 없습니다.');
+        state.invoice = {fileName:file.name, zip:wb.zip, sheetMap:wb.sheetMap, sheetNames:sheetNames, parsedSheets:parsedSheets};
+        icmMarkDropzone('invoice', file.name, '시트 ' + sheetNames.length + '개 중 대상 시트 ' + targetCount + '개 인식', true);
+      }catch(e){
+        state.invoice = null;
+        icmMarkDropzone('invoice', file.name, '읽기 실패: ' + (e.message||e), false);
+      }
+      icmUpdateRunButton();
+      icmSetStatus('');
+    }
+
+    async function handleIcmStockFile(file){
+      icmSetStatus('이카운트 재고현황 파일 읽는 중…');
+      try{
+        var buf = await file.arrayBuffer();
+        var wb = XLSX.read(buf, {type:'array'});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        var built = icmBuildStockIndex(aoa);
+        if(Object.keys(built.exactLookup).length === 0) throw new Error('인식된 재고 품목이 없습니다.');
+        state.stock = built;
+        icmMarkDropzone('stock', file.name, '재고 품목 ' + Object.keys(built.exactLookup).length + '개 인식', true);
+      }catch(e){
+        state.stock = null;
+        icmMarkDropzone('stock', file.name, '읽기 실패: ' + (e.message||e), false);
+      }
+      icmUpdateRunButton();
+      icmSetStatus('');
+    }
+
+    // ---------------- 시트별 처리: 매칭 + 열 삽입(서식 보존) ----------------
+    function icmShiftColsElement(doc, insertColIdx){
+      var colsEls = doc.getElementsByTagName('cols');
+      for(var i=0;i<colsEls.length;i++){
+        var colEls = colsEls[i].getElementsByTagName('col');
+        for(var j=0;j<colEls.length;j++){
+          var min = parseInt(colEls[j].getAttribute('min'), 10);
+          var max = parseInt(colEls[j].getAttribute('max'), 10);
+          if(min >= insertColIdx) colEls[j].setAttribute('min', String(min+1));
+          if(max >= insertColIdx) colEls[j].setAttribute('max', String(max+1));
+        }
+      }
+    }
+    function processIcmSheet(sheetName, sheet, exactLookup, fuzzyIndex, globalStats, globalIssues){
+      var doc = sheet.doc, rows = sheet.rows;
+      var rowIndexMap = buildRowIndexSE(doc);
+      var maxRow = 0;
+      Object.keys(rows).forEach(function(k){ var n = parseInt(k,10); if(n > maxRow) maxRow = n; });
+
+      // 1) 원래 열 위치(J=10 상품명, K=11 사이즈) 기준으로 먼저 매칭 계산
+      var matches = {};
+      for(var r = 2; r <= maxRow; r++){
+        var rd = rows[r];
+        var name = rd ? rd[10] : null;
+        var size = rd ? rd[11] : null;
+        if((name === null || name === undefined || name === '') && (size === null || size === undefined || size === '')) continue;
+        globalStats.total++;
+        var result = icmFindCode(name, size, exactLookup, fuzzyIndex);
+        globalStats.counts[result.status] = (globalStats.counts[result.status] || 0) + 1;
+        matches[r] = result;
+        if(!result.code){
+          var key = icmCleanProductName(name) + ' [' + icmNormalizeSize(size) + ']';
+          globalIssues.push({sheet:sheetName, row:r, key:key, status:result.status});
+        }
+      }
+
+      // 2) 11번째 열(K)부터 오른쪽으로 한 칸씩 밀기 (K→L, L→M, M→N ...)
+      icmShiftColsElement(doc, 11);
+      Object.keys(rowIndexMap).forEach(function(rKey){
+        var rowEl = rowIndexMap[rKey];
+        var cells = Array.prototype.slice.call(rowEl.getElementsByTagName('c'));
+        var toShift = cells.map(function(c){ return {el:c, col: colRowFromRef(c.getAttribute('r')).col}; })
+          .filter(function(x){ return x.col >= 11; })
+          .sort(function(a,b){ return b.col - a.col; });
+        toShift.forEach(function(x){
+          var newRef = colLetter(x.col+1) + rowEl.getAttribute('r');
+          x.el.setAttribute('r', newRef);
+        });
+      });
+
+      // 3) 새 열(K, 11번째) 채우기: 헤더 + 매칭된 코드
+      var headerRowEl = rowIndexMap[1];
+      if(headerRowEl) setCellText(doc, headerRowEl, 11, '이카운트품목코드');
+      Object.keys(matches).forEach(function(rKey){
+        var result = matches[rKey];
+        if(result.code){
+          var rowEl = rowIndexMap[rKey];
+          if(rowEl) setCellText(doc, rowEl, 11, result.code);
+        }
+      });
+
+      updateDimensionSE(doc);
+    }
+
+    function runIcmMatching(){
+      var globalStats = {total:0, counts:{}};
+      var globalIssues = [];
+      var inv = state.invoice;
+      inv.sheetNames.forEach(function(name){
+        var sheet = inv.parsedSheets[name];
+        if(!sheet.isTarget) return;
+        processIcmSheet(name, sheet, state.stock.exactLookup, state.stock.fuzzyIndex, globalStats, globalIssues);
+      });
+      state.stats = globalStats;
+      state.issues = globalIssues;
+      renderIcmResults(globalStats, globalIssues);
+    }
+
+    var ICM_STATUS_CHIP = {
+      '정확매칭':'chip-matched', '유사매칭':'chip-matched',
+      '복수후보(수동확인)':'chip-ambiguous', '매칭실패(재고없음/미등록)':'chip-shortage'
+    };
+
+    function renderIcmResults(stats, issues){
+      document.getElementById('icmResultPanel').style.display = 'block';
+      var statsEl = document.getElementById('icmStats');
+      statsEl.innerHTML = '';
+      function statCard(n, l, colorVar){
+        var s = el('div', {class:'stat'});
+        var nEl = el('div', {class:'n tabular'}, [document.createTextNode(n)]);
+        if(colorVar) nEl.style.color = colorVar;
+        s.appendChild(nEl);
+        s.appendChild(el('div', {class:'l'}, [document.createTextNode(l)]));
+        return s;
+      }
+      var c = stats.counts;
+      statsEl.appendChild(statCard(stats.total.toLocaleString('ko-KR'), '전체 건수'));
+      statsEl.appendChild(statCard((c['정확매칭']||0).toLocaleString('ko-KR'), '정확매칭', 'var(--success)'));
+      statsEl.appendChild(statCard((c['유사매칭']||0).toLocaleString('ko-KR'), '유사매칭(코드 기반)', 'var(--success)'));
+      statsEl.appendChild(statCard((c['복수후보(수동확인)']||0).toLocaleString('ko-KR'), '복수후보(수동확인)', 'var(--warning)'));
+      statsEl.appendChild(statCard((c['매칭실패(재고없음/미등록)']||0).toLocaleString('ko-KR'), '매칭실패(재고없음/미등록)', 'var(--danger)'));
+
+      var table = document.getElementById('icmTable');
+      table.innerHTML = '';
+      var cols = ['시트','행','검색값','상태'];
+      var thead = el('thead');
+      var htr = el('tr');
+      cols.forEach(function(cName){
+        var attrs = (cName === '행') ? {class:'num'} : null;
+        htr.appendChild(el('th', attrs, [document.createTextNode(cName)]));
+      });
+      thead.appendChild(htr); table.appendChild(thead);
+
+      var tbody = el('tbody');
+      function td(v, num){ return el('td', num?{class:'num tabular'}:null, [document.createTextNode(v===null||v===undefined?'':String(v))]); }
+      var showLimit = 500;
+      issues.slice(0, showLimit).forEach(function(r){
+        var tr = el('tr');
+        tr.appendChild(td(r.sheet));
+        tr.appendChild(td(r.row, true));
+        tr.appendChild(td(r.key));
+        var statusTd = el('td');
+        statusTd.appendChild(el('span', {class:'chip ' + (ICM_STATUS_CHIP[r.status]||'chip-ambiguous')}, [document.createTextNode(r.status)]));
+        tr.appendChild(statusTd);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      if(issues.length > showLimit){
+        var note = el('div', {style:'padding:8px 12px;color:var(--ink-muted);font-size:12px;'});
+        note.textContent = '표시는 ' + showLimit.toLocaleString('ko-KR') + '건까지만 됩니다. 전체 ' + issues.length.toLocaleString('ko-KR') + '건은 다운로드 파일에서 직접 확인해주세요.';
+        table.parentNode.appendChild(note);
+      }
+      if(issues.length === 0){
+        var okNote = el('div', {style:'padding:8px 12px;color:var(--ink-muted);font-size:12px;'});
+        okNote.textContent = '수동 확인이 필요한 항목이 없습니다. 전체 품목이 정확매칭 또는 유사매칭되었습니다.';
+        table.parentNode.appendChild(okNote);
+      }
+    }
+
+    // ---------------- 다운로드 ----------------
+    function icmBaseName(fname){
+      return String(fname||'송장').replace(/\.[^.]+$/, '');
+    }
+    function buildIcmOutputBytes(){
+      var inv = state.invoice;
+      var newFiles = Object.assign({}, inv.zip.files);
+      inv.sheetNames.forEach(function(name){
+        var sheet = inv.parsedSheets[name];
+        if(!sheet.isTarget) return;
+        var serialized = new XMLSerializer().serializeToString(sheet.doc);
+        if(serialized.indexOf('<?xml') !== 0){
+          serialized = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + serialized;
+        }
+        newFiles[sheet.path] = new TextEncoder().encode(serialized);
+      });
+      return writeZipSE(inv.zip.order, newFiles);
+    }
+    function buildIcmIssuesCsv(){
+      var aoa = [['시트','행','검색값','상태']];
+      (state.issues||[]).forEach(function(r){ aoa.push([r.sheet, r.row, r.key, r.status]); });
+      return aoaToCsv(aoa);
+    }
+    function downloadIcmResult(){
+      if(!state.invoice){ icmSetDownloadStatus('송장 파일을 먼저 올려주세요.', true); return; }
+      try{
+        var bytes = buildIcmOutputBytes();
+        var blob = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        deliverFile({
+          baseName: icmBaseName(state.invoice.fileName) + '_이카운트코드매칭_' + timestamp(),
+          xlsxBlob: blob,
+          csvText: buildIcmIssuesCsv()
+        }, function(type, title, msg){
+          icmSetDownloadStatus(title + (msg ? ' — ' + msg : ''), type === 'err');
+        });
+      }catch(e){
+        icmSetDownloadStatus('다운로드 파일 생성 중 오류: ' + (e.message||e), true);
+      }
+    }
+
+    function icmReset(){
+      state.invoice = null; state.stock = null; state.stats = null; state.issues = null;
+      icmMarkDropzone('invoice', '1. 송장 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요 (여러 시트 가능, J열 헤더가 "상품명"인 시트만 처리)', false);
+      document.getElementById('icmInvoiceDrop').classList.remove('has-file');
+      icmMarkDropzone('stock', '2. 이카운트 재고현황 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요 (첫 번째 시트, 1~2행 헤더, 3행부터 데이터)', false);
+      document.getElementById('icmStockDrop').classList.remove('has-file');
+      document.getElementById('icmInvoiceFile').value = '';
+      document.getElementById('icmStockFile').value = '';
+      document.getElementById('icmResultPanel').style.display = 'none';
+      icmSetStatus('');
+      icmSetDownloadStatus('');
+      icmUpdateRunButton();
+    }
+
+    function wireDropzoneICM(id, inputSelector, onFile){
+      var dz = document.getElementById(id);
+      var input = dz.querySelector(inputSelector);
+      dz.addEventListener('click', function(){ input.click(); });
+      dz.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); input.click(); } });
+      input.addEventListener('change', function(){ if(input.files[0]) onFile(input.files[0]); });
+      dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('drag'); });
+      dz.addEventListener('dragleave', function(){ dz.classList.remove('drag'); });
+      dz.addEventListener('drop', function(e){
+        e.preventDefault();
+        dz.classList.remove('drag');
+        if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+      });
+    }
+
+    wireDropzoneICM('icmInvoiceDrop', 'input[type="file"]', handleIcmInvoiceFile);
+    wireDropzoneICM('icmStockDrop', 'input[type="file"]', handleIcmStockFile);
+    document.getElementById('icmRun').addEventListener('click', function(){
+      icmSetStatus('매칭 실행 중…');
+      setTimeout(function(){
+        try{ runIcmMatching(); icmSetStatus(''); }
+        catch(e){ icmSetStatus('매칭 중 오류: ' + (e.message||e), true); }
+      }, 20);
+    });
+    document.getElementById('icmDownload').addEventListener('click', function(){
+      var btn = document.getElementById('icmDownload');
+      btn.disabled = true;
+      icmSetDownloadStatus('다운로드 파일 만드는 중…');
+      setTimeout(function(){
+        downloadIcmResult();
+        btn.disabled = false;
+      }, 20);
+    });
+    document.getElementById('icmReset').addEventListener('click', icmReset);
   })();
 
   /* =========================================================
