@@ -584,12 +584,12 @@
 
           <div class="panel" id="rvmResultPanel" style="display:none;">
             <h2>매칭 결과</h2>
-            <p class="sub">"반영예정"만 다운로드 파일에 포함됩니다. 규격 불일치·중복·상품 없음 항목은 표에서 확인 후 수동으로 처리해주세요. "현재값 다운로드"는 같은 품목들의 반영 전(현재) 가상재고를 담아서, 전체업로드 후 문제가 생기면 되돌릴 때 쓸 수 있습니다.</p>
+            <p class="sub">"변동분만 다운로드"에는 반영예정 품목만 담깁니다 (사방넷 전체업로드용). "현재값 다운로드"는 이 화면에 보이는 표 전체(반영예정·변동없음·규격 불일치·중복·상품 없음)를 그대로 엑셀로 내려받습니다.</p>
             <div class="stat-row" id="rvmStats"></div>
             <div class="table-scroll"><table class="data" id="rvmTable"></table></div>
             <div class="btn-row" style="margin-top:14px;">
               <button class="btn btn-primary" id="rvmDownload">변동분만 다운로드 (신규 값)</button>
-              <button class="btn" id="rvmDownloadCurrent">현재값 다운로드 (반영 전, 백업용)</button>
+              <button class="btn" id="rvmDownloadCurrent">현재값 다운로드 (화면 표 전체)</button>
             </div>
             <div class="status-line" id="rvmDownloadStatus" style="margin-top:8px;"></div>
           </div>
@@ -3433,6 +3433,14 @@ else if (typeof exports === 'object')
     var RVM_STATUS_CHIP = {
       changed: 'chip-matched', noChange: 'chip-soldout', specMismatch: 'chip-ambiguous', ambiguous: 'chip-ambiguous', notFound: 'chip-shortage'
     };
+    // 반영예정을 맨 위로, 그다음 확인이 필요한 항목, 변동없음은 맨 아래로 - 화면 표시와 "현재값(전체 결과표)" 다운로드가 항상 같은 순서를 쓰도록 공유한다.
+    var RVM_STATUS_ORDER = {changed:0, ambiguous:1, specMismatch:2, notFound:3, noChange:4};
+    function rvmSortedResults(results){
+      return results.slice().sort(function(a,b){ return RVM_STATUS_ORDER[a.status]-RVM_STATUS_ORDER[b.status]; });
+    }
+    function rvmNewValueDisplay(r){
+      return r.status === 'changed' ? r.newStock : (r.status === 'noChange' ? r.item.remain : '');
+    }
 
     function renderRvmResults(results, stats){
       document.getElementById('rvmResultPanel').style.display = 'block';
@@ -3465,9 +3473,7 @@ else if (typeof exports === 'object')
 
       var tbody = el('tbody');
       function td(v, num){ return el('td', num?{class:'num tabular'}:null, [document.createTextNode(v===null||v===undefined?'':String(v))]); }
-      // 반영예정을 맨 위로, 그다음 확인이 필요한 항목, 변동없음은 맨 아래로.
-      var order = {changed:0, ambiguous:1, specMismatch:2, notFound:3, noChange:4};
-      var sorted = results.slice().sort(function(a,b){ return order[a.status]-order[b.status]; });
+      var sorted = rvmSortedResults(results);
       sorted.forEach(function(r){
         var tr = el('tr');
         tr.appendChild(td(r.item.name));
@@ -3477,7 +3483,7 @@ else if (typeof exports === 'object')
         tr.appendChild(statusTd);
         tr.appendChild(td(r.sbName || ''));
         tr.appendChild(td(r.curStock === undefined ? '' : r.curStock, true));
-        tr.appendChild(td(r.status === 'changed' ? r.newStock : (r.status === 'noChange' ? r.item.remain : ''), true));
+        tr.appendChild(td(rvmNewValueDisplay(r), true));
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
@@ -3532,20 +3538,29 @@ else if (typeof exports === 'object')
         rvmSetDownloadStatus('다운로드 파일 생성 중 오류: ' + (e.message||e), true);
       }
     }
+    // 화면에 보이는 매칭 결과 표(반영예정·변동없음·규격불일치·중복·상품없음 전부)를 그대로 다운로드한다.
+    // 사방넷 재업로드용 파일이 아니라, 지금 화면 상태를 그대로 기록해두는 결과표다.
+    function buildRvmFullResultAoa(){
+      var header = ['품목명','규격','상태','사방넷 상품명','기존 가상재고','신규 값(잔량)'];
+      var aoa = [header];
+      rvmSortedResults(state.results||[]).forEach(function(r){
+        aoa.push([r.item.name, r.item.spec, RVM_STATUS_LABEL[r.status], r.sbName||'', r.curStock===undefined?'':r.curStock, rvmNewValueDisplay(r)]);
+      });
+      return aoa;
+    }
     function downloadRvmCurrentResult(){
-      var changed = rvmChangedRows();
-      if(changed.length === 0){ rvmSetDownloadStatus('반영 예정 건이 없어 백업할 항목이 없습니다.', true); return; }
+      if(!state.results || state.results.length === 0){ rvmSetDownloadStatus('매칭 결과가 없습니다.', true); return; }
       try{
-        var outAoa = buildRvmOutputAoa(changed, 'curStock');
+        var outAoa = buildRvmFullResultAoa();
         var ws = XLSX.utils.aoa_to_sheet(outAoa);
         var wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, '사방넷단품대량수정');
+        XLSX.utils.book_append_sheet(wb, ws, '매칭결과');
         var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
         var blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
         deliverFile({
-          baseName: '사방넷_재고변동매칭_반영전백업_' + timestamp(),
+          baseName: '사방넷_재고변동매칭_결과표_' + timestamp(),
           xlsxBlob: blob,
-          csvText: buildRvmResultCsv(changed, 'curStock', '현재(반영 전) 가상재고')
+          csvText: aoaToCsv(outAoa)
         }, function(type, title, msg){
           rvmSetDownloadStatus(title + (msg ? ' — ' + msg : ''), type === 'err');
         });
