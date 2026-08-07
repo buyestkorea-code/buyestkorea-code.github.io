@@ -1186,6 +1186,10 @@ else if (typeof exports === 'object')
     }catch(e){ /* getDocument() will surface an error when actually used */ }
   }
 
+  // 배포/캐시 문제로 "고쳤는데도 그대로다" 라는 신고가 반복될 때, 지금 화면이 실제로
+  // 어느 빌드를 쓰고 있는지 즉시 확인할 수 있게 진단 메시지에 넣어 보여준다.
+  var BUILD_STAMP = '20260806-2010';
+
   /* ---------------- Navigation ---------------- */
   var sidebar = document.getElementById('sidebar');
   var scrim = document.getElementById('scrim');
@@ -2626,7 +2630,7 @@ else if (typeof exports === 'object')
           var groups = await processOne(toProcess[i], i, toProcess.length);
           groups.forEach(function(g){
             if(!g.items || g.items.length === 0){
-              var msg = g.source + ' (' + g.title + ') - 품목을 추출하지 못함';
+              var msg = g.source + ' (' + g.title + ') - 품목을 추출하지 못함 [빌드:' + BUILD_STAMP + ']';
               if(g.ocrSample) msg += ' | 인식된 텍스트: ' + g.ocrSample;
               invcSkipped.push(msg);
             }
