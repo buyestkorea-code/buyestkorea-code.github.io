@@ -2944,6 +2944,23 @@ else if (typeof exports === 'object')
       return { bytes: outBytes, report: report };
     }
 
+    // 진단용: 사용자의 실제 브라우저 콘솔에서 이 화면이 실제로 돌리고 있는 parseStyle이
+    // 특정 데이터에 대해 무엇을 반환하는지 직접 확인할 수 있게 노출한다. 여러 단계로
+    // 코드/데이터가 전부 일치함을 확인했는데도 실제 화면에서만 재현되는 문제를 좁히기 위함.
+    window.__buyestDebug = {
+      parseStyle: parseStyle,
+      vendorParsers: VENDOR_PARSERS,
+      buildStamp: BUILD_STAMP,
+      dispatch: function(vendorKey, pagesLines){
+        if(vendorKey === '갈리아노') return parseGaliano(pagesLines);
+        else if(vendorKey === '베네레') return parseVenere(pagesLines);
+        else if(vendorKey === '비니') return parseBini(pagesLines);
+        else if(vendorKey === '스타일') return parseStyle(pagesLines);
+        else if(vendorKey === '다니엘') return parseDaniel(pagesLines);
+        else return parseGruppoKim(pagesLines);
+      },
+      lastInvoiceEntries: function(){ return invcFiles; }
+    };
     document.getElementById('invcDownload').addEventListener('click', async function(){
       var table = document.getElementById('invcTable');
       var byTitle = {}; var order = [];
