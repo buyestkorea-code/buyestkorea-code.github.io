@@ -1995,7 +1995,14 @@ else if (typeof exports === 'object')
       return line;
     }
     function cleanStyleLine(line){
-      return line.replace(/(?<=\))\s+[lI](?=\s)/g, ' 1');
+      line = line.replace(/(?<=\))\s+[lI](?=\s)/g, ' 1');
+      // 품번(줄 맨 앞 토큰)은 항상 대문자 L 바로 뒤에 숫자가 온다(예: "L2S154100109").
+      // 스캔 상태가 안 좋으면 OCR이 이 L 뒤에 점을 잘못 붙이거나("L." + 숫자) L 자체를
+      // 1로 잘못 읽고 점까지 붙이는("1." + 숫자) 경우가 실제로 자주 나온다. 이 두 경우
+      // 모두 뒤에 숫자가 바로 온다는 확실한 조건에서만 안전하게 L로 되돌린다.
+      line = line.replace(/^\[+/, '');
+      line = line.replace(/^(?:L\.|1\.)(?=\d)/, 'L');
+      return line;
     }
 
     /* ---- vendor parsers (pagesLines = array of pages, each an array of line strings) ---- */
