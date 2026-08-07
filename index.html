@@ -2735,6 +2735,7 @@ else if (typeof exports === 'object')
         }
         var totalItems = allResults.reduce(function(a,g){ return a+g.items.length; }, 0);
         banner(statusEl, 'ok', '인식 완료', allResults.length + '개 인보이스에서 ' + totalItems + '개 품목을 찾았습니다.');
+        allResults.sort(function(a,b){ return a.title.localeCompare(b.title, 'ko'); });
         renderInvcResult(allResults);
       }catch(err){
         hideProgress();
