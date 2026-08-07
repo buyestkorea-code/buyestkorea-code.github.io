@@ -2960,7 +2960,13 @@ else if (typeof exports === 'object')
         else return parseGruppoKim(pagesLines);
       },
       lastInvoiceEntries: function(){ return invcFiles; },
-      processOne: processOne
+      processOne: processOne,
+      // OCR만 돌리고 파싱은 안 해서, 나온 pagesLines를 콘솔에서 직접 parseStyle에
+      // 넣어볼 수 있게 한다 (JSON으로 한 번 옮겨적는 과정 없이, 실제 배열 참조 그대로).
+      extractRaw: async function(entry){
+        var extracted = await extractPdfPagesLines(entry.file, true, function(){});
+        return extracted.pagesLines;
+      }
     };
     document.getElementById('invcDownload').addEventListener('click', async function(){
       var table = document.getElementById('invcTable');
