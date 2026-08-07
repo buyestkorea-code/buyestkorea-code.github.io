@@ -1342,6 +1342,26 @@ else if (typeof exports === 'object')
     setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
   }
 
+  // 일부 엑셀(특히 사방넷 내보내기)은 <dimension> 태그가 실제 데이터 범위보다 훨씬 작게
+  // 잘못 적혀 있는 경우가 있다 (예: 82,000행짜리 파일인데 태그는 "A1:AB4"). SheetJS의
+  // sheet_to_json은 이 태그(ws['!ref'])만 보고 범위를 정하기 때문에, 셀 데이터 자체는
+  // 전부 정상 파싱됐는데도 뒤쪽 수만 행이 통째로 잘려나간다. 실제 채워진 셀을 훑어서
+  // ref를 다시 계산해두면 이 문제가 사라진다.
+  function sheetToAoa(ws){
+    var maxRow = 0, maxCol = 0;
+    Object.keys(ws).forEach(function(k){
+      if(k[0] === '!') return;
+      var m = /^([A-Z]+)(\d+)$/.exec(k);
+      if(!m) return;
+      var r = parseInt(m[2], 10);
+      if(r > maxRow) maxRow = r;
+      var col = 0;
+      for(var i=0;i<m[1].length;i++) col = col*26 + (m[1].charCodeAt(i)-64);
+      if(col > maxCol) maxCol = col;
+    });
+    if(maxRow > 0 && maxCol > 0) ws['!ref'] = 'A1:' + XLSX.utils.encode_col(maxCol-1) + maxRow;
+    return sheetToAoa(ws);
+  }
   function csvEscape(v){
     v = (v === null || v === undefined) ? '' : String(v);
     return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
@@ -1855,7 +1875,7 @@ else if (typeof exports === 'object')
 
       invSelectedSheets.forEach(function(name){
         var ws = invWorkbook.Sheets[name];
-        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        var aoa = sheetToAoa(ws);
         var range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
         var rowOffset = range.s.r;
         var header = detectHeader(aoa);
@@ -2589,7 +2609,7 @@ else if (typeof exports === 'object')
         var buf = await file.arrayBuffer();
         var wb = XLSX.read(buf, {type:'array'});
         var ws = wb.Sheets['Sheet1'] || wb.Sheets[wb.SheetNames[0]];
-        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        var aoa = sheetToAoa(ws);
         var stem = file.name.replace(/\.[^.]+$/, '');
         var blocks = parseCuminiMulti(aoa, stem);
         return blocks.map(function(b){ return {title: cfg.label + ' ' + b.label, items:b.items, vendor:vendorKey, source:file.name}; });
@@ -3388,7 +3408,7 @@ else if (typeof exports === 'object')
         var buf = await file.arrayBuffer();
         var wb = XLSX.read(buf, {type:'array'});
         var ws = wb.Sheets[wb.SheetNames[0]];
-        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        var aoa = sheetToAoa(ws);
         var hIdx = rvmFindHeaderRowIdx(aoa, function(r){ return r[0] && String(r[0]).indexOf('사방넷상품코드') !== -1; });
         if(hIdx === -1) throw new Error('헤더 행("사방넷상품코드")을 찾을 수 없습니다.');
         var col = rvmHeaderColMap(aoa[hIdx]);
@@ -3422,7 +3442,7 @@ else if (typeof exports === 'object')
         var buf = await file.arrayBuffer();
         var wb = XLSX.read(buf, {type:'array'});
         var ws = wb.Sheets[wb.SheetNames[0]];
-        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        var aoa = sheetToAoa(ws);
         var hIdx = rvmFindHeaderRowIdx(aoa, function(r){ return r[0] === '품목코드'; });
         if(hIdx === -1) throw new Error('헤더 행("품목코드")을 찾을 수 없습니다.');
         var col = rvmHeaderColMap(aoa[hIdx]);
@@ -3894,7 +3914,7 @@ else if (typeof exports === 'object')
         var buf = await file.arrayBuffer();
         var wb = XLSX.read(buf, {type:'array'});
         var ws = wb.Sheets[wb.SheetNames[0]];
-        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        var aoa = sheetToAoa(ws);
         var built = icmBuildStockIndex(aoa);
         if(Object.keys(built.exactLookup).length === 0) throw new Error('인식된 재고 품목이 없습니다.');
         state.stock = built;
@@ -4201,7 +4221,7 @@ else if (typeof exports === 'object')
     }
 
     function stSheetHeaders(ws){
-      var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+      var aoa = sheetToAoa(ws);
       var headerRowIdx = stDetectHeaderRow(aoa);
       var headerRow = aoa[headerRowIdx] || [];
       var headers = [];
@@ -4214,7 +4234,7 @@ else if (typeof exports === 'object')
     }
 
     function stSheetRows(ws, headerRowIdx){
-      var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+      var aoa = sheetToAoa(ws);
       var headerRow = aoa[headerRowIdx] || [];
       var rows = [];
       for(var r = headerRowIdx+1; r < aoa.length; r++){
@@ -4790,7 +4810,7 @@ else if (typeof exports === 'object')
       var compareMap = {};
       workbook.SheetNames.forEach(function(sheetName){
         var ws = workbook.Sheets[sheetName];
-        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        var aoa = sheetToAoa(ws);
         var headerIdx = osDetectHeaderRow(aoa.slice(0,10), ['품목명','재고량']);
         var headerRow = aoa[headerIdx] || [];
         var colName = osFindColumn(headerRow, ['품목명']);
@@ -4905,7 +4925,7 @@ else if (typeof exports === 'object')
         osOrderWorkbook = wb;
         osOrderFileName = file.name;
         var ws = wb.Sheets[wb.SheetNames[0]];
-        osOrderAoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        osOrderAoa = sheetToAoa(ws);
         document.getElementById('osOrderDrop').classList.add('has-file');
         var info = document.getElementById('osOrderInfo'); info.innerHTML = '';
         var pill = el('div', {class:'file-pill', style:'margin-top:10px;'});
