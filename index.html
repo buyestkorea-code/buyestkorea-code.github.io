@@ -2739,7 +2739,7 @@ else if (typeof exports === 'object')
       }catch(err){
         hideProgress();
         document.getElementById('invcRun').disabled = false;
-        banner(statusEl, 'err', '처리 중 오류가 발생했습니다', String(err.message || err));
+        banner(statusEl, 'err', '처리 중 오류가 발생했습니다', String((err && err.stack) || err.message || err));
       }
     });
 
