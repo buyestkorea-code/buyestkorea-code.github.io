@@ -3750,6 +3750,8 @@ else if (typeof exports === 'object')
       try{
         var outAoa = buildRvmFullResultAoa();
         var ws = XLSX.utils.aoa_to_sheet(outAoa);
+        ws['!cols'] = [{wch:38},{wch:8},{wch:12},{wch:38},{wch:12},{wch:12}];
+        ws['!autofilter'] = {ref: ws['!ref']};
         var wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '매칭결과');
         var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
