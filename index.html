@@ -2959,7 +2959,8 @@ else if (typeof exports === 'object')
         else if(vendorKey === '다니엘') return parseDaniel(pagesLines);
         else return parseGruppoKim(pagesLines);
       },
-      lastInvoiceEntries: function(){ return invcFiles; }
+      lastInvoiceEntries: function(){ return invcFiles; },
+      processOne: processOne
     };
     document.getElementById('invcDownload').addEventListener('click', async function(){
       var table = document.getElementById('invcTable');
