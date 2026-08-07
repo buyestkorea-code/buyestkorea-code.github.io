@@ -3403,7 +3403,11 @@ else if (typeof exports === 'object')
     }
 
     async function handleRvmSabangFile(file){
-      rvmSetStatus('사방넷 파일 읽는 중… (품목 수가 많으면 10초 정도 걸릴 수 있습니다)');
+      rvmSetStatus('사방넷 파일 읽는 중… (용량이 크면 십수 초 동안 화면이 멈춘 것처럼 보일 수 있습니다 - 정상입니다, 기다려주세요)');
+      // 위 상태 문구를 실제로 화면에 그릴 시간을 준다. await만으로는 부족하다 - 프라미스가
+      // 마이크로태스크로 바로 풀리면 브라우저가 그 사이에 리페인트를 보장해주지 않아서,
+      // 바로 이어지는 무거운 동기 파싱 때문에 문구가 뜨기도 전에 화면이 멈춰버릴 수 있다.
+      await new Promise(function(resolve){ setTimeout(resolve, 30); });
       try{
         var buf = await file.arrayBuffer();
         var wb = XLSX.read(buf, {type:'array'});
