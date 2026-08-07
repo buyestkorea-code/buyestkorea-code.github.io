@@ -2155,10 +2155,17 @@ else if (typeof exports === 'object')
     // "$", 줄끝에 붙는 "|" 등 OCR 잡음이 있어도 줄 전체 매칭이 깨지지 않도록 뒤는 검증하지 않는다.
     // 수량 뒤에 (?!\.\d)를 둬서, "258.62"처럼 수량 없이 단가만 있는 줄에서 그 정수부(258)를
     // 수량으로 잘못 집어먹는 일을 막는다 (수량이 정말 없으면 STYLE_PAT_NOQTY로 넘어간다).
-    var STYLE_PAT = /^(\S+)\s+(.+?)\s*\(MADE IN ([A-Z]+(?:\s[A-Z]+)*)\)[^\d]{0,10}(\d[\d,]*)(?!\.\d)\s[^\d]{0,9}([\d,.]+)\b.*$/;
+    // 진짜 근본 원인: Tesseract를 preserve_interword_spaces로 돌리기 때문에, 표 안에서
+    // 칸이 떨어져 있는 숫자들 사이에 정렬을 맞추려고 공백이 수십 개씩 들어간다
+    // (예: "5           309.70              1,548.50"). 예전엔 이 틈을 {0,10}/{0,9}처럼
+    // 글자 수를 제한해서 받았는데, 실제 스캔에서는 그 개수를 넘는 공백이 흔해서 정규식 자체가
+    // 아예 안 맞아버렸다 - 그런데 이 틈 안의 공백이 채팅으로 옮겨질 때마다(복사/붙여넣기,
+    // HTML 렌더링) 연속 공백이 하나로 합쳐져 보여서, 실제 원인을 계속 못 잡고 있었다.
+    // 이제 글자 수 제한을 없애고 "숫자가 아닌 문자는 몇 개가 오든 상관없다"로 바꿨다.
+    var STYLE_PAT = /^(\S+)\s+(.+?)\s*\(MADE IN ([A-Z]+(?:\s[A-Z]+)*)\)[^\d]*(\d[\d,]*)(?!\.\d)\s+[^\d]*([\d,.]+)\b.*$/;
     // 수량 칸이 OCR에서 통째로 빠져 단가/금액 두 숫자만 남는 줄에 대한 예비 패턴.
     // 금액을 단가로 나눠 수량을 역산한다 (parseStyle에서 나눗셈이 정수에 가까울 때만 사용).
-    var STYLE_PAT_NOQTY = /^(\S+)\s+(.+?)\s*\(MADE IN ([A-Z]+(?:\s[A-Z]+)*)\)[^\d]{0,10}([\d,.]+)\s+([\d,.]+)\s*$/;
+    var STYLE_PAT_NOQTY = /^(\S+)\s+(.+?)\s*\(MADE IN ([A-Z]+(?:\s[A-Z]+)*)\)[^\d]*([\d,.]+)\s+([\d,.]+)\s*$/;
     var STYLE_CATEGORY_WORDS = [
       'SCIARPA','SCIARPE','FOULARD','GIUBBOTTO','GIUBBOTTI','GIUBBINI','GIACCA','GIACCHE','CAPPOTTO','CAPPOTTI',
       'GONNA','GONNE','PANTALONE','PANTALONI','VESTITO','ABITO','CAPPELLO','CAPPELLI','GUANTI','STIVALI','SCARPE',
