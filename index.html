@@ -1188,7 +1188,7 @@ else if (typeof exports === 'object')
 
   // 배포/캐시 문제로 "고쳤는데도 그대로다" 라는 신고가 반복될 때, 지금 화면이 실제로
   // 어느 빌드를 쓰고 있는지 즉시 확인할 수 있게 진단 메시지에 넣어 보여준다.
-  var BUILD_STAMP = '20260806-2010';
+  var BUILD_STAMP = '20260807-rawjson';
 
   /* ---------------- Navigation ---------------- */
   var sidebar = document.getElementById('sidebar');
@@ -2600,14 +2600,13 @@ else if (typeof exports === 'object')
       }
       var ocrSample = null;
       if(cfg.ocr && (!items || items.length === 0)){
-        // 품목이 0개일 때 원인 파악용: 실제로 OCR이 어떤 텍스트를 읽어냈는지 그대로 보여준다
-        // (완전히 빈 화면을 읽었는지, 글자는 읽었는데 정규식과 안 맞는 형식인지 구분하기 위함).
-        var allLines = [];
-        pagesLines.forEach(function(pl){ pl.forEach(function(l){ if(l.trim()) allLines.push(l.trim()); }); });
-        // 줄 경계를 " / "처럼 애매한 문자 대신 명확한 표시로 구분해서, 실제 OCR이 어디서
-        // 줄을 끊었는지(단어 중간에 줄바꿈이 생기는지) 그대로 보이게 한다.
-        var joined = allLines.join('⏎');
-        ocrSample = allLines.length ? (joined.length > 4000 ? joined.slice(0,4000) + '...' : joined) : '(추출된 텍스트가 전혀 없음 - 빈 페이지로 인식됨)';
+        // 품목이 0개일 때 원인 파악용: pagesLines를 다듬지 않고 JSON 그대로 보여준다.
+        // (기존엔 빈 줄을 지우고 trim해서 "⏎"로 이어붙인 요약만 보여줬는데, 그렇게 다듬는
+        // 과정 자체에 실제 구조와의 차이가 숨을 수 있다는 게 드러나서 - 페이지 경계, 빈 줄
+        // 위치, 원본 공백까지 전부 그대로 보여주는 쪽으로 바꿨다. 페이지 수가 예상과 다르거나,
+        // 빈 줄처럼 보였던 게 실제로는 공백 아닌 문자를 담고 있거나 하는 것도 이걸로 바로 보인다.)
+        var raw = JSON.stringify(pagesLines);
+        ocrSample = raw.length > 4000 ? raw.slice(0,4000) + '...(생략)' : raw;
       }
       return [{title: cfg.label + ' ' + stem2, items:items, vendor:vendorKey, source:file.name, ocrSample:ocrSample}];
     }
