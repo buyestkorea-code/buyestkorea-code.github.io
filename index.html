@@ -3559,6 +3559,26 @@ else if (typeof exports === 'object')
       return toks.slice(i).join(' ');
     }
 
+    // "[스크래치] 렌즈 와펜... 20CMSS034A 002246G 103" 같은 이카운트 품목명과, 사방넷에
+    // "스크래치 20CMSS034A 002246G 103"처럼 같은 품번을 상태 라벨(하자/스크래치 등)로
+    // 별도 등록해둔 상품이 둘 다 있을 수 있다. 코드(품번) 추출 자체는 라벨이 있어도 그대로
+    // 맞는데(라벨 단어도 한글이라 rvmCodeSuffix가 알아서 건너뜀), 라벨을 구분하지 않고
+    // 코드만으로 매칭하면 정상 재고 수량이 하자/스크래치 상품에도 그대로 반영되거나 그
+    // 반대가 되어버린다. 그래서 코드가 같아도 라벨까지 같은 후보만 매칭 대상으로 좁힌다.
+    // 하자1/하자2처럼 뒤에 번호가 붙는 경우도 있어, 끝의 숫자는 떼고 기본 단어로 비교한다.
+    var RVM_LABEL_WORDS = ['하자', '스크래치'];
+    function rvmEcountLabel(name){
+      var m = /^\[([^\]]+)\]/.exec(String(name||'').trim());
+      if(!m) return null;
+      var base = m[1].trim().replace(/\d+$/, '');
+      return RVM_LABEL_WORDS.indexOf(base) !== -1 ? base : null;
+    }
+    function rvmSabangLabel(name){
+      var first = String(name||'').trim().split(/\s+/)[0] || '';
+      var base = first.replace(/\d+$/, '');
+      return RVM_LABEL_WORDS.indexOf(base) !== -1 ? base : null;
+    }
+
     function runRvmMatching(){
       var aoa = state.sabangAoa, col = state.sabangCol, dataStart = state.sabangDataStart;
       var nameGroups = {};
@@ -3591,10 +3611,14 @@ else if (typeof exports === 'object')
         if(candNames.length === 0){ stats.notFound++; results.push({item:it, status:'notFound'}); return; }
 
         // 품번이 같은 사방넷 상품명이 여러 개일 수 있다(같은 품번을 시즌/성별 등으로 중복
-        // 등록한 경우). 그런 후보 전부에서 규격이 맞는 행을 다 모아, 매칭된 사방넷 행이
+        // 등록한 경우, 또는 "하자"/"스크래치"처럼 상태 라벨로 별도 등록한 경우). 그런 후보
+        // 중에서도 라벨(정상/하자/스크래치 등)이 이카운트 품목명과 같은 것만 매칭 대상으로
+        // 좁힌 뒤, 남은 후보 전부에서 규격이 맞는 행을 다 모은다 - 매칭된 사방넷 행이
         // 1개면 평범하게 처리하고 2개 이상이면 전부 "중복변경"으로 값을 그대로 반영한다.
+        var ecLabel = rvmEcountLabel(it.name);
         var matchedRows = [];
         candNames.forEach(function(name){
+          if(rvmSabangLabel(name) !== ecLabel) return;
           nameGroups[name].forEach(function(ri){
             if(rvmSpecsMatch(it.spec, aoa[ri][col['옵션상세명칭']])) matchedRows.push({rowIdx:ri, sbName:name});
           });
