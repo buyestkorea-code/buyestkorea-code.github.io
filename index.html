@@ -3672,7 +3672,7 @@ else if (typeof exports === 'object')
           var v = updatedMap[ri];
           if(v === undefined){ var raw = aoa[ri][col['가상재고']]; v = raw==null?0:(Number(raw)||0); }
           total += v;
-          lines.push({name:name, spec: aoa[ri][col['옵션상세명칭']], stock: v});
+          lines.push({name:name, spec: aoa[ri][col['옵션상세명칭']], stock: v, itemCode: aoa[ri][col['자체상품코드']]});
         });
         if(total === 0) soldOut = soldOut.concat(lines);
       });
@@ -3832,10 +3832,10 @@ else if (typeof exports === 'object')
       var lines = computeRvmFullySoldOut();
       if(lines.length === 0){ rvmSetDownloadStatus('전체 품절인 상품이 없습니다.', true); return; }
       try{
-        var outAoa = [['상품명','규격','가상재고(매칭 후)']];
-        lines.forEach(function(l){ outAoa.push([l.name, l.spec, l.stock]); });
+        var outAoa = [['상품명','규격','가상재고(매칭 후)','자체상품코드']];
+        lines.forEach(function(l){ outAoa.push([l.name, l.spec, l.stock, l.itemCode||'']); });
         var ws = XLSX.utils.aoa_to_sheet(outAoa);
-        ws['!cols'] = [{wch:38},{wch:8},{wch:14}];
+        ws['!cols'] = [{wch:38},{wch:8},{wch:14},{wch:16}];
         ws['!autofilter'] = {ref: ws['!ref']};
         var wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '전체품절');
