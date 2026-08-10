@@ -590,6 +590,7 @@
             <div class="btn-row" style="margin-top:14px;">
               <button class="btn btn-primary" id="rvmDownload">변동분만 다운로드 (신규 값)</button>
               <button class="btn" id="rvmDownloadCurrent">현재값 다운로드 (화면 표 전체)</button>
+              <button class="btn" id="rvmDownloadSoldOut">전체 품절 상품만 다운로드</button>
             </div>
             <div class="status-line" id="rvmDownloadStatus" style="margin-top:8px;"></div>
           </div>
@@ -3621,7 +3622,33 @@ else if (typeof exports === 'object')
 
       state.results = results;
       state.stats = stats;
+      state.sabangNameGroups = nameGroups;
       renderRvmResults(results, stats);
+    }
+
+    // 매칭 결과를 반영한 "이후" 값 기준으로, 같은 상품명(사이즈/규격 전부)의 가상재고 합이
+    // 0이 되는 상품만 골라낸다. 오늘 새로 0이 된 것과 원래부터 0이었던 것을 구분하지 않고,
+    // 매칭 실행 후 시점의 전체 품절 여부만 본다.
+    function computeRvmFullySoldOut(){
+      var aoa = state.sabangAoa, col = state.sabangCol;
+      var updatedMap = {};
+      (state.results||[]).forEach(function(r){
+        if(r.sbRowIdx === undefined) return;
+        updatedMap[r.sbRowIdx] = (r.status === 'noChange') ? r.curStock : r.newStock;
+      });
+      var soldOut = [];
+      Object.keys(state.sabangNameGroups||{}).forEach(function(name){
+        var rows = state.sabangNameGroups[name];
+        var total = 0, lines = [];
+        rows.forEach(function(ri){
+          var v = updatedMap[ri];
+          if(v === undefined){ var raw = aoa[ri][col['가상재고']]; v = raw==null?0:(Number(raw)||0); }
+          total += v;
+          lines.push({name:name, spec: aoa[ri][col['옵션상세명칭']], stock: v});
+        });
+        if(total === 0) soldOut = soldOut.concat(lines);
+      });
+      return soldOut;
     }
 
     var RVM_STATUS_LABEL = {
@@ -3657,6 +3684,9 @@ else if (typeof exports === 'object')
       statsEl.appendChild(statCard(stats.noChange.toLocaleString('ko-KR'), '매칭됨 · 변동없음', 'var(--ink-muted)'));
       statsEl.appendChild(statCard(stats.specMismatch.toLocaleString('ko-KR'), '규격 불일치', 'var(--warning)'));
       statsEl.appendChild(statCard(stats.notFound.toLocaleString('ko-KR'), '사방넷에 상품 없음', 'var(--danger)'));
+      var soldOutProducts = computeRvmFullySoldOut();
+      var soldOutCount = new Set(soldOutProducts.map(function(l){ return l.name; })).size;
+      statsEl.appendChild(statCard(soldOutCount.toLocaleString('ko-KR'), '전체 품절 (사이즈 전부 0)', 'var(--danger)'));
 
       var table = document.getElementById('rvmTable');
       table.innerHTML = '';
@@ -3769,8 +3799,34 @@ else if (typeof exports === 'object')
       }
     }
 
+    function downloadRvmFullySoldOut(){
+      if(!state.results || state.results.length === 0){ rvmSetDownloadStatus('매칭 결과가 없습니다.', true); return; }
+      var lines = computeRvmFullySoldOut();
+      if(lines.length === 0){ rvmSetDownloadStatus('전체 품절인 상품이 없습니다.', true); return; }
+      try{
+        var outAoa = [['상품명','규격','가상재고(매칭 후)']];
+        lines.forEach(function(l){ outAoa.push([l.name, l.spec, l.stock]); });
+        var ws = XLSX.utils.aoa_to_sheet(outAoa);
+        ws['!cols'] = [{wch:38},{wch:8},{wch:14}];
+        ws['!autofilter'] = {ref: ws['!ref']};
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '전체품절');
+        var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+        var blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        deliverFile({
+          baseName: '사방넷_전체품절상품_' + timestamp(),
+          xlsxBlob: blob,
+          csvText: aoaToCsv(outAoa)
+        }, function(type, title, msg){
+          rvmSetDownloadStatus(title + (msg ? ' — ' + msg : ''), type === 'err');
+        });
+      }catch(e){
+        rvmSetDownloadStatus('다운로드 파일 생성 중 오류: ' + (e.message||e), true);
+      }
+    }
+
     function rvmReset(){
-      state.sabangAoa = null; state.ecount = null; state.results = null; state.stats = null;
+      state.sabangAoa = null; state.ecount = null; state.results = null; state.stats = null; state.sabangNameGroups = null;
       rvmMarkDropzone('sabang', '1. 사방넷단품대량수정 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요', false);
       document.getElementById('rvmSabangDrop').classList.remove('has-file');
       rvmMarkDropzone('ecount', '2. 이카운트 재고변동표 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요', false);
@@ -3822,6 +3878,15 @@ else if (typeof exports === 'object')
       rvmSetDownloadStatus('다운로드 파일 만드는 중…');
       setTimeout(function(){
         downloadRvmCurrentResult();
+        btn.disabled = false;
+      }, 20);
+    });
+    document.getElementById('rvmDownloadSoldOut').addEventListener('click', function(){
+      var btn = document.getElementById('rvmDownloadSoldOut');
+      btn.disabled = true;
+      rvmSetDownloadStatus('다운로드 파일 만드는 중…');
+      setTimeout(function(){
+        downloadRvmFullySoldOut();
         btn.disabled = false;
       }, 20);
     });
