@@ -3981,12 +3981,22 @@ else if (typeof exports === 'object')
       text = text.replace(/\s+/g, ' ').trim();
       return text;
     }
+    // 이름 전체에서 숫자/영문 토큰을 다 모으면 "26FW", "SMMBALI"처럼 시즌/브랜드 표시까지
+    // 필수 매칭 토큰이 되어버려, 재고 품목명이 품번만 달랑 등록된 경우(예: "2629786021 003")
+    // 비교할 설명 단어가 없어 매칭이 실패한다. 실제 품번은 항상 이름 끝쪽, 마지막 한글 단어
+    // 다음부터 시작하므로(MD품절 도구의 rvmCodeSuffix와 같은 방식) 그 구간만 코드 토큰으로 쓴다.
     function icmCodeTokens(name){
-      return icmCleanProductName(name).split(' ').filter(function(t){ return t && ICM_CODE_TOKEN_RE.test(t); });
+      var toks = icmCleanProductName(name).split(' ').filter(Boolean);
+      var i = toks.length;
+      while(i > 0 && !/[가-힣]/.test(toks[i-1])) i--;
+      return toks.slice(i).filter(function(t){ return ICM_CODE_TOKEN_RE.test(t); });
     }
     function icmTokenMatches(token, base, baseWords){
       if(base.indexOf(token) !== -1) return true;
-      return baseWords.some(function(w){ return w.length >= 3 && token.indexOf(w) !== -1; });
+      // 짧은 숫자만으로 된 코드(예: "929")가 다른 상품의 더 긴 숫자 코드(예: "8026929") 안에
+      // 우연히 포함되는 경우를 막기 위해, 이 역방향 포함 검사는 영문이 섞인 단어(브랜드 약자
+      // 등, 예: WKDTENUE ↔ TENUE)에만 적용하고 순수 숫자 단어에는 적용하지 않는다.
+      return baseWords.some(function(w){ return w.length >= 3 && /[A-Za-z]/.test(w) && token.indexOf(w) !== -1; });
     }
     function icmBuildStockIndex(stockAoa){
       var exactLookup = {};
