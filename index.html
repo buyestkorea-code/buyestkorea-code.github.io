@@ -4089,15 +4089,20 @@ else if (typeof exports === 'object')
     }
 
     // ---------------- 시트별 처리: 매칭 + 열 삽입(서식 보존) ----------------
+    // 엑셀 열 범위는 최대 16384(XFD)까지만 유효하다. 송장 시트들은 보통 "min=14~16384"
+    // 처럼 끝까지 덮는 열 너비 범위를 갖고 있는데, 여기에 그냥 shiftBy를 더하면 16384를
+    // 넘어버려(예: 16386) 엑셀이 파일을 손상된 것으로 보고 "복구" 경고를 띄운다 - 16384로
+    // 잘라준다.
     function icmShiftColsElement(doc, insertColIdx, shiftBy){
+      var MAX_COL = 16384;
       var colsEls = doc.getElementsByTagName('cols');
       for(var i=0;i<colsEls.length;i++){
         var colEls = colsEls[i].getElementsByTagName('col');
         for(var j=0;j<colEls.length;j++){
           var min = parseInt(colEls[j].getAttribute('min'), 10);
           var max = parseInt(colEls[j].getAttribute('max'), 10);
-          if(min >= insertColIdx) colEls[j].setAttribute('min', String(min+shiftBy));
-          if(max >= insertColIdx) colEls[j].setAttribute('max', String(max+shiftBy));
+          if(min >= insertColIdx) colEls[j].setAttribute('min', String(Math.min(min+shiftBy, MAX_COL)));
+          if(max >= insertColIdx) colEls[j].setAttribute('max', String(Math.min(max+shiftBy, MAX_COL)));
         }
       }
     }
