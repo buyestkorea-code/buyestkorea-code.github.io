@@ -4001,15 +4001,19 @@ else if (typeof exports === 'object')
     function icmBuildStockIndex(stockAoa){
       var exactLookup = {};
       var fuzzyIndex = [];
+      var priceByCode = {};
       for(var r = 2; r < stockAoa.length; r++){
         var row = stockAoa[r];
         if(!row) continue;
-        var code = row[0], name = row[1];
+        var code = row[0], name = row[1], price = row[3];
         if(code === null || code === undefined || code === '' || name === null || name === undefined || name === '') continue;
         code = icmNormalizeText(code);
         name = icmNormalizeText(name);
         if(!code || !name) continue;
         if(!(name in exactLookup)) exactLookup[name] = code;
+        if(!(code in priceByCode) && price !== null && price !== undefined && price !== ''){
+          priceByCode[code] = typeof price === 'number' ? price : Number(icmNormalizeText(price));
+        }
         var m = ICM_SIZE_TAIL_RE.exec(name);
         if(m){
           var base = name.slice(0, m.index).trim();
@@ -4017,7 +4021,7 @@ else if (typeof exports === 'object')
           fuzzyIndex.push({code:code, base:base, size:size});
         }
       }
-      return {exactLookup:exactLookup, fuzzyIndex:fuzzyIndex};
+      return {exactLookup:exactLookup, fuzzyIndex:fuzzyIndex, priceByCode:priceByCode};
     }
     function icmFindCode(name, size, exactLookup, fuzzyIndex){
       var key = icmCleanProductName(name) + ' [' + icmNormalizeSize(size) + ']';
@@ -4085,19 +4089,20 @@ else if (typeof exports === 'object')
     }
 
     // ---------------- 시트별 처리: 매칭 + 열 삽입(서식 보존) ----------------
-    function icmShiftColsElement(doc, insertColIdx){
+    function icmShiftColsElement(doc, insertColIdx, shiftBy){
       var colsEls = doc.getElementsByTagName('cols');
       for(var i=0;i<colsEls.length;i++){
         var colEls = colsEls[i].getElementsByTagName('col');
         for(var j=0;j<colEls.length;j++){
           var min = parseInt(colEls[j].getAttribute('min'), 10);
           var max = parseInt(colEls[j].getAttribute('max'), 10);
-          if(min >= insertColIdx) colEls[j].setAttribute('min', String(min+1));
-          if(max >= insertColIdx) colEls[j].setAttribute('max', String(max+1));
+          if(min >= insertColIdx) colEls[j].setAttribute('min', String(min+shiftBy));
+          if(max >= insertColIdx) colEls[j].setAttribute('max', String(max+shiftBy));
         }
       }
     }
-    function processIcmSheet(sheetName, sheet, exactLookup, fuzzyIndex, globalStats, globalIssues){
+    var ICM_INSERT_COLS = 2; // 이카운트품목코드, 입고단가
+    function processIcmSheet(sheetName, sheet, exactLookup, fuzzyIndex, priceByCode, globalStats, globalIssues){
       var doc = sheet.doc, rows = sheet.rows;
       var rowIndexMap = buildRowIndexSE(doc);
       var maxRow = 0;
@@ -4120,8 +4125,9 @@ else if (typeof exports === 'object')
         }
       }
 
-      // 2) 11번째 열(K)부터 오른쪽으로 한 칸씩 밀기 (K→L, L→M, M→N ...)
-      icmShiftColsElement(doc, 11);
+      // 2) 11번째 열(K)부터 오른쪽으로 두 칸씩 밀기 (K→M, L→N, M→O ...) - 이카운트품목코드,
+      //    입고단가 두 열이 새로 끼워지기 때문에 1칸이 아니라 2칸을 민다.
+      icmShiftColsElement(doc, 11, ICM_INSERT_COLS);
       Object.keys(rowIndexMap).forEach(function(rKey){
         var rowEl = rowIndexMap[rKey];
         var cells = Array.prototype.slice.call(rowEl.getElementsByTagName('c'));
@@ -4129,19 +4135,26 @@ else if (typeof exports === 'object')
           .filter(function(x){ return x.col >= 11; })
           .sort(function(a,b){ return b.col - a.col; });
         toShift.forEach(function(x){
-          var newRef = colLetter(x.col+1) + rowEl.getAttribute('r');
+          var newRef = colLetter(x.col+ICM_INSERT_COLS) + rowEl.getAttribute('r');
           x.el.setAttribute('r', newRef);
         });
       });
 
-      // 3) 새 열(K, 11번째) 채우기: 헤더 + 매칭된 코드
+      // 3) 새 열(K=11 이카운트품목코드, L=12 입고단가) 채우기: 헤더 + 매칭된 코드/가격
       var headerRowEl = rowIndexMap[1];
-      if(headerRowEl) setCellText(doc, headerRowEl, 11, '이카운트품목코드');
+      if(headerRowEl){
+        setCellText(doc, headerRowEl, 11, '이카운트품목코드');
+        setCellText(doc, headerRowEl, 12, '입고단가');
+      }
       Object.keys(matches).forEach(function(rKey){
         var result = matches[rKey];
         if(result.code){
           var rowEl = rowIndexMap[rKey];
-          if(rowEl) setCellText(doc, rowEl, 11, result.code);
+          if(rowEl){
+            setCellText(doc, rowEl, 11, result.code);
+            var price = priceByCode[result.code];
+            if(typeof price === 'number' && !isNaN(price)) setCellNumber(doc, rowEl, 12, price);
+          }
         }
       });
 
@@ -4155,7 +4168,7 @@ else if (typeof exports === 'object')
       inv.sheetNames.forEach(function(name){
         var sheet = inv.parsedSheets[name];
         if(!sheet.isTarget) return;
-        processIcmSheet(name, sheet, state.stock.exactLookup, state.stock.fuzzyIndex, globalStats, globalIssues);
+        processIcmSheet(name, sheet, state.stock.exactLookup, state.stock.fuzzyIndex, state.stock.priceByCode, globalStats, globalIssues);
       });
       state.stats = globalStats;
       state.issues = globalIssues;
