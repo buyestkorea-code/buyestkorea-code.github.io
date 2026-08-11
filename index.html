@@ -3694,6 +3694,11 @@ else if (typeof exports === 'object')
       if(r.status === 'changed' || r.status === 'dupChanged') return r.newStock;
       return r.status === 'noChange' ? r.item.remain : '';
     }
+    function rvmSbCode(r){
+      if(r.sbRowIdx === undefined) return '';
+      var v = state.sabangAoa[r.sbRowIdx][state.sabangCol['사방넷상품코드']];
+      return v == null ? '' : v;
+    }
 
     function renderRvmResults(results, stats){
       document.getElementById('rvmResultPanel').style.display = 'block';
@@ -3718,7 +3723,7 @@ else if (typeof exports === 'object')
 
       var table = document.getElementById('rvmTable');
       table.innerHTML = '';
-      var cols = ['품목명','규격','상태','사방넷 상품명','기존 가상재고','신규 값(잔량)'];
+      var cols = ['품목명','규격','상태','사방넷 상품명','사방넷상품코드','기존 가상재고','신규 값(잔량)'];
       var thead = el('thead');
       var htr = el('tr');
       cols.forEach(function(c){
@@ -3738,6 +3743,7 @@ else if (typeof exports === 'object')
         statusTd.appendChild(el('span', {class:'chip ' + RVM_STATUS_CHIP[r.status]}, [document.createTextNode(RVM_STATUS_LABEL[r.status])]));
         tr.appendChild(statusTd);
         tr.appendChild(td(r.sbName || ''));
+        tr.appendChild(td(rvmSbCode(r)));
         tr.appendChild(td(r.curStock === undefined ? '' : r.curStock, true));
         tr.appendChild(td(rvmNewValueDisplay(r), true));
         tbody.appendChild(tr);
@@ -3797,10 +3803,10 @@ else if (typeof exports === 'object')
     // 화면에 보이는 매칭 결과 표(반영예정·변동없음·규격불일치·중복·상품없음 전부)를 그대로 다운로드한다.
     // 사방넷 재업로드용 파일이 아니라, 지금 화면 상태를 그대로 기록해두는 결과표다.
     function buildRvmFullResultAoa(){
-      var header = ['품목명','규격','상태','사방넷 상품명','기존 가상재고','신규 값(잔량)'];
+      var header = ['품목명','규격','상태','사방넷 상품명','사방넷상품코드','기존 가상재고','신규 값(잔량)'];
       var aoa = [header];
       rvmSortedResults(state.results||[]).forEach(function(r){
-        aoa.push([r.item.name, r.item.spec, RVM_STATUS_LABEL[r.status], r.sbName||'', r.curStock===undefined?'':r.curStock, rvmNewValueDisplay(r)]);
+        aoa.push([r.item.name, r.item.spec, RVM_STATUS_LABEL[r.status], r.sbName||'', rvmSbCode(r), r.curStock===undefined?'':r.curStock, rvmNewValueDisplay(r)]);
       });
       return aoa;
     }
@@ -3809,7 +3815,7 @@ else if (typeof exports === 'object')
       try{
         var outAoa = buildRvmFullResultAoa();
         var ws = XLSX.utils.aoa_to_sheet(outAoa);
-        ws['!cols'] = [{wch:38},{wch:8},{wch:12},{wch:38},{wch:12},{wch:12}];
+        ws['!cols'] = [{wch:38},{wch:8},{wch:12},{wch:38},{wch:16},{wch:12},{wch:12}];
         ws['!autofilter'] = {ref: ws['!ref']};
         var wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '매칭결과');
