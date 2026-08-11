@@ -591,6 +591,7 @@
               <button class="btn btn-primary" id="rvmDownload">변동분만 다운로드 (신규 값)</button>
               <button class="btn" id="rvmDownloadCurrent">현재값 다운로드 (화면 표 전체)</button>
               <button class="btn" id="rvmDownloadSoldOut">전체 품절 상품만 다운로드</button>
+              <button class="btn" id="rvmDownloadRestocked">품절 해제 대상만 다운로드 (반품·재입고로 재판매 가능)</button>
             </div>
             <div class="status-line" id="rvmDownloadStatus" style="margin-top:8px;"></div>
           </div>
@@ -3679,6 +3680,37 @@ else if (typeof exports === 'object')
       return soldOut;
     }
 
+    // 위 computeRvmFullySoldOut()의 반대: 매칭 전(사방넷 원래 값 기준)에는 같은 상품명의
+    // 사이즈/규격 전부가 0(완전 품절)이었는데, 오늘 매칭 결과 하나라도 +가 된 상품만 골라낸다.
+    // 반품(이카운트 판매가 마이너스로 잡히는 경우)이든 재구매/재입고(증가→구매)든, 이카운트
+    // 잔량에는 이미 그 결과가 반영돼 있으므로 원인을 구분할 필요 없이 "이전 0 → 이후 0 초과"
+    // 조건 하나로 두 경우 다 잡힌다. MD팀이 수동으로 정지시켜둔 상품을 다시 라이브로 돌려야
+    // 하는 대상을 찾는 용도다.
+    function computeRvmNewlyRestocked(){
+      var aoa = state.sabangAoa, col = state.sabangCol;
+      var updatedMap = {};
+      (state.results||[]).forEach(function(r){
+        if(r.sbRowIdx === undefined) return;
+        updatedMap[r.sbRowIdx] = (r.status === 'noChange') ? r.curStock : r.newStock;
+      });
+      var restocked = [];
+      Object.keys(state.sabangNameGroups||{}).forEach(function(name){
+        var rows = state.sabangNameGroups[name];
+        var beforeTotal = 0, afterTotal = 0, lines = [];
+        rows.forEach(function(ri){
+          var raw = aoa[ri][col['가상재고']];
+          var before = raw==null?0:(Number(raw)||0);
+          beforeTotal += before;
+          var after = updatedMap[ri];
+          if(after === undefined) after = before;
+          afterTotal += after;
+          lines.push({name:name, spec: aoa[ri][col['옵션상세명칭']], beforeStock: before, afterStock: after, itemCode: aoa[ri][col['자체상품코드']]});
+        });
+        if(beforeTotal === 0 && afterTotal > 0) restocked = restocked.concat(lines);
+      });
+      return restocked;
+    }
+
     var RVM_STATUS_LABEL = {
       changed: '반영예정', dupChanged: '중복변경', noChange: '변동없음', specMismatch: '규격 불일치', notFound: '상품 없음'
     };
@@ -3720,6 +3752,9 @@ else if (typeof exports === 'object')
       var soldOutProducts = computeRvmFullySoldOut();
       var soldOutCount = new Set(soldOutProducts.map(function(l){ return l.name; })).size;
       statsEl.appendChild(statCard(soldOutCount.toLocaleString('ko-KR'), '전체 품절 (사이즈 전부 0)', 'var(--danger)'));
+      var restockedProducts = computeRvmNewlyRestocked();
+      var restockedCount = new Set(restockedProducts.map(function(l){ return l.name; })).size;
+      statsEl.appendChild(statCard(restockedCount.toLocaleString('ko-KR'), '품절 해제 필요 (반품·재입고)', 'var(--success)'));
 
       var table = document.getElementById('rvmTable');
       table.innerHTML = '';
@@ -3859,6 +3894,32 @@ else if (typeof exports === 'object')
       }
     }
 
+    function downloadRvmNewlyRestocked(){
+      if(!state.results || state.results.length === 0){ rvmSetDownloadStatus('매칭 결과가 없습니다.', true); return; }
+      var lines = computeRvmNewlyRestocked();
+      if(lines.length === 0){ rvmSetDownloadStatus('품절 해제 대상 상품이 없습니다.', true); return; }
+      try{
+        var outAoa = [['상품명','규격','기존 가상재고','신규 가상재고','자체상품코드']];
+        lines.forEach(function(l){ outAoa.push([l.name, l.spec, l.beforeStock, l.afterStock, l.itemCode||'']); });
+        var ws = XLSX.utils.aoa_to_sheet(outAoa);
+        ws['!cols'] = [{wch:38},{wch:8},{wch:12},{wch:12},{wch:16}];
+        ws['!autofilter'] = {ref: ws['!ref']};
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '품절해제대상');
+        var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+        var blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        deliverFile({
+          baseName: '사방넷_품절해제대상_' + timestamp(),
+          xlsxBlob: blob,
+          csvText: aoaToCsv(outAoa)
+        }, function(type, title, msg){
+          rvmSetDownloadStatus(title + (msg ? ' — ' + msg : ''), type === 'err');
+        });
+      }catch(e){
+        rvmSetDownloadStatus('다운로드 파일 생성 중 오류: ' + (e.message||e), true);
+      }
+    }
+
     function rvmReset(){
       state.sabangAoa = null; state.ecount = null; state.results = null; state.stats = null; state.sabangNameGroups = null;
       rvmMarkDropzone('sabang', '1. 사방넷단품대량수정 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요', false);
@@ -3921,6 +3982,15 @@ else if (typeof exports === 'object')
       rvmSetDownloadStatus('다운로드 파일 만드는 중…');
       setTimeout(function(){
         downloadRvmFullySoldOut();
+        btn.disabled = false;
+      }, 20);
+    });
+    document.getElementById('rvmDownloadRestocked').addEventListener('click', function(){
+      var btn = document.getElementById('rvmDownloadRestocked');
+      btn.disabled = true;
+      rvmSetDownloadStatus('다운로드 파일 만드는 중…');
+      setTimeout(function(){
+        downloadRvmNewlyRestocked();
         btn.disabled = false;
       }, 20);
     });
