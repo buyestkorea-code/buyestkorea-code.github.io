@@ -383,6 +383,11 @@
     </nav>
 
     <nav class="nav-group">
+      <span class="nav-group-label">이미지 · 영상</span>
+      <button class="nav-item" data-nav="studio"><span class="ic">&#10022;</span>Studio (AI 보정/영상)<span class="chip chip-ready">사용가능</span></button>
+    </nav>
+
+    <nav class="nav-group">
       <span class="nav-group-label">개발 예정</span>
       <button class="nav-item" data-nav="roadmap" data-roadmap-target="rm-brand"><span class="ic">&#9675;</span>브랜드 매칭<span class="chip chip-soon">준비중</span></button>
       <button class="nav-item" data-nav="roadmap" data-roadmap-target="rm-naver"><span class="ic">&#9675;</span>네이버 가격비교<span class="chip chip-soon">준비중</span></button>
@@ -797,6 +802,11 @@
         </div>
       </section>
 
+      <!-- ============ STUDIO ============ -->
+      <section data-view="studio">
+        <iframe src="studio.html" title="BUYEST Kids Studio" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <!-- ============ ROADMAP ============ -->
       <section data-view="roadmap">
         <div class="hero">
@@ -1190,7 +1200,7 @@ else if (typeof exports === 'object')
 
   // 배포/캐시 문제로 "고쳤는데도 그대로다" 라는 신고가 반복될 때, 지금 화면이 실제로
   // 어느 빌드를 쓰고 있는지 즉시 확인할 수 있게 진단 메시지에 넣어 보여준다.
-  var BUILD_STAMP = '20260807-rawjson';
+  var BUILD_STAMP = '20260812-studio';
 
   /* ---------------- Navigation ---------------- */
   var sidebar = document.getElementById('sidebar');
@@ -1200,7 +1210,7 @@ else if (typeof exports === 'object')
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', sabangEcount:'사방넷-이카운트 매칭',
     stockMove:'MD 품절', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
-    orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', studio:'Studio (AI 보정/영상)', roadmap:'개발 예정 도구'
   };
 
   function closeDrawer(){
