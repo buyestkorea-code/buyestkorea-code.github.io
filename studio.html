@@ -320,7 +320,7 @@
       promptPlaceholder: "예: 화이트 밸런스 살짝 따뜻하게",
       showBgMode: false,
       showCinema: false,
-      async: false,
+      resultType: "image",
     },
     background: {
       title: "Sfondo",
@@ -330,7 +330,7 @@
       promptPlaceholder: "예: 크림톤 스튜디오 배경, 은은한 그림자",
       showBgMode: true,
       showCinema: false,
-      async: false,
+      resultType: "image",
     },
     reel: {
       title: "Reel",
@@ -340,7 +340,7 @@
       promptPlaceholder: "예: 카메라 살짝 줌인, 옷자락 흔들림",
       showBgMode: false,
       showCinema: false,
-      async: true,
+      resultType: "video",
     },
     cinema: {
       title: "Cinema",
@@ -350,7 +350,7 @@
       promptPlaceholder: "예: 아이가 천천히 돌아보는 룩북 컷",
       showBgMode: false,
       showCinema: true,
-      async: true,
+      resultType: "video",
     },
   };
 
@@ -450,14 +450,9 @@
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "생성 실패");
 
-      if (s.async) {
-        // 영상은 request_id를 받아 폴링
-        showStatus("영상 생성 중입니다… (최대 1~2분 소요)");
-        await pollResult(data.request_id || data.id, s);
-      } else {
-        showResult(data.output_url || data.url, "image");
-        showStatus("완료되었습니다.");
-      }
+      // muapi.ai는 모든 요청이 request_id를 반환하는 비동기 방식이므로 항상 폴링합니다.
+      showStatus("생성 중입니다… (최대 1~2분 소요)");
+      await pollResult(data.request_id || data.id, s);
     } catch (err) {
       showStatus(err.message, true);
     } finally {
@@ -471,15 +466,16 @@
       await new Promise((r) => setTimeout(r, 3000));
       const res = await fetch(`${WORKER_URL}/api/result?id=${requestId}`);
       const data = await res.json();
-      if (data.status === "succeeded" || data.status === "completed") {
-        showResult(data.output_url || data.url, "video");
+      if (data.status === "completed" || data.status === "succeeded") {
+        const outputUrl = (data.outputs && data.outputs[0]) || data.output_url || data.url;
+        showResult(outputUrl, studio.resultType);
         showStatus("완료되었습니다.");
         return;
       }
       if (data.status === "failed") {
-        throw new Error("영상 생성에 실패했습니다.");
+        throw new Error(data.error || "생성에 실패했습니다.");
       }
-      showStatus(`영상 생성 중입니다… (${i + 1}회 확인)`);
+      showStatus(`생성 중입니다… (${i + 1}회 확인)`);
     }
     throw new Error("시간이 초과되었습니다. 잠시 후 다시 시도해주세요.");
   }
