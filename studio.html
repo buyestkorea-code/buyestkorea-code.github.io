@@ -355,7 +355,8 @@
   };
 
   let currentStudio = "retouch";
-  let uploadedImageUrl = null; // Worker에 base64로 보낼 것이므로 실제로는 data URL 사용
+  let uploadedImageUrl = null; // 미리보기용 data URL
+  let uploadedHostedUrl = null; // muapi에 업로드해서 받은 실제 이미지 URL (studio 호출에 필요)
 
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("fileInput");
@@ -403,6 +404,7 @@
     const reader = new FileReader();
     reader.onload = () => {
       uploadedImageUrl = reader.result; // data:image/...;base64,...
+      uploadedHostedUrl = null; // 새 이미지이므로 재업로드 필요
       dropzone.classList.add("has-image");
       dropzoneHint.style.display = "none";
       dropzone.innerHTML = `<img src="${uploadedImageUrl}" alt="업로드한 이미지" />`;
@@ -431,17 +433,30 @@
     resultBox.classList.remove("show");
     showStatus("생성 요청 중입니다…");
 
-    const body = {
-      imageUrl: uploadedImageUrl,
-      prompt: document.getElementById("promptInput").value,
-    };
-    if (s.showBgMode) body.mode = document.getElementById("bgMode").value;
-    if (s.showCinema) {
-      body.focalLength = document.getElementById("focalLength").value;
-      body.aperture = document.getElementById("aperture").value;
-    }
-
     try {
+      if (!uploadedHostedUrl) {
+        showStatus("이미지 업로드 중입니다…");
+        const upRes = await fetch(WORKER_URL + "/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dataUrl: uploadedImageUrl }),
+        });
+        const upData = await upRes.json();
+        if (!upRes.ok || upData.error) throw new Error(upData.error || "이미지 업로드 실패");
+        uploadedHostedUrl = upData.url;
+      }
+
+      const body = {
+        imageUrl: uploadedHostedUrl,
+        prompt: document.getElementById("promptInput").value,
+      };
+      if (s.showBgMode) body.mode = document.getElementById("bgMode").value;
+      if (s.showCinema) {
+        body.focalLength = document.getElementById("focalLength").value;
+        body.aperture = document.getElementById("aperture").value;
+      }
+
+      showStatus("생성 요청 중입니다…");
       const res = await fetch(WORKER_URL + s.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
