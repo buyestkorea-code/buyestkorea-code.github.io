@@ -2210,19 +2210,38 @@ else if (typeof exports === 'object')
     // 통째로 인식 실패했다. FW/AW는 이런 오인식이 관측되지 않아 그대로 두고, SS만 두 글자
     // 자리에 흔한 오인식 문자들을 허용한다.
     var DANIEL_LINE_PAT = /^(.+?)\s*(FW\d{2}|AW\d{2}|[S85$§]{2}\d{2})\s+(.+?)(?:\s+Customs)?\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)\b/;
+    // "11"처럼 좁은 숫자 두 개가 붙어 있으면 OCR이 따옴표(")나 비슷한 기호로 잘못 읽어
+    // 수량 칸이 숫자로 안 잡히는 경우가 있다. 그런 줄은 위 패턴이 실패하는데, "단가 x 수량 =
+    // 합계"라는 인보이스 구조를 거꾸로 이용해 합계/단가로 수량을 역산한다(수량 칸은 어떤
+    // 문자든 하나로 취급해 건너뛴다). 나눈 값이 정수에 아주 가까울 때만 채택해서, 정말
+    // 계산이 안 맞는 줄까지 억지로 품목으로 잡아버리는 걸 막는다.
+    var DANIEL_LINE_PAT_QTYFALLBACK = /^(.+?)\s*(FW\d{2}|AW\d{2}|[S85$§]{2}\d{2})\s+(.+?)(?:\s+Customs)?\s+\S+\s+([\d.,]+)\s+([\d.,]+)\b/;
     function parseDaniel(pagesLines){
       var items = [];
       pagesLines.forEach(function(lines){
         var i = 0;
         while(i < lines.length){
-          var m = DANIEL_LINE_PAT.exec(lines[i].trim());
+          var line = lines[i].trim();
+          var code, desc, qty, unitPrice;
+          var m = DANIEL_LINE_PAT.exec(line);
           if(m){
-            var code = m[1].replace(/\s+/g,'').replace(/^[^A-Za-z0-9]+/,'');
-            var desc = m[3].trim();
-            var qty = parseInt(m[4],10);
-            var unitPrice = numIt(m[5]);
+            code = m[1]; desc = m[3]; qty = parseInt(m[4],10); unitPrice = numIt(m[5]);
+          } else {
+            var m2 = DANIEL_LINE_PAT_QTYFALLBACK.exec(line);
+            if(m2){
+              var price2 = numIt(m2[4]), amount2 = numIt(m2[5]);
+              if(price2 > 0){
+                var computed = amount2 / price2, rounded = Math.round(computed);
+                if(rounded > 0 && Math.abs(computed - rounded) < 0.02){
+                  code = m2[1]; desc = m2[3]; qty = rounded; unitPrice = price2;
+                }
+              }
+            }
+          }
+          if(code !== undefined){
+            code = code.replace(/\s+/g,'').replace(/^[^A-Za-z0-9]+/,'');
             var note = findCountryInText(lines.slice(i+1, i+4).join(' '));
-            items.push({model:code, name:desc, qty:qty, unitPrice:unitPrice, note:note, brand:''});
+            items.push({model:code, name:desc.trim(), qty:qty, unitPrice:unitPrice, note:note, brand:''});
           }
           i++;
         }
