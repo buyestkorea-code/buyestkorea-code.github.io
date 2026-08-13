@@ -28,19 +28,74 @@
 </head>
 <body>
   <h1>이카운트 변동분 → BUYEST 품절 반영</h1>
-  <p>오늘 이카운트에서 재고가 바뀐 품목만 가져와요. 매핑 실패한 건 BUYEST 상품코드를 직접 입력해야 실행돼요.</p>
+  <p>이카운트에서 다운받은 재고변동표 엑셀을 올리면, 그 품목들만 이카운트 API로 최신 재고를 다시 확인해요. 매핑 실패한 건 BUYEST 상품코드를 직접 입력해야 실행돼요.</p>
 
-  <button class="btn btn-primary" id="loadBtn" onclick="loadDelta()">이카운트 변동 조회</button>
+  <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadFromExcel(this.files[0])">
+  <button class="btn btn-primary" id="loadBtn" onclick="loadDelta()">(대안) 이카운트 API로 자동 변동 조회</button>
   <button class="btn btn-danger" id="execBtn" onclick="execute()" disabled style="display:none">최종 실행 (실제 품절처리)</button>
 
   <div id="status"></div>
   <div id="result"></div>
   <div id="tableWrap"></div>
 
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script>
 const DELTA_URL = 'https://buyest.co.kr/ecount_sync_delta_api.php';
+const REPORT_URL = 'https://buyest.co.kr/ecount_sync_report_api.php';
 const EXEC_URL = 'https://buyest.co.kr/ecount_sync_execute_api.php';
 let currentItems = [];
+
+async function loadFromExcel(file) {
+  if (!file) return;
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const execBtn = document.getElementById('execBtn');
+  const tableWrap = document.getElementById('tableWrap');
+  result.textContent = ''; result.className = '';
+  tableWrap.innerHTML = '';
+  execBtn.style.display = 'none';
+  status.textContent = '엑셀 읽는 중...';
+
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+
+    // rows 0-2 are the title + two-level header; data starts at row 3
+    const rows = [];
+    for (let i = 3; i < grid.length; i++) {
+      const r = grid[i];
+      if (!r || !r[0]) continue;
+      rows.push({ ec_code: String(r[0]).trim(), ec_name: (r[1] || '').toString().trim(), size: (r[2] || '').toString().trim() });
+    }
+    if (!rows.length) throw new Error('엑셀에서 품목을 못 찾았어요 (형식이 다른 파일인가요?)');
+
+    status.textContent = `엑셀에서 ${rows.length}건 읽음, 이카운트에서 최신 재고 확인 중...`;
+
+    const res = await fetch(REPORT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+
+    currentItems = data.items;
+    let msg = `총 ${data.items.length}건 (매핑실패 ${data.items.filter(i=>i.status==='failed').length}건)`;
+    if (data.not_found_in_ecount && data.not_found_in_ecount.length) {
+      msg += ` — 이카운트에서 조회 안 된 ${data.not_found_in_ecount.length}건은 제외됨`;
+    }
+    status.textContent = msg;
+    renderTable();
+    execBtn.style.display = 'inline-block';
+    updateExecButton();
+  } catch (e) {
+    status.textContent = '';
+    result.textContent = '오류: ' + e.message;
+    result.className = 'err';
+  }
+}
 
 async function loadDelta() {
   const loadBtn = document.getElementById('loadBtn');
