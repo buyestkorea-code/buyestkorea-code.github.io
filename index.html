@@ -2205,7 +2205,11 @@ else if (typeof exports === 'object')
       return items;
     }
 
-    var DANIEL_LINE_PAT = /^(.+?)\s*(FW\d{2}|SS\d{2}|AW\d{2})\s+(.+?)(?:\s+Customs)?\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)\b/;
+    // "SS26"의 첫/둘째 글자 S가 OCR에서 8, $, 5, §로 자주 오인식된다(예: "S826", "8826",
+    // "$826", "5826", "§526") - 실제 다니엘 인보이스에서 SS 시즌 품목 다수가 이 때문에
+    // 통째로 인식 실패했다. FW/AW는 이런 오인식이 관측되지 않아 그대로 두고, SS만 두 글자
+    // 자리에 흔한 오인식 문자들을 허용한다.
+    var DANIEL_LINE_PAT = /^(.+?)\s*(FW\d{2}|AW\d{2}|[S85$§]{2}\d{2})\s+(.+?)(?:\s+Customs)?\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)\b/;
     function parseDaniel(pagesLines){
       var items = [];
       pagesLines.forEach(function(lines){
