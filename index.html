@@ -186,12 +186,17 @@
   .section-head h2{ font-size:15px; letter-spacing:.02em; }
   .section-head .hint{ font-size:12.5px; color:var(--ink-muted); }
 
+  .card-group-label{
+    font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-muted); margin:18px 0 8px;
+  }
+  .card-group-label:first-of-type{ margin-top:4px; }
   .card-grid{
-    display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px;
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px;
   }
   .tool-card{
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
-    padding:18px; display:flex; flex-direction:column; gap:10px; text-align:left;
+    padding:13px; display:flex; flex-direction:column; gap:7px; text-align:left;
     cursor:pointer; box-shadow:var(--shadow); transition:transform .12s ease, border-color .12s ease;
   }
   .tool-card:hover{ border-color:var(--accent); transform:translateY(-1px); }
@@ -199,11 +204,14 @@
   .tool-card:disabled:hover, .tool-card.disabled:hover{ transform:none; border-color:var(--border); }
   .tool-card-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
   .tool-card .ic{
-    width:38px;height:38px;border-radius:9px; background:var(--accent-soft); color:var(--accent);
-    display:flex;align-items:center;justify-content:center; font-size:18px; flex:none;
+    width:30px;height:30px;border-radius:8px; background:var(--accent-soft); color:var(--accent);
+    display:flex;align-items:center;justify-content:center; font-size:14px; flex:none;
   }
-  .tool-card h3{ font-size:15px; }
-  .tool-card p{ margin:0; font-size:13px; color:var(--ink-muted); }
+  .tool-card h3{ font-size:13.5px; }
+  .tool-card p{
+    margin:0; font-size:12px; color:var(--ink-muted); line-height:1.45;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
 
   .note-band{
     display:flex; gap:10px; align-items:flex-start;
@@ -419,6 +427,7 @@
           <h2>지금 사용 가능</h2>
           <span class="hint">클릭하면 바로 시작합니다</span>
         </div>
+        <div class="card-group-label">재고 · 발주</div>
         <div class="card-grid">
           <button class="tool-card" data-nav="inventory">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
@@ -445,11 +454,6 @@
             <h3>이카운트 -송장 재고매칭 (CS)</h3>
             <p>송장 엑셀의 상품명·사이즈를 이카운트 재고현황과 매칭해 이카운트 품목코드를 자동으로 채워 넣습니다. 서식은 그대로 유지됩니다.</p>
           </button>
-          <button class="tool-card" data-nav="invoice">
-            <div class="tool-card-top"><div class="ic">&#8618;</div><span class="chip chip-ready">사용가능</span></div>
-            <h3>인보이스 자동인식</h3>
-            <p>갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일 인보이스에서 거래처를 자동 인식하고 품목을 추출합니다. 스캔본은 브라우저 안에서 OCR로 처리합니다.</p>
-          </button>
           <button class="tool-card" data-nav="stocktake">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>재고조사 (바코드 실사)</h3>
@@ -460,6 +464,19 @@
             <h3>주문서 창고위치찾기</h3>
             <p>사방넷 주문서의 상품명·쇼핑몰 표기를 정리하고, 상품코드·사이즈를 뽑아 현재 재고장과 매칭해 재고 위치를 찾아줍니다.</p>
           </button>
+        </div>
+
+        <div class="card-group-label">문서 변환</div>
+        <div class="card-grid">
+          <button class="tool-card" data-nav="invoice">
+            <div class="tool-card-top"><div class="ic">&#8618;</div><span class="chip chip-ready">사용가능</span></div>
+            <h3>인보이스 자동인식</h3>
+            <p>갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일 인보이스에서 거래처를 자동 인식하고 품목을 추출합니다. 스캔본은 브라우저 안에서 OCR로 처리합니다.</p>
+          </button>
+        </div>
+
+        <div class="card-group-label">이미지 · 영상</div>
+        <div class="card-grid">
           <button class="tool-card" data-nav="studio">
             <div class="tool-card-top"><div class="ic">&#10022;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>Studio (AI 보정/영상)</h3>
