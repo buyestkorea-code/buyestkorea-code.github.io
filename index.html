@@ -2205,7 +2205,11 @@ else if (typeof exports === 'object')
       return items;
     }
 
-    var DANIEL_LINE_PAT = /^(.+?)\s*(FW\d{2}|SS\d{2}|AW\d{2})\s+(.+?)(?:\s+Customs)?\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)\b/;
+    // "SS26"의 첫/둘째 글자 S가 OCR에서 8, $, 5, §로 자주 오인식된다(예: "S826", "8826",
+    // "$826", "5826", "§526") - 실제 다니엘 인보이스에서 SS 시즌 품목 다수가 이 때문에
+    // 통째로 인식 실패했다. FW/AW는 이런 오인식이 관측되지 않아 그대로 두고, SS만 두 글자
+    // 자리에 흔한 오인식 문자들을 허용한다.
+    var DANIEL_LINE_PAT = /^(.+?)\s*(FW\d{2}|AW\d{2}|[S85$§]{2}\d{2})\s+(.+?)(?:\s+Customs)?\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)\b/;
     function parseDaniel(pagesLines){
       var items = [];
       pagesLines.forEach(function(lines){
@@ -2433,7 +2437,20 @@ else if (typeof exports === 'object')
         if(!cur || Math.abs(it.y - cur.y) > Y_TOL){ cur = {y: it.y, items:[it]}; lines.push(cur); }
         else cur.items.push(it);
       });
-      return lines.map(function(l){ l.items.sort(function(a,b){ return a.x-b.x; }); return l.items.map(function(i){ return i.str; }).join(' '); });
+      // 일부 인보이스(비니 등)는 숫자 한 칸(예: "12,0%")을 글자/조각 단위 텍스트 항목 여러 개로
+      // 쪼개서 렌더링한다("1","2",",0%") - 실측 좌표상 이런 조각들 사이 간격은 항상 0에 가깝고,
+      // 진짜 다른 칸으로 넘어가는 지점은 항상 5pt 이상 벌어져 있어서 확실히 구분된다. 간격이
+      // 거의 없을 때만 공백 없이 붙이고, 그 외에는 공백을 넣어 원래 칸 구분을 그대로 살린다.
+      return lines.map(function(l){
+        l.items.sort(function(a,b){ return a.x-b.x; });
+        var out = '', prevEnd = null;
+        l.items.forEach(function(it){
+          if(prevEnd !== null && (it.x - prevEnd) > 1) out += ' ';
+          out += it.str;
+          prevEnd = it.x + it.w;
+        });
+        return out;
+      });
     }
 
     /* ---- OCR worker (Tesseract.js, fully offline via shim) ---- */
@@ -3065,7 +3082,8 @@ else if (typeof exports === 'object')
       // OCR만 돌리고 파싱은 안 해서, 나온 pagesLines를 콘솔에서 직접 parseStyle에
       // 넣어볼 수 있게 한다 (JSON으로 한 번 옮겨적는 과정 없이, 실제 배열 참조 그대로).
       extractRaw: async function(entry){
-        var extracted = await extractPdfPagesLines(entry.file, true, function(){});
+        var cfg = VENDOR_PARSERS[entry.vendor];
+        var extracted = await extractPdfPagesLines(entry.file, !!(cfg && cfg.ocr), function(){});
         return extracted.pagesLines;
       }
     };
