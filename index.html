@@ -372,6 +372,7 @@
       <button class="nav-item" data-nav="inventory"><span class="ic">&#8942;</span>재고 세로변환<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="sabangEcount"><span class="ic">&#8942;</span>사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stockMove"><span class="ic">&#8942;</span>MD 품절<span class="chip chip-ready">사용가능</span></button>
+      <button class="nav-item" data-nav="buyestSoldOut"><span class="ic">&#8942;</span>바이스트사이트 품절<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="icm"><span class="ic">&#8942;</span>이카운트 -송장 재고매칭 (CS)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stocktake"><span class="ic">&#8942;</span>재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="orderStock"><span class="ic">&#8942;</span>주문서 창고위치찾기<span class="chip chip-ready">사용가능</span></button>
@@ -803,6 +804,10 @@
       </section>
 
       <!-- ============ STUDIO ============ -->
+      <section data-view="buyestSoldOut">
+        <iframe src="ecount-sync-delta.html" title="바이스트사이트 품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <section data-view="studio">
         <iframe src="studio.html" title="BUYEST Kids Studio" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
@@ -1209,7 +1214,7 @@ else if (typeof exports === 'object')
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', sabangEcount:'사방넷-이카운트 매칭',
-    stockMove:'MD 품절', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
+    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
     orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', studio:'Studio (AI 보정/영상)', roadmap:'개발 예정 도구'
   };
 
