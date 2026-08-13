@@ -2254,7 +2254,7 @@ else if (typeof exports === 'object')
         var i = 0;
         while(i < lines.length){
           var line = lines[i].trim();
-          var code, desc, qty, unitPrice;
+          var code = undefined, desc, qty, unitPrice;
           var m = DANIEL_LINE_PAT.exec(line);
           if(m){
             code = m[1]; desc = m[3]; qty = parseInt(m[4],10); unitPrice = numIt(m[5]);
