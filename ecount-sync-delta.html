@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>이카운트 변동 → BUYEST 품절 반영</title>
 <style>
-  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1000px; margin: 40px auto; padding: 0 20px; background: #fafafa; color: #222; }
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1100px; margin: 40px auto; padding: 0 20px; background: #fafafa; color: #222; }
   h1 { font-size: 20px; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
   .badge.warn { background: #fef3c7; color: #92400e; }
@@ -25,6 +25,12 @@
   #result { margin-top: 16px; padding: 12px; border-radius: 6px; }
   #result.ok { background: #f0fdf4; color: #15803d; }
   #result.err { background: #fef2f2; color: #b91c1c; }
+  .tag-sale { color: #15803d; }
+  .tag-soldout { color: #b91c1c; }
+  .tag-nochange { color: #9ca3af; }
+  .chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+  .chip-soldout { background: #fef2f2; color: #b91c1c; }
+  .chip-sale { background: #f0fdf4; color: #15803d; }
 </style>
 </head>
 <body>
@@ -47,6 +53,8 @@ const REPORT_URL = 'https://buyest.co.kr/ecount_sync_report_api.php';
 const EXEC_URL = 'https://buyest.co.kr/ecount_sync_execute_api.php';
 const SAVE_MAP_URL = 'https://buyest.co.kr/ecount_sync_save_mapping_api.php';
 let currentItems = [];
+
+const STATE_LABEL = { sale: '판매중', soldout: '품절' };
 
 async function loadFromExcel(file) {
   if (!file) return;
@@ -142,6 +150,17 @@ async function loadDelta() {
   }
 }
 
+function changeCellHtml(it) {
+  if (!it.before || !it.after) return '<span class="tag-nochange">-</span>';
+  if (!it.changed) return `<span class="tag-nochange">${STATE_LABEL[it.after]} (변경없음)</span>`;
+  return `<span class="tag-${it.before}">${STATE_LABEL[it.before]}</span> → <span class="tag-${it.after}">${STATE_LABEL[it.after]}</span>`;
+}
+
+function wholeCellHtml(it) {
+  if (!it.whole_after) return '-';
+  return `<span class="chip chip-${it.whole_after}">${STATE_LABEL[it.whole_after]}</span>`;
+}
+
 function renderTable() {
   const rows = currentItems.map((it, i) => {
     if (it.status === 'matched') {
@@ -150,6 +169,8 @@ function renderTable() {
         <td class="status-ok">매핑성공</td>
         <td>${it.ec_code}</td><td>${it.size||'-'}</td><td>${it.qty}</td>
         <td>${escapeHtml(it.buyest_product_code)}</td>
+        <td>${changeCellHtml(it)}</td>
+        <td>${wholeCellHtml(it)}</td>
       </tr>`;
     }
     return `<tr class="failed">
@@ -157,12 +178,13 @@ function renderTable() {
       <td class="status-fail">실패</td>
       <td>${it.ec_code}</td><td>${it.size||'-'}</td><td>${it.qty}</td>
       <td><input class="fixinput" data-idx="${i}" placeholder="BUYEST 상품코드 입력" oninput="onFixInput(${i}, this.value)"></td>
+      <td>-</td><td>-</td>
     </tr>`;
   }).join('');
 
   document.getElementById('tableWrap').innerHTML = `
     <table>
-      <thead><tr><th>#</th><th>이카운트 상품명</th><th>상태</th><th>이카운트코드</th><th>사이즈</th><th>재고</th><th>BUYEST 상품코드</th></tr></thead>
+      <thead><tr><th>#</th><th>이카운트 상품명</th><th>상태</th><th>이카운트코드</th><th>사이즈</th><th>재고</th><th>BUYEST 상품코드</th><th>변경</th><th>전체상품</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
@@ -217,6 +239,7 @@ async function execute() {
   const execBtn = document.getElementById('execBtn');
   const status = document.getElementById('status');
   const result = document.getElementById('result');
+  const tableWrap = document.getElementById('tableWrap');
   if (!confirm(`${currentItems.length}건을 실제로 품절/판매 반영합니다. 진행할까요?`)) return;
 
   execBtn.disabled = true;
@@ -235,7 +258,19 @@ async function execute() {
     let msg = `완료: ${data.processed}건 처리, ${data.products_touched}개 상품 변경, 새 매핑 ${data.new_mappings_saved}건 저장됨`;
     if (data.errors.length) msg += `<br>오류 ${data.errors.length}건: ` + data.errors.join(', ');
     result.innerHTML = msg;
-    document.getElementById('tableWrap').innerHTML = '';
+
+    // show the confirmed before/after result per row instead of the input table
+    const rows = (data.results || []).map((r, i) => `<tr>
+        <td>${i+1}</td><td>${r.ec_code}</td><td>${r.size||'-'}</td>
+        <td>${changeCellHtml(r)}</td>
+        <td>${wholeCellHtml(r)}</td>
+      </tr>`).join('');
+    tableWrap.innerHTML = rows ? `
+      <table>
+        <thead><tr><th>#</th><th>이카운트코드</th><th>사이즈</th><th>변경 결과</th><th>전체상품</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>` : '';
+
     execBtn.style.display = 'none';
     document.getElementById('saveMapBtn').style.display = 'none';
   } catch (e) {
