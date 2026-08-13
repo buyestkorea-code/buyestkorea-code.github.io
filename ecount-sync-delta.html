@@ -10,6 +10,7 @@
   .badge.warn { background: #fef3c7; color: #92400e; }
   .btn { font-size: 15px; padding: 10px 22px; border: none; border-radius: 6px; cursor: pointer; margin-right: 8px; }
   .btn-primary { background: #111827; color: #fff; }
+  .btn-refresh { background: #2563eb; color: #fff; }
   .btn-secondary { background: #0f766e; color: #fff; }
   .btn-danger { background: #b91c1c; color: #fff; }
   .btn:disabled { background: #d1d5db; color: #6b7280; cursor: not-allowed; }
@@ -39,6 +40,7 @@
 
   <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadFromExcel(this.files[0])">
   <button class="btn btn-primary" id="loadBtn" onclick="loadDelta()">(대안) 이카운트 API로 자동 변동 조회</button>
+  <button class="btn btn-refresh" id="refreshMapBtn" onclick="refreshMapping()" style="display:none">바이스트상품최신화</button>
   <button class="btn btn-secondary" id="saveMapBtn" onclick="saveMappings()" disabled style="display:none">매핑 저장 (직접 입력한 것만)</button>
   <button class="btn btn-danger" id="execBtn" onclick="execute()" disabled style="display:none">최종 실행 (실제 품절처리)</button>
 
@@ -52,6 +54,7 @@ const DELTA_URL = 'https://buyest.co.kr/ecount_sync_delta_api.php';
 const REPORT_URL = 'https://buyest.co.kr/ecount_sync_report_api.php';
 const EXEC_URL = 'https://buyest.co.kr/ecount_sync_execute_api.php';
 const SAVE_MAP_URL = 'https://buyest.co.kr/ecount_sync_save_mapping_api.php';
+const REFRESH_MAP_URL = 'https://buyest.co.kr/ecount_sync_refresh_mapping_api.php';
 let currentItems = [];
 
 const STATE_LABEL = { sale: '판매중', soldout: '품절' };
@@ -100,6 +103,7 @@ async function loadFromExcel(file) {
     status.textContent = msg;
     renderTable();
     execBtn.style.display = 'inline-block';
+    document.getElementById('refreshMapBtn').style.display = 'inline-block';
     document.getElementById('saveMapBtn').style.display = 'inline-block';
     updateExecButton();
   } catch (e) {
@@ -139,6 +143,7 @@ async function loadDelta() {
     status.textContent = `변동 ${data.items.length}건 (매핑실패 ${data.items.filter(i=>i.status==='failed').length}건)`;
     renderTable();
     execBtn.style.display = 'inline-block';
+    document.getElementById('refreshMapBtn').style.display = 'inline-block';
     document.getElementById('saveMapBtn').style.display = 'inline-block';
     updateExecButton();
   } catch (e) {
@@ -203,6 +208,45 @@ function updateExecButton() {
   // save button: enabled whenever at least one still-"failed" row has something typed in
   const hasFixToSave = currentItems.some(it => it.status === 'failed' && !!it.buyest_product_code);
   document.getElementById('saveMapBtn').disabled = !hasFixToSave;
+}
+
+async function refreshMapping() {
+  const btn = document.getElementById('refreshMapBtn');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const failedRows = currentItems.filter(it => it.status === 'failed');
+  if (!failedRows.length) {
+    status.textContent = '매핑실패 항목이 없어요. 이미 다 매칭돼있어요.';
+    return;
+  }
+  btn.disabled = true;
+  status.textContent = `바이스트 상품 목록과 대조해서 매핑실패 ${failedRows.length}건 재매칭 중...`;
+  try {
+    const res = await fetch(REFRESH_MAP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: failedRows })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+
+    const byCode = {};
+    for (const r of data.items) byCode[r.ec_code] = r.buyest_product_code;
+    for (const it of currentItems) {
+      if (it.status === 'failed' && byCode[it.ec_code]) {
+        it.buyest_product_code = byCode[it.ec_code];
+        it.status = 'matched';
+      }
+    }
+    renderTable();
+    status.textContent = `새로 매칭됨 ${data.matched}건 (여전히 매핑실패 ${currentItems.filter(i=>i.status==='failed').length}건)`;
+    updateExecButton();
+  } catch (e) {
+    result.className = 'err';
+    result.textContent = '오류: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function saveMappings() {
