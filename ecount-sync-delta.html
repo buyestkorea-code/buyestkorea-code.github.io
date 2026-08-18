@@ -178,7 +178,7 @@ function renderTable() {
         <td>${wholeCellHtml(it)}</td>
       </tr>`;
     }
-    const label = it.ambiguous ? '재확인 (후보 2개+)' : '실패';
+    const label = it.mapping_dead ? '매핑상품 삭제됨' : (it.ambiguous ? '재확인 (후보 2개+)' : '실패');
     const prefill = it.buyest_product_code || '';
     return `<tr class="failed">
       <td>${i+1}</td><td>${escapeHtml(it.ec_name)}</td>
