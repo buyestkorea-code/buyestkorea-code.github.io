@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>바이스트사이트 시즌품절</title>
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1100px; margin: 40px auto; padding: 0 20px; background: #fafafa; color: #222; }
+  h1 { font-size: 20px; }
+  textarea { width: 100%; height: 140px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; box-sizing: border-box; }
+  .btn { font-size: 15px; padding: 10px 22px; border: none; border-radius: 6px; cursor: pointer; margin-right: 8px; margin-top: 10px; }
+  .btn-primary { background: #111827; color: #fff; }
+  .btn-danger { background: #b91c1c; color: #fff; }
+  .btn:disabled { background: #d1d5db; color: #6b7280; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; background: #fff; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+  th { background: #f3f4f6; }
+  tr.notfound { background: #fef2f2; }
+  .tag-hide { color: #b91c1c; font-weight: 600; }
+  .tag-keep { color: #9ca3af; }
+  #status { color: #6b7280; margin: 10px 0; }
+  #result { margin-top: 16px; padding: 12px; border-radius: 6px; }
+  #result.ok { background: #f0fdf4; color: #15803d; }
+  #result.err { background: #fef2f2; color: #b91c1c; }
+</style>
+</head>
+<body>
+  <h1>바이스트사이트 시즌품절</h1>
+  <p>스타일코드 목록을 붙여넣으면, 상품명에 그 코드가 들어간 BUYEST 상품 중 <b>노출함</b>인 것만 찾아서 <b>미노출</b>로 바꿔요. 품절여부·가격 등 다른 값은 전혀 안 건드려요.</p>
+
+  <textarea id="codeInput" placeholder="[시즌품절]&#10;SW0093FA D1M04E BGBY / SW0093FA D1M04E ECPK / ..."></textarea>
+  <br>
+  <button class="btn btn-primary" id="loadBtn" onclick="preview()">조회</button>
+  <button class="btn btn-danger" id="execBtn" onclick="execute()" disabled style="display:none">미노출로 실행</button>
+
+  <div id="status"></div>
+  <div id="result"></div>
+  <div id="tableWrap"></div>
+
+<script>
+const PREVIEW_URL = 'https://buyest.co.kr/season_soldout_preview_api.php';
+const EXEC_URL = 'https://buyest.co.kr/season_soldout_execute_api.php';
+let currentResults = [];
+
+async function preview() {
+  const loadBtn = document.getElementById('loadBtn');
+  const execBtn = document.getElementById('execBtn');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const tableWrap = document.getElementById('tableWrap');
+  const text = document.getElementById('codeInput').value;
+
+  result.textContent = ''; result.className = '';
+  tableWrap.innerHTML = '';
+  execBtn.style.display = 'none';
+  loadBtn.disabled = true;
+  status.textContent = '조회 중...';
+
+  try {
+    const res = await fetch(PREVIEW_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+
+    currentResults = data.results;
+    const willHideCount = currentResults.reduce((n, r) => n + r.matches.filter(m => m.action === 'will_hide').length, 0);
+    const notFoundCount = currentResults.filter(r => r.matches.length === 0).length;
+    status.textContent = `코드 ${data.total_codes}개 조회 — 미노출로 바뀔 상품 ${willHideCount}건, 매칭 안 된 코드 ${notFoundCount}개`;
+
+    renderTable();
+    if (willHideCount > 0) {
+      execBtn.style.display = 'inline-block';
+      execBtn.disabled = false;
+    }
+  } catch (e) {
+    status.textContent = '';
+    result.textContent = '오류: ' + e.message;
+    result.className = 'err';
+  } finally {
+    loadBtn.disabled = false;
+  }
+}
+
+function renderTable() {
+  const rows = [];
+  currentResults.forEach(r => {
+    if (r.matches.length === 0) {
+      rows.push(`<tr class="notfound"><td>${escapeHtml(r.code)}</td><td colspan="4">매칭되는 상품 없음</td></tr>`);
+      return;
+    }
+    r.matches.forEach(m => {
+      const actionHtml = m.action === 'will_hide'
+        ? '<span class="tag-hide">노출 → 미노출</span>'
+        : '<span class="tag-keep">이미 미노출 (변경없음)</span>';
+      rows.push(`<tr>
+        <td>${escapeHtml(r.code)}</td>
+        <td>${escapeHtml(m.product_code)}</td>
+        <td>${escapeHtml(m.product_name)}</td>
+        <td>${m.product_display === 'Y' ? '노출' : '미노출'}</td>
+        <td>${actionHtml}</td>
+      </tr>`);
+    });
+  });
+
+  document.getElementById('tableWrap').innerHTML = `
+    <table>
+      <thead><tr><th>검색코드</th><th>상품코드</th><th>상품명</th><th>현재 노출상태</th><th>변경</th></tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+  `;
+}
+
+async function execute() {
+  const execBtn = document.getElementById('execBtn');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+
+  const pids = [];
+  currentResults.forEach(r => r.matches.forEach(m => { if (m.action === 'will_hide') pids.push(m.pid); }));
+  if (!pids.length) return;
+
+  if (!confirm(`${pids.length}개 상품을 미노출로 바꿉니다. 진행할까요?`)) return;
+
+  execBtn.disabled = true;
+  status.textContent = '실행 중...';
+  try {
+    const res = await fetch(EXEC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pids })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+
+    status.textContent = '';
+    result.className = 'ok';
+    result.textContent = `완료: ${data.hidden}건 미노출로 반영됨`;
+    execBtn.style.display = 'none';
+  } catch (e) {
+    result.className = 'err';
+    result.textContent = '오류: ' + e.message;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+</script>
+</body>
+</html>
