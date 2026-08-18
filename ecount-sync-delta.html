@@ -43,6 +43,9 @@
   <button class="btn btn-refresh" id="refreshMapBtn" onclick="refreshMapping()" style="display:none">바이스트상품최신화</button>
   <button class="btn btn-secondary" id="saveMapBtn" onclick="saveMappings()" disabled style="display:none">매핑 저장 (직접 입력한 것만)</button>
   <button class="btn btn-danger" id="execBtn" onclick="execute()" disabled style="display:none">최종 실행 (실제 품절처리)</button>
+  <label id="failedOnlyLabel" style="display:none; margin-left:4px; font-size:13px; cursor:pointer; vertical-align:middle;">
+    <input type="checkbox" id="failedOnlyToggle" onchange="setFailedOnly(this.checked)"> 실패만 보기
+  </label>
 
   <div id="status"></div>
   <div id="result"></div>
@@ -56,8 +59,23 @@ const EXEC_URL = 'https://buyest.co.kr/ecount_sync_execute_api.php';
 const SAVE_MAP_URL = 'https://buyest.co.kr/ecount_sync_save_mapping_api.php';
 const REFRESH_MAP_URL = 'https://buyest.co.kr/ecount_sync_refresh_mapping_api.php';
 let currentItems = [];
+let showFailedOnly = false;
 
 const STATE_LABEL = { sale: '판매중', soldout: '품절' };
+
+function statusHtml(items, extra) {
+  const failedCount = items.filter(i => i.status === 'failed').length;
+  let html = `총 ${items.length}건 (<a href="javascript:void(0)" onclick="setFailedOnly(true)" style="color:#b91c1c;text-decoration:underline;">매핑실패 ${failedCount}건</a>)`;
+  if (extra) html += ' — ' + extra;
+  return html;
+}
+
+function setFailedOnly(v) {
+  showFailedOnly = v;
+  const toggle = document.getElementById('failedOnlyToggle');
+  if (toggle) toggle.checked = v;
+  renderTable();
+}
 
 async function loadFromExcel(file) {
   if (!file) return;
@@ -96,15 +114,18 @@ async function loadFromExcel(file) {
     if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
 
     currentItems = data.items;
-    let msg = `총 ${data.items.length}건 (매핑실패 ${data.items.filter(i=>i.status==='failed').length}건)`;
+    showFailedOnly = false;
+    let extra = '';
     if (data.not_found_in_ecount && data.not_found_in_ecount.length) {
-      msg += ` — 이카운트에서 조회 안 된 ${data.not_found_in_ecount.length}건은 제외됨`;
+      extra = `이카운트에서 조회 안 된 ${data.not_found_in_ecount.length}건은 제외됨`;
     }
-    status.textContent = msg;
+    status.innerHTML = statusHtml(data.items, extra);
     renderTable();
     execBtn.style.display = 'inline-block';
     document.getElementById('refreshMapBtn').style.display = 'inline-block';
     document.getElementById('saveMapBtn').style.display = 'inline-block';
+    document.getElementById('failedOnlyLabel').style.display = 'inline-block';
+    document.getElementById('failedOnlyToggle').checked = false;
     updateExecButton();
   } catch (e) {
     status.textContent = '';
@@ -140,11 +161,14 @@ async function loadDelta() {
     }
 
     currentItems = data.items;
-    status.textContent = `변동 ${data.items.length}건 (매핑실패 ${data.items.filter(i=>i.status==='failed').length}건)`;
+    showFailedOnly = false;
+    status.innerHTML = statusHtml(data.items);
     renderTable();
     execBtn.style.display = 'inline-block';
     document.getElementById('refreshMapBtn').style.display = 'inline-block';
     document.getElementById('saveMapBtn').style.display = 'inline-block';
+    document.getElementById('failedOnlyLabel').style.display = 'inline-block';
+    document.getElementById('failedOnlyToggle').checked = false;
     updateExecButton();
   } catch (e) {
     status.textContent = '';
@@ -167,10 +191,18 @@ function wholeCellHtml(it) {
 }
 
 function renderTable() {
-  const rows = currentItems.map((it, i) => {
+  // failed/ambiguous/dead-mapping rows always sort to the top so they're easy to
+  // find in a large list; "실패만 보기" additionally hides matched rows entirely.
+  const indexes = currentItems
+    .map((it, idx) => idx)
+    .filter(idx => !showFailedOnly || currentItems[idx].status !== 'matched')
+    .sort((a, b) => (currentItems[a].status === 'matched' ? 1 : 0) - (currentItems[b].status === 'matched' ? 1 : 0));
+
+  const rows = indexes.map((idx, pos) => {
+    const it = currentItems[idx];
     if (it.status === 'matched') {
       return `<tr>
-        <td>${i+1}</td><td>${escapeHtml(it.ec_name)}</td>
+        <td>${pos+1}</td><td>${escapeHtml(it.ec_name)}</td>
         <td class="status-ok">매핑성공</td>
         <td>${it.ec_code}</td><td>${it.size||'-'}</td><td>${it.qty}</td>
         <td>${escapeHtml(it.buyest_product_code)}</td>
@@ -181,10 +213,10 @@ function renderTable() {
     const label = it.mapping_dead ? '매핑상품 삭제됨' : (it.ambiguous ? '재확인 (후보 2개+)' : '실패');
     const prefill = it.buyest_product_code || '';
     return `<tr class="failed">
-      <td>${i+1}</td><td>${escapeHtml(it.ec_name)}</td>
+      <td>${pos+1}</td><td>${escapeHtml(it.ec_name)}</td>
       <td class="status-fail">${label}</td>
       <td>${it.ec_code}</td><td>${it.size||'-'}</td><td>${it.qty}</td>
-      <td><input class="fixinput${prefill ? ' filled' : ''}" data-idx="${i}" value="${escapeHtml(prefill)}" placeholder="BUYEST 상품코드 입력" oninput="onFixInput(${i}, this.value)"></td>
+      <td><input class="fixinput${prefill ? ' filled' : ''}" data-idx="${idx}" value="${escapeHtml(prefill)}" placeholder="BUYEST 상품코드 입력" oninput="onFixInput(${idx}, this.value)"></td>
       <td>-</td><td>-</td>
     </tr>`;
   }).join('');
