@@ -178,11 +178,13 @@ function renderTable() {
         <td>${wholeCellHtml(it)}</td>
       </tr>`;
     }
+    const label = it.ambiguous ? '재확인 (후보 2개+)' : '실패';
+    const prefill = it.buyest_product_code || '';
     return `<tr class="failed">
       <td>${i+1}</td><td>${escapeHtml(it.ec_name)}</td>
-      <td class="status-fail">실패</td>
+      <td class="status-fail">${label}</td>
       <td>${it.ec_code}</td><td>${it.size||'-'}</td><td>${it.qty}</td>
-      <td><input class="fixinput" data-idx="${i}" placeholder="BUYEST 상품코드 입력" oninput="onFixInput(${i}, this.value)"></td>
+      <td><input class="fixinput${prefill ? ' filled' : ''}" data-idx="${i}" value="${escapeHtml(prefill)}" placeholder="BUYEST 상품코드 입력" oninput="onFixInput(${i}, this.value)"></td>
       <td>-</td><td>-</td>
     </tr>`;
   }).join('');
