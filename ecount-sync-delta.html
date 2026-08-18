@@ -120,6 +120,8 @@ async function loadFromExcel(file) {
       extra = `이카운트에서 조회 안 된 ${data.not_found_in_ecount.length}건은 제외됨`;
     }
     status.innerHTML = statusHtml(data.items, extra);
+    result.className = 'ok';
+    result.textContent = '✅ 파일 선택만으로 이카운트 최신 재고까지 자동 조회 완료';
     renderTable();
     execBtn.style.display = 'inline-block';
     document.getElementById('refreshMapBtn').style.display = 'inline-block';
