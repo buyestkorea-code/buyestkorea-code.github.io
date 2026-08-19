@@ -96,12 +96,19 @@ async function loadFromExcel(file) {
 
     // rows 0-2 are the title + two-level header; data starts at row 3
     const rows = [];
+    let noCodeCount = 0;
     for (let i = 3; i < grid.length; i++) {
       const r = grid[i];
-      if (!r || !r[0]) continue;
+      if (!r) continue;
+      const hasContent = r.some(v => v !== null && v !== undefined && String(v).trim() !== '');
+      if (!hasContent) continue;
+      if (!r[0]) { noCodeCount++; continue; } // 품목코드(A열)가 비어있으면 이 시스템은 못 읽음
       rows.push({ ec_code: String(r[0]).trim(), ec_name: (r[1] || '').toString().trim(), size: (r[2] || '').toString().trim() });
     }
-    if (!rows.length) throw new Error('엑셀에서 품목을 못 찾았어요 (형식이 다른 파일인가요?)');
+    if (!rows.length) {
+      if (noCodeCount > 0) throw new Error(`품목코드(A열)가 비어있는 행 ${noCodeCount}개뿐이라 읽을 게 없어요. 이카운트에서 재고변동표를 다시 받을 때 품목코드가 채워져서 나오는지 확인해주세요.`);
+      throw new Error('엑셀에서 품목을 못 찾았어요 (형식이 다른 파일인가요?)');
+    }
 
     status.textContent = `엑셀에서 ${rows.length}건 읽음, 이카운트에서 최신 재고 확인 중...`;
 
@@ -116,8 +123,12 @@ async function loadFromExcel(file) {
     currentItems = data.items;
     showFailedOnly = false;
     let extra = '';
+    if (noCodeCount > 0) {
+      extra += `⚠ 품목코드 없는 행 ${noCodeCount}개는 못 읽어서 제외됨`;
+    }
     if (data.not_found_in_ecount && data.not_found_in_ecount.length) {
-      extra = `이카운트에서 조회 안 된 ${data.not_found_in_ecount.length}건은 제외됨`;
+      if (extra) extra += ' / ';
+      extra += `이카운트에서 조회 안 된 ${data.not_found_in_ecount.length}건은 제외됨`;
     }
     status.innerHTML = statusHtml(data.items, extra);
     result.className = 'ok';
