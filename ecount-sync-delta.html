@@ -218,7 +218,7 @@ function renderTable() {
       <td>${pos+1}</td><td>${escapeHtml(it.ec_name)}</td>
       <td class="status-fail">${label}</td>
       <td>${it.ec_code}</td><td>${it.size||'-'}</td><td>${it.qty}</td>
-      <td><input class="fixinput${prefill ? ' filled' : ''}" data-idx="${idx}" value="${escapeHtml(prefill)}" placeholder="BUYEST 상품코드 입력" oninput="onFixInput(${idx}, this.value)"></td>
+      <td><input class="fixinput${prefill ? ' filled' : ''}" data-idx="${idx}" value="${escapeHtml(prefill)}" placeholder="상품코드 입력 (콜라보면 쉼표로 여러개)" oninput="onFixInput(${idx}, this.value)"></td>
       <td>-</td><td>-</td>
     </tr>`;
   }).join('');
