@@ -381,7 +381,6 @@
       <button class="nav-item" data-nav="sabangEcount"><span class="ic">&#8942;</span>사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stockMove"><span class="ic">&#8942;</span>MD 품절<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="buyestSoldOut"><span class="ic">&#8942;</span>바이스트사이트 품절<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="soldOutManual"><span class="ic">&#8942;</span>바이스트사이트 품절 매뉴얼<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="seasonSoldOut"><span class="ic">&#8942;</span>바이스트사이트 시즌품절<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="icm"><span class="ic">&#8942;</span>이카운트 -송장 재고매칭 (CS)<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stocktake"><span class="ic">&#8942;</span>재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span></button>
@@ -450,11 +449,6 @@
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>바이스트사이트 품절</h3>
             <p>이카운트 재고변동표를 올리면 그 품목만 이카운트 API로 최신 재고를 다시 확인해, BUYEST 사이트 DB에 직접 품절/판매 상태를 반영합니다.</p>
-          </button>
-          <button class="tool-card" data-nav="soldOutManual">
-            <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
-            <h3>바이스트사이트 품절 매뉴얼</h3>
-            <p>처음 쓰시는 분도 따라할 수 있는 사용법 안내입니다. 사용 순서와 매핑실패 처리 방법을 정리했습니다.</p>
           </button>
           <button class="tool-card" data-nav="seasonSoldOut">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
@@ -847,9 +841,6 @@
         <iframe src="ecount-sync-delta.html" title="바이스트사이트 품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
-      <section data-view="soldOutManual">
-        <iframe src="soldout-manual.html" title="바이스트사이트 품절 매뉴얼" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
-      </section>
 
       <section data-view="seasonSoldOut">
         <iframe src="season-soldout.html" title="바이스트사이트 시즌품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
@@ -1261,7 +1252,7 @@ else if (typeof exports === 'object')
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', sabangEcount:'사방넷-이카운트 매칭',
-    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', soldOutManual:'바이스트사이트 품절 매뉴얼', seasonSoldOut:'바이스트사이트 시즌품절', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
+    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
     orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', studio:'Studio (AI 보정/영상)', roadmap:'개발 예정 도구'
   };
 

@@ -35,7 +35,7 @@
 </style>
 </head>
 <body>
-  <h1>이카운트 변동분 → BUYEST 품절 반영</h1>
+  <h1>이카운트 변동분 → BUYEST 품절 반영 <a href="soldout-manual.html" target="_blank" style="font-size:13px; font-weight:normal; color:#2563eb;">📖 사용법 보기</a></h1>
   <p>이카운트에서 다운받은 재고변동표 엑셀을 올리면, 그 품목들만 이카운트 API로 최신 재고를 다시 확인해요. 매핑 실패한 건 BUYEST 상품코드를 직접 입력해야 실행돼요.</p>
 
   <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadFromExcel(this.files[0])">
