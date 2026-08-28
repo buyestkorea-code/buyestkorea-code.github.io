@@ -7,42 +7,163 @@
   body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1200px; margin: 40px auto; padding: 0 20px; background: #fafafa; color: #222; }
   h1 { font-size: 20px; }
   p.desc { color: #4b5563; font-size: 14px; }
+  .step { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 14px 0; }
+  .step h3 { margin: 0 0 8px; font-size: 15px; }
   .btn { font-size: 15px; padding: 10px 22px; border: none; border-radius: 6px; cursor: pointer; margin-right: 8px; background: #111827; color: #fff; }
   .btn:disabled { background: #d1d5db; color: #6b7280; cursor: not-allowed; }
   .btn-secondary { background: #0f766e; }
-  #progress { margin: 16px 0; font-size: 14px; color: #374151; }
-  #bar { width: 100%; height: 10px; background: #e5e7eb; border-radius: 6px; overflow: hidden; margin-top: 6px; }
-  #barFill { height: 100%; background: #2563eb; width: 0%; transition: width .2s; }
+  select, input[type=text] { padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13.5px; }
   table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; background: #fff; }
   th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
-  th { background: #f3f4f6; position: sticky; top: 0; }
+  th { background: #f3f4f6; }
   .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
   .tag-mismatch { background: #fef2f2; color: #b91c1c; }
   .tag-dead { background: #fef3c7; color: #92400e; }
   .tag-size { background: #eff6ff; color: #1e40af; }
   #status { color: #6b7280; margin: 10px 0; font-size: 13.5px; }
-  #err { color: #b91c1c; margin: 10px 0; }
+  #err { color: #b91c1c; margin: 10px 0; white-space: pre-wrap; }
+  .ok-msg { color: #15803d; }
 </style>
 </head>
 <body>
   <h1>이카운트-사이트 재고 불일치 확인</h1>
-  <p class="desc">mapping_v2.csv에 매핑된 이카운트코드 전체를 이카운트 실제 재고와 대조해서, 사이트(바이스트) 품절/판매 상태가 어긋난 것만 찾아줘요. <b>자동으로 고치지 않고 목록만 뽑아줍니다</b> — 확인 후 "바이스트사이트 품절" 도구로 수동 반영하세요.</p>
+  <p class="desc">이카운트 API를 직접 호출하지 않아요(레이트리밋 걱정 없음) — 이카운트에서 받은 재고현황 엑셀과, 바이스트 사이트의 현재 상태를 파일로 비교하는 방식입니다.</p>
 
-  <button class="btn" id="runBtn" onclick="run()">전체 확인 시작</button>
-  <button class="btn btn-secondary" id="downloadBtn" onclick="downloadCsv()" disabled>결과 CSV로 다운로드</button>
-
-  <div id="progress" style="display:none">
-    <span id="progressText"></span>
-    <div id="bar"><div id="barFill"></div></div>
+  <div class="step">
+    <h3>1. 이카운트 재고현황 엑셀 업로드</h3>
+    <p style="font-size:13px;color:#6b7280;">이카운트 → 재고현황(또는 재고수불부) 메뉴에서 전체 품목 엑셀 다운로드 후 여기에 업로드하세요.</p>
+    <input type="file" id="ecFileInput" accept=".xlsx,.xls" onchange="loadEcountFile(this.files[0])">
+    <div id="ecColumnPicker" style="display:none; margin-top:10px;">
+      <span style="font-size:13px;">자동 인식이 안 됐어요 — 열을 직접 골라주세요: </span>
+      품목코드 열: <select id="codeColSelect"></select>
+      재고수량 열: <select id="qtyColSelect"></select>
+      <button class="btn" style="padding:6px 14px;font-size:13px;" onclick="applyManualColumns()">적용</button>
+    </div>
+    <div id="ecStatus" style="font-size:13px;margin-top:8px;"></div>
   </div>
-  <div id="status"></div>
-  <div id="err"></div>
-  <div id="tableWrap"></div>
 
+  <div class="step">
+    <h3>2. 바이스트 현재 상태 불러오기</h3>
+    <button class="btn" id="loadSiteBtn" onclick="loadSiteSnapshot()">바이스트 상태 불러오기</button>
+    <div id="siteStatus" style="font-size:13px;margin-top:8px;"></div>
+  </div>
+
+  <div class="step">
+    <h3>3. 비교 결과</h3>
+    <button class="btn btn-secondary" id="downloadBtn" onclick="downloadCsv()" disabled>결과 CSV로 다운로드</button>
+    <div id="status"></div>
+    <div id="err"></div>
+    <div id="tableWrap"></div>
+  </div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script>
-const API_URL = 'https://buyest.co.kr/ecount_stock_mismatch_report_api.php';
-const CHUNK = 800;
-let allMismatches = [];
+const SNAPSHOT_URL = 'https://buyest.co.kr/buyest_stock_snapshot_api.php';
+const CHUNK = 10000;
+
+let ecMap = null;       // ec_code(품목코드) => qty
+let siteMap = null;     // ec_code => [{size, buyest_product_code, site_status, issue}]
+let ecRawGrid = null;   // 수동 열선택용 원본 그리드
+let mismatches = [];
+
+function findHeaderAndColumns(grid) {
+  const codeKeywords = ['품목코드', 'PROD_CD', '품번코드', '코드'];
+  const qtyKeywords = ['재고수량', '현재고', '재고량', '재고'];
+  for (let r = 0; r < Math.min(grid.length, 15); r++) {
+    const row = grid[r] || [];
+    let codeCol = -1, qtyCol = -1;
+    for (let c = 0; c < row.length; c++) {
+      const cell = String(row[c] ?? '').trim();
+      if (codeCol === -1 && codeKeywords.some(k => cell.includes(k))) codeCol = c;
+      if (qtyCol === -1 && qtyKeywords.some(k => cell.includes(k))) qtyCol = c;
+    }
+    if (codeCol !== -1 && qtyCol !== -1) return { headerRow: r, codeCol, qtyCol };
+  }
+  return null;
+}
+
+async function loadEcountFile(file) {
+  if (!file) return;
+  document.getElementById('ecStatus').textContent = '읽는 중...';
+  document.getElementById('ecColumnPicker').style.display = 'none';
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+  ecRawGrid = grid;
+
+  const found = findHeaderAndColumns(grid);
+  if (found) {
+    buildEcMap(grid, found.headerRow, found.codeCol, found.qtyCol);
+  } else {
+    showManualColumnPicker(grid);
+  }
+}
+
+function showManualColumnPicker(grid) {
+  document.getElementById('ecStatus').textContent = '⚠ 자동으로 열을 못 찾았어요. 아래에서 직접 골라주세요.';
+  const headerRow = grid[0] || [];
+  const codeSel = document.getElementById('codeColSelect');
+  const qtySel = document.getElementById('qtyColSelect');
+  codeSel.innerHTML = ''; qtySel.innerHTML = '';
+  headerRow.forEach((cell, i) => {
+    const label = `${i+1}번째 열 (${cell ?? ''})`;
+    codeSel.innerHTML += `<option value="${i}">${label}</option>`;
+    qtySel.innerHTML += `<option value="${i}">${label}</option>`;
+  });
+  document.getElementById('ecColumnPicker').style.display = 'block';
+}
+
+function applyManualColumns() {
+  const codeCol = parseInt(document.getElementById('codeColSelect').value, 10);
+  const qtyCol = parseInt(document.getElementById('qtyColSelect').value, 10);
+  buildEcMap(ecRawGrid, 0, codeCol, qtyCol);
+}
+
+function buildEcMap(grid, headerRow, codeCol, qtyCol) {
+  ecMap = {};
+  let count = 0;
+  for (let r = headerRow + 1; r < grid.length; r++) {
+    const row = grid[r];
+    if (!row) continue;
+    const code = String(row[codeCol] ?? '').trim();
+    if (!code) continue;
+    const qty = parseFloat(row[qtyCol]) || 0;
+    ecMap[code] = qty;
+    count++;
+  }
+  document.getElementById('ecColumnPicker').style.display = 'none';
+  document.getElementById('ecStatus').innerHTML = `<span class="ok-msg">✅ 이카운트 품목 ${count.toLocaleString()}건 읽음</span>`;
+  tryCompare();
+}
+
+async function loadSiteSnapshot() {
+  document.getElementById('loadSiteBtn').disabled = true;
+  document.getElementById('err').textContent = '';
+  siteMap = {};
+  let offset = 0, total = null;
+  try {
+    while (true) {
+      const res = await fetch(`${SNAPSHOT_URL}?offset=${offset}&limit=${CHUNK}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+      total = data.total;
+      for (const row of data.rows) {
+        if (!siteMap[row.ec_code]) siteMap[row.ec_code] = [];
+        siteMap[row.ec_code].push(row);
+      }
+      offset += CHUNK;
+      document.getElementById('siteStatus').textContent = `${Math.min(offset, total).toLocaleString()} / ${total.toLocaleString()} 불러오는 중...`;
+      if (data.done) break;
+    }
+    document.getElementById('siteStatus').innerHTML = `<span class="ok-msg">✅ 바이스트 매핑 ${total.toLocaleString()}건 불러옴</span>`;
+  } catch (e) {
+    document.getElementById('err').textContent = '오류: ' + e.message;
+  } finally {
+    document.getElementById('loadSiteBtn').disabled = false;
+  }
+  tryCompare();
+}
 
 function tagFor(issue) {
   if (issue === 'mismatch') return '<span class="tag tag-mismatch">재고↔상태 불일치</span>';
@@ -51,58 +172,40 @@ function tagFor(issue) {
   return issue;
 }
 
-async function run() {
-  document.getElementById('runBtn').disabled = true;
-  document.getElementById('downloadBtn').disabled = true;
-  document.getElementById('err').textContent = '';
-  document.getElementById('progress').style.display = 'block';
-  allMismatches = [];
-
-  let offset = 0;
-  let total = null;
-  try {
-    while (true) {
-      const res = await fetch(`${API_URL}?offset=${offset}&limit=${CHUNK}`);
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
-
-      total = data.total;
-      allMismatches.push(...data.mismatches);
-      offset += CHUNK;
-
-      const pct = Math.min(100, Math.round((offset / total) * 100));
-      document.getElementById('progressText').textContent =
-        `${Math.min(offset, total).toLocaleString()} / ${total.toLocaleString()} 확인중... (불일치 ${allMismatches.length.toLocaleString()}건 발견)`;
-      document.getElementById('barFill').style.width = pct + '%';
-
-      renderTable(); // 중간중간 계속 갱신해서 진행상황 눈에 보이게
-
-      if (data.done) break;
+function tryCompare() {
+  if (!ecMap || !siteMap) return;
+  mismatches = [];
+  for (const ecCode in siteMap) {
+    const ecQty = ecMap[ecCode];
+    for (const row of siteMap[ecCode]) {
+      if (row.issue) {
+        mismatches.push({ ec_code: ecCode, size: row.size, buyest_product_code: row.buyest_product_code,
+          ecount_qty: ecQty ?? '', ecount_status: '', site_status: row.site_status, issue: row.issue });
+        continue;
+      }
+      if (ecQty === undefined) continue; // 이카운트 엑셀에 이 코드 자체가 없음 — 판단 보류
+      const ecHasStock = ecQty > 0;
+      const siteHasStock = row.site_status === 'sale';
+      if (ecHasStock !== siteHasStock) {
+        mismatches.push({ ec_code: ecCode, size: row.size, buyest_product_code: row.buyest_product_code,
+          ecount_qty: ecQty, ecount_status: ecHasStock ? '재고있음' : '재고없음',
+          site_status: siteHasStock ? '판매중' : '품절', issue: 'mismatch' });
+      }
     }
-    document.getElementById('status').textContent =
-      `✅ 전체 ${total.toLocaleString()}건 확인 완료 — 불일치 ${allMismatches.length.toLocaleString()}건`;
-    document.getElementById('downloadBtn').disabled = allMismatches.length === 0;
-  } catch (e) {
-    document.getElementById('err').textContent = '오류: ' + e.message + ' (잠시 후 다시 시도해주세요. 이카운트 API를 짧은 간격으로 계속 재시도하면 안 돼요)';
-  } finally {
-    document.getElementById('runBtn').disabled = false;
   }
+  document.getElementById('status').innerHTML = `<span class="ok-msg">✅ 비교 완료 — 불일치 ${mismatches.length.toLocaleString()}건</span>`;
+  document.getElementById('downloadBtn').disabled = mismatches.length === 0;
+  renderTable();
 }
 
 function renderTable() {
-  if (allMismatches.length === 0) {
-    document.getElementById('tableWrap').innerHTML = '';
-    return;
-  }
+  if (mismatches.length === 0) { document.getElementById('tableWrap').innerHTML = ''; return; }
   let html = '<table><tr><th>이카운트코드</th><th>사이즈</th><th>바이스트상품코드</th><th>이카운트재고</th><th>이카운트상태</th><th>사이트상태</th><th>이슈</th></tr>';
-  for (const m of allMismatches) {
+  for (const m of mismatches) {
     html += `<tr>
-      <td>${m.ec_code}</td>
-      <td>${m.size || ''}</td>
-      <td>${m.buyest_product_code}</td>
-      <td>${m.ecount_qty}</td>
-      <td>${m.ecount_status}</td>
-      <td>${m.site_status || '-'}</td>
+      <td>${m.ec_code}</td><td>${m.size || ''}</td><td>${m.buyest_product_code}</td>
+      <td>${m.ecount_qty}</td><td>${m.ecount_status}</td>
+      <td>${m.site_status === 'sale' ? '판매중' : m.site_status === 'soldout' ? '품절' : (m.site_status || '-')}</td>
       <td>${tagFor(m.issue)}</td>
     </tr>`;
   }
@@ -111,10 +214,10 @@ function renderTable() {
 }
 
 function downloadCsv() {
-  if (allMismatches.length === 0) return;
+  if (mismatches.length === 0) return;
   const header = ['이카운트코드', '사이즈', '바이스트상품코드', '이카운트재고', '이카운트상태', '사이트상태', '이슈'];
   const rows = [header.join(',')];
-  for (const m of allMismatches) {
+  for (const m of mismatches) {
     rows.push([m.ec_code, m.size || '', m.buyest_product_code, m.ecount_qty, m.ecount_status, m.site_status || '', m.issue].join(','));
   }
   const blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
