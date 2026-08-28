@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>이카운트-사이트 재고 불일치 확인</title>
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1200px; margin: 40px auto; padding: 0 20px; background: #fafafa; color: #222; }
+  h1 { font-size: 20px; }
+  p.desc { color: #4b5563; font-size: 14px; }
+  .btn { font-size: 15px; padding: 10px 22px; border: none; border-radius: 6px; cursor: pointer; margin-right: 8px; background: #111827; color: #fff; }
+  .btn:disabled { background: #d1d5db; color: #6b7280; cursor: not-allowed; }
+  .btn-secondary { background: #0f766e; }
+  #progress { margin: 16px 0; font-size: 14px; color: #374151; }
+  #bar { width: 100%; height: 10px; background: #e5e7eb; border-radius: 6px; overflow: hidden; margin-top: 6px; }
+  #barFill { height: 100%; background: #2563eb; width: 0%; transition: width .2s; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; background: #fff; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+  th { background: #f3f4f6; position: sticky; top: 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+  .tag-mismatch { background: #fef2f2; color: #b91c1c; }
+  .tag-dead { background: #fef3c7; color: #92400e; }
+  .tag-size { background: #eff6ff; color: #1e40af; }
+  #status { color: #6b7280; margin: 10px 0; font-size: 13.5px; }
+  #err { color: #b91c1c; margin: 10px 0; }
+</style>
+</head>
+<body>
+  <h1>이카운트-사이트 재고 불일치 확인</h1>
+  <p class="desc">mapping_v2.csv에 매핑된 이카운트코드 전체를 이카운트 실제 재고와 대조해서, 사이트(바이스트) 품절/판매 상태가 어긋난 것만 찾아줘요. <b>자동으로 고치지 않고 목록만 뽑아줍니다</b> — 확인 후 "바이스트사이트 품절" 도구로 수동 반영하세요.</p>
+
+  <button class="btn" id="runBtn" onclick="run()">전체 확인 시작</button>
+  <button class="btn btn-secondary" id="downloadBtn" onclick="downloadCsv()" disabled>결과 CSV로 다운로드</button>
+
+  <div id="progress" style="display:none">
+    <span id="progressText"></span>
+    <div id="bar"><div id="barFill"></div></div>
+  </div>
+  <div id="status"></div>
+  <div id="err"></div>
+  <div id="tableWrap"></div>
+
+<script>
+const API_URL = 'https://buyest.co.kr/ecount_stock_mismatch_report_api.php';
+const CHUNK = 800;
+let allMismatches = [];
+
+function tagFor(issue) {
+  if (issue === 'mismatch') return '<span class="tag tag-mismatch">재고↔상태 불일치</span>';
+  if (issue === 'buyest_product_missing') return '<span class="tag tag-dead">매핑상품 없음</span>';
+  if (issue === 'size_not_found') return '<span class="tag tag-size">사이즈 못찾음</span>';
+  return issue;
+}
+
+async function run() {
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('downloadBtn').disabled = true;
+  document.getElementById('err').textContent = '';
+  document.getElementById('progress').style.display = 'block';
+  allMismatches = [];
+
+  let offset = 0;
+  let total = null;
+  try {
+    while (true) {
+      const res = await fetch(`${API_URL}?offset=${offset}&limit=${CHUNK}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+
+      total = data.total;
+      allMismatches.push(...data.mismatches);
+      offset += CHUNK;
+
+      const pct = Math.min(100, Math.round((offset / total) * 100));
+      document.getElementById('progressText').textContent =
+        `${Math.min(offset, total).toLocaleString()} / ${total.toLocaleString()} 확인중... (불일치 ${allMismatches.length.toLocaleString()}건 발견)`;
+      document.getElementById('barFill').style.width = pct + '%';
+
+      renderTable(); // 중간중간 계속 갱신해서 진행상황 눈에 보이게
+
+      if (data.done) break;
+    }
+    document.getElementById('status').textContent =
+      `✅ 전체 ${total.toLocaleString()}건 확인 완료 — 불일치 ${allMismatches.length.toLocaleString()}건`;
+    document.getElementById('downloadBtn').disabled = allMismatches.length === 0;
+  } catch (e) {
+    document.getElementById('err').textContent = '오류: ' + e.message + ' (잠시 후 다시 시도해주세요. 이카운트 API를 짧은 간격으로 계속 재시도하면 안 돼요)';
+  } finally {
+    document.getElementById('runBtn').disabled = false;
+  }
+}
+
+function renderTable() {
+  if (allMismatches.length === 0) {
+    document.getElementById('tableWrap').innerHTML = '';
+    return;
+  }
+  let html = '<table><tr><th>이카운트코드</th><th>사이즈</th><th>바이스트상품코드</th><th>이카운트재고</th><th>이카운트상태</th><th>사이트상태</th><th>이슈</th></tr>';
+  for (const m of allMismatches) {
+    html += `<tr>
+      <td>${m.ec_code}</td>
+      <td>${m.size || ''}</td>
+      <td>${m.buyest_product_code}</td>
+      <td>${m.ecount_qty}</td>
+      <td>${m.ecount_status}</td>
+      <td>${m.site_status || '-'}</td>
+      <td>${tagFor(m.issue)}</td>
+    </tr>`;
+  }
+  html += '</table>';
+  document.getElementById('tableWrap').innerHTML = html;
+}
+
+function downloadCsv() {
+  if (allMismatches.length === 0) return;
+  const header = ['이카운트코드', '사이즈', '바이스트상품코드', '이카운트재고', '이카운트상태', '사이트상태', '이슈'];
+  const rows = [header.join(',')];
+  for (const m of allMismatches) {
+    rows.push([m.ec_code, m.size || '', m.buyest_product_code, m.ecount_qty, m.ecount_status, m.site_status || '', m.issue].join(','));
+  }
+  const blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `이카운트_사이트_불일치_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
