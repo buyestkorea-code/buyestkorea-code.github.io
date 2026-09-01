@@ -3273,15 +3273,18 @@ else if (typeof exports === 'object')
         var parsed = parseSheetSE(sheetXml, wb.sharedStrings);
         var doc = parsed.doc, rows = parsed.rows;
 
-        // 문자형추가항목1/규격 칸이 있는 행을 헤더로 보고, 그 칸 위치를 열 기준으로 삼는다.
+        // 문자형추가항목1/규격/사이트 상품명/입고단가/출고단가 헤더 텍스트로 열 위치를 찾는다.
         // (이카운트 양식이 앞에 열을 더 끼워넣어도 자동으로 따라감. 못 찾으면 옛 양식 기본값으로.)
-        var headerRow = 1, charBase = 5, specCol = null;
+        var headerRow = 1, charBase = 5, specCol = null, siteNameCol = null, inPriceCol = null, outPriceCol = null;
         for (var hr in rows) {
           var hrow = rows[hr];
           for (var c in hrow) {
             var hv = String(hrow[c] == null ? "" : hrow[c]).trim();
             if (hv === "문자형추가항목1") { headerRow = parseInt(hr, 10); charBase = parseInt(c, 10); }
             if (hv === "규격") specCol = parseInt(c, 10);
+            if (hv === "사이트 상품명") siteNameCol = parseInt(c, 10);
+            if (hv === "입고단가") inPriceCol = parseInt(c, 10);
+            if (hv === "출고단가") outPriceCol = parseInt(c, 10);
           }
         }
 
@@ -3297,7 +3300,8 @@ else if (typeof exports === 'object')
           items.push({ rowIdx: rIdx, code: String(code).trim(), name: name, spec: spec });
         }
 
-        state.ecount = { buf: buf, zipOrder: wb.zip.order, zipFiles: wb.zip.files, sheetPath: sheetPath, doc: doc, items: items, charBase: charBase };
+        state.ecount = { buf: buf, zipOrder: wb.zip.order, zipFiles: wb.zip.files, sheetPath: sheetPath, doc: doc, items: items,
+          charBase: charBase, siteNameCol: siteNameCol, inPriceCol: inPriceCol, outPriceCol: outPriceCol };
         seMarkDropzone("ecount", file.name, "품목 " + items.length + "행 인식 (시트: " + targetName + ")", true);
       } catch (e) {
         seMarkDropzone("ecount", file.name, "읽기 실패: " + e.message, false);
@@ -3342,7 +3346,7 @@ else if (typeof exports === 'object')
         }
 
         if (info) {
-          results.push(Object.assign({}, it, { status: "matched", brand: info.brand, modelno: info.modelno, origin: info.origin, price: info.price }));
+          results.push(Object.assign({}, it, { status: "matched", brand: info.brand, modelno: info.modelno, origin: info.origin, price: info.price, siteName: info.name }));
           matched++;
         } else if (matches.length > 0) {
           results.push(Object.assign({}, it, { status: "ambiguous" }));
@@ -3435,11 +3439,15 @@ else if (typeof exports === 'object')
           setCellText(doc, rowEl, b, label);
           setCellText(doc, rowEl, b + 1, label);
           setCellText(doc, rowEl, b + 4, label);
+          if (ec.siteNameCol != null) setCellText(doc, rowEl, ec.siteNameCol, label);
         } else {
           setCellText(doc, rowEl, b, r.brand);
           setCellText(doc, rowEl, b + 1, r.modelno);
           setCellText(doc, rowEl, b + 4, r.origin);
           setCellNumber(doc, rowEl, b + 6, r.price);
+          if (ec.siteNameCol != null) setCellText(doc, rowEl, ec.siteNameCol, r.siteName); // 사이트 상품명 = 사방넷 상품명 그대로
+          if (ec.inPriceCol != null) setCellNumber(doc, rowEl, ec.inPriceCol, r.price); // 입고단가 = 판매가(숫자1)와 동일
+          if (ec.outPriceCol != null) setCellNumber(doc, rowEl, ec.outPriceCol, r.price); // 출고단가 = 판매가(숫자1)와 동일
         }
       });
       updateDimensionSE(doc);
