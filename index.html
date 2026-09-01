@@ -3653,13 +3653,16 @@ else if (typeof exports === 'object')
       var s = (v===null||v===undefined ? '' : String(v)).trim().toUpperCase();
       s = s.replace(/\(/g, ' ').replace(/\)/g, ' ');
       s = s.replace(/\s+/g, ' ').trim();
+      // 키즈 사이즈는 같은 값을 이카운트는 "4Y", 사방넷은 "4A"처럼 다른 글자로 쓴다 -
+      // 숫자+A/Y 형태면 A로 통일해서 비교한다.
+      s = s.replace(/^(\d+)Y$/, '$1A');
       return s;
     }
     function rvmSpecsMatch(ecSpec, sbSpec){
       var e = rvmNormalizeSpec(ecSpec);
       var s = rvmNormalizeSpec(sbSpec);
       if(e === s) return true;
-      if(e === 'TU' && s === '') return true;
+      if(e === 'TU' && (s === '' || s === 'FREE')) return true;
       return false;
     }
     // 상품명 끝에서부터, 한글이 아닌(영문/숫자/기호) 토큰이 이어지는 구간을 "품번"으로 본다.
@@ -3675,7 +3678,10 @@ else if (typeof exports === 'object')
     //     "24SS 폭스 헤드 패치 티셔츠 화이트 IU00149KJ0008 P100" → "IU00149KJ0008 P100"
     //     "23FW V 로고 체인 버킷백 아이보리 3W2P0T83 HPF I16" → "3W2P0T83 HPF I16"
     function rvmCodeSuffix(name){
-      var toks = String(name||'').trim().split(/\s+/).filter(Boolean);
+      // 사방넷 상품명 끝에 사이즈 목록이 괄호로 붙는 경우가 있다 - 예: "... K1035S25 629
+      // (4A 5A 6A)". 이 괄호는 품번이 아니므로 코드를 뽑기 전에 먼저 떼어낸다.
+      var cleaned = String(name||'').replace(/\s*\([^)]*\)\s*$/, '');
+      var toks = cleaned.trim().split(/\s+/).filter(Boolean);
       var i = toks.length;
       while(i > 0 && !/[가-힣]/.test(toks[i-1])) i--;
       return toks.slice(i).join(' ');
