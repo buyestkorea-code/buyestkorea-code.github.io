@@ -560,7 +560,7 @@
         <div class="workspace">
           <div class="panel">
             <h2>사방넷-이카운트 매칭</h2>
-            <p class="sub">사방넷 상품대량수정 엑셀과 이카운트 품목등록 엑셀을 올리면, 품번(모델NO) 기준으로 자동 매칭해서 브랜드·품번·옵션·원산지·판매가·품목코드를 이카운트 파일에 채워 넣습니다. 매칭이 안 되는 품목은 미매칭/품절로 표시됩니다.</p>
+            <p class="sub">사방넷 상품대량수정 엑셀과 이카운트 품목등록 엑셀을 올리면, 품번(모델NO) 기준으로 자동 매칭해서 브랜드·품번·옵션·원산지·판매가·품목코드를 이카운트 파일에 채워 넣습니다. 같은 품번이면 사이즈가 달라도 브랜드·원산지·판매가는 동일하게 채워지고, 매칭이 안 되는 품목은 미매칭/품절로 표시됩니다.</p>
 
             <div class="dz-grid">
               <div class="dropzone" id="seSabangDrop" tabindex="0" role="button" aria-label="사방넷 파일 선택">
@@ -3273,19 +3273,31 @@ else if (typeof exports === 'object')
         var parsed = parseSheetSE(sheetXml, wb.sharedStrings);
         var doc = parsed.doc, rows = parsed.rows;
 
+        // 문자형추가항목1/규격 칸이 있는 행을 헤더로 보고, 그 칸 위치를 열 기준으로 삼는다.
+        // (이카운트 양식이 앞에 열을 더 끼워넣어도 자동으로 따라감. 못 찾으면 옛 양식 기본값으로.)
+        var headerRow = 1, charBase = 5, specCol = null;
+        for (var hr in rows) {
+          var hrow = rows[hr];
+          for (var c in hrow) {
+            var hv = String(hrow[c] == null ? "" : hrow[c]).trim();
+            if (hv === "문자형추가항목1") { headerRow = parseInt(hr, 10); charBase = parseInt(c, 10); }
+            if (hv === "규격") specCol = parseInt(c, 10);
+          }
+        }
+
         var items = [];
         for (var r in rows) {
           var rIdx = parseInt(r, 10);
-          if (rIdx < 2) continue;
+          if (rIdx <= headerRow) continue;
           var row = rows[r];
           var code = row[1];
           if (code === undefined || code === null || code === "") continue;
-          var name = row[2] == null ? "" : String(row[2]);
-          var spec = row[4];
-          items.push({ rowIdx: rIdx, code: String(code), name: name, spec: spec });
+          var name = row[2] == null ? "" : String(row[2]).trim();
+          var spec = specCol == null || row[specCol] == null ? "" : String(row[specCol]).trim();
+          items.push({ rowIdx: rIdx, code: String(code).trim(), name: name, spec: spec });
         }
 
-        state.ecount = { buf: buf, zipOrder: wb.zip.order, zipFiles: wb.zip.files, sheetPath: sheetPath, doc: doc, items: items };
+        state.ecount = { buf: buf, zipOrder: wb.zip.order, zipFiles: wb.zip.files, sheetPath: sheetPath, doc: doc, items: items, charBase: charBase };
         seMarkDropzone("ecount", file.name, "품목 " + items.length + "행 인식 (시트: " + targetName + ")", true);
       } catch (e) {
         seMarkDropzone("ecount", file.name, "읽기 실패: " + e.message, false);
@@ -3410,23 +3422,24 @@ else if (typeof exports === 'object')
     function buildOutputFile() {
       var ec = state.ecount;
       var doc = ec.doc;
+      var b = ec.charBase; // 문자1(브랜드) 열 번호 — 양식에 따라 자동 감지된 값
       var rowIndex = buildRowIndexSE(doc);
       state.results.forEach(function(r){
         var rowEl = rowIndex[r.rowIdx];
         if (!rowEl) return;
         var label = r.status === "matched" ? null : (r.status === "ambiguous" ? "미매칭" : "품절");
-        setCellText(doc, rowEl, 7, r.spec == null ? "" : String(r.spec)); // 문자3 옵션 = 이카운트 규격 그대로
-        setCellText(doc, rowEl, 8, "바이스트"); // 문자4 고정
-        setCellText(doc, rowEl, 10, r.code); // 문자6 바코드 = 이카운트 품목코드 그대로
+        setCellText(doc, rowEl, b + 2, r.spec == null ? "" : String(r.spec)); // 문자3 옵션 = 이카운트 규격 그대로 (같은 품번이면 사이즈 달라도 브랜드·원산지·판매가는 동일)
+        setCellText(doc, rowEl, b + 3, "바이스트"); // 문자4 고정
+        setCellText(doc, rowEl, b + 5, r.code); // 문자6 바코드 = 이카운트 품목코드 그대로
         if (label) {
-          setCellText(doc, rowEl, 5, label);
-          setCellText(doc, rowEl, 6, label);
-          setCellText(doc, rowEl, 9, label);
+          setCellText(doc, rowEl, b, label);
+          setCellText(doc, rowEl, b + 1, label);
+          setCellText(doc, rowEl, b + 4, label);
         } else {
-          setCellText(doc, rowEl, 5, r.brand);
-          setCellText(doc, rowEl, 6, r.modelno);
-          setCellText(doc, rowEl, 9, r.origin);
-          setCellNumber(doc, rowEl, 11, r.price);
+          setCellText(doc, rowEl, b, r.brand);
+          setCellText(doc, rowEl, b + 1, r.modelno);
+          setCellText(doc, rowEl, b + 4, r.origin);
+          setCellNumber(doc, rowEl, b + 6, r.price);
         }
       });
       updateDimensionSE(doc);
@@ -3440,16 +3453,16 @@ else if (typeof exports === 'object')
     }
 
     function buildResultCsv() {
-      // buildOutputFile이 이카운트 시트에 써넣는 것과 같은 열 배치(A~K)로,
+      // buildOutputFile이 이카운트 시트에 써넣는 것과 같은 열 배치로,
       // xlsx 저장이 불가능한 화면(claude.ai 아티팩트)에서 대신 내려주는 표.
-      var aoa = [['품목코드','품목명','','규격','브랜드(문자1)','품번(문자2)','옵션(문자3)','문자4','원산지(문자5)','바코드(문자6)','판매가']];
+      var aoa = [['품목코드','품목명','규격','브랜드(문자1)','품번(문자2)','옵션(문자3)','문자4','원산지(문자5)','바코드(문자6)','판매가']];
       state.results.forEach(function(r){
         var label = r.status === "matched" ? null : (r.status === "ambiguous" ? "미매칭" : "품절");
-        var spec = r.spec == null ? "" : String(r.spec);
+        var spec = r.spec == null ? "" : r.spec;
         if (label) {
-          aoa.push([r.code, r.name, '', spec, label, label, spec, '바이스트', label, r.code, '']);
+          aoa.push([r.code, r.name, spec, label, label, spec, '바이스트', label, r.code, '']);
         } else {
-          aoa.push([r.code, r.name, '', spec, r.brand, r.modelno, spec, '바이스트', r.origin, r.code, r.price]);
+          aoa.push([r.code, r.name, spec, r.brand, r.modelno, spec, '바이스트', r.origin, r.code, r.price]);
         }
       });
       return aoaToCsv(aoa);
