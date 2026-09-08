@@ -481,7 +481,7 @@
           <button class="tool-card" data-nav="stockMove">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>MD 품절</h3>
-            <p>이카운트 재고변동표의 잔량을 품목명·규격 기준으로 사방넷 단품대량수정 엑셀과 매칭해, 변동이 있는 품목만 가상재고를 갱신한 파일로 내려받습니다.</p>
+            <p>이카운트 재고변동표의 잔량을 품목명·규격 기준으로 사방넷 단품대량수정 엑셀과 매칭해, 변동이 있는 품목만 현재고를 갱신한 파일로 내려받습니다.</p>
           </button>
           <button class="tool-card" data-nav="buyestSoldOut">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
@@ -693,7 +693,7 @@
         <div class="workspace">
           <div class="panel">
             <h2>MD 품절</h2>
-            <p class="sub">이카운트 재고변동표와 사방넷 단품대량수정 엑셀을 올리면, 품목명 끝의 모델코드와 규격을 기준으로 자동 매칭해 이카운트 잔량을 사방넷 가상재고(F열)에 반영합니다. 실제 값이 바뀌는 품목만 골라 다운로드 파일에 담기 때문에, 사방넷 전체업로드에 그대로 쓸 수 있습니다.</p>
+            <p class="sub">이카운트 재고변동표와 사방넷 단품대량수정 엑셀을 올리면, 품목명 끝의 모델코드와 규격을 기준으로 자동 매칭해 이카운트 잔량을 사방넷 현재고에 반영합니다. 실제 값이 바뀌는 품목만 골라 다운로드 파일에 담기 때문에, 사방넷 전체업로드에 그대로 쓸 수 있습니다.</p>
 
             <div class="dz-grid">
               <div class="dropzone" id="rvmSabangDrop" tabindex="0" role="button" aria-label="사방넷 파일 선택">
@@ -3908,7 +3908,7 @@ else if (typeof exports === 'object')
 
   /* =========================================================
      TOOL 6: MD 품절
-     이카운트 재고변동표의 잔량을 사방넷 단품대량수정 엑셀의 가상재고(F열)에 반영한다.
+     이카운트 재고변동표의 잔량을 사방넷 단품대량수정 엑셀의 현재고에 반영한다.
      매칭 기준: 이카운트 품목명 끝부분(모델코드)과 사방넷 상품명 끝부분이 얼마나 겹치는 토큰까지
      일치하는지로 상품을 찾고(설명 앞부분 표기가 서로 달라도 끝의 모델코드는 같다는 점을 이용),
      그 후보 안에서 이카운트 규격 = 사방넷 옵션상세명칭(공백=TU)으로 정확한 옵션(사이즈) 행을 고른다.
@@ -3953,7 +3953,7 @@ else if (typeof exports === 'object')
         var hIdx = rvmFindHeaderRowIdx(aoa, function(r){ return r[0] && String(r[0]).indexOf('사방넷상품코드') !== -1; });
         if(hIdx === -1) throw new Error('헤더 행("사방넷상품코드")을 찾을 수 없습니다.');
         var col = rvmHeaderColMap(aoa[hIdx]);
-        ['상품명','옵션상세명칭','가상재고'].forEach(function(need){
+        ['상품명','옵션상세명칭','현재고'].forEach(function(need){
           if(!(need in col)) throw new Error('"' + need + '" 열을 찾을 수 없습니다.');
         });
         var dataStart = -1;
@@ -4122,7 +4122,7 @@ else if (typeof exports === 'object')
 
         if(matchedRows.length === 1){
           var ri = matchedRows[0].rowIdx;
-          var curStock = aoa[ri][col['가상재고']];
+          var curStock = aoa[ri][col['현재고']];
           var curNum = curStock==null ? 0 : (Number(curStock) || 0);
           if(curNum === it.remain){ stats.noChange++; results.push({item:it, status:'noChange', sbRowIdx:ri, sbName:matchedRows[0].sbName, curStock:curNum}); }
           else { stats.changed++; results.push({item:it, status:'changed', sbRowIdx:ri, sbName:matchedRows[0].sbName, curStock:curNum, newStock:it.remain}); }
@@ -4131,7 +4131,7 @@ else if (typeof exports === 'object')
 
         // 중복: 매칭된 행 전부에 이카운트 잔량을 반영한다 (이미 값이 같은 행도 다시 써서 맞춘다).
         matchedRows.forEach(function(m){
-          var curStock2 = aoa[m.rowIdx][col['가상재고']];
+          var curStock2 = aoa[m.rowIdx][col['현재고']];
           var curNum2 = curStock2==null ? 0 : (Number(curStock2) || 0);
           stats.dupChanged++;
           results.push({item:it, status:'dupChanged', sbRowIdx:m.rowIdx, sbName:m.sbName, curStock:curNum2, newStock:it.remain});
@@ -4145,7 +4145,7 @@ else if (typeof exports === 'object')
     }
 
     // 오늘 매칭에서 실제로 재고 변동이 있었던(반영예정·중복변경) 상품만 대상으로, 매칭
-    // 반영 후 값 기준 같은 상품명(사이즈/규격 전부)의 가상재고 합이 0이 되는 것만 골라낸다.
+    // 반영 후 값 기준 같은 상품명(사이즈/규격 전부)의 현재고 합이 0이 되는 것만 골라낸다.
     // 오늘 아무 변동도 없었는데 원래부터 전체 0이던 상품은 여기 포함하지 않는다 - "오늘 재고
     // 변동이 있던 것들 중에서" 전체 품절이 된 것만 보고 싶다는 요청에 맞춘 것이다.
     function computeRvmFullySoldOut(){
@@ -4164,7 +4164,7 @@ else if (typeof exports === 'object')
         var total = 0, lines = [];
         rows.forEach(function(ri){
           var v = updatedMap[ri];
-          if(v === undefined){ var raw = aoa[ri][col['가상재고']]; v = raw==null?0:(Number(raw)||0); }
+          if(v === undefined){ var raw = aoa[ri][col['현재고']]; v = raw==null?0:(Number(raw)||0); }
           total += v;
           lines.push({name:name, spec: aoa[ri][col['옵션상세명칭']], stock: v, itemCode: aoa[ri][col['자체상품코드']]});
         });
@@ -4191,7 +4191,7 @@ else if (typeof exports === 'object')
         var rows = state.sabangNameGroups[name];
         var beforeTotal = 0, afterTotal = 0, lines = [];
         rows.forEach(function(ri){
-          var raw = aoa[ri][col['가상재고']];
+          var raw = aoa[ri][col['현재고']];
           var before = raw==null?0:(Number(raw)||0);
           beforeTotal += before;
           var after = updatedMap[ri];
@@ -4237,7 +4237,7 @@ else if (typeof exports === 'object')
         s.appendChild(el('div', {class:'l'}, [document.createTextNode(l)]));
         return s;
       }
-      statsEl.appendChild(statCard(stats.changed.toLocaleString('ko-KR'), '반영예정 (가상재고 변경)', 'var(--success)'));
+      statsEl.appendChild(statCard(stats.changed.toLocaleString('ko-KR'), '반영예정 (현재고 변경)', 'var(--success)'));
       statsEl.appendChild(statCard(stats.dupChanged.toLocaleString('ko-KR'), '중복변경 (동일 품번 전체 반영)', 'var(--success)'));
       statsEl.appendChild(statCard(stats.noChange.toLocaleString('ko-KR'), '매칭됨 · 변동없음', 'var(--ink-muted)'));
       statsEl.appendChild(statCard(stats.specMismatch.toLocaleString('ko-KR'), '규격 불일치', 'var(--warning)'));
@@ -4251,11 +4251,11 @@ else if (typeof exports === 'object')
 
       var table = document.getElementById('rvmTable');
       table.innerHTML = '';
-      var cols = ['품목명','규격','상태','사방넷 상품명','사방넷상품코드','기존 가상재고','신규 값(잔량)'];
+      var cols = ['품목명','규격','상태','사방넷 상품명','사방넷상품코드','기존 현재고','신규 값(잔량)'];
       var thead = el('thead');
       var htr = el('tr');
       cols.forEach(function(c){
-        var attrs = (c === '규격' || c === '기존 가상재고' || c === '신규 값(잔량)') ? {class:'num'} : null;
+        var attrs = (c === '규격' || c === '기존 현재고' || c === '신규 값(잔량)') ? {class:'num'} : null;
         htr.appendChild(el('th', attrs, [document.createTextNode(c)]));
       });
       thead.appendChild(htr); table.appendChild(thead);
@@ -4288,14 +4288,14 @@ else if (typeof exports === 'object')
       return (state.results||[]).filter(function(r){ return r.status === 'changed' || r.status === 'dupChanged'; });
     }
     // valueKey: 'newStock'(반영예정 값) 또는 'curStock'(반영 전 현재 값, 백업용) 중 어느 쪽을
-    // 가상재고 칸에 넣을지 고른다. 두 다운로드 모두 같은 행(반영예정 6건 등)을 대상으로 하므로,
+    // 현재고 칸에 넣을지 고른다. 두 다운로드 모두 같은 행(반영예정 6건 등)을 대상으로 하므로,
     // "현재값" 파일을 그대로 재업로드하면 "변동분만" 업로드를 취소(롤백)할 수 있다.
     function buildRvmOutputAoa(changed, valueKey){
       var aoa = state.sabangAoa, col = state.sabangCol, dataStart = state.sabangDataStart;
       var headRows = aoa.slice(0, dataStart);
       var rows = changed.map(function(r){
         var row = aoa[r.sbRowIdx].slice();
-        row[col['가상재고']] = r[valueKey];
+        row[col['현재고']] = r[valueKey];
         return row;
       });
       return headRows.concat(rows);
@@ -4331,7 +4331,7 @@ else if (typeof exports === 'object')
     // 화면에 보이는 매칭 결과 표(반영예정·변동없음·규격불일치·중복·상품없음 전부)를 그대로 다운로드한다.
     // 사방넷 재업로드용 파일이 아니라, 지금 화면 상태를 그대로 기록해두는 결과표다.
     function buildRvmFullResultAoa(){
-      var header = ['품목명','규격','상태','사방넷 상품명','사방넷상품코드','기존 가상재고','신규 값(잔량)'];
+      var header = ['품목명','규격','상태','사방넷 상품명','사방넷상품코드','기존 현재고','신규 값(잔량)'];
       var aoa = [header];
       rvmSortedResults(state.results||[]).forEach(function(r){
         aoa.push([r.item.name, r.item.spec, RVM_STATUS_LABEL[r.status], r.sbName||'', rvmSbCode(r), r.curStock===undefined?'':r.curStock, rvmNewValueDisplay(r)]);
@@ -4366,7 +4366,7 @@ else if (typeof exports === 'object')
       var lines = computeRvmFullySoldOut();
       if(lines.length === 0){ rvmSetDownloadStatus('전체 품절인 상품이 없습니다.', true); return; }
       try{
-        var outAoa = [['상품명','규격','가상재고(매칭 후)','자체상품코드']];
+        var outAoa = [['상품명','규격','현재고(매칭 후)','자체상품코드']];
         lines.forEach(function(l){ outAoa.push([l.name, l.spec, l.stock, l.itemCode||'']); });
         var ws = XLSX.utils.aoa_to_sheet(outAoa);
         ws['!cols'] = [{wch:38},{wch:8},{wch:14},{wch:16}];
@@ -4392,7 +4392,7 @@ else if (typeof exports === 'object')
       var lines = computeRvmNewlyRestocked();
       if(lines.length === 0){ rvmSetDownloadStatus('품절 해제 대상 상품이 없습니다.', true); return; }
       try{
-        var outAoa = [['상품명','규격','기존 가상재고','신규 가상재고','자체상품코드']];
+        var outAoa = [['상품명','규격','기존 현재고','신규 현재고','자체상품코드']];
         lines.forEach(function(l){ outAoa.push([l.name, l.spec, l.beforeStock, l.afterStock, l.itemCode||'']); });
         var ws = XLSX.utils.aoa_to_sheet(outAoa);
         ws['!cols'] = [{wch:38},{wch:8},{wch:12},{wch:12},{wch:16}];
