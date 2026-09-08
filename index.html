@@ -378,6 +378,7 @@
     <nav class="nav-group">
       <span class="nav-group-label">재고 · 발주</span>
       <button class="nav-item" data-nav="inventory"><span class="ic">&#8942;</span>재고 세로변환<span class="chip chip-ready">사용가능</span></button>
+      <button class="nav-item" data-nav="stockAddConvert"><span class="ic">&#8942;</span>재고추가변환<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="sabangEcount"><span class="ic">&#8942;</span>사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="stockMove"><span class="ic">&#8942;</span>MD 품절<span class="chip chip-ready">사용가능</span></button>
       <button class="nav-item" data-nav="buyestSoldOut"><span class="ic">&#8942;</span>바이스트사이트 품절<span class="chip chip-ready">사용가능</span></button>
@@ -842,6 +843,10 @@
         </div>
       </section>
 
+      <section data-view="stockAddConvert">
+        <iframe src="stock-add-convert.html" title="재고추가변환" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <!-- ============ STUDIO ============ -->
       <section data-view="buyestSoldOut">
         <iframe src="ecount-sync-delta.html" title="바이스트사이트 품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
@@ -1261,7 +1266,7 @@ else if (typeof exports === 'object')
   var hamburger = document.getElementById('hamburger');
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
-    dashboard:'대시보드', inventory:'재고 세로변환', sabangEcount:'사방넷-이카운트 매칭',
+    dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', sabangEcount:'사방넷-이카운트 매칭',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
     orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', studio:'Studio (AI 보정/영상)', roadmap:'개발 예정 도구'
   };
