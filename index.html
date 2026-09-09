@@ -3626,7 +3626,7 @@ else if (typeof exports === 'object')
         var hIdx = rvmFindHeaderRowIdx(aoa, function(r){ return r[0] === '품목코드'; });
         if(hIdx === -1) throw new Error('헤더 행("품목코드")을 찾을 수 없습니다.');
         var col = rvmHeaderColMap(aoa[hIdx]);
-        ['품목코드','품목명','규격','잔량'].forEach(function(need){
+        ['품목코드','품목명','규격','전일재고','구매','판매','잔량'].forEach(function(need){
           if(!(need in col)) throw new Error('"' + need + '" 열을 찾을 수 없습니다.');
         });
         var items = [];
@@ -3638,6 +3638,9 @@ else if (typeof exports === 'object')
             code: String(code).trim(),
             name: String(row[col['품목명']]||'').trim(),
             spec: row[col['규격']]==null ? '' : String(row[col['규격']]).trim(),
+            prevStock: row[col['전일재고']]==null ? 0 : (Number(row[col['전일재고']]) || 0),
+            buy: row[col['구매']]==null ? 0 : (Number(row[col['구매']]) || 0),
+            sale: row[col['판매']]==null ? 0 : (Number(row[col['판매']]) || 0),
             remain: row[col['잔량']]==null ? 0 : (Number(row[col['잔량']]) || 0)
           });
         }
@@ -3970,10 +3973,10 @@ else if (typeof exports === 'object')
     // 화면에 보이는 매칭 결과 표(반영예정·변동없음·규격불일치·중복·상품없음 전부)를 그대로 다운로드한다.
     // 사방넷 재업로드용 파일이 아니라, 지금 화면 상태를 그대로 기록해두는 결과표다.
     function buildRvmFullResultAoa(){
-      var header = ['품목명','규격','상태','사방넷 상품명','사방넷상품코드','기존 현재고','신규 값(잔량)'];
+      var header = ['품목명','규격','전일재고','구매','판매','잔량','상태','사방넷 상품명','사방넷상품코드','기존 현재고','신규 값(잔량)'];
       var aoa = [header];
       rvmSortedResults(state.results||[]).forEach(function(r){
-        aoa.push([r.item.name, r.item.spec, RVM_STATUS_LABEL[r.status], r.sbName||'', rvmSbCode(r), r.curStock===undefined?'':r.curStock, rvmNewValueDisplay(r)]);
+        aoa.push([r.item.name, r.item.spec, r.item.prevStock, r.item.buy, r.item.sale, r.item.remain, RVM_STATUS_LABEL[r.status], r.sbName||'', rvmSbCode(r), r.curStock===undefined?'':r.curStock, rvmNewValueDisplay(r)]);
       });
       return aoa;
     }
@@ -3982,7 +3985,7 @@ else if (typeof exports === 'object')
       try{
         var outAoa = buildRvmFullResultAoa();
         var ws = XLSX.utils.aoa_to_sheet(outAoa);
-        ws['!cols'] = [{wch:38},{wch:8},{wch:12},{wch:38},{wch:16},{wch:12},{wch:12}];
+        ws['!cols'] = [{wch:38},{wch:8},{wch:10},{wch:8},{wch:8},{wch:8},{wch:12},{wch:38},{wch:16},{wch:12},{wch:12}];
         ws['!autofilter'] = {ref: ws['!ref']};
         var wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '매칭결과');
