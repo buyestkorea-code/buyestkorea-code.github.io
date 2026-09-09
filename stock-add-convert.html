@@ -50,11 +50,11 @@
     <div class="field">
       <label>이카운트 품목 조회 방식</label>
       <div class="modes">
-        <button id="mAuto" class="on" onclick="setMode('cache')">자동 (서버 캐시)</button>
-        <button id="mManual" onclick="setMode('manual')">수동 (엑셀 업로드)</button>
+        <button id="mManual" class="on" onclick="setMode('manual')">수동 (엑셀 업로드)</button>
+        <button id="mAuto" onclick="setMode('cache')">자동 (서버 캐시)</button>
       </div>
     </div>
-    <div class="field" id="ecFileField" style="display:none;">
+    <div class="field" id="ecFileField">
       <label>이카운트 품목 엑셀 (.xlsx) — 품목코드 / 품목명[규격]</label>
       <input type="file" id="ecFile" accept=".xlsx,.xls">
     </div>
@@ -70,7 +70,7 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script>
 const API_URL = 'https://buyest.co.kr/stock_add_convert_api.php';
-let mode = 'cache';
+let mode = 'manual';
 let stockWB = null, ecWB = null, resultItems = [], srcBase = 'result';
 
 function setMode(m) {
@@ -211,7 +211,13 @@ async function run() {
     resultItems = data.items;
     render(data);
     let metaTxt = '';
-    if (data.ecount_source === 'cache' && data.ecount_meta) metaTxt = ` · 이카운트 캐시 기준: ${data.ecount_meta.updated_at}`;
+    if (data.ecount_source === 'cache' && data.ecount_meta) {
+      metaTxt = ` · 이카운트 캐시 기준: ${data.ecount_meta.updated_at}`;
+      const u = Date.parse((data.ecount_meta.updated_at || '').slice(0, 19).replace(' ', 'T'));
+      if (/임시|bootstrap/i.test(JSON.stringify(data.ecount_meta)) || (u && Date.now() - u > 2 * 864e5)) {
+        metaTxt += ' ⚠ 캐시가 아직 임시/오래됨 — "신규"가 실제보다 많을 수 있어요. 수동 모드를 쓰거나 캐시 갱신 후 다시 확인하세요.';
+      }
+    }
     if (data.ecount_source === 'manual') metaTxt = ' · 업로드한 이카운트 엑셀 기준';
     const cnt = c => resultItems.filter(i => i.상태 === c).length;
     status.innerHTML = `총 ${resultItems.length}행 — 판매중 ${cnt('판매중')} · 품절 ${cnt('품절')} · 신규 ${cnt('신규')} · 확인필요 ${cnt('확인필요')}${metaTxt}`;
