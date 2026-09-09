@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BUYEST Toolkit</title>
 <style>
+  @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendard-variable-dynamic-subset.min.css");
   :root{
     --bg:#F3F1EC;
     --surface:#FFFFFF;
@@ -20,7 +21,7 @@
     --danger-soft:#F6E2E0;
     --radius:10px;
     --shadow:0 1px 2px rgba(20,24,20,.06), 0 10px 28px -14px rgba(20,24,20,.22);
-    --font-ui:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Segoe UI",system-ui,sans-serif;
+    --font-ui:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Segoe UI",system-ui,sans-serif;
     --font-mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono","Noto Sans Mono",monospace;
     --sidebar-w:264px;
     color-scheme:light;
@@ -359,38 +360,146 @@
     .topbar-meta span.txt{ display:none; }
   }
 
-  /* ---------- 개인 대시보드 (로그인 시 대시보드 상단에 표시) ---------- */
-  .me-wrap{ margin:0 0 26px; }
-  .me-login{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px 20px; max-width:440px; box-shadow:var(--shadow); }
-  .me-login h2{ margin:0 0 4px; font-size:16px; }
-  .me-login p{ margin:0 0 14px; font-size:12.5px; color:var(--ink-muted); }
-  .me-row{ display:flex; gap:8px; flex-wrap:wrap; }
-  .me-row input{ flex:1 1 130px; min-width:0; padding:9px 11px; border:1px solid var(--border); border-radius:9px; font:inherit; background:var(--surface); color:var(--ink); }
-  .me-row button{ padding:9px 16px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); border-radius:9px; cursor:pointer; font:inherit; }
-  .me-msg{ font-size:12px; color:var(--ink-muted); margin-top:8px; min-height:1em; }
-  .me-head{ display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
-  .me-head h2{ margin:0; font-size:17px; }
-  .me-head .me-sync{ font-size:12px; color:var(--ink-muted); }
-  .me-head button{ background:none; border:none; color:var(--ink-muted); cursor:pointer; text-decoration:underline; font:inherit; font-size:12px; padding:0; }
-  .me-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; align-items:start; }
-  .me-card{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; }
-  .me-card h3{ margin:0 0 10px; font-size:14px; }
-  .me-card textarea{ width:100%; box-sizing:border-box; resize:vertical; padding:9px; border:1px solid var(--border); border-radius:9px; font:inherit; background:var(--surface); color:var(--ink); }
-  .me-card input[type=text]{ flex:1 1 110px; min-width:0; padding:7px 9px; border:1px solid var(--border); border-radius:7px; font:inherit; background:var(--surface); color:var(--ink); }
-  .me-add{ display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
-  .me-add button{ padding:7px 12px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); border-radius:7px; cursor:pointer; font:inherit; font-size:13px; }
-  .me-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
-  .me-list li{ display:flex; align-items:center; gap:8px; font-size:13px; }
-  .me-list li .x{ margin-left:auto; cursor:pointer; color:var(--ink-muted); border:none; background:none; font-size:16px; line-height:1; padding:0 2px; }
+  /* ================= 로그인 관문 + 개인 대시보드 (2026-09 리디자인) ================= */
+  :root{
+    --me-radius:18px;
+    --me-shadow:0 1px 3px rgba(28,32,26,.04), 0 14px 40px -12px rgba(28,32,26,.16);
+    --me-shadow-hi:0 2px 6px rgba(28,32,26,.06), 0 20px 48px -12px rgba(28,32,26,.22);
+    --me-accent-hi:#264C43;
+  }
+
+  /* ---- 로그인 화면 ---- */
+  .me-gate{
+    position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+    padding:24px; overflow:hidden;
+    background:radial-gradient(1200px 600px at 50% -10%, #EDEFE9 0%, var(--bg) 55%);
+  }
+  .me-gate::before{  /* 시그니처: 거대한 흐린 워드마크 */
+    content:"BUYEST"; position:absolute; left:50%; bottom:-.18em; transform:translateX(-50%);
+    font-weight:800; font-size:min(30vw,340px); letter-spacing:-.04em; line-height:.8;
+    color:var(--accent); opacity:.05; pointer-events:none; white-space:nowrap;
+  }
+  .me-gate-box{
+    position:relative; width:100%; max-width:392px;
+    background:var(--surface); border-radius:22px; padding:38px 34px 30px;
+    box-shadow:var(--me-shadow-hi);
+  }
+  .me-gate-brand{ display:flex; align-items:center; gap:9px; font-weight:700; font-size:15px; letter-spacing:-.01em; color:var(--ink); margin-bottom:22px; }
+  .me-gate-mark{
+    display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px;
+    border-radius:8px; background:var(--accent); color:var(--accent-ink); font-size:14px; font-weight:800;
+  }
+  .me-gate-tabs{ display:flex; gap:3px; background:var(--surface-2); border-radius:12px; padding:3px; margin-bottom:20px; }
+  .me-gate-tabs button{
+    flex:1; padding:10px; border:none; border-radius:9px; background:none;
+    font:inherit; font-size:13.5px; font-weight:600; color:var(--ink-muted); cursor:pointer;
+    transition:background .16s ease, color .16s ease;
+  }
+  .me-gate-tabs button.on{ background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(28,32,26,.12); }
+  .me-gate-box form{ display:flex; flex-direction:column; gap:10px; }
+  .me-gate-box input{
+    height:46px; padding:0 14px; border:1px solid var(--border); border-radius:12px;
+    font:inherit; font-size:14px; background:var(--surface); color:var(--ink);
+    transition:border-color .16s ease, box-shadow .16s ease;
+  }
+  .me-gate-box input:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .me-gate-box form button{
+    height:46px; margin-top:4px; border:none; border-radius:12px;
+    background:var(--accent); color:var(--accent-ink); cursor:pointer;
+    font:inherit; font-size:14.5px; font-weight:600; letter-spacing:.01em;
+    transition:background .16s ease, transform .05s ease;
+  }
+  .me-gate-box form button:hover{ background:var(--me-accent-hi); }
+  .me-gate-box form button:active{ transform:translateY(1px); }
+  .me-gate-msg{ font-size:12.5px; color:var(--ink-muted); margin:14px 2px 0; min-height:1em; line-height:1.55; }
+  .me-gate-skip{
+    display:block; width:100%; margin-top:22px; padding:2px; background:none; border:none;
+    color:var(--ink-muted); cursor:pointer; font:inherit; font-size:13px; text-align:center;
+  }
+  .me-gate-skip:hover{ color:var(--ink); }
+
+  /* ---- 상단 로그인 버튼 ---- */
+  .me-topauth{
+    margin-left:auto; flex:none; white-space:nowrap; cursor:pointer;
+    background:var(--surface); border:1px solid var(--border); border-radius:999px;
+    padding:6px 15px; font:inherit; font-size:12.5px; font-weight:500; color:var(--ink);
+    transition:border-color .16s ease, color .16s ease;
+  }
+  .me-topauth:hover{ border-color:var(--accent); color:var(--accent); }
+  .topbar > .topbar-meta{ margin-left:12px !important; flex:none; }
+  @media (max-width:920px){ .topbar > .topbar-meta{ display:none; } }
+
+  /* ---- 로그인 후 개인 대시보드 ---- */
+  body.me-in #dashCatalog{ display:none; }
+  body.me-in .hero{ margin-bottom:22px; }
+  body.me-in .hero h1{ font-size:27px; letter-spacing:-.02em; }
+  .me-wrap{ margin:0; }
+  .me-head{ display:flex; align-items:center; gap:10px; margin:0 0 16px; min-height:1.4em; }
+  .me-head .me-sync{
+    font-size:11.5px; font-weight:500; color:var(--ink-muted);
+    background:var(--surface-2); border-radius:999px; padding:4px 11px;
+  }
+  .me-head .me-sync:empty{ display:none; }
+  .me-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:start; }
+  @media (max-width:760px){ .me-grid{ grid-template-columns:1fr; } }
+  .me-card{
+    background:var(--surface); border:1px solid rgba(219,213,199,.55); border-radius:var(--me-radius);
+    padding:18px 20px 20px; box-shadow:var(--me-shadow);
+    transition:box-shadow .18s ease, transform .18s ease;
+  }
+  .me-card:hover{ box-shadow:var(--me-shadow-hi); }
+  .me-card h3{
+    margin:0 0 14px; font-size:13.5px; font-weight:600; letter-spacing:-.005em; color:var(--ink);
+    display:flex; align-items:center; gap:7px;
+  }
+  .me-card h3::before{ content:""; width:5px; height:5px; border-radius:2px; background:var(--accent); flex:none; }
+  .me-card textarea{
+    width:100%; box-sizing:border-box; resize:vertical; min-height:120px; padding:11px 12px;
+    border:1px solid var(--border); border-radius:12px; font:inherit; font-size:13.5px; line-height:1.6;
+    background:var(--surface); color:var(--ink); transition:border-color .16s ease, box-shadow .16s ease;
+  }
+  .me-card textarea:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .me-card input[type=text]{
+    flex:1 1 110px; min-width:0; height:36px; padding:0 11px; border:1px solid var(--border);
+    border-radius:10px; font:inherit; font-size:13px; background:var(--surface); color:var(--ink);
+    transition:border-color .16s ease, box-shadow .16s ease;
+  }
+  .me-card input[type=text]:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .me-add{ display:flex; gap:7px; margin-bottom:12px; flex-wrap:wrap; }
+  .me-add button{
+    height:36px; padding:0 14px; border:none; border-radius:10px; background:var(--accent);
+    color:var(--accent-ink); cursor:pointer; font:inherit; font-size:13px; font-weight:500;
+    transition:background .16s ease;
+  }
+  .me-add button:hover{ background:var(--me-accent-hi); }
+  .me-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .me-list li{ display:flex; align-items:center; gap:9px; font-size:13.5px; padding:6px 4px; border-radius:8px; }
+  .me-list li:hover{ background:var(--surface-2); }
+  .me-list li input[type=checkbox]{ width:15px; height:15px; accent-color:var(--accent); flex:none; }
+  .me-list li label{ cursor:pointer; }
+  .me-list li .x{
+    margin-left:auto; cursor:pointer; color:var(--ink-muted); border:none; background:none;
+    font-size:17px; line-height:1; padding:0 4px; opacity:0; transition:opacity .12s ease;
+  }
+  .me-list li:hover .x{ opacity:1; }
   .me-list li a{ color:var(--accent); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .me-list li a:hover{ text-decoration:underline; }
   .me-list li.done label{ text-decoration:line-through; color:var(--ink-muted); }
-  .me-mini{ margin-top:8px; border:none; background:none; color:var(--ink-muted); cursor:pointer; text-decoration:underline; padding:0; font:inherit; font-size:12px; }
-  .me-picks{ display:flex; flex-wrap:wrap; gap:7px; margin-bottom:8px; }
-  .me-picks button{ padding:6px 11px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--ink); cursor:pointer; font:inherit; font-size:12px; }
-  .me-picks button:hover{ border-color:var(--accent); color:var(--accent); }
-  .me-opts{ display:flex; flex-direction:column; gap:5px; margin-top:8px; font-size:12.5px; }
-  .me-card details summary{ cursor:pointer; font-size:12.5px; color:var(--ink-muted); }
-  .me-wrap [hidden], #meLogin[hidden], #meApp[hidden]{ display:none !important; }
+  .me-mini{ margin-top:10px; border:none; background:none; color:var(--ink-muted); cursor:pointer; padding:0; font:inherit; font-size:12px; }
+  .me-mini:hover{ color:var(--ink); }
+  .me-picks{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .me-picks button{
+    padding:7px 13px; border:1px solid var(--border); border-radius:999px; background:var(--surface);
+    color:var(--ink); cursor:pointer; font:inherit; font-size:12.5px; font-weight:500;
+    transition:border-color .16s ease, color .16s ease, background .16s ease;
+  }
+  .me-picks button:hover{ border-color:var(--accent); color:var(--accent-ink); background:var(--accent); }
+  .me-opts{ display:flex; flex-direction:column; gap:7px; margin-top:10px; font-size:13px; }
+  .me-opts label{ display:flex; align-items:center; gap:8px; cursor:pointer; }
+  .me-opts input[type=checkbox]{ width:15px; height:15px; accent-color:var(--accent); }
+  .me-card details summary{ cursor:pointer; font-size:12.5px; font-weight:500; color:var(--ink-muted); list-style-position:inside; }
+  .me-card details summary:hover{ color:var(--ink); }
+  .me-wrap [hidden], #meApp[hidden], #meGate[hidden], #meTopAuth[hidden]{ display:none !important; }
 </style>
 
 <div class="app">
@@ -428,11 +537,6 @@
     </nav>
 
     <nav class="nav-group">
-      <span class="nav-group-label">이미지 · 영상</span>
-      <button class="nav-item" data-nav="studio"><span class="ic">&#10022;</span>Studio (AI 보정/영상)<span class="chip chip-ready">사용가능</span></button>
-    </nav>
-
-    <nav class="nav-group">
       <span class="nav-group-label">개발 예정</span>
       <button class="nav-item" data-nav="roadmap" data-roadmap-target="rm-brand"><span class="ic">&#9675;</span>브랜드 매칭<span class="chip chip-soon">준비중</span></button>
       <button class="nav-item" data-nav="roadmap" data-roadmap-target="rm-naver"><span class="ic">&#9675;</span>네이버 가격비교<span class="chip chip-soon">준비중</span></button>
@@ -447,36 +551,43 @@
     <header class="topbar">
       <button class="hamburger" id="hamburger" aria-label="메뉴 열기">&#9776;</button>
       <div class="topbar-title" id="topbarTitle">대시보드</div>
+      <button type="button" id="meTopAuth" class="me-topauth" hidden></button>
       <div class="topbar-meta"><span class="dot"></span><span class="txt">브라우저 내에서 처리 · 업로드 없음</span></div>
     </header>
+
+    <!-- 로그인 / 회원가입 화면 (인트라넷 관문). "로그인 없이 도구만 사용" 으로 건너뛸 수 있음 -->
+    <div id="meGate" class="me-gate" hidden>
+      <div class="me-gate-box">
+        <div class="me-gate-brand"><span class="me-gate-mark">B</span> BUYEST Toolkit</div>
+        <div class="me-gate-tabs">
+          <button type="button" id="meTabLogin" class="on">로그인</button>
+          <button type="button" id="meTabSignup">회원가입</button>
+        </div>
+        <form id="meGateForm">
+          <input type="text" id="meGateId" placeholder="아이디" autocomplete="username" />
+          <input type="password" id="meGatePw" placeholder="비밀번호" autocomplete="current-password" />
+          <input type="password" id="meGatePw2" placeholder="비밀번호 확인" autocomplete="new-password" hidden />
+          <button type="submit" id="meGateSubmit">로그인</button>
+        </form>
+        <div class="me-gate-msg" id="meGateMsg"></div>
+        <button type="button" id="meGateSkip" class="me-gate-skip">로그인 없이 도구만 사용 &rarr;</button>
+      </div>
+    </div>
 
     <main class="content">
 
       <!-- ============ DASHBOARD ============ -->
       <section data-view="dashboard" class="active">
         <div class="hero">
-          <h1>바이스트 업무 도구모음</h1>
-          <p>재고 양식 변환, 인보이스 자동인식, 사방넷-이카운트 매칭 등 반복 업무를 브라우저에서 바로 처리하세요. 별도 설치 없이 이 페이지 링크만 있으면 누구나 사용할 수 있습니다.</p>
+          <h1 id="dashHeroH1">바이스트 업무 도구모음</h1>
+          <p id="dashHeroP">재고 양식 변환, 인보이스 자동인식, 사방넷-이카운트 매칭 등 반복 업무를 브라우저에서 바로 처리하세요. 별도 설치 없이 이 페이지 링크만 있으면 누구나 사용할 수 있습니다.</p>
         </div>
 
-        <!-- 개인 대시보드: 로그인하면 메모·링크·바로가기. 로그인 안 해도 아래 도구는 다 됨 -->
+        <!-- 로그인하면 이 위젯이 대시보드 메인이 되고, 아래 도구목록은 숨겨진다 (도구는 사이드바에) -->
         <div class="me-wrap">
-          <div id="meLogin" class="me-login">
-            <h2>로그인</h2>
-            <p>로그인하면 개인 메모·자주 쓰는 링크·바로가기를 어느 PC에서든 쓸 수 있어요. 안 해도 아래 도구는 다 됩니다. 처음이면 아이디·비밀번호를 정해서 입력하면 계정이 만들어집니다.</p>
-            <form id="meLoginForm" class="me-row">
-              <input type="text" id="meLoginId" placeholder="아이디" autocomplete="username" />
-              <input type="password" id="meLoginPw" placeholder="비밀번호 (4자 이상)" autocomplete="current-password" />
-              <button type="submit">들어가기</button>
-            </form>
-            <div class="me-msg" id="meLoginMsg"></div>
-          </div>
-
           <div id="meApp" hidden>
             <div class="me-head">
-              <h2 id="meHi">내 대시보드</h2>
               <span class="me-sync" id="meSync"></span>
-              <button type="button" id="meLogout">로그아웃</button>
             </div>
             <div class="me-grid">
               <div class="me-card">
@@ -510,6 +621,7 @@
           </div>
         </div>
 
+        <div id="dashCatalog">
         <div class="section-head">
           <h2>지금 사용 가능</h2>
           <span class="hint">클릭하면 바로 시작합니다</span>
@@ -572,15 +684,6 @@
           </button>
         </div>
 
-        <div class="card-group-label">이미지 · 영상</div>
-        <div class="card-grid">
-          <button class="tool-card" data-nav="studio">
-            <div class="tool-card-top"><div class="ic">&#10022;</div><span class="chip chip-ready">사용가능</span></div>
-            <h3>Studio (AI 보정/영상)</h3>
-            <p>상품 이미지를 AI로 보정하고 짧은 영상을 만듭니다.</p>
-          </button>
-        </div>
-
         <div class="section-head">
           <h2>개발 예정</h2>
           <span class="hint">기존 파이썬 프로그램을 순차적으로 이식 중입니다</span>
@@ -602,6 +705,7 @@
           <span>&#9432;</span>
           <div><strong>계속 업데이트됩니다.</strong> 이 페이지는 하나의 링크로 계속 갱신되는 방식으로 운영됩니다. 새 기능이 추가되면 같은 주소에서 바로 사용할 수 있고, 필요한 도구를 우선순위로 알려주시면 순서를 조정합니다.</div>
         </div>
+        </div><!-- /#dashCatalog -->
       </section>
 
       <!-- ============ INVENTORY VERTICAL TRANSFORM ============ -->
@@ -943,10 +1047,6 @@
 
       <section data-view="stockMismatch">
         <iframe src="stock-mismatch.html" title="이카운트-사이트 재고 불일치 확인" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
-      </section>
-
-      <section data-view="studio">
-        <iframe src="studio.html" title="BUYEST Kids Studio" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <!-- ============ ROADMAP ============ -->
@@ -1352,7 +1452,7 @@ else if (typeof exports === 'object')
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', sabangEcount:'사방넷-이카운트 매칭',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
-    orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', studio:'Studio (AI 보정/영상)', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
   };
 
   function closeDrawer(){
@@ -1423,7 +1523,7 @@ else if (typeof exports === 'object')
     if(VALID_VIEWS[name] && name !== 'dashboard') showView(name, roadmapTarget, false);
   })();
 
-  /* ---------------- 개인 대시보드 (로그인) ---------------- */
+  /* ---------------- 로그인 관문 + 개인 대시보드 ---------------- */
   (function(){
     var API = 'https://buyest.co.kr/toolkit_dashboard_api.php';
     var LS = {
@@ -1431,14 +1531,21 @@ else if (typeof exports === 'object')
       set:function(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
     };
 
-    var AUTH  = LS.get('buyest.dash.auth', null);          // {id, pass} — 이 PC에서 한 번 로그인하면 저장
+    var AUTH  = LS.get('buyest.dash.auth', null);          // {id, pass}
     var state = normState(LS.get('buyest.dash.cache', null));
 
-    var loginBox = document.getElementById('meLogin');
-    var appBox   = document.getElementById('meApp');
-    var loginMsg = document.getElementById('meLoginMsg');
-    var syncEl   = document.getElementById('meSync');
-    var HIDE = {dashboard:1, roadmap:1};
+    var gate      = document.getElementById('meGate');
+    var gateForm  = document.getElementById('meGateForm');
+    var gateId    = document.getElementById('meGateId');
+    var gatePw    = document.getElementById('meGatePw');
+    var gateMsg   = document.getElementById('meGateMsg');
+    var appBox    = document.getElementById('meApp');
+    var syncEl    = document.getElementById('meSync');
+    var topAuth   = document.getElementById('meTopAuth');
+    var heroH1    = document.getElementById('dashHeroH1');
+    var heroP     = document.getElementById('dashHeroP');
+    var HIDE      = {dashboard:1, roadmap:1};
+    var HERO_H1   = heroH1.textContent, HERO_P = heroP.textContent;
 
     function normState(d){
       d = d || {};
@@ -1450,10 +1557,24 @@ else if (typeof exports === 'object')
       };
     }
     function nowT(){ return new Date().toLocaleTimeString('ko-KR'); }
-    function setSync(t){ if(syncEl) syncEl.textContent = t ? '· ' + t : ''; }
-    function showLogin(msg){ appBox.hidden = true; loginBox.hidden = false; if(msg!=null) loginMsg.textContent = msg; }
-    function showApp(){ loginBox.hidden = true; appBox.hidden = false;
-      document.getElementById('meHi').textContent = (AUTH ? AUTH.id : '') + '님의 메모';
+    function setSync(t){ if(syncEl) syncEl.textContent = t || ''; }
+    function isPwErr(res){ return res && res.error && res.error.indexOf('비밀번호') === 0; }
+
+    /* 화면 상태: 'gate'(로그인화면) | 'guest'(로그인없이 도구만) | 'in'(로그인됨) */
+    function applyMode(mode){
+      gate.hidden = (mode !== 'gate');
+      appBox.hidden = (mode !== 'in');
+      document.body.classList.toggle('me-in', mode === 'in');
+      topAuth.hidden = (mode === 'gate');
+      if(mode === 'in'){
+        topAuth.textContent = (AUTH ? AUTH.id : '') + '님 · 로그아웃';
+        heroH1.textContent = (AUTH ? AUTH.id : '') + '님, 안녕하세요';
+        heroP.textContent = '메모·할 일·자주 쓰는 링크는 계정에 저장돼 어느 PC에서든 같은 내용이 보입니다. 도구는 왼쪽 메뉴에서 여세요.';
+      } else {
+        topAuth.textContent = '로그인';
+        heroH1.textContent = HERO_H1;
+        heroP.textContent = HERO_P;
+      }
     }
 
     function api(action, extra){
@@ -1475,30 +1596,30 @@ else if (typeof exports === 'object')
       setSync('저장 중…');
       api('save', {data: state}).then(function(res){
         if(res && res.ok){ dirty = false; setSync('저장됨 ' + nowT()); }
-        else if(res && res.error === '비밀번호가 틀렸습니다'){ logout('다시 로그인해 주세요.'); }
+        else if(isPwErr(res)){ doLogout('gate'); gateMsg.textContent = '다시 로그인해 주세요.'; }
         else setSync('저장 실패 — 이 PC에는 보관됨');
       }).catch(function(){ setSync('서버 연결 안 됨 — 이 PC에만 저장됨'); });
     }
 
-    function logout(msg){
-      AUTH = null; LS.set('buyest.dash.auth', null); LS.set('buyest.dash.cache', null);
+    function doLogout(nextMode){
+      AUTH = null;
+      LS.set('buyest.dash.auth', null);
+      LS.set('buyest.dash.cache', null);
+      LS.set('buyest.dash.skip', null);
       state = normState(null);
       renderAll();
-      showLogin(msg || '');
+      setGateMode('login');
+      applyMode(nextMode || 'gate');
       setSync('');
     }
 
-    /* 메모 */
-    var memo = document.getElementById('meMemo');
-    var memoTimer;
+    /* ---- 위젯들 ---- */
+    var memo = document.getElementById('meMemo'), memoTimer;
     memo.addEventListener('input', function(){
-      state.memo = memo.value;
-      clearTimeout(memoTimer);
-      memoTimer = setTimeout(persist, 300);
+      state.memo = memo.value; clearTimeout(memoTimer); memoTimer = setTimeout(persist, 300);
     });
     function renderMemo(){ if(document.activeElement !== memo) memo.value = state.memo; }
 
-    /* 할 일 */
     var todoList = document.getElementById('meTodoList');
     function renderTodos(){
       todoList.innerHTML = '';
@@ -1524,7 +1645,6 @@ else if (typeof exports === 'object')
       state.todos = state.todos.filter(function(t){ return !t.done; }); persist(); renderTodos();
     });
 
-    /* 링크 */
     var linkList = document.getElementById('meLinkList');
     function normUrl(u){ u = u.trim(); if(!u) return ''; if(!/^https?:\/\//i.test(u)) u = 'https://' + u; return u; }
     function renderLinks(){
@@ -1548,9 +1668,7 @@ else if (typeof exports === 'object')
       lab.value=''; url.value=''; persist(); renderLinks();
     });
 
-    /* 내 바로가기 */
-    var picksBox = document.getElementById('mePicks');
-    var optsBox = document.getElementById('meOpts');
+    var picksBox = document.getElementById('mePicks'), optsBox = document.getElementById('meOpts');
     function renderPicks(){
       picksBox.innerHTML = state.tools.length ? '' : '<span style="font-size:12px;color:var(--ink-muted)">아래 ‘도구 고르기’에서 선택</span>';
       state.tools.forEach(function(k){
@@ -1575,57 +1693,102 @@ else if (typeof exports === 'object')
         optsBox.appendChild(lb);
       });
     }
-
     function renderAll(){ renderMemo(); renderTodos(); renderLinks(); renderPicks(); renderOpts(); }
 
-    /* 로그인 폼 */
-    document.getElementById('meLoginForm').addEventListener('submit', function(e){
+    /* ---- 로그인 / 회원가입 ---- */
+    var gatePw2   = document.getElementById('meGatePw2');
+    var gateSubmit= document.getElementById('meGateSubmit');
+    var tabLogin  = document.getElementById('meTabLogin');
+    var tabSignup = document.getElementById('meTabSignup');
+    var gateMode  = 'login';   // 'login' | 'signup'
+
+    function setGateMode(m, keepMsg){
+      gateMode = m;
+      tabLogin.classList.toggle('on', m === 'login');
+      tabSignup.classList.toggle('on', m === 'signup');
+      gatePw2.hidden = (m !== 'signup');
+      gatePw.setAttribute('autocomplete', m === 'signup' ? 'new-password' : 'current-password');
+      gateSubmit.textContent = (m === 'signup') ? '가입하고 시작' : '로그인';
+      if(!keepMsg) gateMsg.textContent = (m === 'signup') ? '아이디는 한글·영문·숫자 2~20자, 비밀번호는 4자 이상.' : '';
+    }
+    tabLogin.addEventListener('click', function(){ setGateMode('login'); });
+    tabSignup.addEventListener('click', function(){ setGateMode('signup'); });
+
+    function enterWith(res, okMsg){
+      LS.set('buyest.dash.auth', AUTH);
+      LS.set('buyest.dash.skip', null);
+      state = normState(res.data);
+      LS.set('buyest.dash.cache', state);
+      gatePw.value = ''; gatePw2.value = '';
+      renderAll();
+      applyMode('in');
+      showView('dashboard');
+      setSync(okMsg);
+    }
+
+    gateForm.addEventListener('submit', function(e){
       e.preventDefault();
-      var id = document.getElementById('meLoginId').value.trim();
-      var pw = document.getElementById('meLoginPw').value;
-      if(!id){ loginMsg.textContent = '아이디를 입력하세요'; return; }
-      if(pw.length < 4){ loginMsg.textContent = '비밀번호는 4자 이상'; return; }
-      loginMsg.textContent = '확인 중…';
+      var id = gateId.value.trim(), pw = gatePw.value;
+      if(!/^[\wㄱ-ㅎㅏ-ㅣ가-힣-]{2,20}$/.test(id)){ gateMsg.textContent = '아이디는 한글·영문·숫자 2~20자'; return; }
+      if(pw.length < 4){ gateMsg.textContent = '비밀번호는 4자 이상'; return; }
+      if(gateMode === 'signup' && pw !== gatePw2.value){ gateMsg.textContent = '비밀번호 확인이 일치하지 않아요'; return; }
+
+      gateMsg.textContent = '확인 중…';
       AUTH = {id:id, pass:pw};
-      api('load').then(function(res){
+      api(gateMode === 'signup' ? 'signup' : 'login').then(function(res){
         if(res && res.ok){
-          LS.set('buyest.dash.auth', AUTH);
-          state = normState(res.data);
-          LS.set('buyest.dash.cache', state);
-          document.getElementById('meLoginPw').value = '';
-          renderAll(); showApp();
-          setSync(res.created ? '새 계정이 만들어졌어요' : '동기화됨 ' + nowT());
+          enterWith(res, gateMode === 'signup' ? '가입 완료! · ' + nowT() : '로그인됨 · ' + nowT());
         } else {
           AUTH = null;
-          loginMsg.textContent = (res && res.error) || '로그인 실패';
+          var err = (res && res.error) || (gateMode === 'signup' ? '가입 실패' : '로그인 실패');
+          // 로그인 시도인데 계정이 없으면 회원가입 탭으로 옮기고 이유를 알려준다
+          if(gateMode === 'login' && res && res.error && res.error.indexOf('없는 아이디') === 0){
+            setGateMode('signup', true);
+            err = '처음이신가요? 아이디·비밀번호를 정하고 "가입하고 시작"을 누르세요.';
+          }
+          // 회원가입 시도인데 이미 있으면 로그인 탭으로
+          if(gateMode === 'signup' && res && res.error && res.error.indexOf('이미 있는') === 0){
+            setGateMode('login', true);
+            err = '이미 가입된 아이디예요. 비밀번호를 넣고 로그인하세요.';
+          }
+          gateMsg.textContent = err;
         }
       }).catch(function(){
         AUTH = null;
-        loginMsg.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.';
+        gateMsg.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.';
       });
     });
-    document.getElementById('meLogout').addEventListener('click', function(){ logout(''); });
+    setGateMode('login');
+    document.getElementById('meGateSkip').addEventListener('click', function(){
+      LS.set('buyest.dash.skip', 1);
+      applyMode('guest');
+      showView('dashboard');
+    });
+    topAuth.addEventListener('click', function(){
+      if(AUTH){ doLogout('gate'); }
+      else { LS.set('buyest.dash.skip', null); setGateMode('login'); applyMode('gate'); gateId.focus(); }
+    });
 
-    /* 부팅 */
+    /* ---- 부팅 ---- */
     renderAll();
     if(AUTH){
-      showApp();
+      applyMode('in');
       setSync('동기화 중…');
-      api('load').then(function(res){
+      api('login').then(function(res){
         if(res && res.ok){
           state = normState(res.data);
           LS.set('buyest.dash.cache', state);
           renderAll();
           setSync('동기화됨 ' + nowT());
           if(dirty) pushSave();
-        } else if(res && res.error === '비밀번호가 틀렸습니다'){
-          logout('비밀번호가 바뀌었습니다. 다시 로그인해 주세요.');
-        } else {
-          setSync((res && res.error) || '');
-        }
+        } else if(isPwErr(res) || (res && res.error && res.error.indexOf('없는 아이디') === 0)){
+          doLogout('gate'); gateMsg.textContent = '다시 로그인해 주세요.';
+        } else { setSync((res && res.error) || ''); }
       }).catch(function(){ setSync('오프라인 — 이 PC에 저장된 내용'); });
+    } else if(LS.get('buyest.dash.skip', null)){
+      applyMode('guest');
     } else {
-      showLogin('');
+      applyMode('gate');
     }
   })();
 
