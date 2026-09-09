@@ -3987,7 +3987,7 @@ else if (typeof exports === 'object')
         var hIdx = rvmFindHeaderRowIdx(aoa, function(r){ return r[0] === '품목코드'; });
         if(hIdx === -1) throw new Error('헤더 행("품목코드")을 찾을 수 없습니다.');
         var col = rvmHeaderColMap(aoa[hIdx]);
-        ['품목코드','품목명','규격','전일재고','구매','판매','잔량'].forEach(function(need){
+        ['품목코드','품목명','규격','잔량'].forEach(function(need){
           if(!(need in col)) throw new Error('"' + need + '" 열을 찾을 수 없습니다.');
         });
         var items = [];
