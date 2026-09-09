@@ -359,40 +359,38 @@
     .topbar-meta span.txt{ display:none; }
   }
 
-  /* ---------- 직원별 대시보드 (my) ---------- */
-  .nav-item[hidden]{ display:none; }
-  .my-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; align-items:start; }
-  .my-card textarea{ width:100%; box-sizing:border-box; resize:vertical; padding:10px; border:1px solid var(--border); border-radius:10px; font:inherit; background:var(--surface); color:var(--ink); }
-  .my-row{ display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
-  .my-row input{ flex:1 1 120px; min-width:0; padding:8px 10px; border:1px solid var(--border); border-radius:8px; font:inherit; background:var(--surface); color:var(--ink); }
-  .my-row button{ padding:8px 14px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); border-radius:8px; cursor:pointer; font:inherit; }
-  .my-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
-  .my-list li{ display:flex; align-items:center; gap:8px; font-size:13.5px; }
-  .my-list li .x{ margin-left:auto; cursor:pointer; color:var(--ink-muted); border:none; background:none; font-size:16px; line-height:1; padding:0 2px; }
-  .my-list li a{ color:var(--accent); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .my-list li.done label{ text-decoration:line-through; color:var(--ink-muted); }
-  .my-saved{ font-size:12px; color:var(--ink-muted); margin-top:6px; min-height:1em; }
-  .my-mini{ margin-top:8px; border:none; background:none; color:var(--ink-muted); cursor:pointer; text-decoration:underline; padding:0; font:inherit; font-size:12px; }
-  .my-toolpicks{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
-  .my-toolpicks button{ padding:7px 12px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--ink); cursor:pointer; font:inherit; font-size:12.5px; }
-  .my-toolpicks button:hover{ border-color:var(--accent); color:var(--accent); }
-  .my-tooloptions{ display:flex; flex-direction:column; gap:6px; margin-top:10px; font-size:13px; }
-  .my-card details summary{ cursor:pointer; font-size:13px; color:var(--ink-muted); }
-  .my-sync{ font-size:12px; color:var(--ink-muted); }
-  .my-login{ max-width:420px; }
-  #myLogin[hidden], #myApp[hidden]{ display:none; }
-
-  .gate{ position:fixed; inset:0; z-index:50; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:24px; }
-  .gate-box{ width:100%; max-width:460px; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:28px; box-shadow:var(--shadow); }
-  .gate-box h2{ margin:0 0 4px; font-size:19px; }
-  .gate-box p{ margin:0 0 18px; font-size:13px; color:var(--ink-muted); }
-  .gate-names{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
-  .gate-names button{ padding:9px 16px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--ink); cursor:pointer; font:inherit; }
-  .gate-names button:hover{ border-color:var(--accent); color:var(--accent); }
-  .gate-add{ display:flex; gap:8px; margin-bottom:18px; }
-  .gate-add input{ flex:1; min-width:0; padding:9px 12px; border:1px solid var(--border); border-radius:9px; font:inherit; background:var(--surface); color:var(--ink); }
-  .gate-add button{ padding:9px 14px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); border-radius:9px; cursor:pointer; font:inherit; }
-  .gate-all{ background:none; border:none; color:var(--ink-muted); cursor:pointer; font-size:13px; text-decoration:underline; padding:0; font:inherit; }
+  /* ---------- 개인 대시보드 (로그인 시 대시보드 상단에 표시) ---------- */
+  .me-wrap{ margin:0 0 26px; }
+  .me-login{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px 20px; max-width:440px; box-shadow:var(--shadow); }
+  .me-login h2{ margin:0 0 4px; font-size:16px; }
+  .me-login p{ margin:0 0 14px; font-size:12.5px; color:var(--ink-muted); }
+  .me-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .me-row input{ flex:1 1 130px; min-width:0; padding:9px 11px; border:1px solid var(--border); border-radius:9px; font:inherit; background:var(--surface); color:var(--ink); }
+  .me-row button{ padding:9px 16px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); border-radius:9px; cursor:pointer; font:inherit; }
+  .me-msg{ font-size:12px; color:var(--ink-muted); margin-top:8px; min-height:1em; }
+  .me-head{ display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+  .me-head h2{ margin:0; font-size:17px; }
+  .me-head .me-sync{ font-size:12px; color:var(--ink-muted); }
+  .me-head button{ background:none; border:none; color:var(--ink-muted); cursor:pointer; text-decoration:underline; font:inherit; font-size:12px; padding:0; }
+  .me-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; align-items:start; }
+  .me-card{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; }
+  .me-card h3{ margin:0 0 10px; font-size:14px; }
+  .me-card textarea{ width:100%; box-sizing:border-box; resize:vertical; padding:9px; border:1px solid var(--border); border-radius:9px; font:inherit; background:var(--surface); color:var(--ink); }
+  .me-card input[type=text]{ flex:1 1 110px; min-width:0; padding:7px 9px; border:1px solid var(--border); border-radius:7px; font:inherit; background:var(--surface); color:var(--ink); }
+  .me-add{ display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .me-add button{ padding:7px 12px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); border-radius:7px; cursor:pointer; font:inherit; font-size:13px; }
+  .me-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  .me-list li{ display:flex; align-items:center; gap:8px; font-size:13px; }
+  .me-list li .x{ margin-left:auto; cursor:pointer; color:var(--ink-muted); border:none; background:none; font-size:16px; line-height:1; padding:0 2px; }
+  .me-list li a{ color:var(--accent); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .me-list li.done label{ text-decoration:line-through; color:var(--ink-muted); }
+  .me-mini{ margin-top:8px; border:none; background:none; color:var(--ink-muted); cursor:pointer; text-decoration:underline; padding:0; font:inherit; font-size:12px; }
+  .me-picks{ display:flex; flex-wrap:wrap; gap:7px; margin-bottom:8px; }
+  .me-picks button{ padding:6px 11px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--ink); cursor:pointer; font:inherit; font-size:12px; }
+  .me-picks button:hover{ border-color:var(--accent); color:var(--accent); }
+  .me-opts{ display:flex; flex-direction:column; gap:5px; margin-top:8px; font-size:12.5px; }
+  .me-card details summary{ cursor:pointer; font-size:12.5px; color:var(--ink-muted); }
+  .me-wrap [hidden], #meLogin[hidden], #meApp[hidden]{ display:none !important; }
 </style>
 
 <div class="app">
@@ -407,8 +405,7 @@
 
     <nav class="nav-group">
       <span class="nav-group-label">홈</span>
-      <button class="nav-item" data-nav="my" id="navMyBtn" hidden><span class="ic">&#9733;</span>내 대시보드</button>
-      <button class="nav-item" data-nav="dashboard"><span class="ic">&#9679;</span>전체 툴키트</button>
+      <button class="nav-item" data-nav="dashboard"><span class="ic">&#9679;</span>대시보드</button>
     </nav>
 
     <nav class="nav-group">
@@ -460,6 +457,57 @@
         <div class="hero">
           <h1>바이스트 업무 도구모음</h1>
           <p>재고 양식 변환, 인보이스 자동인식, 사방넷-이카운트 매칭 등 반복 업무를 브라우저에서 바로 처리하세요. 별도 설치 없이 이 페이지 링크만 있으면 누구나 사용할 수 있습니다.</p>
+        </div>
+
+        <!-- 개인 대시보드: 로그인하면 메모·링크·바로가기. 로그인 안 해도 아래 도구는 다 됨 -->
+        <div class="me-wrap">
+          <div id="meLogin" class="me-login">
+            <h2>로그인</h2>
+            <p>로그인하면 개인 메모·자주 쓰는 링크·바로가기를 어느 PC에서든 쓸 수 있어요. 안 해도 아래 도구는 다 됩니다. 처음이면 아이디·비밀번호를 정해서 입력하면 계정이 만들어집니다.</p>
+            <form id="meLoginForm" class="me-row">
+              <input type="text" id="meLoginId" placeholder="아이디" autocomplete="username" />
+              <input type="password" id="meLoginPw" placeholder="비밀번호 (4자 이상)" autocomplete="current-password" />
+              <button type="submit">들어가기</button>
+            </form>
+            <div class="me-msg" id="meLoginMsg"></div>
+          </div>
+
+          <div id="meApp" hidden>
+            <div class="me-head">
+              <h2 id="meHi">내 대시보드</h2>
+              <span class="me-sync" id="meSync"></span>
+              <button type="button" id="meLogout">로그아웃</button>
+            </div>
+            <div class="me-grid">
+              <div class="me-card">
+                <h3>메모</h3>
+                <textarea id="meMemo" rows="8" placeholder="자유 메모 — 입력하면 자동 저장"></textarea>
+              </div>
+              <div class="me-card">
+                <h3>할 일</h3>
+                <form id="meTodoForm" class="me-add">
+                  <input type="text" id="meTodoInput" placeholder="할 일 입력 후 Enter" autocomplete="off" />
+                  <button type="submit">추가</button>
+                </form>
+                <ul id="meTodoList" class="me-list"></ul>
+                <button type="button" id="meTodoClear" class="me-mini">완료한 항목 지우기</button>
+              </div>
+              <div class="me-card">
+                <h3>자주 쓰는 링크</h3>
+                <form id="meLinkForm" class="me-add">
+                  <input type="text" id="meLinkLabel" placeholder="이름 (예: 사방넷)" autocomplete="off" />
+                  <input type="text" id="meLinkUrl" placeholder="주소 (예: sabangnet.co.kr)" autocomplete="off" />
+                  <button type="submit">추가</button>
+                </form>
+                <ul id="meLinkList" class="me-list"></ul>
+              </div>
+              <div class="me-card">
+                <h3>내 바로가기</h3>
+                <div id="mePicks" class="me-picks"></div>
+                <details><summary>도구 고르기</summary><div id="meOpts" class="me-opts"></div></details>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="section-head">
@@ -555,60 +603,6 @@
           <div><strong>계속 업데이트됩니다.</strong> 이 페이지는 하나의 링크로 계속 갱신되는 방식으로 운영됩니다. 새 기능이 추가되면 같은 주소에서 바로 사용할 수 있고, 필요한 도구를 우선순위로 알려주시면 순서를 조정합니다.</div>
         </div>
       </section>
-
-      <!-- ============ MY DASHBOARD (직원별) ============ -->
-      <section data-view="my">
-        <div class="hero">
-          <h1 id="myTitle">내 대시보드</h1>
-          <p>메모·할 일·링크·바로가기가 계정에 저장돼 어느 PC에서든 같은 내용이 보입니다. <span id="mySync" class="my-sync"></span> &nbsp;<a href="#" id="mySwitchUser">사용자 전환</a></p>
-        </div>
-
-        <div id="myLogin" class="panel my-login" hidden>
-          <h2 id="myLoginTitle">로그인</h2>
-          <p class="sub">처음이면 비밀번호를 정해서 입력하세요 — 그대로 계정이 만들어집니다.</p>
-          <form id="myLoginForm" class="my-row">
-            <input type="password" id="myLoginPw" placeholder="비밀번호 (4자 이상)" autocomplete="current-password" />
-            <button type="submit">들어가기</button>
-          </form>
-          <div class="my-saved" id="myLoginMsg"></div>
-        </div>
-
-        <div id="myApp" class="my-grid" hidden>
-          <div class="panel my-card">
-            <h2>메모</h2>
-            <textarea id="myMemo" rows="10" placeholder="자유 메모 — 입력하면 자동 저장됩니다"></textarea>
-            <div class="my-saved" id="myMemoSaved"></div>
-          </div>
-
-          <div class="panel my-card">
-            <h2>할 일</h2>
-            <form id="myTodoForm" class="my-row">
-              <input type="text" id="myTodoInput" placeholder="할 일 입력 후 Enter" autocomplete="off" />
-              <button type="submit">추가</button>
-            </form>
-            <ul id="myTodoList" class="my-list"></ul>
-            <button type="button" id="myTodoClear" class="my-mini">완료한 항목 지우기</button>
-          </div>
-
-          <div class="panel my-card">
-            <h2>자주 쓰는 링크</h2>
-            <form id="myLinkForm" class="my-row">
-              <input type="text" id="myLinkLabel" placeholder="이름 (예: 사방넷)" autocomplete="off" />
-              <input type="text" id="myLinkUrl" placeholder="주소 (예: sabangnet.co.kr)" autocomplete="off" />
-              <button type="submit">추가</button>
-            </form>
-            <ul id="myLinkList" class="my-list"></ul>
-          </div>
-
-          <div class="panel my-card">
-            <h2>내 툴 바로가기</h2>
-            <p class="sub">자주 쓰는 도구를 골라 두면 여기서 바로 엽니다.</p>
-            <div id="myToolPicks" class="my-toolpicks"></div>
-            <details><summary>도구 고르기</summary><div id="myToolOptions" class="my-tooloptions"></div></details>
-          </div>
-        </div>
-      </section>
-      <!-- /MY DASHBOARD -->
 
       <!-- ============ INVENTORY VERTICAL TRANSFORM ============ -->
       <section data-view="inventory">
@@ -1429,92 +1423,22 @@ else if (typeof exports === 'object')
     if(VALID_VIEWS[name] && name !== 'dashboard') showView(name, roadmapTarget, false);
   })();
 
-  /* ---------------- 직원별 대시보드 (my) ---------------- */
+  /* ---------------- 개인 대시보드 (로그인) ---------------- */
   (function(){
+    var API = 'https://buyest.co.kr/toolkit_dashboard_api.php';
     var LS = {
       get:function(k,d){ try{ var v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } },
       set:function(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
     };
-    var params = new URLSearchParams(location.search);
-    var USER = (params.get('user')||'').trim();
-    var ALL = params.get('all') === '1';
 
-    TITLES.dashboard = '전체 툴키트';
+    var AUTH  = LS.get('buyest.dash.auth', null);          // {id, pass} — 이 PC에서 한 번 로그인하면 저장
+    var state = normState(LS.get('buyest.dash.cache', null));
 
-    function withSearch(mut){
-      var p = new URLSearchParams(location.search); mut(p); location.search = p.toString();
-    }
-    // 마지막 선택을 기억해서, 다음에 주소만으로 들어오면 게이트를 건너뛴다(게이트는 항상 "사용자 전환"으로 다시 열림)
-    function gotoUser(name){ LS.set('buyest.entry', 'user:' + name); withSearch(function(p){ p.set('user',name); p.delete('all'); }); }
-    function gotoAll(){ LS.set('buyest.entry', 'all'); withSearch(function(p){ p.delete('user'); p.set('all','1'); }); }
-    function gotoGate(){ LS.set('buyest.entry', null); withSearch(function(p){ p.delete('user'); p.delete('all'); }); }
-
-    function esc(s){ return String(s).replace(/[<>&"]/g, function(c){ return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]; }); }
-    function users(){ return LS.get('buyest.users', []); }
-    function addUser(name){
-      var list = users();
-      if(list.indexOf(name) === -1){ list.push(name); LS.set('buyest.users', list); }
-    }
-
-    /* ----- 이름 선택 화면 ----- */
-    function showGate(){
-      var box = document.createElement('div');
-      box.className = 'gate';
-      var names = users().map(function(n){
-        return '<button type="button" data-name="'+esc(n)+'">'+esc(n)+'</button>';
-      }).join('') || '<span style="font-size:13px;color:var(--ink-muted)">저장된 이름이 없어요. 아래에서 추가하세요.</span>';
-      box.innerHTML =
-        '<div class="gate-box">'+
-          '<h2>누구세요?</h2>'+
-          '<p>이름을 고르면 내 대시보드로 들어갑니다.</p>'+
-          '<div class="gate-names">'+names+'</div>'+
-          '<form class="gate-add"><input type="text" placeholder="새 이름 추가" autocomplete="off" maxlength="20"/><button type="submit">추가</button></form>'+
-          '<button type="button" class="gate-all">전체 툴키트로 들어가기 &rarr;</button>'+
-        '</div>';
-      document.body.appendChild(box);
-      box.querySelector('.gate-names').addEventListener('click', function(e){
-        var b = e.target.closest('button[data-name]'); if(b) gotoUser(b.getAttribute('data-name'));
-      });
-      box.querySelector('.gate-add').addEventListener('submit', function(e){
-        e.preventDefault();
-        var v = this.querySelector('input').value.trim();
-        if(v){ addUser(v); gotoUser(v); }
-      });
-      box.querySelector('.gate-all').addEventListener('click', gotoAll);
-    }
-
-    if(!USER && !ALL){
-      var entry = LS.get('buyest.entry', null);
-      if(entry === 'all'){ ALL = true; }                       // 지난번에 전체 툴키트 선택함
-      else if(entry && entry.indexOf('user:') === 0){ gotoUser(entry.slice(5)); return; }  // 지난번 그 사람
-      else { showGate(); return; }                             // 첫 방문 → 이름 선택 화면
-    }
-    if(!USER){  // 전체 툴키트 모드 — 개인 화면(my)은 접근 불가
-      if(location.hash.slice(1).split(':')[0] === 'my') showView('dashboard');
-      return;
-    }
-
-    /* ----- 개인 모드 ----- */
-    // 서버 동기화 API (buyest.co.kr). 계정 없으면 첫 로그인 때 자동 생성.
-    var API = 'https://buyest.co.kr/toolkit_dashboard_api.php';
-    addUser(USER);
-    TITLES.my = USER + '님의 대시보드';
-    var navBtn = document.getElementById('navMyBtn');
-    if(navBtn) navBtn.hidden = false;
-    document.getElementById('myTitle').textContent = USER + '님의 대시보드';
-
-    var CK = 'buyest.my.' + USER;               // localStorage 네임스페이스(캐시/자격)
-    var AUTH = LS.get(CK + '.auth', null);      // {pass} — 이 PC에서 한 번 로그인하면 저장
-    var state = normState(LS.get(CK + '.cache', null));   // 마지막으로 본 내용(오프라인/즉시표시용)
-
-    var loginWrap = document.getElementById('myLogin');
-    var appWrap   = document.getElementById('myApp');
-    var loginMsg  = document.getElementById('myLoginMsg');
-    var syncEl    = document.getElementById('mySync');
-
-    document.getElementById('mySwitchUser').addEventListener('click', function(e){
-      e.preventDefault(); LS.set(CK + '.auth', null); gotoGate();
-    });
+    var loginBox = document.getElementById('meLogin');
+    var appBox   = document.getElementById('meApp');
+    var loginMsg = document.getElementById('meLoginMsg');
+    var syncEl   = document.getElementById('meSync');
+    var HIDE = {dashboard:1, roadmap:1};
 
     function normState(d){
       d = d || {};
@@ -1527,77 +1451,82 @@ else if (typeof exports === 'object')
     }
     function nowT(){ return new Date().toLocaleTimeString('ko-KR'); }
     function setSync(t){ if(syncEl) syncEl.textContent = t ? '· ' + t : ''; }
-    function showLogin(msg){ appWrap.hidden = true; loginWrap.hidden = false; loginMsg.textContent = msg || ''; }
-    function showApp(){ loginWrap.hidden = true; appWrap.hidden = false; }
+    function showLogin(msg){ appBox.hidden = true; loginBox.hidden = false; if(msg!=null) loginMsg.textContent = msg; }
+    function showApp(){ loginBox.hidden = true; appBox.hidden = false;
+      document.getElementById('meHi').textContent = (AUTH ? AUTH.id : '') + '님의 메모';
+    }
 
     function api(action, extra){
-      var body = {action:action, user:USER, pass:(AUTH && AUTH.pass) || ''};
+      var body = {action:action, user:(AUTH&&AUTH.id)||'', pass:(AUTH&&AUTH.pass)||''};
       if(extra) for(var k in extra) body[k] = extra[k];
-      return fetch(API, {
-        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
-      }).then(function(r){ return r.json(); });
+      return fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+        .then(function(r){ return r.json(); });
     }
 
     var saveTimer, dirty = false;
     function persist(){
-      LS.set(CK + '.cache', state);
+      LS.set('buyest.dash.cache', state);
       dirty = true;
       clearTimeout(saveTimer);
       saveTimer = setTimeout(pushSave, 700);
     }
     function pushSave(){
-      if(!AUTH){ return; }
+      if(!AUTH) return;
       setSync('저장 중…');
       api('save', {data: state}).then(function(res){
         if(res && res.ok){ dirty = false; setSync('저장됨 ' + nowT()); }
-        else if(res && res.error === '비밀번호가 틀렸습니다'){ AUTH = null; LS.set(CK+'.auth', null); showLogin('다시 로그인해 주세요.'); }
-        else { setSync('저장 실패 — 이 PC에는 보관됨'); }
+        else if(res && res.error === '비밀번호가 틀렸습니다'){ logout('다시 로그인해 주세요.'); }
+        else setSync('저장 실패 — 이 PC에는 보관됨');
       }).catch(function(){ setSync('서버 연결 안 됨 — 이 PC에만 저장됨'); });
     }
 
+    function logout(msg){
+      AUTH = null; LS.set('buyest.dash.auth', null); LS.set('buyest.dash.cache', null);
+      state = normState(null);
+      renderAll();
+      showLogin(msg || '');
+      setSync('');
+    }
+
     /* 메모 */
-    var memo = document.getElementById('myMemo');
+    var memo = document.getElementById('meMemo');
     var memoTimer;
-    function renderMemo(){ if(document.activeElement !== memo) memo.value = state.memo; }
     memo.addEventListener('input', function(){
       state.memo = memo.value;
       clearTimeout(memoTimer);
       memoTimer = setTimeout(persist, 300);
     });
+    function renderMemo(){ if(document.activeElement !== memo) memo.value = state.memo; }
 
     /* 할 일 */
-    var todoList = document.getElementById('myTodoList');
+    var todoList = document.getElementById('meTodoList');
     function renderTodos(){
       todoList.innerHTML = '';
       state.todos.forEach(function(t, i){
         var li = document.createElement('li');
         if(t.done) li.className = 'done';
-        var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!t.done; cb.id='td'+i;
+        var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!t.done; cb.id='metd'+i;
         cb.addEventListener('change', function(){ state.todos[i].done = cb.checked; persist(); renderTodos(); });
-        var lb = document.createElement('label'); lb.htmlFor='td'+i; lb.textContent=t.text;
+        var lb = document.createElement('label'); lb.htmlFor='metd'+i; lb.textContent=t.text;
         var x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×'; x.setAttribute('aria-label','삭제');
         x.addEventListener('click', function(){ state.todos.splice(i,1); persist(); renderTodos(); });
         li.appendChild(cb); li.appendChild(lb); li.appendChild(x);
         todoList.appendChild(li);
       });
     }
-    document.getElementById('myTodoForm').addEventListener('submit', function(e){
+    document.getElementById('meTodoForm').addEventListener('submit', function(e){
       e.preventDefault();
-      var inp = document.getElementById('myTodoInput');
+      var inp = document.getElementById('meTodoInput');
       var v = inp.value.trim(); if(!v) return;
       state.todos.push({text:v, done:false}); inp.value=''; persist(); renderTodos();
     });
-    document.getElementById('myTodoClear').addEventListener('click', function(){
+    document.getElementById('meTodoClear').addEventListener('click', function(){
       state.todos = state.todos.filter(function(t){ return !t.done; }); persist(); renderTodos();
     });
 
     /* 링크 */
-    var linkList = document.getElementById('myLinkList');
-    function normUrl(u){
-      u = u.trim(); if(!u) return '';
-      if(!/^https?:\/\//i.test(u)) u = 'https://' + u;
-      return u;
-    }
+    var linkList = document.getElementById('meLinkList');
+    function normUrl(u){ u = u.trim(); if(!u) return ''; if(!/^https?:\/\//i.test(u)) u = 'https://' + u; return u; }
     function renderLinks(){
       linkList.innerHTML = '';
       state.links.forEach(function(l, i){
@@ -1611,20 +1540,19 @@ else if (typeof exports === 'object')
         linkList.appendChild(li);
       });
     }
-    document.getElementById('myLinkForm').addEventListener('submit', function(e){
+    document.getElementById('meLinkForm').addEventListener('submit', function(e){
       e.preventDefault();
-      var lab = document.getElementById('myLinkLabel'), url = document.getElementById('myLinkUrl');
+      var lab = document.getElementById('meLinkLabel'), url = document.getElementById('meLinkUrl');
       var u = normUrl(url.value); if(!u) return;
       state.links.push({label: lab.value.trim() || u, url: u});
       lab.value=''; url.value=''; persist(); renderLinks();
     });
 
-    /* 내 툴 바로가기 */
-    var HIDE = {dashboard:1, roadmap:1, my:1};
-    var picksBox = document.getElementById('myToolPicks');
-    var optsBox = document.getElementById('myToolOptions');
+    /* 내 바로가기 */
+    var picksBox = document.getElementById('mePicks');
+    var optsBox = document.getElementById('meOpts');
     function renderPicks(){
-      picksBox.innerHTML = state.tools.length ? '' : '<span style="font-size:12.5px;color:var(--ink-muted)">아래 ‘도구 고르기’에서 선택하세요.</span>';
+      picksBox.innerHTML = state.tools.length ? '' : '<span style="font-size:12px;color:var(--ink-muted)">아래 ‘도구 고르기’에서 선택</span>';
       state.tools.forEach(function(k){
         if(!TITLES[k]) return;
         var b = document.createElement('button'); b.type='button'; b.textContent = TITLES[k];
@@ -1651,17 +1579,20 @@ else if (typeof exports === 'object')
     function renderAll(){ renderMemo(); renderTodos(); renderLinks(); renderPicks(); renderOpts(); }
 
     /* 로그인 폼 */
-    document.getElementById('myLoginForm').addEventListener('submit', function(e){
+    document.getElementById('meLoginForm').addEventListener('submit', function(e){
       e.preventDefault();
-      var pw = document.getElementById('myLoginPw').value;
+      var id = document.getElementById('meLoginId').value.trim();
+      var pw = document.getElementById('meLoginPw').value;
+      if(!id){ loginMsg.textContent = '아이디를 입력하세요'; return; }
       if(pw.length < 4){ loginMsg.textContent = '비밀번호는 4자 이상'; return; }
       loginMsg.textContent = '확인 중…';
-      AUTH = {pass: pw};
+      AUTH = {id:id, pass:pw};
       api('load').then(function(res){
         if(res && res.ok){
-          LS.set(CK + '.auth', AUTH);
+          LS.set('buyest.dash.auth', AUTH);
           state = normState(res.data);
-          LS.set(CK + '.cache', state);
+          LS.set('buyest.dash.cache', state);
+          document.getElementById('meLoginPw').value = '';
           renderAll(); showApp();
           setSync(res.created ? '새 계정이 만들어졌어요' : '동기화됨 ' + nowT());
         } else {
@@ -1673,8 +1604,9 @@ else if (typeof exports === 'object')
         loginMsg.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.';
       });
     });
+    document.getElementById('meLogout').addEventListener('click', function(){ logout(''); });
 
-    /* 부팅: 캐시 즉시 표시 → 서버와 동기화 */
+    /* 부팅 */
     renderAll();
     if(AUTH){
       showApp();
@@ -1682,22 +1614,19 @@ else if (typeof exports === 'object')
       api('load').then(function(res){
         if(res && res.ok){
           state = normState(res.data);
-          LS.set(CK + '.cache', state);
+          LS.set('buyest.dash.cache', state);
           renderAll();
           setSync('동기화됨 ' + nowT());
           if(dirty) pushSave();
         } else if(res && res.error === '비밀번호가 틀렸습니다'){
-          AUTH = null; LS.set(CK + '.auth', null);
-          showLogin('비밀번호가 바뀌었습니다. 다시 로그인해 주세요.');
+          logout('비밀번호가 바뀌었습니다. 다시 로그인해 주세요.');
         } else {
           setSync((res && res.error) || '');
         }
-      }).catch(function(){ setSync('오프라인 — 이 PC에 저장된 내용입니다'); });
+      }).catch(function(){ setSync('오프라인 — 이 PC에 저장된 내용'); });
     } else {
       showLogin('');
     }
-
-    if(!location.hash) showView('my');
   })();
 
   /* ---------------- Shared helpers ---------------- */
