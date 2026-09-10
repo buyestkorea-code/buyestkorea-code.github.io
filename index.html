@@ -429,77 +429,217 @@
   .topbar > .topbar-meta{ margin-left:12px !important; flex:none; }
   @media (max-width:920px){ .topbar > .topbar-meta{ display:none; } }
 
-  /* ---- 로그인 후 개인 대시보드 ---- */
+  /* ---- 로그인 후: 인트라넷 대시보드 ---- */
+  :root{
+    --k-mkt:#D64545; --k-mkt-bg:#FBEAEA;
+    --k-log:#3F7D4A; --k-log-bg:#E6F1E7;
+    --k-ops:#7A5AA8; --k-ops-bg:#EFEAF6;
+    --k-cs:#3B6FB0;  --k-cs-bg:#E8F0F9;
+    --k-etc:#5B6B7C; --k-etc-bg:#EDF0F3;
+    --k-off:#B4791B; --k-off-bg:#F7EBD6;
+    --side:#1E2320; --side-2:#2A302C; --side-ink:#D2D5CE; --side-mut:#868C82; --side-line:#333A35;
+  }
+
+  /* ===== 다크 사이드바 (전역) ===== */
+  .sidebar{ background:var(--side); border-right:1px solid var(--side-line); }
+  .brand{ padding:6px 10px 16px; border-bottom:1px solid var(--side-line); margin-bottom:2px; }
+  .brand-mark{ background:var(--accent); color:#fff; }
+  .brand-text strong{ color:#F1F0EA; }
+  .brand-text span{ color:var(--side-mut); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; }
+  .nav-group-label{ color:#767C72; }
+  .nav-item{ color:var(--side-ink); }
+  .nav-item:hover{ background:var(--side-2); color:#F1F0EA; }
+  .nav-item.active{ background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+  .nav-item.active .chip{ background:rgba(255,255,255,.18); color:#fff; }
+  .sidebar .chip-ready{ background:rgba(111,203,128,.14); color:#84C98A; }
+  .sidebar .chip-soon{ background:rgba(255,255,255,.08); color:var(--side-mut); }
+  .sidebar-foot{ border-top-color:var(--side-line); color:var(--side-mut); }
+  .side-tag{ margin-top:auto; padding:16px 14px 14px; border-radius:12px; background:linear-gradient(160deg,#2C3A34,#232A26); color:#CFD3CB; }
+  .side-tag b{ display:block; font-size:12px; font-weight:600; color:#EDECE4; line-height:1.5; margin-bottom:8px; }
+  .side-tag span{ font-size:9.5px; letter-spacing:.14em; color:#8A9088; }
+
+  /* ===== 상단바 ===== */
+  .topbar{ gap:14px; }
+  .me-search{ flex:1 1 auto; max-width:420px; height:38px; padding:0 14px 0 36px; border:1px solid var(--border); border-radius:999px;
+    font:inherit; font-size:13px; background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235C6259' stroke-width='2'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='M11 11l4 4'/%3E%3C/svg%3E") no-repeat 12px center; color:var(--ink); }
+  .me-search:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .me-topdate{ font-size:12.5px; font-weight:500; color:var(--ink-muted); white-space:nowrap; flex:none; }
+  .me-user{ flex:none; display:flex; align-items:center; gap:9px; padding:5px 10px 5px 6px; border:1px solid var(--border); border-radius:999px; background:var(--surface); cursor:pointer; font:inherit; }
+  .me-user:hover{ border-color:var(--accent); }
+  .me-user .ava{ width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex:none; }
+  .me-user .un{ display:flex; flex-direction:column; line-height:1.2; text-align:left; }
+  .me-user .un b{ font-size:12.5px; font-weight:600; color:var(--ink); }
+  .me-user .un s{ font-size:10.5px; color:var(--ink-muted); text-decoration:none; }
+  .me-usermenu{ position:absolute; top:56px; right:22px; z-index:20; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--me-shadow-hi); padding:6px; min-width:150px; }
+  .me-usermenu button{ display:block; width:100%; text-align:left; padding:9px 12px; border:none; border-radius:8px; background:none; font:inherit; font-size:13px; color:var(--ink); cursor:pointer; }
+  .me-usermenu button:hover{ background:var(--surface-2); }
+
+  /* ===== 히어로 배너 ===== */
+  .me-herorow{ display:flex; gap:16px; margin-bottom:20px; }
+  .me-hero{ flex:1 1 auto; position:relative; overflow:hidden; border-radius:18px; padding:34px 34px 32px;
+    background:linear-gradient(115deg,#EEEBE2 0%,#E4E8E0 60%,#DDE4DD 100%); box-shadow:var(--me-shadow); }
+  .me-hero::after{ content:"PEOPLE · BRANDS · GROW TOGETHER"; position:absolute; right:26px; bottom:14px;
+    font-size:11px; font-weight:700; letter-spacing:.16em; color:var(--accent); opacity:.4; }
+  .me-hero h1{ margin:0 0 8px; font-size:25px; font-weight:700; letter-spacing:-.02em; color:var(--ink); }
+  .me-hero p{ margin:0; font-size:13.5px; color:#5A5F55; }
+  .me-quote-card{ flex:none; width:250px; border-radius:18px; padding:22px 22px 20px; background:var(--side); color:#E7E7DF; box-shadow:var(--me-shadow);
+    display:flex; flex-direction:column; justify-content:center; }
+  .me-quote-card .q{ font-size:14px; font-weight:600; line-height:1.6; letter-spacing:-.01em; }
+  .me-quote-card .by{ margin-top:12px; font-size:11px; font-weight:700; letter-spacing:.14em; color:#8FB3A6; }
+  @media (max-width:1040px){ .me-herorow{ flex-direction:column; } .me-quote-card{ width:auto; } }
+
+  body.me-in .hero{ display:none; }
   body.me-in #dashCatalog{ display:none; }
-  body.me-in .hero{ margin-bottom:22px; }
-  body.me-in .hero h1{ font-size:27px; letter-spacing:-.02em; }
-  .me-wrap{ margin:0; }
-  .me-head{ display:flex; align-items:center; gap:10px; margin:0 0 16px; min-height:1.4em; }
-  .me-head .me-sync{
-    font-size:11.5px; font-weight:500; color:var(--ink-muted);
-    background:var(--surface-2); border-radius:999px; padding:4px 11px;
-  }
-  .me-head .me-sync:empty{ display:none; }
-  .me-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:start; }
-  @media (max-width:760px){ .me-grid{ grid-template-columns:1fr; } }
-  .me-card{
-    background:var(--surface); border:1px solid rgba(219,213,199,.55); border-radius:var(--me-radius);
-    padding:18px 20px 20px; box-shadow:var(--me-shadow);
-    transition:box-shadow .18s ease, transform .18s ease;
-  }
-  .me-card:hover{ box-shadow:var(--me-shadow-hi); }
-  .me-card h3{
-    margin:0 0 14px; font-size:13.5px; font-weight:600; letter-spacing:-.005em; color:var(--ink);
-    display:flex; align-items:center; gap:7px;
-  }
-  .me-card h3::before{ content:""; width:5px; height:5px; border-radius:2px; background:var(--accent); flex:none; }
-  .me-card textarea{
-    width:100%; box-sizing:border-box; resize:vertical; min-height:120px; padding:11px 12px;
-    border:1px solid var(--border); border-radius:12px; font:inherit; font-size:13.5px; line-height:1.6;
-    background:var(--surface); color:var(--ink); transition:border-color .16s ease, box-shadow .16s ease;
-  }
-  .me-card textarea:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
-  .me-card input[type=text]{
-    flex:1 1 110px; min-width:0; height:36px; padding:0 11px; border:1px solid var(--border);
-    border-radius:10px; font:inherit; font-size:13px; background:var(--surface); color:var(--ink);
-    transition:border-color .16s ease, box-shadow .16s ease;
-  }
-  .me-card input[type=text]:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
-  .me-add{ display:flex; gap:7px; margin-bottom:12px; flex-wrap:wrap; }
-  .me-add button{
-    height:36px; padding:0 14px; border:none; border-radius:10px; background:var(--accent);
-    color:var(--accent-ink); cursor:pointer; font:inherit; font-size:13px; font-weight:500;
-    transition:background .16s ease;
-  }
-  .me-add button:hover{ background:var(--me-accent-hi); }
-  .me-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
-  .me-list li{ display:flex; align-items:center; gap:9px; font-size:13.5px; padding:6px 4px; border-radius:8px; }
+  body.me-in .content{ max-width:1280px; }
+  body.me-in .topbar-title{ display:none; }
+
+  .me-hero .me-sync{ position:absolute; top:16px; right:18px; font-size:11px; font-weight:500; color:#6A6F64; background:rgba(255,255,255,.55); border-radius:999px; padding:4px 11px; white-space:nowrap; }
+  .me-hero .me-sync:empty{ display:none; }
+  .me-pwform{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  .me-pwform strong{ font-size:13px; }
+  .me-pwform input{ height:36px; padding:0 11px; border:1px solid var(--border); border-radius:9px; font:inherit; font-size:13px; background:var(--surface); color:var(--ink); }
+  .me-admin-search{ width:100%; box-sizing:border-box; height:34px; padding:0 11px; margin-bottom:8px; border:1px solid var(--border); border-radius:9px; font:inherit; font-size:13px; background:var(--surface); color:var(--ink); }
+  .me-arow .addate{ font-size:11px; color:var(--ink-muted); }
+
+  .me-dash{ display:grid; grid-template-columns:minmax(0,1fr) 328px; gap:20px; align-items:start; }
+  .me-dash-main{ display:flex; flex-direction:column; gap:18px; min-width:0; }
+  .me-dash-rail{ display:flex; flex-direction:column; gap:16px; }
+  @media (max-width:1040px){ .me-dash{ grid-template-columns:1fr; } .me-dash-rail{ order:2; } }
+
+  .me-panel{ background:var(--surface); border:1px solid rgba(219,213,199,.5); border-radius:16px; padding:18px 20px; box-shadow:var(--me-shadow); }
+  .me-panel-h{ display:flex; align-items:flex-start; gap:10px; margin-bottom:14px; }
+  .me-panel-h h3{ margin:0; font-size:15px; font-weight:700; letter-spacing:-.01em; }
+  .me-panel-h p{ margin:3px 0 0; font-size:12px; color:var(--ink-muted); }
+  .me-panel-h .me-link, .me-panel-h .me-sub{ margin-left:auto; flex:none; }
+  .me-link{ background:none; border:none; color:var(--accent); font:inherit; font-size:12.5px; font-weight:500; cursor:pointer; padding:0; }
+  .me-link:hover{ text-decoration:underline; }
+  .me-sub{ font-size:11.5px; color:var(--ink-muted); }
+
+  .me-solid{ height:34px; padding:0 14px; border:none; border-radius:9px; background:var(--accent); color:var(--accent-ink); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .me-solid:hover{ background:var(--me-accent-hi); }
+  .me-ghost{ height:34px; padding:0 12px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; font-size:12.5px; font-weight:500; cursor:pointer; white-space:nowrap; }
+  .me-ghost:hover{ border-color:var(--accent); color:var(--accent); }
+  .me-icobtn{ width:32px; height:32px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--ink); cursor:pointer; font-size:16px; line-height:1; }
+  .me-icobtn:hover{ border-color:var(--accent); color:var(--accent); }
+
+  /* 가입 관리 */
+  .me-badge{ font-size:11px; font-weight:700; color:#fff; background:var(--danger); border-radius:999px; padding:2px 9px; align-self:center; }
+  .me-badge:empty{ display:none; }
+  .me-adminlist{ display:flex; flex-direction:column; }
+  .me-arow{ display:flex; align-items:center; gap:10px; padding:9px 6px; border-radius:9px; font-size:13.5px; }
+  .me-arow + .me-arow{ border-top:1px solid var(--surface-2); }
+  .me-arow .who{ font-weight:600; }
+  .me-arow .st{ font-size:11px; font-weight:600; border-radius:999px; padding:2px 9px; }
+  .me-arow .st.pending{ color:var(--warning); background:var(--warning-soft); }
+  .me-arow .st.approved{ color:var(--success); background:var(--success-soft); }
+  .me-arow .st.rejected{ color:var(--danger); background:var(--danger-soft); }
+  .me-arow .st.admin{ color:var(--accent); background:var(--accent-soft); }
+  .me-arow .btns{ margin-left:auto; display:flex; gap:6px; }
+  .me-arow .btns button{ border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 11px; font:inherit; font-size:12px; font-weight:500; cursor:pointer; }
+  .me-arow .btns button.ok{ border-color:var(--accent); background:var(--accent); color:var(--accent-ink); }
+  .me-arow .btns button:hover{ filter:brightness(.96); }
+
+  /* 캘린더 */
+  .me-cal-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  .me-cal-head h3{ margin:0; font-size:16px; font-weight:700; letter-spacing:-.01em; }
+  .me-cal-head p{ margin:4px 0 0; font-size:12px; color:var(--ink-muted); }
+  .me-cal-ctl{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .me-cal-ctl strong{ font-size:14px; font-weight:700; min-width:96px; text-align:center; }
+  .me-cal-filters{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .me-cal-filters button{ padding:5px 12px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--ink-muted); font:inherit; font-size:12px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:5px; }
+  .me-cal-filters button::before{ content:""; width:7px; height:7px; border-radius:3px; background:currentColor; }
+  .me-cal-filters button[data-k=all]::before{ display:none; }
+  .me-cal-filters button[data-k=mkt]{ color:var(--k-mkt); } .me-cal-filters button[data-k=log]{ color:var(--k-log); }
+  .me-cal-filters button[data-k=ops]{ color:var(--k-ops); } .me-cal-filters button[data-k=cs]{ color:var(--k-cs); }
+  .me-cal-filters button[data-k=etc]{ color:var(--k-etc); } .me-cal-filters button[data-k=off]{ color:var(--k-off); }
+  .me-cal-filters button.on{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  .me-cal-filters button.on::before{ background:var(--accent-ink); }
+
+  .me-cal-addpanel{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; padding:12px; background:var(--surface-2); border-radius:12px; }
+  .me-cal-addpanel input, .me-cal-addpanel select{ height:36px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; font-size:13px; padding:0 10px; }
+  .me-cal-addpanel input[type=text]{ flex:1 1 200px; min-width:0; }
+
+  .me-cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .me-cal-dow{ text-align:center; font-size:11px; font-weight:700; color:var(--ink-muted); padding:2px 0 5px; }
+  .me-cal-dow.sun{ color:var(--danger); } .me-cal-dow.sat{ color:var(--k-cs); }
+  .me-cal-cell{ min-height:88px; border:1px solid transparent; border-radius:10px; padding:5px 6px 6px; cursor:pointer; background:#FAFAF7; transition:border-color .12s ease, background .12s ease; overflow:hidden; }
+  .me-cal-cell:hover{ border-color:var(--border); background:var(--surface); }
+  .me-cal-cell.dim{ opacity:.4; }
+  .me-cal-cell.today .d{ background:var(--accent); color:var(--accent-ink); }
+  .me-cal-cell .d{ display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; border-radius:7px; font-size:11.5px; font-weight:700; }
+  .me-cal-cell.sun .d{ color:var(--danger); } .me-cal-cell.sat .d{ color:var(--k-cs); }
+  .me-cal-cell.today.sun .d, .me-cal-cell.today.sat .d{ color:var(--accent-ink); }
+  .me-cal-ev{ display:flex; align-items:center; gap:4px; font-size:10.5px; line-height:1.5; border-radius:5px; padding:1px 5px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .me-cal-ev::before{ content:""; width:5px; height:5px; border-radius:2px; background:currentColor; flex:none; }
+  .me-cal-ev .t{ color:var(--ink); overflow:hidden; text-overflow:ellipsis; }
+  .me-cal-more{ font-size:10px; color:var(--ink-muted); margin-top:3px; padding-left:5px; }
+  .me-cal-cell .del{ float:right; border:none; background:none; color:var(--ink-muted); font-size:13px; line-height:1; cursor:pointer; opacity:0; }
+  .me-cal-cell:hover .me-cal-ev .del{ opacity:.7; }
+
+  /* 도구 그리드 */
+  .me-toolgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+  .me-toolgrid button{ display:flex; flex-direction:column; gap:6px; align-items:flex-start; padding:14px; border:1px solid var(--border); border-radius:12px; background:var(--surface); cursor:pointer; font:inherit; text-align:left; transition:border-color .14s ease, box-shadow .14s ease; }
+  .me-toolgrid button:hover{ border-color:var(--accent); box-shadow:var(--me-shadow); }
+  .me-toolgrid button .nm{ font-size:13px; font-weight:600; color:var(--ink); }
+  .me-toolgrid button .bd{ font-size:10.5px; font-weight:600; color:var(--success); background:var(--success-soft); border-radius:999px; padding:1px 7px; }
+  .me-toolgrid .empty{ grid-column:1/-1; font-size:12.5px; color:var(--ink-muted); padding:6px; }
+  .me-opts{ display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:14px; padding-top:14px; border-top:1px solid var(--surface-2); font-size:12.5px; }
+  .me-opts label{ display:flex; align-items:center; gap:7px; cursor:pointer; }
+  .me-opts input{ width:14px; height:14px; accent-color:var(--accent); }
+
+  /* 우측 레일 */
+  .me-quote{ background:var(--accent-soft); border-radius:14px; padding:16px 18px; font-size:13px; font-style:italic; color:var(--ink); line-height:1.55; }
+  .me-quote span{ display:block; margin-top:6px; font-style:normal; font-size:11.5px; font-weight:600; color:var(--accent); }
+  .me-rail{ padding:16px 18px; }
+  .me-rail .me-panel-h{ margin-bottom:12px; }
+  .me-agenda{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .me-agenda li{ display:flex; align-items:center; gap:8px; padding:7px 4px; border-radius:8px; font-size:12.5px; }
+  .me-agenda li:hover{ background:var(--surface-2); }
+  .me-agenda .when{ font-size:11px; font-weight:600; color:var(--ink-muted); flex:none; min-width:46px; }
+  .me-agenda .tt{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .me-agenda .tag{ margin-left:auto; flex:none; font-size:10px; font-weight:700; border-radius:5px; padding:2px 7px; }
+  .me-agenda .none{ color:var(--ink-muted); padding:4px; }
+  .me-notices{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+  .me-notices li{ display:flex; align-items:baseline; gap:8px; padding:8px 4px; font-size:12.5px; }
+  .me-notices li + li{ border-top:1px solid var(--surface-2); }
+  .me-notices li::before{ content:"\25B8"; color:var(--ink-muted); font-size:10px; flex:none; }
+  .me-notices .nt{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .me-notices .nd{ margin-left:auto; flex:none; font-size:10.5px; color:var(--ink-muted); }
+  .me-notices .x{ border:none; background:none; color:var(--ink-muted); font-size:14px; line-height:1; cursor:pointer; flex:none; opacity:0; }
+  .me-notices li:hover .x{ opacity:.7; }
+  .me-notices .none{ color:var(--ink-muted); padding:4px; font-size:12.5px; }
+  #meMemo{ width:100%; box-sizing:border-box; resize:vertical; min-height:96px; padding:11px 12px; border:1px solid var(--border); border-radius:11px; font:inherit; font-size:13px; line-height:1.6; background:var(--surface); color:var(--ink); }
+  #meMemo:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .me-memofoot{ display:flex; justify-content:space-between; margin-top:7px; }
+
+  .me-more{ padding:0; }
+  .me-more > summary{ list-style-position:inside; padding:16px 18px; cursor:pointer; font-size:14px; font-weight:600; }
+  .me-more[open] > summary{ border-bottom:1px solid var(--surface-2); }
+  .me-more > *:not(summary){ margin-left:18px; margin-right:18px; }
+  .me-more > form:first-of-type{ margin-top:14px; }
+  .me-more > ul:last-child{ margin-bottom:16px; }
+  .me-inline{ display:flex; gap:6px; }
+  .me-inline input{ flex:1 1 60px; min-width:0; height:34px; padding:0 10px; border:1px solid var(--border); border-radius:9px; font:inherit; font-size:13px; background:var(--surface); color:var(--ink); }
+  .me-inline button{ width:34px; height:34px; flex:none; border:none; border-radius:9px; background:var(--accent); color:var(--accent-ink); font-size:16px; cursor:pointer; }
+  .me-list{ list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:1px; }
+  .me-list li{ display:flex; align-items:center; gap:8px; font-size:13px; padding:5px 4px; border-radius:7px; }
   .me-list li:hover{ background:var(--surface-2); }
-  .me-list li input[type=checkbox]{ width:15px; height:15px; accent-color:var(--accent); flex:none; }
-  .me-list li label{ cursor:pointer; }
-  .me-list li .x{
-    margin-left:auto; cursor:pointer; color:var(--ink-muted); border:none; background:none;
-    font-size:17px; line-height:1; padding:0 4px; opacity:0; transition:opacity .12s ease;
-  }
-  .me-list li:hover .x{ opacity:1; }
+  .me-list li input[type=checkbox]{ width:14px; height:14px; accent-color:var(--accent); flex:none; }
   .me-list li a{ color:var(--accent); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .me-list li a:hover{ text-decoration:underline; }
   .me-list li.done label{ text-decoration:line-through; color:var(--ink-muted); }
-  .me-mini{ margin-top:10px; border:none; background:none; color:var(--ink-muted); cursor:pointer; padding:0; font:inherit; font-size:12px; }
+  .me-list li .x{ margin-left:auto; border:none; background:none; color:var(--ink-muted); font-size:15px; line-height:1; cursor:pointer; opacity:0; }
+  .me-list li:hover .x{ opacity:1; }
+  .me-mini{ margin-top:8px; border:none; background:none; color:var(--ink-muted); cursor:pointer; padding:0; font:inherit; font-size:11.5px; }
   .me-mini:hover{ color:var(--ink); }
-  .me-picks{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
-  .me-picks button{
-    padding:7px 13px; border:1px solid var(--border); border-radius:999px; background:var(--surface);
-    color:var(--ink); cursor:pointer; font:inherit; font-size:12.5px; font-weight:500;
-    transition:border-color .16s ease, color .16s ease, background .16s ease;
-  }
-  .me-picks button:hover{ border-color:var(--accent); color:var(--accent-ink); background:var(--accent); }
-  .me-opts{ display:flex; flex-direction:column; gap:7px; margin-top:10px; font-size:13px; }
-  .me-opts label{ display:flex; align-items:center; gap:8px; cursor:pointer; }
-  .me-opts input[type=checkbox]{ width:15px; height:15px; accent-color:var(--accent); }
-  .me-card details summary{ cursor:pointer; font-size:12.5px; font-weight:500; color:var(--ink-muted); list-style-position:inside; }
-  .me-card details summary:hover{ color:var(--ink); }
-  .me-wrap [hidden], #meApp[hidden], #meGate[hidden], #meTopAuth[hidden]{ display:none !important; }
+
+  /* 상단 로그인/유저 버튼 */
+  .me-topauth{ margin-left:auto; flex:none; white-space:nowrap; cursor:pointer; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:6px 15px; font:inherit; font-size:12.5px; font-weight:500; color:var(--ink); }
+  .me-topauth:hover{ border-color:var(--accent); color:var(--accent); }
+  body:not(.me-in) .me-search, body:not(.me-in) .me-topdate{ display:none; }
+  .topbar-meta{ display:none; }
+  body:not(.me-in):not(.me-guest) .topbar-title{ margin-right:auto; }
+
+  #meApp[hidden], #meGate[hidden], #meTopAuth[hidden], #meAdmin[hidden], #meCalAddPanel[hidden], #meNoticeAdd[hidden], #meOpts[hidden], #mePwForm[hidden], #meAdminSearch[hidden], #meSearch[hidden], #meTopDate[hidden], #meUser[hidden], #meUserMenu[hidden]{ display:none !important; }
 </style>
 
 <div class="app">
@@ -542,7 +682,10 @@
       <button class="nav-item" data-nav="roadmap" data-roadmap-target="rm-naver"><span class="ic">&#9675;</span>네이버 가격비교<span class="chip chip-soon">준비중</span></button>
     </nav>
 
-    <div class="sidebar-foot">모든 변환은 이 브라우저 안에서만 실행됩니다.<br>파일은 서버로 전송되지 않습니다.</div>
+    <div class="side-tag">
+      <b>좋은 브랜드가<br>더 나은 일상을 만듭니다.</b>
+      <span>FOR A BETTER TOMORROW</span>
+    </div>
   </aside>
 
   <div class="scrim" id="scrim"></div>
@@ -551,7 +694,18 @@
     <header class="topbar">
       <button class="hamburger" id="hamburger" aria-label="메뉴 열기">&#9776;</button>
       <div class="topbar-title" id="topbarTitle">대시보드</div>
+      <input type="text" id="meSearch" class="me-search" placeholder="도구·일정 검색…" autocomplete="off" hidden />
+      <span class="me-topdate" id="meTopDate" hidden></span>
       <button type="button" id="meTopAuth" class="me-topauth" hidden></button>
+      <button type="button" id="meUser" class="me-user" hidden>
+        <span class="ava" id="meUserAva">B</span>
+        <span class="un"><b id="meUserName">buyest</b><s id="meUserRole">바이스트 팀</s></span>
+        <span aria-hidden="true">▾</span>
+      </button>
+      <div id="meUserMenu" class="me-usermenu" hidden>
+        <button type="button" id="mePwBtn">비밀번호 변경</button>
+        <button type="button" id="meLogoutBtn">로그아웃</button>
+      </div>
       <div class="topbar-meta"><span class="dot"></span><span class="txt">브라우저 내에서 처리 · 업로드 없음</span></div>
     </header>
 
@@ -586,36 +740,103 @@
         <!-- 로그인하면 이 위젯이 대시보드 메인이 되고, 아래 도구목록은 숨겨진다 (도구는 사이드바에) -->
         <div class="me-wrap">
           <div id="meApp" hidden>
-            <div class="me-head">
-              <span class="me-sync" id="meSync"></span>
+            <div class="me-herorow">
+              <div class="me-hero">
+                <span class="me-sync" id="meSync"></span>
+                <h1 id="meGreetH1">안녕하세요 👋</h1>
+                <p id="meGreetP">오늘도 BUYEST와 함께, 더 특별한 가치를 만들어가요.</p>
+              </div>
+              <div class="me-quote-card">
+                <div class="q">좋은 사람들이<br>좋은 브랜드를 만듭니다.</div>
+                <div class="by">— BUYEST</div>
+              </div>
             </div>
-            <div class="me-grid">
-              <div class="me-card">
-                <h3>메모</h3>
-                <textarea id="meMemo" rows="8" placeholder="자유 메모 — 입력하면 자동 저장"></textarea>
+
+            <form id="mePwForm" class="me-panel me-pwform" hidden>
+              <strong>비밀번호 변경</strong>
+              <input type="password" id="mePwCur" placeholder="현재 비밀번호" autocomplete="current-password" />
+              <input type="password" id="mePwNew" placeholder="새 비밀번호 (4자 이상)" autocomplete="new-password" />
+              <input type="password" id="mePwNew2" placeholder="새 비밀번호 확인" autocomplete="new-password" />
+              <button type="submit" class="me-solid">변경</button>
+              <button type="button" id="mePwCancel" class="me-ghost">취소</button>
+              <span class="me-sub" id="mePwMsg"></span>
+            </form>
+
+            <div class="me-dash">
+              <div class="me-dash-main">
+
+                <div id="meAdmin" class="me-panel me-admin" hidden>
+                  <div class="me-panel-h">
+                    <div><h3>가입 관리</h3><p id="meAdminSum" class="me-sub"></p></div>
+                    <span id="meAdminCount" class="me-badge"></span>
+                  </div>
+                  <input type="text" id="meAdminSearch" class="me-admin-search" placeholder="아이디 검색" hidden />
+                  <div id="meAdminList" class="me-adminlist"></div>
+                </div>
+
+                <div class="me-panel me-cal">
+                  <div class="me-cal-head">
+                    <div><h3>전체 공유 캘린더</h3><p>함께 만드는 일정, 더 나은 오늘을 위한 계획입니다.</p></div>
+                    <div class="me-cal-ctl">
+                      <button type="button" id="meCalPrev" class="me-icobtn" aria-label="이전 달">&#8249;</button>
+                      <strong id="meCalLabel"></strong>
+                      <button type="button" id="meCalNext" class="me-icobtn" aria-label="다음 달">&#8250;</button>
+                      <button type="button" id="meCalToday" class="me-ghost">오늘로 이동</button>
+                      <button type="button" id="meCalAdd" class="me-solid">+ 일정 추가</button>
+                    </div>
+                  </div>
+                  <div class="me-cal-filters" id="meCalFilters"></div>
+                  <form id="meCalAddPanel" class="me-cal-addpanel" hidden>
+                    <input type="date" id="meCalDate" required />
+                    <select id="meCalCat"></select>
+                    <input type="text" id="meCalTitle" maxlength="100" placeholder="내용 (예: 주간 회의, 오전 반차)" required />
+                    <button type="submit" class="me-solid">추가</button>
+                    <button type="button" id="meCalCancel" class="me-ghost">취소</button>
+                  </form>
+                  <div id="meCalGrid" class="me-cal-grid"></div>
+                </div>
+
+                <div class="me-panel me-tools">
+                  <div class="me-panel-h">
+                    <div><h3>자주 쓰는 도구</h3><p>자주 사용하는 업무 도구를 더 빠르게 이용하세요.</p></div>
+                    <button type="button" id="meToolsEdit" class="me-link">고르기</button>
+                  </div>
+                  <div id="mePicks" class="me-toolgrid"></div>
+                  <div id="meOpts" class="me-opts" hidden></div>
+                </div>
+
               </div>
-              <div class="me-card">
-                <h3>할 일</h3>
-                <form id="meTodoForm" class="me-add">
-                  <input type="text" id="meTodoInput" placeholder="할 일 입력 후 Enter" autocomplete="off" />
-                  <button type="submit">추가</button>
-                </form>
-                <ul id="meTodoList" class="me-list"></ul>
-                <button type="button" id="meTodoClear" class="me-mini">완료한 항목 지우기</button>
-              </div>
-              <div class="me-card">
-                <h3>자주 쓰는 링크</h3>
-                <form id="meLinkForm" class="me-add">
-                  <input type="text" id="meLinkLabel" placeholder="이름 (예: 사방넷)" autocomplete="off" />
-                  <input type="text" id="meLinkUrl" placeholder="주소 (예: sabangnet.co.kr)" autocomplete="off" />
-                  <button type="submit">추가</button>
-                </form>
-                <ul id="meLinkList" class="me-list"></ul>
-              </div>
-              <div class="me-card">
-                <h3>내 바로가기</h3>
-                <div id="mePicks" class="me-picks"></div>
-                <details><summary>도구 고르기</summary><div id="meOpts" class="me-opts"></div></details>
+
+              <div class="me-dash-rail">
+                <div class="me-panel me-rail">
+                  <div class="me-panel-h"><h3>오늘 일정</h3><span id="meTodayDate" class="me-sub"></span></div>
+                  <ul id="meToday" class="me-agenda"></ul>
+                </div>
+
+                <div class="me-panel me-rail">
+                  <div class="me-panel-h"><h3>다가오는 일정</h3></div>
+                  <ul id="meUpcoming" class="me-agenda"></ul>
+                </div>
+
+                <div class="me-panel me-rail">
+                  <div class="me-panel-h"><h3>공지사항</h3><button type="button" id="meNoticeAdd" class="me-link" hidden>+ 등록</button></div>
+                  <ul id="meNotice" class="me-notices"></ul>
+                </div>
+
+                <div class="me-panel me-rail">
+                  <div class="me-panel-h"><h3>빠른 메모</h3><button type="button" id="meMemoSave" class="me-link">저장하기</button></div>
+                  <textarea id="meMemo" rows="5" maxlength="300" placeholder="간단한 메모를 입력하세요… (예: 회의 내용, 해야할 일 등)"></textarea>
+                  <div class="me-memofoot"><span class="me-sub" id="meMemoSaved"></span><span class="me-sub" id="meMemoCount">0/300</span></div>
+                </div>
+
+                <details class="me-panel me-rail me-more">
+                  <summary>할 일 &middot; 자주 쓰는 링크</summary>
+                  <form id="meTodoForm" class="me-inline"><input type="text" id="meTodoInput" placeholder="할 일 추가" autocomplete="off" /><button type="submit">+</button></form>
+                  <ul id="meTodoList" class="me-list"></ul>
+                  <button type="button" id="meTodoClear" class="me-mini">완료한 항목 지우기</button>
+                  <form id="meLinkForm" class="me-inline" style="margin-top:12px"><input type="text" id="meLinkLabel" placeholder="이름" autocomplete="off" /><input type="text" id="meLinkUrl" placeholder="주소" autocomplete="off" /><button type="submit">+</button></form>
+                  <ul id="meLinkList" class="me-list"></ul>
+                </details>
               </div>
             </div>
           </div>
@@ -1523,29 +1744,26 @@ else if (typeof exports === 'object')
     if(VALID_VIEWS[name] && name !== 'dashboard') showView(name, roadmapTarget, false);
   })();
 
-  /* ---------------- 로그인 관문 + 개인 대시보드 ---------------- */
+  /* ---------------- 인트라넷 대시보드 (로그인 · 캘린더 · 공지 · 개인메모) ---------------- */
   (function(){
     var API = 'https://buyest.co.kr/toolkit_dashboard_api.php';
     var LS = {
       get:function(k,d){ try{ var v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } },
       set:function(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
     };
+    var $ = function(id){ return document.getElementById(id); };
+    var CATS = [['mkt','마케팅'],['log','물류'],['ops','운영'],['cs','CS'],['etc','기타'],['off','휴가']];
+    var CAT_LABEL = {}; CATS.forEach(function(c){ CAT_LABEL[c[0]] = c[1]; });
 
-    var AUTH  = LS.get('buyest.dash.auth', null);          // {id, pass}
+    var AUTH  = LS.get('buyest.dash.auth', null);          // {id, pass, role}
+    var IS_ADMIN = !!(AUTH && AUTH.role === 'admin');
     var state = normState(LS.get('buyest.dash.cache', null));
 
-    var gate      = document.getElementById('meGate');
-    var gateForm  = document.getElementById('meGateForm');
-    var gateId    = document.getElementById('meGateId');
-    var gatePw    = document.getElementById('meGatePw');
-    var gateMsg   = document.getElementById('meGateMsg');
-    var appBox    = document.getElementById('meApp');
-    var syncEl    = document.getElementById('meSync');
-    var topAuth   = document.getElementById('meTopAuth');
-    var heroH1    = document.getElementById('dashHeroH1');
-    var heroP     = document.getElementById('dashHeroP');
-    var HIDE      = {dashboard:1, roadmap:1};
-    var HERO_H1   = heroH1.textContent, HERO_P = heroP.textContent;
+    var gate = $('meGate'), gateForm = $('meGateForm'), gateId = $('meGateId'), gatePw = $('meGatePw'),
+        gatePw2 = $('meGatePw2'), gateSubmit = $('meGateSubmit'), gateMsg = $('meGateMsg'),
+        tabLogin = $('meTabLogin'), tabSignup = $('meTabSignup'),
+        appBox = $('meApp'), syncEl = $('meSync'), topAuth = $('meTopAuth');
+    var gateMode = 'login';
 
     function normState(d){
       d = d || {};
@@ -1556,26 +1774,13 @@ else if (typeof exports === 'object')
         tools: Array.isArray(d.tools) ? d.tools : []
       };
     }
-    function nowT(){ return new Date().toLocaleTimeString('ko-KR'); }
+    function nowT(){ return new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}); }
     function setSync(t){ if(syncEl) syncEl.textContent = t || ''; }
     function isPwErr(res){ return res && res.error && res.error.indexOf('비밀번호') === 0; }
-
-    /* 화면 상태: 'gate'(로그인화면) | 'guest'(로그인없이 도구만) | 'in'(로그인됨) */
-    function applyMode(mode){
-      gate.hidden = (mode !== 'gate');
-      appBox.hidden = (mode !== 'in');
-      document.body.classList.toggle('me-in', mode === 'in');
-      topAuth.hidden = (mode === 'gate');
-      if(mode === 'in'){
-        topAuth.textContent = (AUTH ? AUTH.id : '') + '님 · 로그아웃';
-        heroH1.textContent = (AUTH ? AUTH.id : '') + '님, 안녕하세요';
-        heroP.textContent = '메모·할 일·자주 쓰는 링크는 계정에 저장돼 어느 PC에서든 같은 내용이 보입니다. 도구는 왼쪽 메뉴에서 여세요.';
-      } else {
-        topAuth.textContent = '로그인';
-        heroH1.textContent = HERO_H1;
-        heroP.textContent = HERO_P;
-      }
-    }
+    function pad2(n){ return (n < 10 ? '0' : '') + n; }
+    function ymd(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+    var WK = ['일','월','화','수','목','금','토'];
+    var TODAY = ymd(new Date());
 
     function api(action, extra){
       var body = {action:action, user:(AUTH&&AUTH.id)||'', pass:(AUTH&&AUTH.pass)||''};
@@ -1584,6 +1789,33 @@ else if (typeof exports === 'object')
         .then(function(r){ return r.json(); });
     }
 
+    function applyMode(mode){
+      var inn = (mode === 'in');
+      gate.hidden = (mode !== 'gate');
+      appBox.hidden = !inn;
+      document.body.classList.toggle('me-in', inn);
+      document.body.classList.toggle('me-admin', inn && IS_ADMIN);
+      $('meAdmin').hidden = !(inn && IS_ADMIN);
+      $('meNoticeAdd').hidden = !(inn && IS_ADMIN);
+      $('meSearch').hidden = !inn;
+      $('meTopDate').hidden = !inn;
+      $('meUser').hidden = !inn;
+      $('meUserMenu').hidden = true;
+      topAuth.hidden = (mode !== 'guest');   // 로그인 버튼은 게스트에서만
+      if(inn){
+        var nm = AUTH ? AUTH.id : '';
+        $('meUserName').textContent = nm;
+        $('meUserRole').textContent = IS_ADMIN ? '관리자' : '바이스트 팀';
+        $('meUserAva').textContent = (nm[0] || 'B').toUpperCase();
+        $('meGreetH1').textContent = nm + '님, 좋은 하루 되세요! 👋';
+        var d = new Date();
+        $('meTopDate').textContent = (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + WK[d.getDay()] + ')';
+      } else {
+        topAuth.textContent = '로그인';
+      }
+    }
+
+    /* ---------------- 개인 메모/할일/링크/도구 ---------------- */
     var saveTimer, dirty = false;
     function persist(){
       LS.set('buyest.dash.cache', state);
@@ -1595,85 +1827,73 @@ else if (typeof exports === 'object')
       if(!AUTH) return;
       setSync('저장 중…');
       api('save', {data: state}).then(function(res){
-        if(res && res.ok){ dirty = false; setSync('저장됨 ' + nowT()); }
+        if(res && res.ok){ dirty = false; setSync('저장됨 ' + nowT()); $('meMemoSaved').textContent = '저장됨 ' + nowT(); }
         else if(isPwErr(res)){ doLogout('gate'); gateMsg.textContent = '다시 로그인해 주세요.'; }
         else setSync('저장 실패 — 이 PC에는 보관됨');
       }).catch(function(){ setSync('서버 연결 안 됨 — 이 PC에만 저장됨'); });
     }
 
-    function doLogout(nextMode){
-      AUTH = null;
-      LS.set('buyest.dash.auth', null);
-      LS.set('buyest.dash.cache', null);
-      LS.set('buyest.dash.skip', null);
-      state = normState(null);
-      renderAll();
-      setGateMode('login');
-      applyMode(nextMode || 'gate');
-      setSync('');
+    var memo = $('meMemo'), memoTimer;
+    memo.addEventListener('input', function(){
+      state.memo = memo.value;
+      $('meMemoCount').textContent = state.memo.length + '/300';
+      clearTimeout(memoTimer); memoTimer = setTimeout(persist, 400);
+    });
+    $('meMemoSave').addEventListener('click', function(){ state.memo = memo.value; clearTimeout(memoTimer); persist(); });
+    function renderMemo(){
+      if(document.activeElement !== memo) memo.value = state.memo;
+      $('meMemoCount').textContent = state.memo.length + '/300';
     }
 
-    /* ---- 위젯들 ---- */
-    var memo = document.getElementById('meMemo'), memoTimer;
-    memo.addEventListener('input', function(){
-      state.memo = memo.value; clearTimeout(memoTimer); memoTimer = setTimeout(persist, 300);
-    });
-    function renderMemo(){ if(document.activeElement !== memo) memo.value = state.memo; }
-
-    var todoList = document.getElementById('meTodoList');
+    var todoList = $('meTodoList');
     function renderTodos(){
       todoList.innerHTML = '';
       state.todos.forEach(function(t, i){
-        var li = document.createElement('li');
-        if(t.done) li.className = 'done';
+        var li = document.createElement('li'); if(t.done) li.className = 'done';
         var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!t.done; cb.id='metd'+i;
         cb.addEventListener('change', function(){ state.todos[i].done = cb.checked; persist(); renderTodos(); });
         var lb = document.createElement('label'); lb.htmlFor='metd'+i; lb.textContent=t.text;
-        var x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×'; x.setAttribute('aria-label','삭제');
+        var x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×';
         x.addEventListener('click', function(){ state.todos.splice(i,1); persist(); renderTodos(); });
-        li.appendChild(cb); li.appendChild(lb); li.appendChild(x);
-        todoList.appendChild(li);
+        li.appendChild(cb); li.appendChild(lb); li.appendChild(x); todoList.appendChild(li);
       });
     }
-    document.getElementById('meTodoForm').addEventListener('submit', function(e){
-      e.preventDefault();
-      var inp = document.getElementById('meTodoInput');
-      var v = inp.value.trim(); if(!v) return;
-      state.todos.push({text:v, done:false}); inp.value=''; persist(); renderTodos();
+    $('meTodoForm').addEventListener('submit', function(e){
+      e.preventDefault(); var v = $('meTodoInput').value.trim(); if(!v) return;
+      state.todos.push({text:v, done:false}); $('meTodoInput').value=''; persist(); renderTodos();
     });
-    document.getElementById('meTodoClear').addEventListener('click', function(){
+    $('meTodoClear').addEventListener('click', function(){
       state.todos = state.todos.filter(function(t){ return !t.done; }); persist(); renderTodos();
     });
 
-    var linkList = document.getElementById('meLinkList');
+    var linkList = $('meLinkList');
     function normUrl(u){ u = u.trim(); if(!u) return ''; if(!/^https?:\/\//i.test(u)) u = 'https://' + u; return u; }
     function renderLinks(){
       linkList.innerHTML = '';
       state.links.forEach(function(l, i){
         var li = document.createElement('li');
-        var a = document.createElement('a');
-        a.href = l.url; a.target = '_blank'; a.rel = 'noopener';
-        a.textContent = l.label || l.url;
-        var x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×'; x.setAttribute('aria-label','삭제');
+        var a = document.createElement('a'); a.href = l.url; a.target='_blank'; a.rel='noopener'; a.textContent = l.label || l.url;
+        var x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×';
         x.addEventListener('click', function(){ state.links.splice(i,1); persist(); renderLinks(); });
-        li.appendChild(a); li.appendChild(x);
-        linkList.appendChild(li);
+        li.appendChild(a); li.appendChild(x); linkList.appendChild(li);
       });
     }
-    document.getElementById('meLinkForm').addEventListener('submit', function(e){
+    $('meLinkForm').addEventListener('submit', function(e){
       e.preventDefault();
-      var lab = document.getElementById('meLinkLabel'), url = document.getElementById('meLinkUrl');
-      var u = normUrl(url.value); if(!u) return;
-      state.links.push({label: lab.value.trim() || u, url: u});
-      lab.value=''; url.value=''; persist(); renderLinks();
+      var u = normUrl($('meLinkUrl').value); if(!u) return;
+      state.links.push({label: $('meLinkLabel').value.trim() || u, url: u});
+      $('meLinkLabel').value=''; $('meLinkUrl').value=''; persist(); renderLinks();
     });
 
-    var picksBox = document.getElementById('mePicks'), optsBox = document.getElementById('meOpts');
+    var picksBox = $('mePicks'), optsBox = $('meOpts'), HIDE = {dashboard:1, roadmap:1};
     function renderPicks(){
-      picksBox.innerHTML = state.tools.length ? '' : '<span style="font-size:12px;color:var(--ink-muted)">아래 ‘도구 고르기’에서 선택</span>';
+      picksBox.innerHTML = '';
+      if(!state.tools.length){ picksBox.innerHTML = '<div class="empty">오른쪽 위 ‘고르기’에서 자주 쓰는 도구를 선택하세요.</div>'; }
       state.tools.forEach(function(k){
         if(!TITLES[k]) return;
-        var b = document.createElement('button'); b.type='button'; b.textContent = TITLES[k];
+        var b = document.createElement('button'); b.type='button';
+        b.innerHTML = '<span class="nm"></span><span class="bd">사용가능</span>';
+        b.querySelector('.nm').textContent = TITLES[k];
         b.addEventListener('click', function(){ showView(k); });
         picksBox.appendChild(b);
       });
@@ -1693,15 +1913,233 @@ else if (typeof exports === 'object')
         optsBox.appendChild(lb);
       });
     }
-    function renderAll(){ renderMemo(); renderTodos(); renderLinks(); renderPicks(); renderOpts(); }
+    $('meToolsEdit').addEventListener('click', function(){ optsBox.hidden = !optsBox.hidden; });
 
-    /* ---- 로그인 / 회원가입 ---- */
-    var gatePw2   = document.getElementById('meGatePw2');
-    var gateSubmit= document.getElementById('meGateSubmit');
-    var tabLogin  = document.getElementById('meTabLogin');
-    var tabSignup = document.getElementById('meTabSignup');
-    var gateMode  = 'login';   // 'login' | 'signup'
+    function renderPersonal(){ renderMemo(); renderTodos(); renderLinks(); renderPicks(); renderOpts(); }
 
+    /* ---------------- 가입 관리 ---------------- */
+    var adminList = $('meAdminList'), adminCount = $('meAdminCount'), adminSum = $('meAdminSum'),
+        adminSearch = $('meAdminSearch'), ADMIN_USERS = [];
+    function loadAdmin(){
+      if(!IS_ADMIN) return;
+      api('admin_list').then(function(res){ if(res && res.ok){ ADMIN_USERS = res.users || []; renderAdmin(); } }).catch(function(){});
+    }
+    adminSearch.addEventListener('input', renderAdmin);
+    function renderAdmin(){
+      var users = ADMIN_USERS;
+      var pending = users.filter(function(u){ return u.status === 'pending'; }).length;
+      adminCount.textContent = pending ? pending + '명 대기' : '';
+      adminSum.textContent = '전체 ' + users.length + '명' + (pending ? ' · 대기 ' + pending + '명' : '');
+      adminSearch.hidden = users.length < 8;
+      var q = adminSearch.value.trim().toLowerCase();
+      var shown = q ? users.filter(function(u){ return u.username.toLowerCase().indexOf(q) > -1; }) : users;
+      adminList.innerHTML = shown.length ? '' : '<div style="font-size:13px;color:var(--ink-muted);padding:8px">' + (users.length ? '검색 결과 없음' : '아직 다른 계정이 없어요.') + '</div>';
+      shown.forEach(function(u){
+        var me = (u.username === (AUTH && AUTH.id));
+        var row = document.createElement('div'); row.className = 'me-arow';
+        var who = document.createElement('span'); who.className='who'; who.textContent = u.username;
+        var st = document.createElement('span'); st.className = 'st ' + (u.role === 'admin' ? 'admin' : u.status);
+        st.textContent = u.role === 'admin' ? '관리자' : ({pending:'대기',approved:'사용중',rejected:'거절'}[u.status] || u.status);
+        var dt = document.createElement('span'); dt.className = 'addate'; dt.textContent = (u.created_at || '').slice(0,10);
+        row.appendChild(who); row.appendChild(st); row.appendChild(dt);
+        if(me){ var t = document.createElement('span'); t.className='me-sub'; t.textContent='나'; row.appendChild(t); }
+        if(!me && u.role !== 'admin'){
+          var btns = document.createElement('span'); btns.className='btns';
+          function mk(txt, cls, fn){ var b=document.createElement('button'); b.type='button'; b.textContent=txt; if(cls)b.className=cls; b.addEventListener('click',fn); return b; }
+          if(u.status === 'pending'){
+            btns.appendChild(mk('승인','ok',function(){ adminSet(u.username,'approved'); }));
+            btns.appendChild(mk('거절','',function(){ adminSet(u.username,'rejected'); }));
+          } else if(u.status === 'approved'){
+            btns.appendChild(mk('비번 초기화','',function(){ adminReset(u.username); }));
+            btns.appendChild(mk('내보내기','',function(){ if(confirm(u.username+' 계정을 내보낼까요? 개인 메모도 삭제됩니다.')) adminDelete(u.username); }));
+          } else {
+            btns.appendChild(mk('승인','ok',function(){ adminSet(u.username,'approved'); }));
+            btns.appendChild(mk('삭제','',function(){ adminDelete(u.username); }));
+          }
+          row.appendChild(btns);
+        }
+        adminList.appendChild(row);
+      });
+    }
+    function adminSet(t, s){ api('admin_set',{target:t,status:s}).then(function(r){ r&&r.ok?loadAdmin():alert((r&&r.error)||'실패'); }); }
+    function adminDelete(t){ api('admin_delete',{target:t}).then(function(r){ r&&r.ok?loadAdmin():alert((r&&r.error)||'실패'); }); }
+    function adminReset(t){
+      api('admin_reset',{target:t}).then(function(r){
+        if(r && r.ok) alert(t + ' 님의 임시 비밀번호: ' + r.temp + '\n\n이 번호를 ' + t + ' 님에게 알려주세요.\n로그인 후 "비밀번호 변경"에서 새 비번으로 바꾸면 됩니다.');
+        else alert((r && r.error) || '실패');
+      });
+    }
+
+    /* ---------------- 비밀번호 변경 (본인) ---------------- */
+    (function(){
+      var f = $('mePwForm'), msg = $('mePwMsg');
+      $('mePwBtn').addEventListener('click', function(){ $('meUserMenu').hidden = true; f.hidden = false; $('mePwCur').focus(); window.scrollTo(0,0); });
+      $('mePwCancel').addEventListener('click', function(){ f.hidden = true; f.reset(); msg.textContent = ''; });
+      f.addEventListener('submit', function(e){
+        e.preventDefault();
+        var cur = $('mePwCur').value, nw = $('mePwNew').value, nw2 = $('mePwNew2').value;
+        if(!AUTH){ return; }
+        if(cur !== AUTH.pass){ msg.textContent = '현재 비밀번호가 달라요'; return; }
+        if(nw.length < 4){ msg.textContent = '새 비밀번호는 4자 이상'; return; }
+        if(nw !== nw2){ msg.textContent = '새 비밀번호 확인이 일치하지 않아요'; return; }
+        msg.textContent = '변경 중…';
+        api('passwd', {newpass: nw}).then(function(r){
+          if(r && r.ok){
+            AUTH.pass = nw; LS.set('buyest.dash.auth', AUTH);
+            f.hidden = true; f.reset(); msg.textContent = '';
+            setSync('비밀번호 변경됨 ' + nowT());
+          } else msg.textContent = (r && r.error) || '변경 실패';
+        }).catch(function(){ msg.textContent = '서버 연결 실패'; });
+      });
+    })();
+
+    /* ---------------- 공유 캘린더 ---------------- */
+    var calMonth = new Date(); calMonth.setDate(1); calMonth.setHours(0,0,0,0);
+    var calFilter = 'all', calItems = [];
+    var calGrid = $('meCalGrid'), calLabel = $('meCalLabel'), calFilters = $('meCalFilters'),
+        calPanel = $('meCalAddPanel'), calDate = $('meCalDate'), calCat = $('meCalCat'), calTitle = $('meCalTitle');
+
+    calCat.innerHTML = CATS.map(function(c){ return '<option value="'+c[0]+'">'+c[1]+'</option>'; }).join('');
+    (function(){
+      var all = document.createElement('button'); all.type='button'; all.setAttribute('data-k','all'); all.textContent='전체'; all.className='on';
+      calFilters.appendChild(all);
+      CATS.forEach(function(c){ var b=document.createElement('button'); b.type='button'; b.setAttribute('data-k',c[0]); b.textContent=c[1]; calFilters.appendChild(b); });
+      calFilters.addEventListener('click', function(e){
+        var b = e.target.closest('button[data-k]'); if(!b) return;
+        calFilter = b.getAttribute('data-k');
+        [].forEach.call(calFilters.children, function(x){ x.classList.toggle('on', x === b); });
+        renderCal();
+      });
+    })();
+
+    function loadCal(){
+      var from = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1); from.setDate(from.getDate()-7);
+      var to = new Date(calMonth.getFullYear(), calMonth.getMonth()+1, 0); to.setDate(to.getDate()+7);
+      api('cal_list', {from:ymd(from), to:ymd(to)}).then(function(res){
+        if(res && res.ok){ calItems = res.items || []; renderCal(); renderAgenda(); }
+      }).catch(function(){});
+    }
+    function itemsOn(dstr){
+      return calItems.filter(function(it){
+        if(calFilter !== 'all' && it.kind !== calFilter) return false;
+        return dstr >= it.day && dstr <= (it.end_day || it.day);
+      });
+    }
+    function evColor(k){ return 'var(--k-' + k + ')'; }
+    function renderCal(){
+      calLabel.textContent = calMonth.getFullYear() + '년 ' + (calMonth.getMonth()+1) + '월';
+      calGrid.innerHTML = '';
+      WK.forEach(function(w, i){
+        var h = document.createElement('div'); h.className = 'me-cal-dow' + (i===0?' sun':i===6?' sat':''); h.textContent = w;
+        calGrid.appendChild(h);
+      });
+      var first = new Date(calMonth), gridStart = new Date(first);
+      gridStart.setDate(gridStart.getDate() - first.getDay());
+      for(var i = 0; i < 42; i++){
+        var d = new Date(gridStart); d.setDate(d.getDate() + i);
+        var ds = ymd(d), dow = d.getDay();
+        var cell = document.createElement('div');
+        cell.className = 'me-cal-cell'
+          + (d.getMonth() !== calMonth.getMonth() ? ' dim' : '')
+          + (ds === TODAY ? ' today' : '')
+          + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '');
+        var dn = document.createElement('span'); dn.className='d'; dn.textContent = d.getDate(); cell.appendChild(dn);
+        var its = itemsOn(ds);
+        its.slice(0, 3).forEach(function(it){
+          var ev = document.createElement('span'); ev.className = 'me-cal-ev'; ev.style.color = evColor(it.kind);
+          ev.style.background = 'var(--k-' + it.kind + '-bg)';
+          var t = document.createElement('span'); t.className='t'; t.textContent = it.title;
+          ev.appendChild(t);
+          if(it.author === (AUTH && AUTH.id) || IS_ADMIN){
+            var del = document.createElement('button'); del.className='del'; del.type='button'; del.textContent='×';
+            del.addEventListener('click', function( e2){ e2.stopPropagation(); api('cal_del',{id:it.id}).then(function(r){ if(r&&r.ok) loadCal(); }); });
+            ev.appendChild(del);
+          }
+          cell.appendChild(ev);
+        });
+        if(its.length > 3){ var m = document.createElement('div'); m.className='me-cal-more'; m.textContent = '+' + (its.length-3) + '개 더보기'; cell.appendChild(m); }
+        cell.addEventListener('click', (function(x){ return function(){ openCalPanel(x); }; })(ds));
+        calGrid.appendChild(cell);
+      }
+    }
+    function openCalPanel(dstr){
+      calPanel.hidden = false;
+      calDate.value = dstr || TODAY;
+      if(calFilter !== 'all') calCat.value = calFilter;
+      calTitle.focus();
+    }
+    $('meCalAdd').addEventListener('click', function(){ calPanel.hidden ? openCalPanel(TODAY) : (calPanel.hidden = true); });
+    $('meCalCancel').addEventListener('click', function(){ calPanel.hidden = true; calTitle.value = ''; });
+    calPanel.addEventListener('submit', function(e){
+      e.preventDefault();
+      var day = calDate.value, kind = calCat.value, title = calTitle.value.trim();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(day) || !title) return;
+      api('cal_add', {day:day, kind:kind, title:title}).then(function(r){
+        if(r && r.ok){ calTitle.value=''; calPanel.hidden = true; loadCal(); }
+        else alert((r && r.error) || '추가 실패');
+      });
+    });
+    $('meCalPrev').addEventListener('click', function(){ calMonth.setMonth(calMonth.getMonth()-1); renderCal(); loadCal(); });
+    $('meCalNext').addEventListener('click', function(){ calMonth.setMonth(calMonth.getMonth()+1); renderCal(); loadCal(); });
+    $('meCalToday').addEventListener('click', function(){ calMonth = new Date(); calMonth.setDate(1); calMonth.setHours(0,0,0,0); renderCal(); loadCal(); });
+
+    /* ---------------- 오늘 / 다가오는 일정 ---------------- */
+    function agendaRow(it, whenTxt){
+      var li = document.createElement('li');
+      var w = document.createElement('span'); w.className='when'; w.textContent = whenTxt;
+      var t = document.createElement('span'); t.className='tt'; t.textContent = it.title;
+      var g = document.createElement('span'); g.className='tag'; g.style.color = evColor(it.kind); g.style.background = 'var(--k-'+it.kind+'-bg)';
+      g.textContent = CAT_LABEL[it.kind] || it.kind;
+      li.appendChild(w); li.appendChild(t); li.appendChild(g);
+      return li;
+    }
+    function renderAgenda(){
+      var d = new Date();
+      $('meTodayDate').textContent = (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + WK[d.getDay()] + ')';
+      var todayEl = $('meToday'); todayEl.innerHTML = '';
+      var td = calItems.filter(function(it){ return TODAY >= it.day && TODAY <= (it.end_day || it.day); });
+      if(!td.length) todayEl.innerHTML = '<li class="none">오늘 등록된 일정이 없어요.</li>';
+      td.forEach(function(it){ todayEl.appendChild(agendaRow(it, '오늘')); });
+
+      var upEl = $('meUpcoming'); upEl.innerHTML = '';
+      var up = calItems.filter(function(it){ return it.day > TODAY; })
+        .sort(function(a,b){ return a.day < b.day ? -1 : 1; }).slice(0, 6);
+      if(!up.length) upEl.innerHTML = '<li class="none">예정된 일정이 없어요.</li>';
+      up.forEach(function(it){
+        var p = it.day.split('-');
+        var dd = new Date(+p[0], +p[1]-1, +p[2]);
+        upEl.appendChild(agendaRow(it, (+p[1]) + '/' + (+p[2]) + ' (' + WK[dd.getDay()] + ')'));
+      });
+    }
+
+    /* ---------------- 공지사항 ---------------- */
+    var noticeEl = $('meNotice');
+    function loadNotices(){
+      api('notice_list').then(function(res){ if(res && res.ok) renderNotices(res.items || []); }).catch(function(){});
+    }
+    function renderNotices(items){
+      noticeEl.innerHTML = items.length ? '' : '<li class="none">등록된 공지가 없어요.</li>';
+      items.forEach(function(n){
+        var li = document.createElement('li');
+        var t = document.createElement('span'); t.className='nt'; t.textContent = n.title;
+        var dt = document.createElement('span'); dt.className='nd'; dt.textContent = (n.created_at || '').slice(2,10).replace(/-/g,'.');
+        li.appendChild(t); li.appendChild(dt);
+        if(IS_ADMIN){
+          var x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×';
+          x.addEventListener('click', function(){ api('notice_del',{id:n.id}).then(function(r){ if(r&&r.ok) loadNotices(); }); });
+          li.appendChild(x);
+        }
+        noticeEl.appendChild(li);
+      });
+    }
+    $('meNoticeAdd').addEventListener('click', function(){
+      var t = prompt('공지 내용을 입력하세요 (1~120자)');
+      if(t && t.trim()) api('notice_add',{title:t.trim()}).then(function(r){ r&&r.ok?loadNotices():alert((r&&r.error)||'실패'); });
+    });
+
+    function bootWorkspace(){ renderCal(); loadCal(); renderAgenda(); loadNotices(); loadAdmin(); }
+
+    /* ---------------- 로그인 / 회원가입 ---------------- */
     function setGateMode(m, keepMsg){
       gateMode = m;
       tabLogin.classList.toggle('on', m === 'login');
@@ -1715,15 +2153,28 @@ else if (typeof exports === 'object')
     tabSignup.addEventListener('click', function(){ setGateMode('signup'); });
 
     function enterWith(res, okMsg){
+      AUTH.role = res.role || AUTH.role || 'member';
+      IS_ADMIN = (AUTH.role === 'admin');
       LS.set('buyest.dash.auth', AUTH);
       LS.set('buyest.dash.skip', null);
       state = normState(res.data);
       LS.set('buyest.dash.cache', state);
       gatePw.value = ''; gatePw2.value = '';
-      renderAll();
+      renderPersonal();
       applyMode('in');
       showView('dashboard');
       setSync(okMsg);
+      bootWorkspace();
+    }
+
+    function doLogout(nextMode){
+      AUTH = null; IS_ADMIN = false;
+      LS.set('buyest.dash.auth', null); LS.set('buyest.dash.cache', null); LS.set('buyest.dash.skip', null);
+      state = normState(null);
+      renderPersonal();
+      setGateMode('login');
+      applyMode(nextMode || 'gate');
+      setSync('');
     }
 
     gateForm.addEventListener('submit', function(e){
@@ -1738,49 +2189,71 @@ else if (typeof exports === 'object')
       api(gateMode === 'signup' ? 'signup' : 'login').then(function(res){
         if(res && res.ok){
           enterWith(res, gateMode === 'signup' ? '가입 완료! · ' + nowT() : '로그인됨 · ' + nowT());
+        } else if(gateMode === 'signup' && res && res.status === 'pending'){
+          AUTH = null; setGateMode('login', true); gateId.value = id;
+          gateMsg.textContent = '가입 신청이 접수됐어요. 관리자 승인 후 로그인할 수 있어요.';
         } else {
           AUTH = null;
           var err = (res && res.error) || (gateMode === 'signup' ? '가입 실패' : '로그인 실패');
-          // 로그인 시도인데 계정이 없으면 회원가입 탭으로 옮기고 이유를 알려준다
           if(gateMode === 'login' && res && res.error && res.error.indexOf('없는 아이디') === 0){
             setGateMode('signup', true);
             err = '처음이신가요? 아이디·비밀번호를 정하고 "가입하고 시작"을 누르세요.';
           }
-          // 회원가입 시도인데 이미 있으면 로그인 탭으로
           if(gateMode === 'signup' && res && res.error && res.error.indexOf('이미 있는') === 0){
             setGateMode('login', true);
             err = '이미 가입된 아이디예요. 비밀번호를 넣고 로그인하세요.';
           }
           gateMsg.textContent = err;
         }
-      }).catch(function(){
-        AUTH = null;
-        gateMsg.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.';
-      });
+      }).catch(function(){ AUTH = null; gateMsg.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.'; });
     });
     setGateMode('login');
-    document.getElementById('meGateSkip').addEventListener('click', function(){
-      LS.set('buyest.dash.skip', 1);
-      applyMode('guest');
-      showView('dashboard');
-    });
+    $('meGateSkip').addEventListener('click', function(){ LS.set('buyest.dash.skip', 1); applyMode('guest'); showView('dashboard'); });
     topAuth.addEventListener('click', function(){
-      if(AUTH){ doLogout('gate'); }
-      else { LS.set('buyest.dash.skip', null); setGateMode('login'); applyMode('gate'); gateId.focus(); }
+      LS.set('buyest.dash.skip', null); setGateMode('login'); applyMode('gate'); gateId.focus();
+    });
+    $('meUser').addEventListener('click', function(e){ e.stopPropagation(); var m = $('meUserMenu'); m.hidden = !m.hidden; });
+    document.addEventListener('click', function(){ $('meUserMenu').hidden = true; });
+    $('meLogoutBtn').addEventListener('click', function(){ doLogout('gate'); });
+
+    /* 검색: 사이드바 도구 필터 + Enter로 첫 도구 열기 */
+    $('meSearch').addEventListener('input', function(){
+      var q = this.value.trim().toLowerCase();
+      document.querySelectorAll('.nav-item[data-nav]').forEach(function(el){
+        var hit = !q || el.textContent.toLowerCase().indexOf(q) > -1;
+        el.style.display = hit ? '' : 'none';
+      });
+      document.querySelectorAll('.sidebar .nav-group').forEach(function(g){
+        var any = [].some.call(g.querySelectorAll('.nav-item[data-nav]'), function(el){ return el.style.display !== 'none'; });
+        g.style.display = any ? '' : 'none';
+      });
+    });
+    $('meSearch').addEventListener('keydown', function(e){
+      if(e.key !== 'Enter') return;
+      var first = [].find.call(document.querySelectorAll('.nav-item[data-nav]'), function(el){ return el.style.display !== 'none'; });
+      if(first) first.click();
     });
 
-    /* ---- 부팅 ---- */
-    renderAll();
+    /* ---------------- 부팅 ---------------- */
+    renderPersonal();
     if(AUTH){
       applyMode('in');
       setSync('동기화 중…');
+      bootWorkspace();
       api('login').then(function(res){
         if(res && res.ok){
+          AUTH.role = res.role || AUTH.role || 'member';
+          IS_ADMIN = (AUTH.role === 'admin');
+          LS.set('buyest.dash.auth', AUTH);
+          applyMode('in');
           state = normState(res.data);
           LS.set('buyest.dash.cache', state);
-          renderAll();
+          renderPersonal();
           setSync('동기화됨 ' + nowT());
           if(dirty) pushSave();
+          bootWorkspace();
+        } else if(res && (res.status === 'pending' || res.status === 'rejected')){
+          doLogout('gate'); gateMsg.textContent = res.error || '다시 로그인해 주세요.';
         } else if(isPwErr(res) || (res && res.error && res.error.indexOf('없는 아이디') === 0)){
           doLogout('gate'); gateMsg.textContent = '다시 로그인해 주세요.';
         } else { setSync((res && res.error) || ''); }
