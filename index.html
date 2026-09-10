@@ -2187,11 +2187,12 @@ else if (typeof exports === 'object')
       gateMsg.textContent = '확인 중…';
       AUTH = {id:id, pass:pw};
       api(gateMode === 'signup' ? 'signup' : 'login').then(function(res){
-        if(res && res.ok){
-          enterWith(res, gateMode === 'signup' ? '가입 완료! · ' + nowT() : '로그인됨 · ' + nowT());
-        } else if(gateMode === 'signup' && res && res.status === 'pending'){
+        if(res && res.ok && res.status === 'pending'){
+          // 회원가입 됐지만 승인 대기 — 입장 불가
           AUTH = null; setGateMode('login', true); gateId.value = id;
           gateMsg.textContent = '가입 신청이 접수됐어요. 관리자 승인 후 로그인할 수 있어요.';
+        } else if(res && res.ok){
+          enterWith(res, gateMode === 'signup' ? '가입 완료! · ' + nowT() : '로그인됨 · ' + nowT());
         } else {
           AUTH = null;
           var err = (res && res.error) || (gateMode === 'signup' ? '가입 실패' : '로그인 실패');
