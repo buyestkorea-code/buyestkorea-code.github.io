@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BUYEST | 회사소개</title>
+<meta name="description" content="이탈리아 부티크 100여 곳과의 파트너십으로 140여 개 명품 브랜드를 정품으로 큐레이션하는 바이스트(BUYEST)를 소개합니다.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Marcellus&display=swap" rel="stylesheet">
+<style>
+  @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendard-variable-dynamic-subset.min.css");
+
+  :root{
+    --bg:#0B0B0A;
+    --bg-raise:#131311;
+    --panel:#16160F;
+    --hair:rgba(230,222,201,.14);
+    --hair-strong:rgba(230,222,201,.28);
+    --ink:#F3EFE4;
+    --ink-dim:#B9B2A0;
+    --ink-faint:#7E7867;
+    --gold:#C9A961;
+    --gold-soft:#E7D6A6;
+    --emerald:#3A5F52;
+    --serif:"Cormorant Garamond","Marcellus",Georgia,serif;
+    --display:"Marcellus","Cormorant Garamond",Georgia,serif;
+    --sans:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Segoe UI",system-ui,sans-serif;
+    color-scheme: dark;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0;
+    background:
+      radial-gradient(60% 50% at 82% -6%, rgba(201,169,97,.10), transparent 60%),
+      radial-gradient(50% 40% at 10% 8%, rgba(58,95,82,.16), transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  a{ color:inherit; }
+  img{ max-width:100%; display:block; }
+  ::selection{ background:rgba(201,169,97,.32); color:var(--ink); }
+
+  .wrap{ max-width:1120px; margin:0 auto; padding-inline:24px; }
+  @media (min-width:720px){ .wrap{ padding-inline:48px; } }
+
+  .eyebrow{
+    font-family:var(--sans);
+    font-size:11px;
+    letter-spacing:.28em;
+    text-transform:uppercase;
+    color:var(--gold);
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:28px; height:1px;
+    background:var(--gold);
+    display:inline-block;
+  }
+
+  h1,h2,h3{ margin:0; font-family:var(--serif); font-weight:500; text-wrap:balance; }
+
+  /* ---------- Nav ---------- */
+  header.site{
+    position:sticky; top:0; z-index:40;
+    background:rgba(11,11,10,.72);
+    backdrop-filter:blur(10px) saturate(140%);
+    border-bottom:1px solid var(--hair);
+  }
+  .nav{
+    display:flex; align-items:center; justify-content:space-between;
+    padding-block:16px;
+  }
+  .wordmark{
+    font-family:var(--display);
+    font-size:20px;
+    letter-spacing:.18em;
+    text-decoration:none;
+    color:var(--ink);
+  }
+  .wordmark b{ color:var(--gold); font-weight:500; }
+  .nav-links{ display:flex; gap:28px; align-items:center; }
+  .nav-links a{
+    font-size:13px; letter-spacing:.04em;
+    text-decoration:none; color:var(--ink-dim);
+    transition:color .2s ease;
+  }
+  .nav-links a:hover{ color:var(--gold-soft); }
+  .nav-cta{
+    border:1px solid var(--hair-strong);
+    padding:9px 18px;
+    border-radius:2px;
+    font-size:12px;
+    letter-spacing:.08em;
+  }
+  .nav-cta:hover{ border-color:var(--gold); color:var(--gold-soft); }
+  @media (max-width:640px){ .nav-links a:not(.nav-cta){ display:none; } }
+
+  /* ---------- Hero ---------- */
+  .hero{
+    padding-block:96px 72px;
+    text-align:center;
+    position:relative;
+  }
+  .hero .eyebrow{ justify-content:center; margin-inline:auto; }
+  .hero .eyebrow::before{ display:none; }
+  .hero h1{
+    margin-top:22px;
+    font-size:clamp(40px, 8vw, 92px);
+    letter-spacing:.02em;
+    line-height:1.05;
+  }
+  .hero h1 em{ font-style:italic; color:var(--gold-soft); }
+  .hero p.lead{
+    max-width:560px; margin:26px auto 0;
+    color:var(--ink-dim);
+    font-size:16px;
+  }
+  .hero-stats{
+    margin-top:56px;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    border-top:1px solid var(--hair);
+    border-bottom:1px solid var(--hair);
+  }
+  .hero-stats div{
+    padding:22px 8px;
+    border-left:1px solid var(--hair);
+  }
+  .hero-stats div:first-child{ border-left:none; }
+  .hero-stats .num{
+    font-family:var(--serif);
+    font-size:clamp(24px,4vw,36px);
+    color:var(--gold-soft);
+  }
+  .hero-stats .lbl{
+    margin-top:6px;
+    font-size:11.5px;
+    letter-spacing:.05em;
+    color:var(--ink-faint);
+  }
+
+  /* ---------- Section shell ---------- */
+  section{ padding-block:88px; }
+  section + section{ border-top:1px solid var(--hair); }
+  .section-head{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    gap:24px; margin-bottom:48px; flex-wrap:wrap;
+  }
+  .section-head h2{ font-size:clamp(28px,4vw,44px); margin-top:14px; }
+  .section-note{ max-width:320px; color:var(--ink-dim); font-size:14px; }
+
+  .fade-up{ opacity:0; transform:translateY(18px); transition:opacity .7s ease, transform .7s ease; }
+  .fade-up.in{ opacity:1; transform:none; }
+
+  /* ---------- Story ---------- */
+  .story{ display:grid; gap:40px; grid-template-columns:1fr; }
+  @media (min-width:860px){ .story{ grid-template-columns: 0.9fr 1.1fr; gap:64px; } }
+  .story blockquote{
+    margin:0; font-family:var(--serif); font-style:italic;
+    font-size:clamp(22px,2.6vw,30px); color:var(--ink);
+    line-height:1.5; border-left:2px solid var(--gold);
+    padding-left:24px;
+  }
+  .story .body p{ color:var(--ink-dim); font-size:15px; margin:0 0 16px; }
+  .story .body strong{ color:var(--ink); font-weight:600; }
+
+  /* ---------- Process ---------- */
+  .process{
+    display:grid; gap:1px;
+    background:var(--hair);
+    border:1px solid var(--hair);
+  }
+  @media (min-width:820px){ .process{ grid-template-columns:repeat(3,1fr); } }
+  .process .card{
+    background:var(--bg);
+    padding:34px 28px;
+  }
+  .process .idx{
+    font-family:var(--serif); font-size:15px; color:var(--gold);
+    letter-spacing:.05em;
+  }
+  .process h3{ font-size:22px; margin-top:14px; color:var(--ink); }
+  .process p{ margin-top:12px; font-size:14px; color:var(--ink-dim); }
+
+  /* ---------- Trust ---------- */
+  .trust-grid{
+    display:grid; gap:28px;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  }
+  .trust-card{
+    border:1px solid var(--hair);
+    padding:28px 24px;
+    border-radius:2px;
+    background:linear-gradient(180deg, rgba(255,255,255,.02), transparent);
+    transition:border-color .25s ease, transform .25s ease;
+  }
+  .trust-card:hover{ border-color:var(--hair-strong); transform:translateY(-3px); }
+  .trust-card .glyph{
+    width:34px; height:34px;
+    border:1px solid var(--gold);
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--gold-soft); font-family:var(--serif); font-size:16px;
+    margin-bottom:18px;
+  }
+  .trust-card h3{ font-size:18px; color:var(--ink); font-family:var(--sans); font-weight:600; }
+  .trust-card p{ margin-top:10px; font-size:13.5px; color:var(--ink-dim); }
+
+  /* ---------- Brand marquee ---------- */
+  .marquee-wrap{
+    border-top:1px solid var(--hair); border-bottom:1px solid var(--hair);
+    padding-block:28px;
+    overflow:hidden;
+    white-space:nowrap;
+    -webkit-mask-image:linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    mask-image:linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  }
+  .marquee{
+    display:inline-flex;
+    gap:56px;
+    animation: scroll-left 34s linear infinite;
+  }
+  .marquee span{
+    font-family:var(--serif);
+    font-size:22px;
+    letter-spacing:.03em;
+    color:var(--ink-faint);
+  }
+  .marquee span.acc{ color:var(--gold-soft); }
+  @keyframes scroll-left{ from{ transform:translateX(0);} to{ transform:translateX(-50%);} }
+  @media (prefers-reduced-motion: reduce){ .marquee{ animation:none; } .fade-up{ transition:none; opacity:1; transform:none; } }
+
+  /* ---------- Kids line ---------- */
+  .kids{
+    display:flex; flex-wrap:wrap; gap:32px;
+    align-items:center; justify-content:space-between;
+    border:1px solid var(--hair);
+    padding:40px;
+    border-radius:2px;
+    background:radial-gradient(120% 140% at 0% 0%, rgba(58,95,82,.18), transparent 55%);
+  }
+  .kids .txt{ max-width:520px; }
+  .kids .eyebrow{ margin-bottom:12px; }
+  .kids h3{ font-size:clamp(24px,3vw,32px); color:var(--ink); }
+  .kids p{ margin-top:12px; color:var(--ink-dim); font-size:14.5px; }
+  .kids a.btn{
+    white-space:nowrap;
+    border:1px solid var(--gold);
+    color:var(--gold-soft);
+    padding:13px 26px;
+    text-decoration:none;
+    font-size:13px; letter-spacing:.08em;
+    border-radius:2px;
+    transition:background .2s ease, color .2s ease;
+  }
+  .kids a.btn:hover{ background:var(--gold); color:#141207; }
+
+  /* ---------- CTA / contact ---------- */
+  .cta{ text-align:center; padding-block:104px; }
+  .cta h2{ font-size:clamp(30px,5vw,54px); }
+  .cta p{ color:var(--ink-dim); max-width:480px; margin:18px auto 36px; font-size:15px; }
+  .cta-links{ display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
+  .cta-links a{
+    text-decoration:none;
+    border:1px solid var(--hair-strong);
+    padding:14px 28px;
+    font-size:13px; letter-spacing:.08em;
+    border-radius:2px;
+    transition:all .2s ease;
+  }
+  .cta-links a.primary{ background:var(--gold); border-color:var(--gold); color:#141207; }
+  .cta-links a.primary:hover{ background:var(--gold-soft); border-color:var(--gold-soft); }
+  .cta-links a:not(.primary):hover{ border-color:var(--gold); color:var(--gold-soft); }
+
+  /* ---------- Footer ---------- */
+  footer{
+    border-top:1px solid var(--hair);
+    padding-block:32px;
+  }
+  .foot-row{
+    display:flex; justify-content:space-between; align-items:center;
+    flex-wrap:wrap; gap:12px;
+    font-size:12px; color:var(--ink-faint);
+  }
+  .foot-row a{ color:var(--ink-faint); text-decoration:none; }
+  .foot-row a:hover{ color:var(--gold-soft); }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap nav">
+    <a class="wordmark" href="#top"><b>BUY</b>EST</a>
+    <nav class="nav-links">
+      <a href="#story">브랜드 스토리</a>
+      <a href="#process">소싱 방식</a>
+      <a href="#trust">신뢰와 보증</a>
+      <a href="#kids">BUYEST KIDS</a>
+      <a class="nav-cta" href="https://www.buyest.co.kr/" target="_blank" rel="noopener">쇼핑몰 바로가기</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero wrap">
+    <div class="eyebrow">SINCE 2011 · ITALY DIRECT IMPORT</div>
+    <h1 class="fade-up in">이탈리아의 안목을,<br><em>정품 그대로</em> 당신에게</h1>
+    <p class="lead">바이스트(BUYEST)는 이탈리아 부티크 100여 곳과의 직접 파트너십을 바탕으로 140여 개 명품 브랜드를 정품으로 큐레이션하는 명품 편집숍입니다.</p>
+
+    <div class="hero-stats fade-up">
+      <div>
+        <div class="num">2011</div>
+        <div class="lbl">SINCE · 업력</div>
+      </div>
+      <div>
+        <div class="num">140+</div>
+        <div class="lbl">큐레이션 브랜드</div>
+      </div>
+      <div>
+        <div class="num">100+</div>
+        <div class="lbl">이탈리아 파트너 부티크</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="story" class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">OUR STORY</div>
+        <h2>2011년부터, 같은 원칙으로</h2>
+      </div>
+      <p class="section-note">유행보다 먼저 본 것은 '진짜'였습니다. 바이스트는 창립 이래 정품 소싱과 직접 재고 보유라는 원칙을 지켜왔습니다.</p>
+    </div>
+
+    <div class="story">
+      <blockquote class="fade-up">“좋은 물건을, 의심할 필요 없이.”</blockquote>
+      <div class="body fade-up">
+        <p>바이스트는 2011년 문을 연 이래, <strong>이탈리아 현지 부티크와의 직접 거래</strong>를 통해 상품을 소싱해 왔습니다. 국내 대부분의 편집숍이 위탁이나 병행 유통에 의존할 때, 바이스트는 <strong>전 상품을 직접 매입해 재고로 보유</strong>하는 방식을 고수했고, 이는 지금까지도 배송 속도와 정품 신뢰도의 근간이 되고 있습니다.</p>
+        <p>디스퀘어드투(DSQUARED2), 돌체앤가바나(Dolce&amp;Gabbana), 디올 옴므(Dior Homme), 디젤(Diesel), 누디진(Nudie Jeans), 스톤아일랜드(Stone Island)를 비롯한 <strong>140여 개 브랜드</strong>가 바이스트의 큐레이션 안에서 한 곳에 모입니다.</p>
+        <p>브랜드가 늘어나는 동안에도 바꾸지 않은 것은 하나, <strong>진짜만 판다</strong>는 원칙입니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="process" class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">HOW WE SOURCE</div>
+        <h2>세 갈래로 확보하는 물량</h2>
+      </div>
+      <p class="section-note">바이스트의 상품 소싱은 세 가지 경로로 이루어지며, 이는 곧 폭넓은 브랜드 구성과 안정적인 재고 확보로 이어집니다.</p>
+    </div>
+
+    <div class="process fade-up">
+      <div class="card">
+        <div class="idx">01</div>
+        <h3>이탈리아 부티크 파트너십</h3>
+        <p>이탈리아 현지 부티크 100여 곳과 직접 파트너십을 맺고, 시즌마다 검증된 상품을 소싱합니다.</p>
+      </div>
+      <div class="card">
+        <div class="idx">02</div>
+        <h3>PRE-ORDER · STOCK LIST B2B</h3>
+        <p>프리오더 및 스톡리스트 기반 B2B 플랫폼을 통해 다양한 브랜드의 물량을 선제적으로 확보합니다.</p>
+      </div>
+      <div class="card">
+        <div class="idx">03</div>
+        <h3>국내 유통망 협업</h3>
+        <p>국내 대기업 유통망과의 협업으로 오픈마켓 및 디자이너 브랜드까지 폭넓게 확장했습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="trust" class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">TRUST &amp; GUARANTEE</div>
+        <h2>의심 없는 쇼핑을 위해</h2>
+      </div>
+    </div>
+
+    <div class="trust-grid">
+      <div class="trust-card fade-up">
+        <div class="glyph">100</div>
+        <h3>100% 정품 보증</h3>
+        <p>전 상품을 직접 매입·보유하며, 유통 경로를 투명하게 관리해 정품만을 판매합니다.</p>
+      </div>
+      <div class="trust-card fade-up">
+        <div class="glyph">D</div>
+        <h3>당일 발송</h3>
+        <p>모든 상품을 자체 재고로 보유하기 때문에, 평일 오후 4시 이전 주문 건은 원칙적으로 당일 발송됩니다.</p>
+      </div>
+      <div class="trust-card fade-up">
+        <div class="glyph">R</div>
+        <h3>가품 피해 구제</h3>
+        <p>혹시 모를 가품 피해에 대해서도 별도의 신청 절차를 마련해 고객 보호를 최우선으로 합니다.</p>
+      </div>
+      <div class="trust-card fade-up">
+        <div class="glyph">C</div>
+        <h3>큐레이션 안목</h3>
+        <p>수많은 브랜드 중 바이스트의 기준을 통과한 상품만이 매대에 오릅니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="marquee-wrap" aria-hidden="true">
+    <div class="marquee">
+      <span class="acc">DSQUARED2</span><span>·</span>
+      <span>DOLCE&amp;GABBANA</span><span>·</span>
+      <span class="acc">DIOR HOMME</span><span>·</span>
+      <span>DIESEL</span><span>·</span>
+      <span class="acc">STONE ISLAND</span><span>·</span>
+      <span>NUDIE JEANS</span><span>·</span>
+      <span class="acc">AND 140+ MORE</span><span>·</span>
+      <span>DSQUARED2</span><span>·</span>
+      <span class="acc">DOLCE&amp;GABBANA</span><span>·</span>
+      <span>DIOR HOMME</span><span>·</span>
+      <span class="acc">DIESEL</span><span>·</span>
+      <span>STONE ISLAND</span><span>·</span>
+      <span class="acc">NUDIE JEANS</span><span>·</span>
+      <span>AND 140+ MORE</span><span>·</span>
+    </div>
+  </div>
+
+  <section id="kids" class="wrap">
+    <div class="kids fade-up">
+      <div class="txt">
+        <div class="eyebrow">FAMILY BRAND</div>
+        <h3>BUYEST KIDS</h3>
+        <p>바이스트의 정품 소싱 노하우는 아이들의 옷장으로도 이어집니다. 같은 신뢰, 더 작은 사이즈로 만나보세요.</p>
+      </div>
+      <a class="btn" href="https://buyestkids.com/" target="_blank" rel="noopener">BUYEST KIDS 방문하기 →</a>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="wrap">
+      <div class="eyebrow" style="justify-content:center; margin-bottom:0;">VISIT US</div>
+      <h2 style="margin-top:18px;">진짜를 확인하러 가는 길</h2>
+      <p>바이스트의 정품 큐레이션은 자사몰과 SNS 채널에서 매일 업데이트됩니다.</p>
+      <div class="cta-links">
+        <a class="primary" href="https://www.buyest.co.kr/" target="_blank" rel="noopener">BUYEST 쇼핑몰</a>
+        <a href="https://www.instagram.com/buyest_official/" target="_blank" rel="noopener">Instagram @buyest_official</a>
+        <a href="https://x.com/BUYEST" target="_blank" rel="noopener">X @BUYEST</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-row">
+    <span>&copy; <span id="year"></span> BUYEST. Since 2011.</span>
+    <span>
+      <a href="https://www.buyest.co.kr/" target="_blank" rel="noopener">buyest.co.kr</a>
+      &nbsp;·&nbsp;
+      <a href="https://buyestkids.com/" target="_blank" rel="noopener">buyestkids.com</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.fade-up').forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>
