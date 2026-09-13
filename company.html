@@ -70,6 +70,23 @@
 
   h1,h2,h3{ margin:0; font-family:var(--serif); font-weight:500; text-wrap:balance; }
 
+  .icon{ width:22px; height:22px; display:block; }
+
+  .section-num{
+    position:absolute;
+    top:-.35em; right:24px;
+    font-family:var(--serif);
+    font-size:clamp(90px,11vw,168px);
+    line-height:1;
+    color:transparent;
+    -webkit-text-stroke:1px var(--hair-strong);
+    z-index:-1;
+    pointer-events:none;
+    user-select:none;
+  }
+  @media (min-width:720px){ .section-num{ right:48px; } }
+  section{ position:relative; }
+
   /* ---------- Nav ---------- */
   header.site{
     position:sticky; top:0; z-index:40;
@@ -112,6 +129,31 @@
     text-align:center;
     position:relative;
   }
+  .hero::before{
+    content:"BUYEST";
+    position:absolute;
+    top:38%; left:50%;
+    transform:translate(-50%,-50%);
+    font-family:var(--display);
+    font-size:clamp(120px,26vw,420px);
+    letter-spacing:.04em;
+    color:transparent;
+    -webkit-text-stroke:1px rgba(230,222,201,.07);
+    white-space:nowrap;
+    z-index:-1;
+    pointer-events:none;
+    user-select:none;
+  }
+  .frame{
+    position:absolute; inset:14px;
+    z-index:-1;
+    pointer-events:none;
+  }
+  .frame i{ position:absolute; width:22px; height:22px; border:1px solid var(--hair-strong); }
+  .frame i:nth-child(1){ top:0; left:0; border-width:1px 0 0 1px; }
+  .frame i:nth-child(2){ top:0; right:0; border-width:1px 1px 0 0; }
+  .frame i:nth-child(3){ bottom:0; left:0; border-width:0 0 1px 1px; }
+  .frame i:nth-child(4){ bottom:0; right:0; border-width:0 1px 1px 0; }
   .hero .eyebrow{ justify-content:center; margin-inline:auto; }
   .hero .eyebrow::before{ display:none; }
   .hero h1{
@@ -174,6 +216,14 @@
   }
   .story .body p{ color:var(--ink-dim); font-size:15px; margin:0 0 16px; }
   .story .body strong{ color:var(--ink); font-weight:600; }
+  .story .body p.lede::first-letter{
+    font-family:var(--serif);
+    font-size:3.4em;
+    float:left;
+    line-height:.78;
+    padding:.03em .09em 0 0;
+    color:var(--gold-soft);
+  }
 
   /* ---------- Process ---------- */
   .process{
@@ -238,6 +288,7 @@
     color:var(--ink-faint);
   }
   .marquee span.acc{ color:var(--gold-soft); }
+  .marquee span.sep{ color:var(--gold); font-size:12px; transform:translateY(-2px); display:inline-block; }
   @keyframes scroll-left{ from{ transform:translateX(0);} to{ transform:translateX(-50%);} }
   @media (prefers-reduced-motion: reduce){ .marquee{ animation:none; } .fade-up{ transition:none; opacity:1; transform:none; } }
 
@@ -315,6 +366,7 @@
 <main id="top">
 
   <section class="hero wrap">
+    <div class="frame"><i></i><i></i><i></i><i></i></div>
     <div class="eyebrow">SINCE 2011 · ITALY DIRECT IMPORT</div>
     <h1 class="fade-up in">이탈리아의 안목을,<br><em>정품 그대로</em> 당신에게</h1>
     <p class="lead">바이스트(BUYEST)는 이탈리아 부티크 100여 곳과의 직접 파트너십을 바탕으로 140여 개 명품 브랜드를 정품으로 큐레이션하는 명품 편집숍입니다.</p>
@@ -336,6 +388,7 @@
   </section>
 
   <section id="story" class="wrap">
+    <div class="section-num" aria-hidden="true">01</div>
     <div class="section-head">
       <div>
         <div class="eyebrow">OUR STORY</div>
@@ -347,7 +400,7 @@
     <div class="story">
       <blockquote class="fade-up">“좋은 물건을, 의심할 필요 없이.”</blockquote>
       <div class="body fade-up">
-        <p>바이스트는 2011년 문을 연 이래, <strong>이탈리아 현지 부티크와의 직접 거래</strong>를 통해 상품을 소싱해 왔습니다. 국내 대부분의 편집숍이 위탁이나 병행 유통에 의존할 때, 바이스트는 <strong>전 상품을 직접 매입해 재고로 보유</strong>하는 방식을 고수했고, 이는 지금까지도 배송 속도와 정품 신뢰도의 근간이 되고 있습니다.</p>
+        <p class="lede">바이스트는 2011년 문을 연 이래, <strong>이탈리아 현지 부티크와의 직접 거래</strong>를 통해 상품을 소싱해 왔습니다. 국내 대부분의 편집숍이 위탁이나 병행 유통에 의존할 때, 바이스트는 <strong>전 상품을 직접 매입해 재고로 보유</strong>하는 방식을 고수했고, 이는 지금까지도 배송 속도와 정품 신뢰도의 근간이 되고 있습니다.</p>
         <p>디스퀘어드투(DSQUARED2), 돌체앤가바나(Dolce&amp;Gabbana), 디올 옴므(Dior Homme), 디젤(Diesel), 누디진(Nudie Jeans), 스톤아일랜드(Stone Island)를 비롯한 <strong>140여 개 브랜드</strong>가 바이스트의 큐레이션 안에서 한 곳에 모입니다.</p>
         <p>브랜드가 늘어나는 동안에도 바꾸지 않은 것은 하나, <strong>진짜만 판다</strong>는 원칙입니다.</p>
       </div>
@@ -355,6 +408,7 @@
   </section>
 
   <section id="process" class="wrap">
+    <div class="section-num" aria-hidden="true">02</div>
     <div class="section-head">
       <div>
         <div class="eyebrow">HOW WE SOURCE</div>
@@ -383,6 +437,7 @@
   </section>
 
   <section id="trust" class="wrap">
+    <div class="section-num" aria-hidden="true">03</div>
     <div class="section-head">
       <div>
         <div class="eyebrow">TRUST &amp; GUARANTEE</div>
@@ -392,22 +447,43 @@
 
     <div class="trust-grid">
       <div class="trust-card fade-up">
-        <div class="glyph">100</div>
+        <div class="glyph">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l7 3v5c0 5-3.2 8.5-7 10-3.8-1.5-7-5-7-10V6l7-3z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </div>
         <h3>100% 정품 보증</h3>
         <p>전 상품을 직접 매입·보유하며, 유통 경로를 투명하게 관리해 정품만을 판매합니다.</p>
       </div>
       <div class="trust-card fade-up">
-        <div class="glyph">D</div>
+        <div class="glyph">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="8.5"/>
+            <path d="M12 7.5V12l3 2"/>
+          </svg>
+        </div>
         <h3>당일 발송</h3>
         <p>모든 상품을 자체 재고로 보유하기 때문에, 평일 오후 4시 이전 주문 건은 원칙적으로 당일 발송됩니다.</p>
       </div>
       <div class="trust-card fade-up">
-        <div class="glyph">R</div>
+        <div class="glyph">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="9" r="5.5"/>
+            <path d="M9 13.5L7 21l5-3 5 3-2-7.5"/>
+          </svg>
+        </div>
         <h3>가품 피해 구제</h3>
         <p>혹시 모를 가품 피해에 대해서도 별도의 신청 절차를 마련해 고객 보호를 최우선으로 합니다.</p>
       </div>
       <div class="trust-card fade-up">
-        <div class="glyph">C</div>
+        <div class="glyph">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9l3-5.5h6L18 9"/>
+            <path d="M3.5 9h17L12 21 3.5 9z"/>
+            <path d="M9 9l3 12 3-12"/>
+          </svg>
+        </div>
         <h3>큐레이션 안목</h3>
         <p>수많은 브랜드 중 바이스트의 기준을 통과한 상품만이 매대에 오릅니다.</p>
       </div>
@@ -416,20 +492,20 @@
 
   <div class="marquee-wrap" aria-hidden="true">
     <div class="marquee">
-      <span class="acc">DSQUARED2</span><span>·</span>
-      <span>DOLCE&amp;GABBANA</span><span>·</span>
-      <span class="acc">DIOR HOMME</span><span>·</span>
-      <span>DIESEL</span><span>·</span>
-      <span class="acc">STONE ISLAND</span><span>·</span>
-      <span>NUDIE JEANS</span><span>·</span>
-      <span class="acc">AND 140+ MORE</span><span>·</span>
-      <span>DSQUARED2</span><span>·</span>
-      <span class="acc">DOLCE&amp;GABBANA</span><span>·</span>
-      <span>DIOR HOMME</span><span>·</span>
-      <span class="acc">DIESEL</span><span>·</span>
-      <span>STONE ISLAND</span><span>·</span>
-      <span class="acc">NUDIE JEANS</span><span>·</span>
-      <span>AND 140+ MORE</span><span>·</span>
+      <span class="acc">DSQUARED2</span><span class="sep">◆</span>
+      <span>DOLCE&amp;GABBANA</span><span class="sep">◆</span>
+      <span class="acc">DIOR HOMME</span><span class="sep">◆</span>
+      <span>DIESEL</span><span class="sep">◆</span>
+      <span class="acc">STONE ISLAND</span><span class="sep">◆</span>
+      <span>NUDIE JEANS</span><span class="sep">◆</span>
+      <span class="acc">AND 140+ MORE</span><span class="sep">◆</span>
+      <span>DSQUARED2</span><span class="sep">◆</span>
+      <span class="acc">DOLCE&amp;GABBANA</span><span class="sep">◆</span>
+      <span>DIOR HOMME</span><span class="sep">◆</span>
+      <span class="acc">DIESEL</span><span class="sep">◆</span>
+      <span>STONE ISLAND</span><span class="sep">◆</span>
+      <span class="acc">NUDIE JEANS</span><span class="sep">◆</span>
+      <span>AND 140+ MORE</span><span class="sep">◆</span>
     </div>
   </div>
 
