@@ -606,15 +606,15 @@
   .me-cal-cell.sun .d{ color:var(--danger); } .me-cal-cell.sat .d{ color:#2E6FA3; }
   .me-cal-cell.today.sun .d, .me-cal-cell.today.sat .d{ color:var(--accent-ink); }
   .me-cal-evs{ display:flex; flex-direction:column; gap:3px; min-height:0; }
-  .me-cal-ev{ display:flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; line-height:1.5;
-    border-radius:6px; padding:3px 7px 3px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  .me-cal-ev{ display:flex; align-items:flex-start; gap:5px; font-size:11.5px; font-weight:700; line-height:1.45;
+    border-radius:6px; padding:3px 7px 3px 8px; cursor:help;
     border-left:3px solid currentColor; }
-  .me-cal-ev .t{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .me-cal-ev .t{ flex:1 1 auto; min-width:0; width:100%; word-break:break-word; overflow-wrap:anywhere; white-space:normal; }
   .me-cal-more{ font-size:10.5px; font-weight:800; color:var(--accent); background:var(--accent-soft); border-radius:999px;
-    padding:2px 8px; margin-top:4px; align-self:flex-start; }
+    padding:2px 8px; margin-top:4px; align-self:flex-start; cursor:help; }
   .me-cal-cell .del{ flex:none; margin-left:auto; border:none; background:none; color:inherit; opacity:0; font-size:13px; line-height:1; cursor:pointer; }
   .me-cal-ev:hover .del{ opacity:.85; }
-  @media (max-width:640px){ .me-cal-cell{ min-height:auto; } .me-cal-ev .t{ max-width:9ch; } }
+  @media (max-width:640px){ .me-cal-cell{ min-height:auto; } }
 
   /* 도구 그리드 */
   .me-toolgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
@@ -2015,7 +2015,11 @@ else if (typeof exports === 'object')
 
     function loadTasks(){
       api('task_list').then(function(res){
-        if(res && res.ok){ tasks = res.items || []; renderTasks(); }
+        if(res && res.ok){
+          // 서버(mysqli)가 done을 문자열 "0"/"1"로 내려줄 수 있어 !!t.done이 "0"도 true로 오판했음 — 명시적으로 불리언화
+          tasks = (res.items || []).map(function(t){ t.done = (t.done === true || t.done === 1 || t.done === '1'); return t; });
+          renderTasks();
+        }
       }).catch(function(){});
     }
 
@@ -2299,6 +2303,7 @@ else if (typeof exports === 'object')
         its.slice(0, 3).forEach(function(it){
           var ev = document.createElement('span'); ev.className = 'me-cal-ev'; ev.style.color = evColor(it.kind);
           ev.style.background = 'var(--k-' + it.kind + '-bg)';
+          ev.title = '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title;
           var t = document.createElement('span'); t.className='t'; t.textContent = it.title;
           ev.appendChild(t);
           if(it.author === (AUTH && AUTH.id) || IS_ADMIN){
@@ -2308,7 +2313,11 @@ else if (typeof exports === 'object')
           }
           evsBox.appendChild(ev);
         });
-        if(its.length > 3){ var m = document.createElement('div'); m.className='me-cal-more'; m.textContent = '+' + (its.length-3) + '개 더보기'; cell.appendChild(m); }
+        if(its.length > 3){
+          var m = document.createElement('div'); m.className='me-cal-more'; m.textContent = '+' + (its.length-3) + '개 더보기';
+          m.title = its.slice(3).map(function(it){ return '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title; }).join('\n');
+          cell.appendChild(m);
+        }
         cell.addEventListener('click', (function(x){ return function(){ openCalPanel(x); }; })(ds));
         calGrid.appendChild(cell);
       }
