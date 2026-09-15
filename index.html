@@ -132,7 +132,9 @@
   }
   .nav-item:hover{ background:var(--surface-2); }
   .nav-item.active{ background:var(--accent-soft); color:var(--accent); font-weight:600; border-color:var(--accent-soft);}
-  .nav-item .ic{ width:18px; text-align:center; flex:none; font-size:14px; }
+  .nav-item .ic{ width:26px; height:26px; border-radius:8px; flex:none; display:flex; align-items:center; justify-content:center;
+    background:var(--surface-2); color:var(--ink-muted); transition:background .15s ease, color .15s ease; }
+  .nav-item .ic svg{ width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   .nav-item .chip{ margin-left:auto; }
 
   .chip{
@@ -451,12 +453,34 @@
   .nav-item:hover{ background:var(--side-2); color:#F1F0EA; }
   .nav-item.active{ background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
   .nav-item.active .chip{ background:rgba(255,255,255,.18); color:#fff; }
+  .nav-item.active .ic{ background:rgba(255,255,255,.22); color:#fff; }
   .sidebar .chip-ready{ background:rgba(111,203,128,.14); color:#84C98A; }
   .sidebar .chip-soon{ background:rgba(255,255,255,.08); color:var(--side-mut); }
   .sidebar-foot{ border-top-color:var(--side-line); color:var(--side-mut); }
-  .side-tag{ margin-top:auto; padding:16px 14px 14px; border-radius:12px; background:linear-gradient(160deg,#2C3A34,#232A26); color:#CFD3CB; }
-  .side-tag b{ display:block; font-size:12px; font-weight:600; color:#EDECE4; line-height:1.5; margin-bottom:8px; }
-  .side-tag span{ font-size:9.5px; letter-spacing:.14em; color:#8A9088; }
+
+  /* 아이콘 칩 색상 순환 — 목록이 전부 같은 아이콘처럼 보이지 않도록 */
+  .nav-item:nth-of-type(6n+1) .ic{ background:rgba(111,203,128,.16); color:#8FD9A0; }
+  .nav-item:nth-of-type(6n+2) .ic{ background:rgba(110,170,221,.16); color:#8FC0E8; }
+  .nav-item:nth-of-type(6n+3) .ic{ background:rgba(170,140,221,.16); color:#C3A8EE; }
+  .nav-item:nth-of-type(6n+4) .ic{ background:rgba(230,150,90,.16); color:#F0B27E; }
+  .nav-item:nth-of-type(6n+5) .ic{ background:rgba(220,110,150,.16); color:#F0A0C0; }
+  .nav-item:nth-of-type(6n) .ic{ background:rgba(220,170,70,.16); color:#F0C878; }
+  .nav-item[data-nav="roadmap"] .ic{ background:rgba(255,255,255,.06); color:var(--side-mut); }
+  .nav-item.active .ic{ background:rgba(255,255,255,.22) !important; color:#fff !important; }
+
+  .side-tag{ margin-top:auto; display:flex; align-items:center; gap:10px; padding:13px 13px;
+    border-radius:14px; background:linear-gradient(165deg,#FFFDF8,#F1EDDF); color:var(--ink);
+    box-shadow:0 10px 22px -12px rgba(0,0,0,.4); }
+  .side-tag .side-ic{ flex:none; width:30px; height:30px; border-radius:10px; background:var(--accent-soft);
+    color:var(--accent); display:flex; align-items:center; justify-content:center; }
+  .side-tag .side-ic svg{ width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .side-tag b{ flex:1; display:block; font-size:11px; font-weight:700; color:var(--ink); line-height:1.45; }
+  .side-tag .arrow{ flex:none; font-size:15px; color:var(--accent); }
+  .side-brand{ display:flex; align-items:center; gap:8px; padding:3px 3px 0; }
+  .side-brand .mark{ width:21px; height:21px; border-radius:7px; background:var(--accent); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:10.5px; font-weight:800; flex:none; }
+  .side-brand strong{ display:block; font-size:10px; font-weight:800; letter-spacing:.05em; color:#D8D5C8; }
+  .side-brand small{ display:block; font-size:8px; letter-spacing:.09em; color:var(--side-mut); text-transform:uppercase; }
 
   /* ===== 상단바 ===== */
   .topbar{ gap:14px; }
@@ -476,24 +500,34 @@
 
   /* ===== 히어로 배너 ===== */
   .me-herorow{ display:flex; gap:16px; margin-bottom:20px; }
-  .me-hero{ flex:1 1 auto; position:relative; overflow:hidden; border-radius:18px; padding:34px 34px 32px;
-    background:linear-gradient(115deg,#EEEBE2 0%,#E4E8E0 60%,#DDE4DD 100%); box-shadow:var(--me-shadow); }
-  .me-hero::after{ content:"PEOPLE · BRANDS · GROW TOGETHER"; position:absolute; right:26px; bottom:14px;
-    font-size:11px; font-weight:700; letter-spacing:.16em; color:var(--accent); opacity:.4; }
-  .me-hero h1{ margin:0 0 8px; font-size:25px; font-weight:700; letter-spacing:-.02em; color:var(--ink); }
-  .me-hero p{ margin:0; font-size:13.5px; color:#5A5F55; }
-  .me-quote-card{ flex:none; width:250px; border-radius:18px; padding:22px 22px 20px; background:var(--side); color:#E7E7DF; box-shadow:var(--me-shadow);
-    display:flex; flex-direction:column; justify-content:center; }
-  .me-quote-card .q{ font-size:14px; font-weight:600; line-height:1.6; letter-spacing:-.01em; }
-  .me-quote-card .by{ margin-top:12px; font-size:11px; font-weight:700; letter-spacing:.14em; color:#8FB3A6; }
-  @media (max-width:1040px){ .me-herorow{ flex-direction:column; } .me-quote-card{ width:auto; } }
+  .me-hero{
+    flex:1 1 auto; position:relative; overflow:hidden; border-radius:20px; padding:34px 38px;
+    min-height:176px; display:flex; flex-direction:column; justify-content:center;
+    background:
+      radial-gradient(125% 150% at 88% -25%, rgba(255,203,138,.32), transparent 55%),
+      radial-gradient(85% 120% at 4% 120%, rgba(129,206,145,.22), transparent 60%),
+      radial-gradient(65% 95% at 105% 105%, rgba(47,93,83,.65), transparent 65%),
+      linear-gradient(128deg,#141F1B 0%,#1C2B24 45%,#25392C 100%);
+    box-shadow:var(--me-shadow-hi);
+  }
+  .me-hero::before{
+    content:""; position:absolute; inset:0; opacity:.5; mix-blend-mode:overlay; pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .me-hero::after{ content:"PEOPLE · BRANDS · GROW TOGETHER"; position:absolute; left:38px; bottom:14px;
+    font-size:10px; font-weight:700; letter-spacing:.2em; color:#F4F0E4; opacity:.38; }
+  .me-hero h1{ position:relative; margin:0 0 9px; font-size:26px; font-weight:700; letter-spacing:-.02em; color:#F8F6EC; }
+  .me-hero p{ position:relative; margin:0; font-size:13.5px; color:rgba(231,231,221,.74); max-width:48ch; }
+  .me-hero-text{ position:relative; padding-bottom:22px; }
 
   body.me-in .hero{ display:none; }
   body.me-in #dashCatalog{ display:none; }
   body.me-in .content{ max-width:1280px; }
   body.me-in .topbar-title{ display:none; }
 
-  .me-hero .me-sync{ position:absolute; top:16px; right:18px; font-size:11px; font-weight:500; color:#6A6F64; background:rgba(255,255,255,.55); border-radius:999px; padding:4px 11px; white-space:nowrap; }
+  .me-hero .me-sync{ position:absolute; top:16px; right:18px; z-index:1; font-size:11px; font-weight:500; color:#F3EFE3;
+    background:rgba(255,255,255,.14); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.14);
+    border-radius:999px; padding:4px 11px; white-space:nowrap; }
   .me-hero .me-sync:empty{ display:none; }
   .me-pwform{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
   .me-pwform strong{ font-size:13px; }
@@ -582,10 +616,45 @@
   .me-toolgrid button:hover{ border-color:var(--accent); box-shadow:var(--me-shadow); }
   .me-toolgrid button .nm{ font-size:13px; font-weight:600; color:var(--ink); }
   .me-toolgrid button .bd{ font-size:10.5px; font-weight:600; color:var(--success); background:var(--success-soft); border-radius:999px; padding:1px 7px; }
-  .me-toolgrid .empty{ grid-column:1/-1; font-size:12.5px; color:var(--ink-muted); padding:6px; }
+  .me-toolgrid .empty{ grid-column:1/-1; display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--ink-muted);
+    padding:16px 16px; border:1.5px dashed var(--border); border-radius:12px; background:var(--surface-2); }
+  .me-toolgrid .empty::before{ content:"✦"; font-size:14px; color:var(--accent); flex:none; }
   .me-opts{ display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:14px; padding-top:14px; border-top:1px solid var(--surface-2); font-size:12.5px; }
   .me-opts label{ display:flex; align-items:center; gap:7px; cursor:pointer; }
   .me-opts input{ width:14px; height:14px; accent-color:var(--accent); }
+
+  /* 오늘의 할일 */
+  .me-task-form{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .me-task-form input[type=text]{ flex:1 1 220px; min-width:0; height:36px; padding:0 12px; border:1px solid var(--border); border-radius:9px; font:inherit; font-size:13px; background:var(--surface); color:var(--ink); }
+  .me-task-form select, .me-task-form input[type=date]{ height:36px; padding:0 9px; border:1px solid var(--border); border-radius:9px; font:inherit; font-size:12.5px; background:var(--surface); color:var(--ink); flex:none; }
+  .me-task-form button{ display:flex; align-items:center; gap:6px; flex:none; }
+  .me-task-form button svg{ width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  @media (max-width:560px){ .me-task-form select, .me-task-form input[type=date]{ flex:1 1 46%; } }
+
+  .me-task-tabs{ display:flex; gap:6px; margin-bottom:10px; }
+  .me-task-tabs button{ padding:6px 13px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--ink-muted); font:inherit; font-size:12px; font-weight:600; cursor:pointer; }
+  .me-task-tabs button.on{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  .me-task-tabs button:hover:not(.on){ border-color:var(--accent); color:var(--accent); }
+
+  .me-tasklist{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .me-tasklist li{ display:flex; align-items:center; gap:9px; padding:9px 8px; border-radius:9px; font-size:13.5px; flex-wrap:wrap; }
+  .me-tasklist li:hover{ background:var(--surface-2); }
+  .me-tasklist li input[type=checkbox]{ width:16px; height:16px; accent-color:var(--accent); flex:none; cursor:pointer; }
+  .me-tasklist .prio{ width:7px; height:7px; border-radius:50%; flex:none; }
+  .me-tasklist .prio.high{ background:var(--danger); }
+  .me-tasklist .prio.normal{ background:var(--warning); }
+  .me-tasklist .prio.low{ background:var(--ink-muted); }
+  .me-tasklist .txt{ flex:1 1 120px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .me-tasklist li.done .txt{ text-decoration:line-through; color:var(--ink-muted); }
+  .me-tasklist .due{ flex:none; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; background:var(--surface-2); color:var(--ink-muted); }
+  .me-tasklist .due.today{ background:var(--accent-soft); color:var(--accent); }
+  .me-tasklist .due.overdue{ background:var(--danger-soft); color:var(--danger); }
+  .me-tasklist .who{ flex:none; display:flex; align-items:center; gap:3px; font-size:10.5px; font-weight:600; color:var(--ink-muted); background:var(--surface-2); padding:2px 8px; border-radius:999px; }
+  .me-tasklist .who svg{ width:10px; height:10px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .me-tasklist .x{ flex:none; border:none; background:none; color:var(--ink-muted); font-size:15px; line-height:1; cursor:pointer; opacity:0; padding:2px; }
+  .me-tasklist li:hover .x{ opacity:1; }
+  .me-tasklist .empty{ padding:16px 8px; font-size:12.5px; color:var(--ink-muted); display:flex; align-items:center; gap:8px; }
+  .me-tasklist .empty::before{ content:"✓"; color:var(--accent); font-weight:700; }
 
   /* 우측 레일 */
   .me-quote{ background:var(--accent-soft); border-radius:14px; padding:16px 18px; font-size:13px; font-style:italic; color:var(--ink); line-height:1.55; }
@@ -654,37 +723,87 @@
 
     <nav class="nav-group">
       <span class="nav-group-label">홈</span>
-      <button class="nav-item" data-nav="dashboard"><span class="ic">&#9679;</span>대시보드</button>
+      <button class="nav-item" data-nav="dashboard">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h5v-5h2v5h5v-9"/></svg></span>
+        대시보드
+      </button>
     </nav>
 
     <nav class="nav-group">
       <span class="nav-group-label">재고 · 발주</span>
-      <button class="nav-item" data-nav="inventory"><span class="ic">&#8942;</span>재고 세로변환<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="stockAddConvert"><span class="ic">&#8942;</span>재고추가변환<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="sabangEcount"><span class="ic">&#8942;</span>사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="stockMove"><span class="ic">&#8942;</span>MD 품절<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="buyestSoldOut"><span class="ic">&#8942;</span>바이스트사이트 품절<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="seasonSoldOut"><span class="ic">&#8942;</span>바이스트사이트 시즌품절<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="stockMismatch"><span class="ic">&#8942;</span>이카운트-사이트 재고 불일치 확인<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="icm"><span class="ic">&#8942;</span>이카운트 -송장 재고매칭 (CS)<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="stocktake"><span class="ic">&#8942;</span>재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span></button>
-      <button class="nav-item" data-nav="orderStock"><span class="ic">&#8942;</span>주문서 창고위치찾기<span class="chip chip-ready">사용가능</span></button>
+      <button class="nav-item" data-nav="inventory">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M8 4v16"/><path d="M16 4v16"/><path d="m5 9 3-3 3 3"/><path d="m21 15-3 3-3-3"/></svg></span>
+        재고 세로변환<span class="chip chip-ready">사용가능</span>
+      </button>
+      <button class="nav-item" data-nav="stockAddConvert">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="m12 3-8 4 8 4 8-4-8-4Z"/><path d="m4 12 8 4 8-4"/><path d="M12 17v4M10 19h4"/></svg></span>
+        재고추가변환<span class="chip chip-ready">사용가능</span>
+      </button>
+      <button class="nav-item" data-nav="sabangEcount">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 15a4 4 0 0 1 0-6h2"/><path d="M15 9a4 4 0 0 1 0 6h-2"/><path d="M9 12h6"/></svg></span>
+        사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span>
+      </button>
+      <button class="nav-item" data-nav="stockMove">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M12.6 3H20a1 1 0 0 1 1 1v7.4a1 1 0 0 1-.29.7l-8.3 8.3a1 1 0 0 1-1.42 0l-7.4-7.4a1 1 0 0 1 0-1.42l8.3-8.3a1 1 0 0 1 .71-.28Z"/><circle cx="16" cy="8" r="1.3"/></svg></span>
+        MD 품절<span class="chip chip-ready">사용가능</span>
+      </button>
+      <button class="nav-item" data-nav="buyestSoldOut">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
+        바이스트사이트 품절<span class="chip chip-ready">사용가능</span>
+      </button>
+      <button class="nav-item" data-nav="seasonSoldOut">
+        <span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8 3v4M16 3v4"/></svg></span>
+        바이스트사이트 시즌품절<span class="chip chip-ready">사용가능</span>
+      </button>
+      <button class="nav-item" data-nav="stockMismatch">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M8 4 4 8l4 4"/><path d="M4 8h9"/><path d="m16 20 4-4-4-4"/><path d="M20 16h-9"/></svg></span>
+        이카운트-사이트 재고 불일치 확인<span class="chip chip-ready">사용가능</span>
+      </button>
+      <button class="nav-item" data-nav="icm">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg></span>
+        이카운트 -송장 재고매칭 (CS)<span class="chip chip-ready">사용가능</span>
+      </button>
+      <button class="nav-item" data-nav="stocktake">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5v14M8 5v14M11.5 5v14M15 5v14M18.5 5v14"/></svg></span>
+        재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span>
+      </button>
+      <button class="nav-item" data-nav="orderStock">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/></svg></span>
+        주문서 창고위치찾기<span class="chip chip-ready">사용가능</span>
+      </button>
     </nav>
 
     <nav class="nav-group">
       <span class="nav-group-label">문서 변환</span>
-      <button class="nav-item" data-nav="invoice"><span class="ic">&#8618;</span>인보이스 자동인식<span class="chip chip-ready">사용가능</span></button>
+      <button class="nav-item" data-nav="invoice">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/><path d="M9.5 12.5h5M9.5 16h5"/></svg></span>
+        인보이스 자동인식<span class="chip chip-ready">사용가능</span>
+      </button>
     </nav>
 
     <nav class="nav-group">
       <span class="nav-group-label">개발 예정</span>
-      <button class="nav-item" data-nav="roadmap" data-roadmap-target="rm-brand"><span class="ic">&#9675;</span>브랜드 매칭<span class="chip chip-soon">준비중</span></button>
-      <button class="nav-item" data-nav="roadmap" data-roadmap-target="rm-naver"><span class="ic">&#9675;</span>네이버 가격비교<span class="chip chip-soon">준비중</span></button>
+      <button class="nav-item" data-nav="roadmap" data-roadmap-target="rm-brand">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M12.6 3H20a1 1 0 0 1 1 1v7.4a1 1 0 0 1-.29.7l-8.3 8.3a1 1 0 0 1-1.42 0l-7.4-7.4a1 1 0 0 1 0-1.42l8.3-8.3a1 1 0 0 1 .71-.28Z"/><circle cx="16" cy="8" r="1.3"/></svg></span>
+        브랜드 매칭<span class="chip chip-soon">준비중</span>
+      </button>
+      <button class="nav-item" data-nav="roadmap" data-roadmap-target="rm-naver">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 19v-6"/><path d="M12 19V9"/><path d="M16 19v-3"/></svg></span>
+        네이버 가격비교<span class="chip chip-soon">준비중</span>
+      </button>
     </nav>
 
     <div class="side-tag">
-      <b>좋은 브랜드가<br>더 나은 일상을 만듭니다.</b>
-      <span>FOR A BETTER TOMORROW</span>
+      <span class="side-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg></span>
+      <b>더 편리한 업무를 위해<br>지속적으로 개선하고 있어요.</b>
+      <span class="arrow" aria-hidden="true">&#8594;</span>
+    </div>
+    <div class="side-brand">
+      <span class="mark">B</span>
+      <div>
+        <strong>BUYEST</strong>
+        <small>Better Tools, Better Tomorrow</small>
+      </div>
     </div>
   </aside>
 
@@ -743,12 +862,10 @@
             <div class="me-herorow">
               <div class="me-hero">
                 <span class="me-sync" id="meSync"></span>
-                <h1 id="meGreetH1">안녕하세요 👋</h1>
-                <p id="meGreetP">오늘도 BUYEST와 함께, 더 특별한 가치를 만들어가요.</p>
-              </div>
-              <div class="me-quote-card">
-                <div class="q">좋은 사람들이<br>좋은 브랜드를 만듭니다.</div>
-                <div class="by">— BUYEST</div>
+                <div class="me-hero-text">
+                  <h1 id="meGreetH1">안녕하세요 👋</h1>
+                  <p id="meGreetP">오늘도 BUYEST와 함께, 더 특별한 가치를 만들어가요.</p>
+                </div>
               </div>
             </div>
 
@@ -774,6 +891,44 @@
                   <div id="meAdminList" class="me-adminlist"></div>
                 </div>
 
+                <div class="me-panel me-tasks">
+                  <div class="me-panel-h">
+                    <div><h3>오늘의 할일</h3><p>체크하고, 필요하면 동료나 대표님께 바로 보내세요.</p></div>
+                    <span id="meTaskCount" class="me-badge"></span>
+                  </div>
+
+                  <form id="meTaskForm" class="me-task-form">
+                    <input type="text" id="meTaskTitle" maxlength="100" placeholder="할 일을 입력하세요 (예: 9월 20일 미팅)" required />
+                    <select id="meTaskPriority" aria-label="중요도">
+                      <option value="high">🔴 중요</option>
+                      <option value="normal" selected>🟡 보통</option>
+                      <option value="low">⚪ 낮음</option>
+                    </select>
+                    <input type="date" id="meTaskDue" aria-label="마감일" />
+                    <select id="meTaskTo" aria-label="받는 사람"><option value="">나에게</option></select>
+                    <button type="submit" class="me-solid">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 20 4l-6 16-3-7-7-2Z"/></svg>
+                      추가
+                    </button>
+                  </form>
+
+                  <div class="me-task-tabs">
+                    <button type="button" class="on" data-tab="mine">오늘의 할일</button>
+                    <button type="button" data-tab="sent">내가 보낸 할일</button>
+                  </div>
+
+                  <ul id="meTaskList" class="me-tasklist"></ul>
+                </div>
+
+                <div class="me-panel me-tools">
+                  <div class="me-panel-h">
+                    <div><h3>자주 쓰는 도구</h3><p>자주 사용하는 업무 도구를 더 빠르게 이용하세요.</p></div>
+                    <button type="button" id="meToolsEdit" class="me-link">고르기</button>
+                  </div>
+                  <div id="mePicks" class="me-toolgrid"></div>
+                  <div id="meOpts" class="me-opts" hidden></div>
+                </div>
+
                 <div class="me-panel me-cal">
                   <div class="me-cal-head">
                     <div><h3>전체 공유 캘린더</h3><p>함께 만드는 일정, 더 나은 오늘을 위한 계획입니다.</p></div>
@@ -794,15 +949,6 @@
                     <button type="button" id="meCalCancel" class="me-ghost">취소</button>
                   </form>
                   <div id="meCalGrid" class="me-cal-grid"></div>
-                </div>
-
-                <div class="me-panel me-tools">
-                  <div class="me-panel-h">
-                    <div><h3>자주 쓰는 도구</h3><p>자주 사용하는 업무 도구를 더 빠르게 이용하세요.</p></div>
-                    <button type="button" id="meToolsEdit" class="me-link">고르기</button>
-                  </div>
-                  <div id="mePicks" class="me-toolgrid"></div>
-                  <div id="meOpts" class="me-opts" hidden></div>
                 </div>
 
               </div>
@@ -830,11 +976,8 @@
                 </div>
 
                 <details class="me-panel me-rail me-more">
-                  <summary>할 일 &middot; 자주 쓰는 링크</summary>
-                  <form id="meTodoForm" class="me-inline"><input type="text" id="meTodoInput" placeholder="할 일 추가" autocomplete="off" /><button type="submit">+</button></form>
-                  <ul id="meTodoList" class="me-list"></ul>
-                  <button type="button" id="meTodoClear" class="me-mini">완료한 항목 지우기</button>
-                  <form id="meLinkForm" class="me-inline" style="margin-top:12px"><input type="text" id="meLinkLabel" placeholder="이름" autocomplete="off" /><input type="text" id="meLinkUrl" placeholder="주소" autocomplete="off" /><button type="submit">+</button></form>
+                  <summary>자주 쓰는 링크</summary>
+                  <form id="meLinkForm" class="me-inline"><input type="text" id="meLinkLabel" placeholder="이름" autocomplete="off" /><input type="text" id="meLinkUrl" placeholder="주소" autocomplete="off" /><button type="submit">+</button></form>
                   <ul id="meLinkList" class="me-list"></ul>
                 </details>
               </div>
@@ -1845,25 +1988,126 @@ else if (typeof exports === 'object')
       $('meMemoCount').textContent = state.memo.length + '/300';
     }
 
-    var todoList = $('meTodoList');
-    function renderTodos(){
-      todoList.innerHTML = '';
-      state.todos.forEach(function(t, i){
-        var li = document.createElement('li'); if(t.done) li.className = 'done';
-        var cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!t.done; cb.id='metd'+i;
-        cb.addEventListener('change', function(){ state.todos[i].done = cb.checked; persist(); renderTodos(); });
-        var lb = document.createElement('label'); lb.htmlFor='metd'+i; lb.textContent=t.text;
-        var x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×';
-        x.addEventListener('click', function(){ state.todos.splice(i,1); persist(); renderTodos(); });
-        li.appendChild(cb); li.appendChild(lb); li.appendChild(x); todoList.appendChild(li);
+    /* ---------------- 오늘의 할일 (개인 + 동료/대표에게 보내기) ---------------- */
+    var taskListEl = $('meTaskList'), taskForm = $('meTaskForm'), taskCountEl = $('meTaskCount');
+    var tasks = [], taskTab = 'mine';
+    var PRIO_W = {high:0, normal:1, low:2};
+
+    function loadMembers(){
+      api('member_list').then(function(res){
+        if(!res || !res.ok) return;
+        var sel = $('meTaskTo'), cur = sel.value, me = AUTH && AUTH.id;
+        sel.innerHTML = '<option value="">나에게</option>';
+        (res.members || []).forEach(function(m){
+          if(m === me) return;
+          var o = document.createElement('option'); o.value = m; o.textContent = m + '님에게';
+          sel.appendChild(o);
+        });
+        sel.value = cur;
+      }).catch(function(){});
+    }
+
+    function loadTasks(){
+      api('task_list').then(function(res){
+        if(res && res.ok){ tasks = res.items || []; renderTasks(); }
+      }).catch(function(){});
+    }
+
+    // 예전 버전에서 이 PC에만 저장돼 있던 개인 할일 → 서버의 '오늘의 할일'로 1회 이전
+    function migrateLegacyTodos(){
+      if(!state.todos || !state.todos.length){ loadTasks(); return; }
+      var old = state.todos.slice();
+      state.todos = [];
+      persist();
+      var pending = old.length;
+      old.forEach(function(t){
+        api('task_add', {title:(t.text||'').slice(0,100), priority:'normal', due:'', to_user:''}).then(function(r){
+          if(r && r.ok && t.done) api('task_done', {id:r.id, done:true});
+        }).catch(function(){}).then(function(){ pending--; if(pending<=0) loadTasks(); });
       });
     }
-    $('meTodoForm').addEventListener('submit', function(e){
-      e.preventDefault(); var v = $('meTodoInput').value.trim(); if(!v) return;
-      state.todos.push({text:v, done:false}); $('meTodoInput').value=''; persist(); renderTodos();
+
+    document.querySelectorAll('.me-task-tabs button').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelectorAll('.me-task-tabs button').forEach(function(b){ b.classList.remove('on'); });
+        btn.classList.add('on'); taskTab = btn.getAttribute('data-tab'); renderTasks();
+      });
     });
-    $('meTodoClear').addEventListener('click', function(){
-      state.todos = state.todos.filter(function(t){ return !t.done; }); persist(); renderTodos();
+
+    function renderTasks(){
+      var me = AUTH && AUTH.id;
+      var list = tasks.filter(function(t){
+        return taskTab === 'mine' ? t.to_user === me : (t.from_user === me && t.to_user !== me);
+      }).slice().sort(function(a, b){
+        if(!!a.done !== !!b.done) return a.done ? 1 : -1;
+        var pw = (PRIO_W[a.priority] == null ? 1 : PRIO_W[a.priority]) - (PRIO_W[b.priority] == null ? 1 : PRIO_W[b.priority]);
+        if(pw) return pw;
+        var ad = a.due_day || '9999-99-99', bd = b.due_day || '9999-99-99';
+        return ad < bd ? -1 : ad > bd ? 1 : 0;
+      });
+
+      taskListEl.innerHTML = '';
+      if(!list.length){
+        var empty = document.createElement('li'); empty.className = 'empty';
+        empty.textContent = taskTab === 'mine' ? '오늘 할 일이 없어요. 위에서 추가해보세요.' : '아직 보낸 할일이 없어요.';
+        taskListEl.appendChild(empty);
+      }
+      list.forEach(function(t){
+        var li = document.createElement('li'); if(t.done) li.className = 'done';
+
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!t.done;
+        cb.addEventListener('change', function(){
+          var done = cb.checked; t.done = done; renderTasks();
+          api('task_done', {id:t.id, done:done}).then(function(r){ if(!r || !r.ok){ t.done = !done; renderTasks(); } });
+        });
+
+        var dot = document.createElement('span'); dot.className = 'prio ' + (t.priority || 'normal');
+        var txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = t.title;
+        li.appendChild(cb); li.appendChild(dot); li.appendChild(txt);
+
+        if(taskTab === 'mine' && t.from_user !== me){
+          var who = document.createElement('span'); who.className = 'who';
+          who.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 11 20 4l-6 16-3-7-7-2Z"/></svg>';
+          who.appendChild(document.createTextNode(t.from_user));
+          li.appendChild(who);
+        } else if(taskTab === 'sent'){
+          var who2 = document.createElement('span'); who2.className = 'who';
+          who2.textContent = t.to_user + (t.done ? ' · 완료' : ' · 대기');
+          li.appendChild(who2);
+        }
+
+        if(t.due_day){
+          var isToday = t.due_day === TODAY, isOver = !t.done && t.due_day < TODAY;
+          var due = document.createElement('span'); due.className = 'due' + (isToday ? ' today' : isOver ? ' overdue' : '');
+          due.textContent = isToday ? '오늘' : t.due_day.slice(5).replace('-', '/');
+          li.appendChild(due);
+        }
+
+        var x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '×';
+        x.addEventListener('click', function(){
+          api('task_del', {id:t.id}).then(function(r){
+            if(r && r.ok){ tasks = tasks.filter(function(o){ return o.id !== t.id; }); renderTasks(); }
+          });
+        });
+        li.appendChild(x);
+
+        taskListEl.appendChild(li);
+      });
+
+      var openCount = tasks.filter(function(t){ return t.to_user === me && !t.done; }).length;
+      taskCountEl.textContent = openCount ? openCount + '개 남음' : '';
+    }
+
+    taskForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      var title = $('meTaskTitle').value.trim(); if(!title) return;
+      var priority = $('meTaskPriority').value, due = $('meTaskDue').value, to = $('meTaskTo').value;
+      api('task_add', {title:title, priority:priority, due:due, to_user:to}).then(function(r){
+        if(r && r.ok){
+          $('meTaskTitle').value = ''; $('meTaskDue').value = ''; $('meTaskPriority').value = 'normal'; $('meTaskTo').value = '';
+          loadTasks();
+        } else alert((r && r.error) || '추가 실패');
+      });
     });
 
     var linkList = $('meLinkList');
@@ -1915,7 +2159,7 @@ else if (typeof exports === 'object')
     }
     $('meToolsEdit').addEventListener('click', function(){ optsBox.hidden = !optsBox.hidden; });
 
-    function renderPersonal(){ renderMemo(); renderTodos(); renderLinks(); renderPicks(); renderOpts(); }
+    function renderPersonal(){ renderMemo(); renderTasks(); renderLinks(); renderPicks(); renderOpts(); }
 
     /* ---------------- 가입 관리 ---------------- */
     var adminList = $('meAdminList'), adminCount = $('meAdminCount'), adminSum = $('meAdminSum'),
@@ -2137,7 +2381,7 @@ else if (typeof exports === 'object')
       if(t && t.trim()) api('notice_add',{title:t.trim()}).then(function(r){ r&&r.ok?loadNotices():alert((r&&r.error)||'실패'); });
     });
 
-    function bootWorkspace(){ renderCal(); loadCal(); renderAgenda(); loadNotices(); loadAdmin(); }
+    function bootWorkspace(){ renderCal(); loadCal(); renderAgenda(); loadNotices(); loadAdmin(); loadMembers(); migrateLegacyTodos(); }
 
     /* ---------------- 로그인 / 회원가입 ---------------- */
     function setGateMode(m, keepMsg){
