@@ -630,6 +630,21 @@
   .me-cal-ev:hover .del{ opacity:.85; }
   @media (max-width:640px){ .me-cal-cell{ min-height:auto; } }
 
+  /* 업무 지표 */
+  .me-metric-list{ display:flex; flex-direction:column; gap:14px; }
+  .me-metric-list .empty{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-muted);
+    padding:16px; border:1.5px dashed var(--border); border-radius:12px; background:var(--surface-2); }
+  .me-metric-list .empty::before{ content:"✦"; color:var(--accent); font-weight:700; }
+  .me-metric-row{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .me-metric-head{ display:flex; flex-direction:column; gap:2px; min-width:170px; flex:none; }
+  .me-metric-head .nm{ font-size:12.5px; font-weight:700; color:var(--ink); }
+  .me-metric-head .latest{ font-size:11px; color:var(--ink-muted); }
+  .me-metric-head .latest.up{ color:var(--danger); } .me-metric-head .latest.down{ color:var(--success); }
+  .me-metric-bars{ display:flex; align-items:flex-end; gap:3px; height:36px; flex:1 1 160px; min-width:120px; }
+  .me-metric-bars .bar{ flex:1 1 auto; min-width:4px; max-width:14px; border-radius:3px 3px 0 0; background:var(--accent); opacity:.75; cursor:help; }
+  .me-metric-bars .bar:hover{ opacity:1; }
+  .me-metric-bars .bar.zero{ background:var(--surface-2); opacity:1; min-height:3px; }
+
   /* 도구 그리드 */
   .me-toolgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
   .me-toolgrid button{ display:flex; flex-direction:column; gap:6px; align-items:flex-start; padding:14px; border:1px solid var(--border); border-radius:12px; background:var(--surface); cursor:pointer; font:inherit; text-align:left; transition:border-color .14s ease, box-shadow .14s ease; }
@@ -969,6 +984,13 @@
                     <button type="button" id="meCalCancel" class="me-ghost">취소</button>
                   </form>
                   <div id="meCalGrid" class="me-cal-grid"></div>
+                </div>
+
+                <div class="me-panel me-metrics">
+                  <div class="me-panel-h">
+                    <div><h3>업무 지표</h3><p>사방넷-이카운트 매칭, 재고 불일치 확인을 쓸 때마다 결과 건수가 쌓여 추이로 보여요.</p></div>
+                  </div>
+                  <div id="meMetrics" class="me-metric-list"></div>
                 </div>
 
               </div>
@@ -1606,6 +1628,14 @@
         .then(function(r){ return r.json(); });
     }
 
+    // 다른 도구(사방넷 매칭, 재고 불일치 등)가 결과를 다 계산한 뒤 이 함수 하나만 부르면
+    // "업무 지표" 위젯에 쌓인다. 로그인 안 했으면(AUTH 없음) 조용히 무시 — 로그인 없이
+    // 도구만 쓰는 사람도 있으니 지표 기록 실패로 도구 사용을 막지 않는다.
+    window.BUYEST_logMetric = function(tool, value){
+      if(!AUTH || value == null || isNaN(value)) return;
+      api('metric_add', {tool:tool, value:value}).catch(function(){});
+    };
+
     function applyMode(mode){
       var inn = (mode === 'in');
       gate.hidden = (mode !== 'gate');
@@ -1689,6 +1719,60 @@
           renderTasks();
         }
       }).catch(function(){});
+    }
+
+    /* ---------------- 업무 지표 요약 ---------------- */
+    function loadMetrics(){
+      api('metric_summary', {days:14}).then(function(res){
+        if(res && res.ok) renderMetrics(res.items || []);
+      }).catch(function(){});
+    }
+    function renderMetrics(items){
+      var box = $('meMetrics');
+      box.innerHTML = '';
+      var byTool = {};
+      items.forEach(function(it){
+        (byTool[it.tool] = byTool[it.tool] || []).push(it);
+      });
+      var tools = Object.keys(byTool);
+      if(!tools.length){
+        var empty = document.createElement('div'); empty.className = 'empty';
+        empty.textContent = '아직 쌓인 지표가 없어요. 도구를 사용하면 자동으로 기록돼요.';
+        box.appendChild(empty);
+        return;
+      }
+      tools.forEach(function(tool){
+        var rows = byTool[tool].slice(-14); // 서버가 이미 날짜순 정렬해서 줌
+        var max = Math.max.apply(null, rows.map(function(r){ return Number(r.v); }).concat([1]));
+        var last = Number(rows[rows.length - 1].v);
+        var half = Math.max(1, Math.floor(rows.length / 2));
+        var recentSum = 0, prevSum = 0;
+        rows.forEach(function(r, i){ if(i >= rows.length - half) recentSum += Number(r.v); else prevSum += Number(r.v); });
+
+        var wrap = document.createElement('div'); wrap.className = 'me-metric-row';
+        var head = document.createElement('div'); head.className = 'me-metric-head';
+        var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = TITLES[tool] || tool;
+        var latest = document.createElement('span'); latest.className = 'latest';
+        latest.textContent = '최근 ' + last.toLocaleString('ko-KR') + '건';
+        if(prevSum > 0 || recentSum > 0){
+          if(recentSum > prevSum) latest.classList.add('up');
+          else if(recentSum < prevSum) latest.classList.add('down');
+        }
+        head.appendChild(nm); head.appendChild(latest);
+
+        var bars = document.createElement('div'); bars.className = 'me-metric-bars';
+        rows.forEach(function(r){
+          var v = Number(r.v);
+          var bar = document.createElement('span');
+          bar.className = 'bar' + (v === 0 ? ' zero' : '');
+          bar.style.height = Math.max(3, Math.round((v / max) * 34)) + 'px';
+          bar.title = r.d + ' · ' + v.toLocaleString('ko-KR') + '건';
+          bars.appendChild(bar);
+        });
+
+        wrap.appendChild(head); wrap.appendChild(bars);
+        box.appendChild(wrap);
+      });
     }
 
     // 예전 버전에서 이 PC에만 저장돼 있던 개인 할일 → 서버의 '오늘의 할일'로 1회 이전
@@ -2065,7 +2149,7 @@
       if(t && t.trim()) api('notice_add',{title:t.trim()}).then(function(r){ r&&r.ok?loadNotices():alert((r&&r.error)||'실패'); });
     });
 
-    function bootWorkspace(){ renderCal(); loadCal(); renderAgenda(); loadNotices(); loadAdmin(); loadMembers(); migrateLegacyTodos(); }
+    function bootWorkspace(){ renderCal(); loadCal(); renderAgenda(); loadNotices(); loadAdmin(); loadMembers(); migrateLegacyTodos(); loadMetrics(); }
 
     /* ---------------- 로그인 / 회원가입 ---------------- */
     function setGateMode(m, keepMsg){
@@ -4749,6 +4833,7 @@
       statsEl.appendChild(statCard(stats.noChange.toLocaleString('ko-KR'), '매칭됨 · 변동없음', 'var(--ink-muted)'));
       statsEl.appendChild(statCard(stats.specMismatch.toLocaleString('ko-KR'), '규격 불일치', 'var(--warning)'));
       statsEl.appendChild(statCard(stats.notFound.toLocaleString('ko-KR'), '사방넷에 상품 없음', 'var(--danger)'));
+      if(window.BUYEST_logMetric) window.BUYEST_logMetric('sabangEcount', stats.specMismatch + stats.notFound);
       var soldOutProducts = computeRvmFullySoldOut();
       var soldOutCount = new Set(soldOutProducts.map(function(l){ return l.name; })).size;
       statsEl.appendChild(statCard(soldOutCount.toLocaleString('ko-KR'), '전체 품절 (사이즈 전부 0)', 'var(--danger)'));

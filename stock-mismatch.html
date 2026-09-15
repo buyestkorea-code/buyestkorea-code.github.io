@@ -59,7 +59,25 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script>
 const SNAPSHOT_URL = 'https://buyest.co.kr/buyest_stock_snapshot_api.php';
+const TOOLKIT_API_URL = 'https://buyest.co.kr/toolkit_dashboard_api.php';
 const CHUNK = 10000;
+
+// 이 도구는 대시보드(index.html)의 iframe으로 열리지만 문서 자체는 따로라, 대시보드가
+// localStorage에 저장해둔 로그인 정보(같은 출처라 접근 가능)를 그대로 읽어서 결과 건수만
+// "업무 지표" 위젯에 보낸다. 로그인 안 했으면 그냥 조용히 넘어간다(도구 사용은 막지 않음).
+function logToolkitMetric(tool, value) {
+  try {
+    var raw = localStorage.getItem('buyest.dash.auth');
+    if (!raw) return;
+    var auth = JSON.parse(raw);
+    if (!auth || !auth.id || !auth.pass) return;
+    fetch(TOOLKIT_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'metric_add', user: auth.id, pass: auth.pass, tool: tool, value: value })
+    }).catch(function(){});
+  } catch (e) { /* 지표 기록 실패는 무시 — 도구 결과 자체엔 영향 없음 */ }
+}
 
 let ecMap = null;       // ec_code(품목코드) => qty
 let siteMap = null;     // ec_code => [{size, buyest_product_code, site_status, issue}]
@@ -196,6 +214,7 @@ function tryCompare() {
   document.getElementById('status').innerHTML = `<span class="ok-msg">✅ 비교 완료 — 불일치 ${mismatches.length.toLocaleString()}건</span>`;
   document.getElementById('downloadBtn').disabled = mismatches.length === 0;
   renderTable();
+  logToolkitMetric('stockMismatch', mismatches.length);
 }
 
 function renderTable() {
