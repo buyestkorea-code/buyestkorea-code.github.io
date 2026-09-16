@@ -32,6 +32,7 @@
   .chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
   .chip-soldout { background: #fef2f2; color: #b91c1c; }
   .chip-sale { background: #f0fdf4; color: #15803d; }
+  .chip-mismatch { background: #fef3c7; color: #92400e; }
 </style>
 </head>
 <body>
@@ -128,6 +129,11 @@ async function loadFromExcel(file) {
       if (extra) extra += ' / ';
       extra += `이카운트에서 조회 안 된 ${data.not_found_in_ecount.length}건은 제외됨`;
     }
+    const mismatchCount = data.items.filter(i => i.display_mismatch).length;
+    if (mismatchCount > 0) {
+      if (extra) extra += ' / ';
+      extra += `⚠ ${mismatchCount}건은 품절/노출 상태가 이미 어긋나 있어요(표에 표시됨) — 실행해도 자동으로 안 고쳐지니 직접 확인 필요`;
+    }
     status.innerHTML = statusHtml(data.items, extra);
     result.className = 'ok';
     result.textContent = '✅ 파일 선택만으로 이카운트 최신 재고까지 자동 조회 완료';
@@ -156,6 +162,13 @@ function wholeCellHtml(it) {
   return `<span class="chip chip-${it.whole_after}">${STATE_LABEL[it.whole_after]}</span>`;
 }
 
+// 품절여부(option_empty)와 노출여부(option_display)가 이미 어긋나 있는 상태로 발견된 행.
+// 이 도구가 자동으로 고치지 않으므로(재고를 실제로 확인해야 할 수도 있어서) 눈에 띄게 표시만 함.
+function mismatchChip(it) {
+  if (!it.display_mismatch) return '';
+  return ` <span class="chip chip-mismatch" title="품절/노출 상태가 이미 어긋나 있어요. 재고 실물 확인 후 관리자 화면에서 직접 맞춰주세요.">⚠ 직접확인필요</span>`;
+}
+
 function renderTable() {
   // failed/ambiguous/dead-mapping rows always sort to the top so they're easy to
   // find in a large list; "실패만 보기" additionally hides matched rows entirely.
@@ -172,7 +185,7 @@ function renderTable() {
         <td class="status-ok">매핑성공</td>
         <td>${it.ec_code}</td><td>${it.size||'-'}</td><td>${it.qty}</td>
         <td>${escapeHtml(it.buyest_product_code)}</td>
-        <td>${changeCellHtml(it)}</td>
+        <td>${changeCellHtml(it)}${mismatchChip(it)}</td>
         <td>${wholeCellHtml(it)}</td>
       </tr>`;
     }
@@ -301,12 +314,16 @@ async function execute() {
     result.className = 'ok';
     let msg = `완료: ${data.processed}건 처리, ${data.products_touched}개 상품 변경, 새 매핑 ${data.new_mappings_saved}건 저장됨`;
     if (data.errors.length) msg += `<br>오류 ${data.errors.length}건: ` + data.errors.join(', ');
+    const mismatchCount = (data.results || []).filter(r => r.display_mismatch).length;
+    if (mismatchCount > 0) {
+      msg += `<br>⚠ ${mismatchCount}건은 품절/노출 상태가 이미 어긋나 있어서 자동으로 안 고치고 표시만 했어요 — 재고 확인 후 관리자 화면에서 직접 처리해주세요.`;
+    }
     result.innerHTML = msg;
 
     // show the confirmed before/after result per row instead of the input table
     const rows = (data.results || []).map((r, i) => `<tr>
         <td>${i+1}</td><td>${r.ec_code}</td><td>${r.size||'-'}</td>
-        <td>${changeCellHtml(r)}</td>
+        <td>${changeCellHtml(r)}${mismatchChip(r)}</td>
         <td>${wholeCellHtml(r)}</td>
       </tr>`).join('');
     tableWrap.innerHTML = rows ? `
