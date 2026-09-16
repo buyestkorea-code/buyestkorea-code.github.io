@@ -545,6 +545,25 @@
   .me-toolgrid-hero .empty::before{ content:"✦"; color:#9FE3B8; font-weight:700; }
   .me-opts-hero{ position:relative; color:#F3EFE3; border-top-color:rgba(255,255,255,.16) !important; }
   .me-opts-hero input{ accent-color:#6FCB80; }
+  .me-hero-tools-h{ display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:8px; }
+  .me-hero-tools-label{ display:none; margin:0; font-size:15px; font-weight:700; color:var(--ink); }
+
+  /* 폰 화면에서는 이 도구 블록을 히어로 밖(캘린더 아래)으로 옮기는데(JS: placeHeroTools),
+     그 자리에서는 어두운 유리 카드 대신 다른 패널과 같은 밝은 카드로 보이게 다시 칠한다 */
+  #meToolsMobileSlot #meHeroTools{ background:var(--surface); border:1px solid rgba(219,213,199,.5);
+    border-radius:16px; padding:18px 20px; box-shadow:var(--me-shadow); }
+  #meToolsMobileSlot .me-hero-tools-h{ justify-content:space-between; margin-bottom:14px; }
+  #meToolsMobileSlot .me-hero-tools-label{ display:block; }
+  #meToolsMobileSlot .me-hero-pick{ background:none; border:none; padding:0; color:var(--accent); font-weight:600; }
+  #meToolsMobileSlot .me-hero-pick:hover{ background:none; text-decoration:underline; }
+  #meToolsMobileSlot .me-toolgrid-hero button{ background:var(--surface); border-color:var(--border); }
+  #meToolsMobileSlot .me-toolgrid-hero button:hover{ background:var(--surface-2); border-color:var(--accent); }
+  #meToolsMobileSlot .me-toolgrid-hero button .nm{ color:var(--ink); }
+  #meToolsMobileSlot .me-toolgrid-hero button .bd{ color:var(--success); background:var(--success-soft); }
+  #meToolsMobileSlot .me-toolgrid-hero .empty{ color:var(--ink-muted); border-color:var(--border); background:var(--surface-2); }
+  #meToolsMobileSlot .me-toolgrid-hero .empty::before{ color:var(--accent); }
+  #meToolsMobileSlot .me-opts-hero{ color:var(--ink); border-top-color:var(--surface-2) !important; }
+  #meToolsMobileSlot .me-opts-hero input{ accent-color:var(--accent); }
 
   body.me-in .hero{ display:none; }
   body.me-in #dashCatalog{ display:none; }
@@ -650,13 +669,24 @@
   .me-cal-ev{ display:flex; align-items:flex-start; gap:5px; font-size:11.5px; font-weight:700; line-height:1.45;
     border-radius:6px; padding:3px 7px 3px 8px; cursor:help;
     border-left:3px solid currentColor; }
+  .me-cal-ev.editable{ cursor:pointer; }
+  .me-cal-ev.editable:hover{ filter:brightness(.97); }
   .me-cal-ev .t{ flex:1 1 auto; min-width:0; width:100%; word-break:break-word; overflow-wrap:anywhere; white-space:normal; }
   .me-cal-more{ font:inherit; font-size:10.5px; font-weight:800; color:var(--accent); background:var(--accent-soft); border:none; border-radius:999px;
     padding:2px 8px; margin-top:4px; align-self:flex-start; cursor:pointer; }
   .me-cal-more:hover{ filter:brightness(.95); }
   .me-cal-cell .del{ flex:none; margin-left:auto; border:none; background:none; color:inherit; opacity:0; font-size:13px; line-height:1; cursor:pointer; }
   .me-cal-ev:hover .del{ opacity:.85; }
-  @media (max-width:640px){ .me-cal-cell{ min-height:auto; } }
+  @media (max-width:640px){
+    /* 폰에서는 7칸 달력 한 칸이 너무 좁아서(약 36px) 제목 글자가 한 글자씩 세로로 쪼개져
+       보이는 문제가 있었다. 제목 텍스트 대신 카테고리 색 점만 보여주고, 전체 내용은
+       칸을 탭하면 뜨는 팝업에서 읽도록 바꾼다. */
+    .me-cal-cell{ min-height:auto; padding:5px 4px 4px; }
+    .me-cal-evs{ flex-direction:row; flex-wrap:wrap; gap:3px; }
+    .me-cal-ev{ width:7px; height:7px; padding:0 !important; border:none !important; border-radius:50%; background:currentColor !important; }
+    .me-cal-ev .t, .me-cal-ev .del{ display:none; }
+    .me-cal-more{ font-size:0; width:7px; height:7px; padding:0; min-width:0; background:var(--ink-muted); }
+  }
 
   /* 하루 일정 전체보기 팝업 — "+N개 더보기" 클릭 시, 10개가 넘게 몰려도 스크롤로 편하게 */
   .me-cal-daypanel{ position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
@@ -672,8 +702,10 @@
   .me-cal-daypanel-list li{ display:flex; align-items:center; gap:8px; padding:9px 10px; border-radius:10px; border-left:3px solid currentColor; font-size:13px; font-weight:700; }
   .me-cal-daypanel-list li .dot{ display:none; }
   .me-cal-daypanel-list li .t{ flex:1 1 auto; min-width:0; word-break:break-word; }
-  .me-cal-daypanel-list li .del{ flex:none; border:none; background:none; color:inherit; opacity:.55; font-size:14px; line-height:1; cursor:pointer; padding:2px; }
-  .me-cal-daypanel-list li .del:hover{ opacity:1; }
+  .me-cal-daypanel-list li .edit,
+  .me-cal-daypanel-list li .del{ flex:none; border:none; background:none; color:inherit; opacity:.6; font-size:13px; line-height:1; cursor:pointer; padding:3px; border-radius:6px; }
+  .me-cal-daypanel-list li .edit{ font-size:12px; }
+  .me-cal-daypanel-list li .edit:hover, .me-cal-daypanel-list li .del:hover{ opacity:1; background:rgba(0,0,0,.06); }
   .me-cal-daypanel-empty{ justify-content:center; color:var(--ink-muted); font-weight:500 !important; border-left:none !important; background:none !important; }
   .me-cal-daypanel-f{ flex:none; padding:12px 18px 16px; border-top:1px solid var(--surface-2); }
   .me-cal-daypanel-f .me-solid{ width:100%; }
@@ -948,11 +980,16 @@
                   <h1 id="meGreetH1">안녕하세요 👋</h1>
                   <div class="me-hero-top-actions">
                     <span class="me-sync" id="meSync"></span>
-                    <button type="button" id="meToolsEdit" class="me-hero-pick">고르기</button>
                   </div>
                 </div>
-                <div id="mePicks" class="me-toolgrid me-toolgrid-hero"></div>
-                <div id="meOpts" class="me-opts me-opts-hero" hidden></div>
+                <div id="meHeroTools">
+                  <div class="me-hero-tools-h">
+                    <h3 class="me-hero-tools-label">자주 쓰는 도구</h3>
+                    <button type="button" id="meToolsEdit" class="me-hero-pick">고르기</button>
+                  </div>
+                  <div id="mePicks" class="me-toolgrid me-toolgrid-hero"></div>
+                  <div id="meOpts" class="me-opts me-opts-hero" hidden></div>
+                </div>
               </div>
             </div>
 
@@ -1014,7 +1051,7 @@
                     <input type="date" id="meCalDate" required />
                     <select id="meCalCat"></select>
                     <input type="text" id="meCalTitle" maxlength="100" placeholder="내용 (예: 주간 회의, 오전 반차)" required />
-                    <button type="submit" class="me-solid">추가</button>
+                    <button type="submit" id="meCalSubmit" class="me-solid">추가</button>
                     <button type="button" id="meCalCancel" class="me-ghost">취소</button>
                   </form>
                   <div id="meCalGrid" class="me-cal-grid"></div>
@@ -1032,6 +1069,10 @@
                     </div>
                   </div>
                 </div>
+
+                <!-- 좁은 화면(폰)에서는 자주 쓰는 도구의 우선순위가 낮아서, 오늘의 할일·캘린더보다
+                     아래로 오도록 이 자리로 옮겨 붙인다 (JS: placeHeroTools). 데스크톱에서는 비어있음. -->
+                <div id="meToolsMobileSlot"></div>
 
                 <div class="me-panel me-metrics">
                   <div class="me-panel-h">
@@ -1977,6 +2018,16 @@
     }
     $('meToolsEdit').addEventListener('click', function(){ optsBox.hidden = !optsBox.hidden; });
 
+    // 폰 화면에서는 "오늘의 할일 → 캘린더 → 자주 쓰는 도구" 순서가 되도록, 이 도구 블록을
+    // 히어로 안(데스크톱 자리)과 캘린더 아래(폰 자리) 사이에서 그때그때 옮겨 붙인다.
+    (function(){
+      var heroTools = $('meHeroTools'), heroSlot = heroTools.parentNode, mobileSlot = $('meToolsMobileSlot');
+      var mq = window.matchMedia('(max-width:640px)');
+      function place(){ (mq.matches ? mobileSlot : heroSlot).appendChild(heroTools); }
+      place();
+      (mq.addEventListener ? mq.addEventListener.bind(mq) : mq.addListener.bind(mq))('change', place);
+    })();
+
     function renderPersonal(){ renderMemo(); renderTasks(); renderLinks(); renderPicks(); renderOpts(); }
 
     /* ---------------- 가입 관리 ---------------- */
@@ -2111,13 +2162,15 @@
         its.slice(0, 3).forEach(function(it){
           var ev = document.createElement('span'); ev.className = 'me-cal-ev'; ev.style.color = evColor(it.kind);
           ev.style.background = 'var(--k-' + it.kind + '-bg)';
-          ev.title = '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title;
           var t = document.createElement('span'); t.className='t'; t.textContent = it.title;
           ev.appendChild(t);
+          // 삭제는 관리자만(아래 하루보기 팝업에서). 본인 글이거나 관리자면 클릭해서 바로 수정.
           if(it.author === (AUTH && AUTH.id) || IS_ADMIN){
-            var del = document.createElement('button'); del.className='del'; del.type='button'; del.textContent='×';
-            del.addEventListener('click', function( e2){ e2.stopPropagation(); api('cal_del',{id:it.id}).then(function(r){ if(r&&r.ok) loadCal(); }); });
-            ev.appendChild(del);
+            ev.classList.add('editable');
+            ev.title = '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title + ' — 클릭하면 수정';
+            ev.addEventListener('click', function(e2){ e2.stopPropagation(); openCalPanel(it.day, it); });
+          } else {
+            ev.title = '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title;
           }
           evsBox.appendChild(ev);
         });
@@ -2129,7 +2182,14 @@
           m.addEventListener('click', (function(dstr){ return function(e2){ e2.stopPropagation(); openDayPanel(dstr); }; })(ds));
           cell.appendChild(m);
         }
-        cell.addEventListener('click', (function(x){ return function(){ openCalPanel(x); }; })(ds));
+        // 폰 화면에서는 일정이 색 점으로만 보이니, 칸을 탭하면(비어있지 않은 한) 바로
+        // 하루 일정 팝업이 뜨게 한다. 데스크톱은 그대로 새 일정 추가 폼이 열린다.
+        cell.addEventListener('click', (function(x, hasItems){
+          return function(){
+            if(hasItems && window.matchMedia('(max-width:640px)').matches) openDayPanel(x);
+            else openCalPanel(x);
+          };
+        })(ds, its.length > 0));
         calGrid.appendChild(cell);
       }
     }
@@ -2147,9 +2207,15 @@
         var dot = document.createElement('span'); dot.className = 'dot';
         var t = document.createElement('span'); t.className = 't'; t.textContent = it.title;
         li.appendChild(dot); li.appendChild(t);
+        // 수정: 작성자 본인 또는 관리자. 삭제: 관리자만(직원은 등록한 일정을 스스로 지울 수 없고 수정만 가능).
         if(it.author === (AUTH && AUTH.id) || IS_ADMIN){
-          var del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '×';
-          del.addEventListener('click', function(){ api('cal_del',{id:it.id}).then(function(r){ if(r&&r.ok){ loadCal(); openDayPanel(dstr); } }); });
+          var edit = document.createElement('button'); edit.type = 'button'; edit.className = 'edit'; edit.textContent = '✎'; edit.setAttribute('aria-label','수정');
+          edit.addEventListener('click', function(){ closeDayPanel(); openCalPanel(it.day, it); });
+          li.appendChild(edit);
+        }
+        if(IS_ADMIN){
+          var del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '×'; del.setAttribute('aria-label','삭제');
+          del.addEventListener('click', function(){ api('cal_del',{id:it.id}).then(function(r){ if(r&&r.ok){ loadCal(); openDayPanel(dstr); } else alert((r&&r.error)||'삭제 실패'); }); });
           li.appendChild(del);
         }
         dayPanelList.appendChild(li);
@@ -2164,21 +2230,36 @@
     $('meCalDayPanelClose').addEventListener('click', closeDayPanel);
     dayPanel.addEventListener('click', function(e){ if(e.target === dayPanel) closeDayPanel(); });
     document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !dayPanel.hidden) closeDayPanel(); });
-    function openCalPanel(dstr){
+    var calSubmitBtn = $('meCalSubmit'), calEditingId = null;
+    function openCalPanel(dstr, editItem){
       calPanel.hidden = false;
-      calDate.value = dstr || TODAY;
-      if(calFilter !== 'all') calCat.value = calFilter;
+      if(editItem){
+        calEditingId = editItem.id;
+        calDate.value = editItem.day;
+        calCat.value = editItem.kind;
+        calTitle.value = editItem.title;
+        calSubmitBtn.textContent = '수정 완료';
+      } else {
+        calEditingId = null;
+        calDate.value = dstr || TODAY;
+        if(calFilter !== 'all') calCat.value = calFilter;
+        calTitle.value = '';
+        calSubmitBtn.textContent = '추가';
+      }
       calTitle.focus();
     }
-    $('meCalAdd').addEventListener('click', function(){ calPanel.hidden ? openCalPanel(TODAY) : (calPanel.hidden = true); });
-    $('meCalCancel').addEventListener('click', function(){ calPanel.hidden = true; calTitle.value = ''; });
+    function closeCalPanel(){ calPanel.hidden = true; calTitle.value = ''; calEditingId = null; calSubmitBtn.textContent = '추가'; }
+    $('meCalAdd').addEventListener('click', function(){ calPanel.hidden ? openCalPanel(TODAY) : closeCalPanel(); });
+    $('meCalCancel').addEventListener('click', closeCalPanel);
     calPanel.addEventListener('submit', function(e){
       e.preventDefault();
       var day = calDate.value, kind = calCat.value, title = calTitle.value.trim();
       if(!/^\d{4}-\d{2}-\d{2}$/.test(day) || !title) return;
-      api('cal_add', {day:day, kind:kind, title:title}).then(function(r){
-        if(r && r.ok){ calTitle.value=''; calPanel.hidden = true; loadCal(); }
-        else alert((r && r.error) || '추가 실패');
+      var action = calEditingId ? 'cal_edit' : 'cal_add';
+      var payload = calEditingId ? {id:calEditingId, day:day, kind:kind, title:title} : {day:day, kind:kind, title:title};
+      api(action, payload).then(function(r){
+        if(r && r.ok){ closeCalPanel(); loadCal(); }
+        else alert((r && r.error) || (calEditingId ? '수정 실패' : '추가 실패'));
       });
     });
     $('meCalPrev').addEventListener('click', function(){ calMonth.setMonth(calMonth.getMonth()-1); renderCal(); loadCal(); });
