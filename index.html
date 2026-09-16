@@ -586,6 +586,10 @@
   .me-arow .btns button{ border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 11px; font:inherit; font-size:12px; font-weight:500; cursor:pointer; }
   .me-arow .btns button.ok{ border-color:var(--accent); background:var(--accent); color:var(--accent-ink); }
   .me-arow .btns button:hover{ filter:brightness(.96); }
+  /* 가입 관리가 우측 레일(좁은 칸)로 옮겨오면서 한 줄에 다 안 들어가면 자연스럽게 줄바꿈 */
+  .me-admin .me-arow{ flex-wrap:wrap; row-gap:6px; }
+  .me-admin .me-arow .addate{ display:none; }
+  .me-admin .me-arow .btns{ margin-left:0; width:100%; justify-content:flex-end; }
 
   /* 캘린더 */
   .me-cal-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
@@ -917,15 +921,6 @@
             <div class="me-dash">
               <div class="me-dash-main">
 
-                <div id="meAdmin" class="me-panel me-admin" hidden>
-                  <div class="me-panel-h">
-                    <div><h3>가입 관리</h3><p id="meAdminSum" class="me-sub"></p></div>
-                    <span id="meAdminCount" class="me-badge"></span>
-                  </div>
-                  <input type="text" id="meAdminSearch" class="me-admin-search" placeholder="아이디 검색" hidden />
-                  <div id="meAdminList" class="me-adminlist"></div>
-                </div>
-
                 <div class="me-panel me-tasks">
                   <div class="me-panel-h">
                     <div><h3>오늘의 할일</h3><p>체크하고, 필요하면 동료나 대표님께 바로 보내세요.</p></div>
@@ -996,6 +991,15 @@
               </div>
 
               <div class="me-dash-rail">
+                <div id="meAdmin" class="me-panel me-admin" hidden>
+                  <div class="me-panel-h">
+                    <div><h3>가입 관리</h3><p id="meAdminSum" class="me-sub"></p></div>
+                    <span id="meAdminCount" class="me-badge"></span>
+                  </div>
+                  <input type="text" id="meAdminSearch" class="me-admin-search" placeholder="아이디 검색" hidden />
+                  <div id="meAdminList" class="me-adminlist"></div>
+                </div>
+
                 <div class="me-panel me-rail">
                   <div class="me-panel-h"><h3>오늘 일정</h3><span id="meTodayDate" class="me-sub"></span></div>
                   <ul id="meToday" class="me-agenda"></ul>
