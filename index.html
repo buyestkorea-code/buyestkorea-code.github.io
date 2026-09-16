@@ -4615,11 +4615,28 @@
       s = s.replace(/^(\d+)Y$/, '$1A');
       return s;
     }
+    // "2-4"처럼 숫자-숫자 규격을 엑셀에 그대로 입력하면 엑셀이 날짜로 자동인식해
+    // 일련번호(예: 45392)로 바뀌어버리는 경우가 있다. 그 값을 날짜로 되돌려
+    // "월-일"/"일-월" 두 형태를 후보로 만들어서, 원래 텍스트가 남아있는 반대쪽과 비교한다.
+    function rvmSpecCandidates(v){
+      var out = [rvmNormalizeSpec(v)];
+      var n = typeof v === 'number' ? v : (/^\d+$/.test(String(v==null?'':v).trim()) ? Number(v) : NaN);
+      if(isFinite(n) && n >= 20000 && n <= 60000){
+        var d = new Date(Date.UTC(1899,11,30) + Math.round(n)*86400000);
+        var mo = d.getUTCMonth()+1, da = d.getUTCDate();
+        out.push(rvmNormalizeSpec(mo+'-'+da), rvmNormalizeSpec(da+'-'+mo));
+      }
+      return out;
+    }
     function rvmSpecsMatch(ecSpec, sbSpec){
-      var e = rvmNormalizeSpec(ecSpec);
-      var s = rvmNormalizeSpec(sbSpec);
-      if(e === s) return true;
-      if(e === 'TU' && (s === '' || s === 'FREE')) return true;
+      var eList = rvmSpecCandidates(ecSpec), sList = rvmSpecCandidates(sbSpec);
+      for(var i=0;i<eList.length;i++){
+        for(var j=0;j<sList.length;j++){
+          var e = eList[i], s = sList[j];
+          if(e === s) return true;
+          if(e === 'TU' && (s === '' || s === 'FREE')) return true;
+        }
+      }
       return false;
     }
     // 상품명 끝에서부터, 한글이 아닌(영문/숫자/기호) 토큰이 이어지는 구간을 "품번"으로 본다.
