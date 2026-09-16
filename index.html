@@ -399,11 +399,13 @@
     .topbar-meta span.txt{ display:none; }
   }
 
-  /* 폰 폭에서는 햄버거+새로고침 버튼까지 더해지면서 검색창·오늘 날짜·사용자 메뉴가
+  /* 폰 폭에서는 햄버거+새로고침 버튼까지 더해지면서 검색창·사용자 메뉴가
      한 줄에 다 안 들어가 오른쪽(사용자 아바타/이름)이 화면 밖으로 잘려나갔다.
-     검색·날짜는 폰에서 덜 중요하니 숨기고 사용자 메뉴가 항상 보이게 한다. */
+     검색은 폰에서 덜 중요하니 숨기고 사용자 메뉴가 항상 보이게 한다.
+     오늘 날짜는 새로고침 버튼 옆에 작게 붙여서 계속 보이게 유지. */
   @media (max-width:560px){
-    .me-search, .me-topdate{ display:none !important; }
+    .me-search{ display:none !important; }
+    .me-topdate{ font-size:10.5px; }
   }
 
   /* ================= 로그인 관문 + 개인 대시보드 (2026-09 리디자인) ================= */
@@ -960,9 +962,9 @@
       <button type="button" id="meRefresh" class="me-refresh" aria-label="새로고침" title="새로고침">
         <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
       </button>
+      <span class="me-topdate" id="meTopDate" hidden></span>
       <div class="topbar-title" id="topbarTitle">대시보드</div>
       <input type="text" id="meSearch" class="me-search" placeholder="도구·일정 검색…" autocomplete="off" hidden />
-      <span class="me-topdate" id="meTopDate" hidden></span>
       <button type="button" id="meTopAuth" class="me-topauth" hidden></button>
       <button type="button" id="meUser" class="me-user" hidden>
         <span class="ava" id="meUserAva">B</span>
@@ -2534,24 +2536,31 @@
       applyMode('in');
       setSync('동기화 중…');
       bootWorkspace();
-      api('login').then(function(res){
-        if(res && res.ok){
-          AUTH.role = res.role || AUTH.role || 'member';
-          IS_ADMIN = (AUTH.role === 'admin');
-          LS.set('buyest.dash.auth', AUTH);
-          applyMode('in');
-          state = normState(res.data);
-          LS.set('buyest.dash.cache', state);
-          renderPersonal();
-          setSync('동기화됨 ' + nowT());
-          if(dirty) pushSave();
-          bootWorkspace();
-        } else if(res && (res.status === 'pending' || res.status === 'rejected')){
-          doLogout('gate'); gateMsg.textContent = res.error || '다시 로그인해 주세요.';
-        } else if(isPwErr(res) || (res && res.error && res.error.indexOf('없는 아이디') === 0)){
-          doLogout('gate'); gateMsg.textContent = '다시 로그인해 주세요.';
-        } else { setSync((res && res.error) || ''); }
-      }).catch(function(){ setSync('오프라인 — 이 PC에 저장된 내용'); });
+      // 새로고침 직후(특히 셀룰러)에는 무선 상태가 아직 안 깨어나서 첫 요청만
+      // 실패하는 경우가 있다 — 바로 '오프라인'으로 단정 짓지 말고 한 번 더 시도.
+      (function bootLogin(retryLeft){
+        api('login').then(function(res){
+          if(res && res.ok){
+            AUTH.role = res.role || AUTH.role || 'member';
+            IS_ADMIN = (AUTH.role === 'admin');
+            LS.set('buyest.dash.auth', AUTH);
+            applyMode('in');
+            state = normState(res.data);
+            LS.set('buyest.dash.cache', state);
+            renderPersonal();
+            setSync('동기화됨 ' + nowT());
+            if(dirty) pushSave();
+            bootWorkspace();
+          } else if(res && (res.status === 'pending' || res.status === 'rejected')){
+            doLogout('gate'); gateMsg.textContent = res.error || '다시 로그인해 주세요.';
+          } else if(isPwErr(res) || (res && res.error && res.error.indexOf('없는 아이디') === 0)){
+            doLogout('gate'); gateMsg.textContent = '다시 로그인해 주세요.';
+          } else { setSync((res && res.error) || ''); }
+        }).catch(function(){
+          if(retryLeft > 0) setTimeout(function(){ bootLogin(retryLeft - 1); }, 1200);
+          else setSync('오프라인 — 이 PC에 저장된 내용');
+        });
+      })(1);
     } else if(LS.get('buyest.dash.skip', null)){
       applyMode('guest');
     } else {
