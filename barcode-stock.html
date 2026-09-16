@@ -20,8 +20,11 @@
   .list-status { font-size: 12.5px; color: var(--ink-muted); margin-top: 6px; }
   .list-status.ok { color: var(--ok-fg); }
 
-  #reader { width: 100%; border-radius: 10px; overflow: hidden; background: #000; min-height: 0; }
-  #reader:empty { display: none; }
+  /* 카메라를 붙이기 전에도 고정 높이를 미리 잡아둔다 — html5-qrcode가 시작 시점에 이 박스의
+     크기를 측정해서 비디오 크기를 정하는데, 비어있다고 접혀있으면(0x0) 스트림은 켜져도
+     화면엔 아무것도 안 그려지는 문제(사용자 눈엔 "권한만 허용되고 녹화만 되는" 것처럼 보임)가 생긴다. */
+  #reader { width: 100%; min-height: 260px; border-radius: 10px; overflow: hidden; background: #000; display: none; }
+  #reader.active { display: block; }
 
   .btn { font-size: 15px; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; }
   .btn-primary { background: var(--ink); color: #fff; }
@@ -156,6 +159,9 @@ document.getElementById('scanToggle').addEventListener('click', () => {
 
 async function startScan() {
   const btn = document.getElementById('scanToggle');
+  const readerEl = document.getElementById('reader');
+  // 카메라를 붙이기 전에 먼저 박스를 보이게 해서(고정 min-height 있음) 크기가 잡힌 상태로 시작한다.
+  readerEl.classList.add('active');
   try {
     html5Qr = new Html5Qrcode('reader');
     await html5Qr.start(
@@ -164,10 +170,15 @@ async function startScan() {
       decodedText => handleCode(decodedText),
       () => {} // 프레임마다 못 읽으면 호출됨 — 무시
     );
+    // 일부 브라우저(특히 iOS 사파리)는 playsinline이 없으면 전체화면 재생으로 튀어서
+    // 페이지 안에서 안 보이고 카메라만 켜진 것처럼 보인다 — 방어적으로 한 번 더 명시.
+    const videoEl = readerEl.querySelector('video');
+    if (videoEl) { videoEl.setAttribute('playsinline', 'true'); videoEl.muted = true; }
     scanning = true;
     btn.textContent = '카메라 끄기';
     btn.classList.add('on');
   } catch (err) {
+    readerEl.classList.remove('active');
     alert('카메라를 열 수 없습니다. 브라우저 카메라 권한을 확인해주세요.\n(' + err + ')');
   }
 }
@@ -178,6 +189,7 @@ async function stopScan() {
     try { await html5Qr.stop(); html5Qr.clear(); } catch (e) {}
   }
   scanning = false;
+  document.getElementById('reader').classList.remove('active');
   btn.textContent = '카메라로 스캔 시작';
   btn.classList.remove('on');
 }
