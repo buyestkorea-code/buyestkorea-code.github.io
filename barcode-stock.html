@@ -71,7 +71,13 @@
 </head>
 <body>
   <h1>바코드 재고조회</h1>
-  <p class="lead">매장 바코드를 스캔하면 실시간으로 스타일코드를 찾아서 이카운트 재고를 <b>사이즈별로</b> 보여줍니다. 카메라로 찍거나, 전용 스캐너·키보드로 직접 입력해도 됩니다.</p>
+  <p class="lead">매장 바코드를 스캔하면 스타일코드를 뽑아서 이카운트 실시간 재고를 <b>사이즈별로</b> 보여줍니다. 카메라로 찍거나, 전용 스캐너·키보드로 직접 입력해도 됩니다.</p>
+
+  <div class="card">
+    <label class="card-label">키즈매장재고 리스트 업로드 (필수 — 바코드·품목명 열이 있는 파일)</label>
+    <input type="file" id="listFile" accept=".xlsx,.xls,.csv">
+    <div class="list-status" id="listStatus">먼저 리스트를 올려야 바코드를 스타일코드로 바꿀 수 있어요. (품목명이 "스타일코드_사이즈" 형식인 열 필요)</div>
+  </div>
 
   <div class="card">
     <div id="reader"></div>
@@ -94,10 +100,76 @@
   </table>
 
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script>
 const API_URL = 'https://buyest.co.kr/barcode_stock_lookup_api.php';
 const S = v => (v === null || v === undefined) ? '' : String(v).trim();
 const escHtml = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+
+// ---- 키즈매장재고 리스트 업로드: 바코드 -> 품목명("스타일코드_사이즈") 대조표 ----
+// 주의: 이 리스트는 실제로는 엑셀 바이너리가 아니라 HTML 표를 .xls로 저장한 파일인 경우가
+// 많다(여러 국내 POS/ERP가 이렇게 내보냄) — 그래서 우선 내용을 훑어 HTML이면 표를 직접
+// 파싱하고, 진짜 xlsx/xls 바이너리일 때만 SheetJS로 읽는다.
+let codeMap = new Map(); // 바코드 원문 -> { name: "품목명" }
+
+document.getElementById('listFile').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  const statusEl = document.getElementById('listStatus');
+  if (!f) return;
+  try {
+    const buf = await f.arrayBuffer();
+    const head = new TextDecoder('utf-8').decode(buf.slice(0, 300));
+    let rows;
+    if (/<html|<table|<meta/i.test(head)) {
+      const encMatch = /charset=([\w-]+)/i.exec(head);
+      let enc = (encMatch ? encMatch[1] : 'utf-8').toLowerCase();
+      if (enc === 'ks_c_5601-1987' || enc === 'euc-kr') enc = 'euc-kr';
+      const text = new TextDecoder(enc).decode(buf);
+      const doc = new DOMParser().parseFromString(text, 'text/html');
+      rows = Array.from(doc.querySelectorAll('table tr')).map(tr =>
+        Array.from(tr.children).map(td => td.textContent.trim())
+      );
+    } else {
+      const wb = XLSX.read(buf, { type: 'array' });
+      rows = [];
+      for (const name of wb.SheetNames) {
+        rows.push(...XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false }));
+      }
+    }
+
+    codeMap = new Map();
+    let cBar = -1, cName = -1, started = false, count = 0;
+    for (const row of rows) {
+      if (!row) continue;
+      if (!started) {
+        for (let i = 0; i < row.length; i++) {
+          const t = S(row[i]).replace(/\s/g, '');
+          if (/바코드|barcode/i.test(t)) cBar = i;
+          if (/품목명|품명|상품명|PROD_?DES/i.test(t)) cName = i;
+        }
+        if (cBar >= 0 && cName >= 0) { started = true; continue; }
+        continue;
+      }
+      const bar = cBar >= 0 ? S(row[cBar]) : '';
+      const nm = cName >= 0 ? S(row[cName]) : '';
+      if (!bar || !nm) continue;
+      codeMap.set(bar, { name: nm });
+      count++;
+    }
+    statusEl.textContent = count ? `${count}건 불러왔습니다. 이제 바코드를 스캔하면 스타일코드로 바꿔서 조회합니다.` : '리스트에서 "바코드"·"품목명" 열을 못 찾았어요. 파일 형식을 확인해주세요.';
+    statusEl.className = 'list-status' + (count ? ' ok' : '');
+  } catch (err) {
+    statusEl.textContent = '리스트를 읽지 못했습니다: ' + err.message;
+    statusEl.className = 'list-status';
+  }
+});
+
+// "4078604_27" -> "4078604" (언더스코어 앞부분 = 스타일코드, 뒷부분 = 사이즈)
+function extractStyleCode(name) {
+  const s = S(name);
+  const us = s.indexOf('_');
+  return (us >= 0 ? s.slice(0, us) : s).trim();
+}
 
 // ---- 카메라 스캔 (html5-qrcode) ----
 let html5Qr = null, scanning = false;
@@ -174,26 +246,25 @@ function handleCode(raw) {
 }
 
 async function lookup(raw) {
-  showLoading('', raw);
+  const entry = codeMap.get(raw);
+  // 목록에 있으면 품목명에서 스타일코드를 뽑고, 없으면 스캔값 자체를 스타일코드로 시도
+  // (직접 스타일코드를 입력/스캔하는 경우 대응).
+  const name = entry ? entry.name : '';
+  const styleCode = entry ? extractStyleCode(entry.name) : raw;
+
+  showLoading(styleCode, name);
   try {
     const res = await fetch(API_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ barcode: raw })
+      body: JSON.stringify({ style_code: styleCode })
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || '서버 오류');
-    if (data.found_in_wavepos === false) {
-      showError(raw, '', '매장 바코드 목록에서 이 코드를 찾지 못했어요.');
-      addHistory(raw, '', null, '매장목록없음');
-      return;
-    }
-    const styleCode = data.style_code;
-    const name = data.wavepos_name || '';
     renderItems(styleCode, name, data.items || [], data.truncated);
     addHistory(styleCode, name, data.items || [], null);
   } catch (err) {
-    showError('', raw, err.message);
-    addHistory(raw, '', null, err.message);
+    showError(styleCode, name, err.message);
+    addHistory(styleCode, name, null, err.message);
   }
 }
 
