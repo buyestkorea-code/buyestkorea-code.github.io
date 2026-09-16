@@ -604,6 +604,16 @@
   .me-admin .me-arow .addate{ display:none; }
   .me-admin .me-arow .btns{ margin-left:0; width:100%; justify-content:flex-end; }
 
+  /* 가입 관리: 평소엔 접어두고(대기 인원 배지만 보이게) 클릭하면 펼쳐짐 */
+  .me-admin{ padding:0; }
+  .me-admin > summary{ padding:18px 20px; margin:0; cursor:pointer; list-style:none; }
+  .me-admin > summary::-webkit-details-marker{ display:none; }
+  .me-admin > summary::after{ content:"\25BE"; flex:none; align-self:center; margin-left:4px; color:var(--ink-muted); font-size:13px; transition:transform .15s ease; }
+  .me-admin[open] > summary::after{ transform:rotate(180deg); }
+  .me-admin[open] > summary{ border-bottom:1px solid var(--surface-2); }
+  .me-admin > #meAdminSearch{ margin:14px 20px 0; width:calc(100% - 40px); }
+  .me-admin > #meAdminList{ padding:6px 20px 16px; }
+
   /* 캘린더 */
   .me-cal-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
   .me-cal-head h3{ margin:0; font-size:16px; font-weight:700; letter-spacing:-.01em; }
@@ -641,11 +651,32 @@
     border-radius:6px; padding:3px 7px 3px 8px; cursor:help;
     border-left:3px solid currentColor; }
   .me-cal-ev .t{ flex:1 1 auto; min-width:0; width:100%; word-break:break-word; overflow-wrap:anywhere; white-space:normal; }
-  .me-cal-more{ font-size:10.5px; font-weight:800; color:var(--accent); background:var(--accent-soft); border-radius:999px;
-    padding:2px 8px; margin-top:4px; align-self:flex-start; cursor:help; }
+  .me-cal-more{ font:inherit; font-size:10.5px; font-weight:800; color:var(--accent); background:var(--accent-soft); border:none; border-radius:999px;
+    padding:2px 8px; margin-top:4px; align-self:flex-start; cursor:pointer; }
+  .me-cal-more:hover{ filter:brightness(.95); }
   .me-cal-cell .del{ flex:none; margin-left:auto; border:none; background:none; color:inherit; opacity:0; font-size:13px; line-height:1; cursor:pointer; }
   .me-cal-ev:hover .del{ opacity:.85; }
   @media (max-width:640px){ .me-cal-cell{ min-height:auto; } }
+
+  /* 하루 일정 전체보기 팝업 — "+N개 더보기" 클릭 시, 10개가 넘게 몰려도 스크롤로 편하게 */
+  .me-cal-daypanel{ position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+    padding:20px; background:rgba(20,24,20,.5); backdrop-filter:blur(2px); }
+  .me-cal-daypanel-card{ width:100%; max-width:380px; max-height:min(560px,80vh); display:flex; flex-direction:column;
+    background:var(--surface); border-radius:18px; box-shadow:var(--me-shadow-hi); overflow:hidden; }
+  .me-cal-daypanel-h{ flex:none; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:16px 18px; border-bottom:1px solid var(--surface-2); }
+  .me-cal-daypanel-h strong{ font-size:14.5px; font-weight:700; letter-spacing:-.01em; }
+  .me-cal-daypanel-h button{ flex:none; border:none; background:none; font-size:20px; line-height:1; color:var(--ink-muted); cursor:pointer; padding:2px 4px; }
+  .me-cal-daypanel-h button:hover{ color:var(--ink); }
+  .me-cal-daypanel-list{ list-style:none; margin:0; padding:10px 12px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+  .me-cal-daypanel-list li{ display:flex; align-items:center; gap:8px; padding:9px 10px; border-radius:10px; border-left:3px solid currentColor; font-size:13px; font-weight:700; }
+  .me-cal-daypanel-list li .dot{ display:none; }
+  .me-cal-daypanel-list li .t{ flex:1 1 auto; min-width:0; word-break:break-word; }
+  .me-cal-daypanel-list li .del{ flex:none; border:none; background:none; color:inherit; opacity:.55; font-size:14px; line-height:1; cursor:pointer; padding:2px; }
+  .me-cal-daypanel-list li .del:hover{ opacity:1; }
+  .me-cal-daypanel-empty{ justify-content:center; color:var(--ink-muted); font-weight:500 !important; border-left:none !important; background:none !important; }
+  .me-cal-daypanel-f{ flex:none; padding:12px 18px 16px; border-top:1px solid var(--surface-2); }
+  .me-cal-daypanel-f .me-solid{ width:100%; }
 
   /* 업무 지표 */
   .me-metric-list{ display:flex; flex-direction:column; gap:14px; }
@@ -760,7 +791,7 @@
   .topbar-meta{ display:none; }
   body:not(.me-in):not(.me-guest) .topbar-title{ margin-right:auto; }
 
-  #meApp[hidden], #meGate[hidden], #meTopAuth[hidden], #meAdmin[hidden], #meCalAddPanel[hidden], #meNoticeAdd[hidden], #meOpts[hidden], #mePwForm[hidden], #meAdminSearch[hidden], #meSearch[hidden], #meTopDate[hidden], #meUser[hidden], #meUserMenu[hidden]{ display:none !important; }
+  #meApp[hidden], #meGate[hidden], #meTopAuth[hidden], #meAdmin[hidden], #meCalAddPanel[hidden], #meNoticeAdd[hidden], #meOpts[hidden], #mePwForm[hidden], #meAdminSearch[hidden], #meSearch[hidden], #meTopDate[hidden], #meUser[hidden], #meUserMenu[hidden], #meCalDayPanel[hidden]{ display:none !important; }
 </style>
 
 <div class="app">
@@ -989,6 +1020,19 @@
                   <div id="meCalGrid" class="me-cal-grid"></div>
                 </div>
 
+                <div id="meCalDayPanel" class="me-cal-daypanel" hidden>
+                  <div class="me-cal-daypanel-card">
+                    <div class="me-cal-daypanel-h">
+                      <strong id="meCalDayPanelTitle"></strong>
+                      <button type="button" id="meCalDayPanelClose" aria-label="닫기">&times;</button>
+                    </div>
+                    <ul id="meCalDayPanelList" class="me-cal-daypanel-list"></ul>
+                    <div class="me-cal-daypanel-f">
+                      <button type="button" id="meCalDayPanelAdd" class="me-solid">+ 이 날짜에 일정 추가</button>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="me-panel me-metrics">
                   <div class="me-panel-h">
                     <div><h3>업무 지표</h3><p>사방넷-이카운트 매칭, 재고 불일치 확인을 쓸 때마다 결과 건수가 쌓여 추이로 보여요.</p></div>
@@ -999,14 +1043,14 @@
               </div>
 
               <div class="me-dash-rail">
-                <div id="meAdmin" class="me-panel me-admin" hidden>
-                  <div class="me-panel-h">
+                <details id="meAdmin" class="me-panel me-admin" hidden>
+                  <summary class="me-panel-h">
                     <div><h3>가입 관리</h3><p id="meAdminSum" class="me-sub"></p></div>
                     <span id="meAdminCount" class="me-badge"></span>
-                  </div>
+                  </summary>
                   <input type="text" id="meAdminSearch" class="me-admin-search" placeholder="아이디 검색" hidden />
                   <div id="meAdminList" class="me-adminlist"></div>
-                </div>
+                </details>
 
                 <div class="me-panel me-rail">
                   <div class="me-panel-h"><h3>오늘 일정</h3><span id="meTodayDate" class="me-sub"></span></div>
@@ -2077,15 +2121,49 @@
           }
           evsBox.appendChild(ev);
         });
+        // 하루에 일정이 10개 넘게 몰릴 때도 칸이 늘어나지 않도록, 4개째부터는 칸 안에
+        // 다 펼치지 않고 "+N개 더보기"를 눌러 전체 목록 팝업으로 보여준다.
         if(its.length > 3){
-          var m = document.createElement('div'); m.className='me-cal-more'; m.textContent = '+' + (its.length-3) + '개 더보기';
-          m.title = its.slice(3).map(function(it){ return '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title; }).join('\n');
+          var m = document.createElement('button'); m.type = 'button'; m.className = 'me-cal-more';
+          m.textContent = '+' + (its.length - 3) + '개 더보기';
+          m.addEventListener('click', (function(dstr){ return function(e2){ e2.stopPropagation(); openDayPanel(dstr); }; })(ds));
           cell.appendChild(m);
         }
         cell.addEventListener('click', (function(x){ return function(){ openCalPanel(x); }; })(ds));
         calGrid.appendChild(cell);
       }
     }
+
+    /* ---------------- 하루 일정 전체보기 팝업 (더보기 클릭 시) ---------------- */
+    var dayPanel = $('meCalDayPanel'), dayPanelTitle = $('meCalDayPanelTitle'), dayPanelList = $('meCalDayPanelList');
+    function closeDayPanel(){ dayPanel.hidden = true; dayPanelList.innerHTML = ''; }
+    function openDayPanel(dstr){
+      var d = new Date(dstr + 'T00:00:00');
+      var its = itemsOn(dstr).slice().sort(function(a,b){ return (a.kind||'').localeCompare(b.kind||''); });
+      dayPanelTitle.textContent = (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + WK[d.getDay()] + ') · 일정 ' + its.length + '건';
+      dayPanelList.innerHTML = '';
+      its.forEach(function(it){
+        var li = document.createElement('li'); li.style.color = evColor(it.kind); li.style.background = 'var(--k-' + it.kind + '-bg)';
+        var dot = document.createElement('span'); dot.className = 'dot';
+        var t = document.createElement('span'); t.className = 't'; t.textContent = it.title;
+        li.appendChild(dot); li.appendChild(t);
+        if(it.author === (AUTH && AUTH.id) || IS_ADMIN){
+          var del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '×';
+          del.addEventListener('click', function(){ api('cal_del',{id:it.id}).then(function(r){ if(r&&r.ok){ loadCal(); openDayPanel(dstr); } }); });
+          li.appendChild(del);
+        }
+        dayPanelList.appendChild(li);
+      });
+      if(!its.length){
+        var empty = document.createElement('li'); empty.className = 'me-cal-daypanel-empty'; empty.textContent = '이 날은 등록된 일정이 없어요.';
+        dayPanelList.appendChild(empty);
+      }
+      $('meCalDayPanelAdd').onclick = function(){ closeDayPanel(); openCalPanel(dstr); };
+      dayPanel.hidden = false;
+    }
+    $('meCalDayPanelClose').addEventListener('click', closeDayPanel);
+    dayPanel.addEventListener('click', function(e){ if(e.target === dayPanel) closeDayPanel(); });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !dayPanel.hidden) closeDayPanel(); });
     function openCalPanel(dstr){
       calPanel.hidden = false;
       calDate.value = dstr || TODAY;
