@@ -914,6 +914,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5v14M8 5v14M11.5 5v14M15 5v14M18.5 5v14"/></svg></span>
         재고조사 (바코드 실사)<span class="chip chip-ready">사용가능</span>
       </button>
+      <button class="nav-item" data-nav="barcodeStock">
+        <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M6 9v6M9 9v6M12 9v6M15 9v6M18 9v6"/></svg></span>
+        바코드 재고조회<span class="chip chip-ready">사용가능</span>
+      </button>
       <button class="nav-item" data-nav="orderStock">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/></svg></span>
         주문서 창고위치찾기<span class="chip chip-ready">사용가능</span>
@@ -1206,6 +1210,11 @@
             <h3>재고조사 (바코드 실사)</h3>
             <p>기준 재고 엑셀을 올리고 바코드 스캐너로 스캔하면 옆에서 바로 재고 현황을 확인하고, 최종 결과를 바로 다운로드할 수 있습니다.</p>
           </button>
+          <button class="tool-card" data-nav="barcodeStock">
+            <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
+            <h3>바코드 재고조회</h3>
+            <p>휴대폰 카메라로 바코드를 찍으면 이카운트 실시간 재고수량을 바로 보여줍니다. 전용 스캐너 입력도 지원합니다.</p>
+          </button>
           <button class="tool-card" data-nav="orderStock">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>주문서 창고위치찾기</h3>
@@ -1479,6 +1488,11 @@
         </div>
       </section>
 
+      <!-- ============ BARCODE STOCK LOOKUP ============ -->
+      <section data-view="barcodeStock">
+        <iframe src="barcode-stock.html" title="바코드 재고조회" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <!-- ============ SABANGNET ORDER TRANSFORM + STOCK MATCH ============ -->
       <section data-view="orderStock">
         <div class="workspace">
@@ -1644,6 +1658,7 @@
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', sabangEcount:'사방넷-이카운트 매칭',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
+    barcodeStock:'바코드 재고조회',
     orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
   };
 
@@ -1694,7 +1709,7 @@
   // 로그인 없이도 쓸 수 있는 기능은 '재고조사(바코드 실사)'뿐 — 나머지 도구는 로그인해야
   // 열리도록 막는다. localStorage를 직접 읽어서 판단하므로(아래 인트라넷 IIFE가 아직 실행
   // 되기 전인 첫 로드 시점에도) 순서에 상관없이 항상 정확하다.
-  var GUEST_ALLOWED = {dashboard:1, stocktake:1, roadmap:1};
+  var GUEST_ALLOWED = {dashboard:1, stocktake:1, barcodeStock:1, roadmap:1};
   function isLoggedInNow(){
     try{ return !!JSON.parse(localStorage.getItem('buyest.dash.auth')); }catch(e){ return false; }
   }

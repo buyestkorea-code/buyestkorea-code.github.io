@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>바코드 재고조회</title>
+<style>
+  :root {
+    --ink: #111827; --ink-muted: #6b7280; --line: #e5e7eb; --bg: #fafafa;
+    --ok-bg: #f0fdf4; --ok-fg: #15803d; --bad-bg: #fef2f2; --bad-fg: #b91c1c;
+    --warn-bg: #fef3c7; --warn-fg: #92400e; --accent: #0f766e;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 640px; margin: 0 auto; padding: 18px 16px 60px; background: var(--bg); color: var(--ink); }
+  h1 { font-size: 19px; margin: 4px 0 2px; }
+  p.lead { color: var(--ink-muted); margin: 4px 0 16px; font-size: 13px; line-height: 1.55; }
+
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+  .card-label { font-size: 12px; font-weight: 700; color: var(--ink-muted); margin-bottom: 8px; display: block; }
+  .list-status { font-size: 12.5px; color: var(--ink-muted); margin-top: 6px; }
+  .list-status.ok { color: var(--ok-fg); }
+
+  #reader { width: 100%; border-radius: 10px; overflow: hidden; background: #000; min-height: 0; }
+  #reader:empty { display: none; }
+
+  .btn { font-size: 15px; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-primary.on { background: var(--bad-fg); }
+  .btn-primary:active { opacity: .85; }
+
+  .field { margin-top: 12px; }
+  .field label { font-size: 12px; color: var(--ink-muted); font-weight: 600; display: block; margin-bottom: 5px; }
+  input[type=text] { width: 100%; font-size: 17px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; text-align: center; font-weight: 700; letter-spacing: .3px; }
+  input[type=text]:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+  input[type=file] { font-size: 13px; width: 100%; }
+
+  .result { border-radius: 12px; padding: 20px; text-align: center; display: none; }
+  .result.show { display: block; }
+  .result-name { font-size: 14px; color: var(--ink-muted); margin-bottom: 2px; min-height: 18px; }
+  .result-code { font-size: 12px; color: var(--ink-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+  .result-qty { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; font-size: 56px; font-weight: 700; line-height: 1.1; margin: 6px 0; font-variant-numeric: tabular-nums; }
+  .result-note { font-size: 13px; font-weight: 600; }
+  .result.ok { background: var(--ok-bg); } .result.ok .result-qty, .result.ok .result-note { color: var(--ok-fg); }
+  .result.zero { background: var(--bad-bg); } .result.zero .result-qty, .result.zero .result-note { color: var(--bad-fg); }
+  .result.warn { background: var(--warn-bg); } .result.warn .result-qty, .result.warn .result-note { color: var(--warn-fg); }
+  .result.loading { background: #f3f4f6; } .result.loading .result-qty { color: var(--ink-muted); }
+
+  .history-head { font-size: 12px; font-weight: 700; color: var(--ink-muted); margin: 18px 0 6px; display: flex; justify-content: space-between; align-items: center; }
+  .history-head button { font-size: 12px; background: none; border: none; color: var(--accent); font-weight: 700; cursor: pointer; padding: 2px; }
+  table.hist { width: 100%; border-collapse: collapse; font-size: 12.5px; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  table.hist th, table.hist td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+  table.hist th { background: #f3f4f6; font-weight: 600; color: var(--ink-muted); }
+  table.hist tr:last-child td { border-bottom: none; }
+  .qty-chip { font-weight: 700; }
+  .qty-chip.ok { color: var(--ok-fg); } .qty-chip.zero { color: var(--bad-fg); } .qty-chip.warn { color: var(--warn-fg); }
+  .empty-row td { text-align: center; color: var(--ink-muted); padding: 16px 8px; }
+</style>
+</head>
+<body>
+  <h1>바코드 재고조회</h1>
+  <p class="lead">바코드를 스캔하면 이카운트 실시간 재고수량을 바로 보여줍니다. 카메라로 찍거나, 전용 스캐너·키보드로 직접 입력해도 됩니다.</p>
+
+  <div class="card">
+    <label class="card-label">품목코드 리스트 업로드 (선택 — 있으면 상품명도 함께 표시)</label>
+    <input type="file" id="listFile" accept=".xlsx,.xls,.csv">
+    <div class="list-status" id="listStatus">업로드 안 해도 조회는 됩니다. 코드만 뽑아 바로 이카운트에 물어봐요.</div>
+  </div>
+
+  <div class="card">
+    <div id="reader"></div>
+    <button class="btn btn-primary" id="scanToggle">카메라로 스캔 시작</button>
+    <div class="field">
+      <label>또는 직접 입력 / 전용 스캐너로 스캔</label>
+      <input type="text" id="manualInput" placeholder="코드 입력 후 Enter" autocomplete="off" inputmode="numeric">
+    </div>
+  </div>
+
+  <div class="result" id="result">
+    <div class="result-name" id="resultName"></div>
+    <div class="result-qty" id="resultQty">—</div>
+    <div class="result-code" id="resultCode"></div>
+    <div class="result-note" id="resultNote" style="margin-top:6px;"></div>
+  </div>
+
+  <div class="history-head">
+    <span>최근 스캔 기록</span>
+    <button id="clearHistBtn" type="button">지우기</button>
+  </div>
+  <table class="hist" id="histTable">
+    <thead><tr><th>시간</th><th>코드</th><th>품목명</th><th>재고</th></tr></thead>
+    <tbody id="histBody"><tr class="empty-row"><td colspan="4">아직 스캔한 기록이 없습니다.</td></tr></tbody>
+  </table>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script>
+const API_URL = 'https://buyest.co.kr/barcode_stock_lookup_api.php';
+const S = v => (v === null || v === undefined) ? '' : String(v).trim();
+
+// ---- 품목코드 리스트 업로드(선택): 바코드/코드/품목명 헤더 자동 인식 ----
+let codeMap = new Map(); // 원문 문자열(바코드든 품목코드든) -> {code, name}
+document.getElementById('listFile').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  const statusEl = document.getElementById('listStatus');
+  if (!f) return;
+  try {
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    codeMap = new Map();
+    let rows = 0;
+    for (const name of wb.SheetNames) {
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false });
+      let cBar = -1, cCode = -1, cName = -1, started = false;
+      for (const row of aoa) {
+        if (!row) continue;
+        if (!started) {
+          for (let i = 0; i < row.length; i++) {
+            const t = S(row[i]).replace(/\s/g, '');
+            if (/바코드|barcode/i.test(t)) cBar = i;
+            if (/품목코드|품번코드|^코드$|PROD_?CD/i.test(t)) cCode = i;
+            if (/품목명|품명|상품명|PROD_?DES/i.test(t)) cName = i;
+          }
+          if (cCode >= 0 || cBar >= 0) { started = true; continue; }
+          continue;
+        }
+        const code = cCode >= 0 ? S(row[cCode]) : '';
+        const bar = cBar >= 0 ? S(row[cBar]) : '';
+        const nm = cName >= 0 ? S(row[cName]) : '';
+        if (!code && !bar) continue;
+        const entry = { code: code || bar, name: nm };
+        if (bar) codeMap.set(bar, entry);
+        if (code) codeMap.set(code, entry);
+        rows++;
+      }
+    }
+    statusEl.textContent = rows ? `${rows}건 불러왔습니다. 스캔하면 상품명도 함께 표시됩니다.` : '리스트에서 바코드/품목코드 열을 못 찾았어요. 그래도 코드 직접조회는 됩니다.';
+    statusEl.className = 'list-status' + (rows ? ' ok' : '');
+  } catch (err) {
+    statusEl.textContent = '리스트를 읽지 못했습니다: ' + err.message;
+    statusEl.className = 'list-status';
+  }
+});
+
+function normalizeCode(raw) {
+  const v = S(raw);
+  if (/^\d+$/.test(v) && v.length < 10) return v.padStart(10, '0');
+  return v;
+}
+
+// ---- 카메라 스캔 (html5-qrcode) ----
+let html5Qr = null, scanning = false;
+let lastCode = '', lastTime = 0;
+
+document.getElementById('scanToggle').addEventListener('click', () => {
+  if (scanning) stopScan(); else startScan();
+});
+
+async function startScan() {
+  const btn = document.getElementById('scanToggle');
+  try {
+    html5Qr = new Html5Qrcode('reader');
+    await html5Qr.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 280, height: 160 } },
+      decodedText => handleCode(decodedText),
+      () => {} // 프레임마다 못 읽으면 호출됨 — 무시
+    );
+    scanning = true;
+    btn.textContent = '카메라 끄기';
+    btn.classList.add('on');
+  } catch (err) {
+    alert('카메라를 열 수 없습니다. 브라우저 카메라 권한을 확인해주세요.\n(' + err + ')');
+  }
+}
+
+async function stopScan() {
+  const btn = document.getElementById('scanToggle');
+  if (html5Qr && scanning) {
+    try { await html5Qr.stop(); html5Qr.clear(); } catch (e) {}
+  }
+  scanning = false;
+  btn.textContent = '카메라로 스캔 시작';
+  btn.classList.remove('on');
+}
+
+// ---- 수동/전용 스캐너 입력 ----
+document.getElementById('manualInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = e.target.value;
+    e.target.value = '';
+    handleCode(v);
+  }
+});
+
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.08, ctx.currentTime);
+    o.start(); o.stop(ctx.currentTime + 0.08);
+  } catch (e) {}
+}
+
+function handleCode(raw) {
+  const val = S(raw);
+  if (!val) return;
+  const now = Date.now();
+  if (val === lastCode && now - lastTime < 2500) return; // 같은 바코드 연속 인식 방지
+  lastCode = val; lastTime = now;
+  beep();
+  lookup(val);
+}
+
+async function lookup(raw) {
+  const entry = codeMap.get(raw) || codeMap.get(normalizeCode(raw));
+  const code = entry ? entry.code : normalizeCode(raw);
+  const name = entry ? entry.name : '';
+
+  showResult({ state: 'loading', code, name });
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '서버 오류');
+    if (!data.found) {
+      showResult({ state: 'warn', code, name, note: '이카운트에서 이 품목코드를 찾지 못했어요.' });
+      addHistory({ code, name, qtyLabel: '—', cls: 'warn' });
+    } else {
+      const qty = data.qty;
+      showResult({ state: qty > 0 ? 'ok' : 'zero', code, name, qty });
+      addHistory({ code, name, qtyLabel: String(qty), cls: qty > 0 ? 'ok' : 'zero' });
+    }
+  } catch (err) {
+    showResult({ state: 'warn', code, name, note: '조회 실패: ' + err.message });
+    addHistory({ code, name, qtyLabel: '오류', cls: 'warn' });
+  }
+}
+
+function showResult({ state, code, name, qty, note }) {
+  const box = document.getElementById('result');
+  box.className = 'result show ' + state;
+  document.getElementById('resultName').textContent = name || '';
+  document.getElementById('resultCode').textContent = code;
+  document.getElementById('resultQty').textContent =
+    state === 'loading' ? '조회중…' : (qty !== undefined ? qty : (state === 'warn' ? '?' : '—'));
+  document.getElementById('resultNote').textContent =
+    state === 'ok' ? '현재 재고 있음' : state === 'zero' ? '품절 (재고 0)' : (note || '');
+}
+
+const histEntries = [];
+function addHistory({ code, name, qtyLabel, cls }) {
+  histEntries.unshift({ time: new Date().toLocaleTimeString('ko-KR', { hour12: false }), code, name, qtyLabel, cls });
+  if (histEntries.length > 50) histEntries.length = 50;
+  renderHistory();
+}
+function renderHistory() {
+  const body = document.getElementById('histBody');
+  const esc = s => String(s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  if (!histEntries.length) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="4">아직 스캔한 기록이 없습니다.</td></tr>';
+    return;
+  }
+  body.innerHTML = histEntries.map(h => `<tr>
+    <td>${h.time}</td>
+    <td style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;">${esc(h.code)}</td>
+    <td>${esc(h.name)}</td>
+    <td class="qty-chip ${h.cls}">${esc(h.qtyLabel)}</td>
+  </tr>`).join('');
+}
+document.getElementById('clearHistBtn').addEventListener('click', () => {
+  histEntries.length = 0; renderHistory();
+});
+
+window.addEventListener('beforeunload', () => { if (scanning) stopScan(); });
+</script>
+</body>
+</html>
