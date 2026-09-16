@@ -502,7 +502,7 @@
     font:inherit; font-size:13px; background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235C6259' stroke-width='2'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='M11 11l4 4'/%3E%3C/svg%3E") no-repeat 12px center; color:var(--ink); }
   .me-search:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
   .me-topdate{ font-size:12.5px; font-weight:500; color:var(--ink-muted); white-space:nowrap; flex:none; }
-  .me-user{ flex:none; display:flex; align-items:center; gap:9px; padding:5px 10px 5px 6px; border:1px solid var(--border); border-radius:999px; background:var(--surface); cursor:pointer; font:inherit; }
+  .me-user{ flex:none; margin-left:auto; display:flex; align-items:center; gap:9px; padding:5px 10px 5px 6px; border:1px solid var(--border); border-radius:999px; background:var(--surface); cursor:pointer; font:inherit; }
   .me-user:hover{ border-color:var(--accent); }
   .me-user .ava{ width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex:none; }
   .me-user .un{ display:flex; flex-direction:column; line-height:1.2; text-align:left; }
@@ -512,11 +512,11 @@
   .me-usermenu button{ display:block; width:100%; text-align:left; padding:9px 12px; border:none; border-radius:8px; background:none; font:inherit; font-size:13px; color:var(--ink); cursor:pointer; }
   .me-usermenu button:hover{ background:var(--surface-2); }
 
-  /* ===== 히어로 배너 ===== */
+  /* ===== 히어로 배너 (인사말 + 자주 쓰는 도구를 한 카드로) ===== */
   .me-herorow{ display:flex; gap:16px; margin-bottom:20px; }
   .me-hero{
-    flex:1 1 auto; position:relative; overflow:hidden; border-radius:20px; padding:34px 38px;
-    min-height:176px; display:flex; flex-direction:column; justify-content:center;
+    flex:1 1 auto; position:relative; overflow:hidden; border-radius:20px; padding:26px 30px 28px;
+    display:flex; flex-direction:column; gap:14px;
     background:
       radial-gradient(125% 150% at 88% -25%, rgba(255,203,138,.32), transparent 55%),
       radial-gradient(85% 120% at 4% 120%, rgba(129,206,145,.22), transparent 60%),
@@ -528,18 +528,31 @@
     content:""; position:absolute; inset:0; opacity:.5; mix-blend-mode:overlay; pointer-events:none;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
-  .me-hero::after{ content:"PEOPLE · BRANDS · GROW TOGETHER"; position:absolute; left:38px; bottom:14px;
-    font-size:10px; font-weight:700; letter-spacing:.2em; color:#F4F0E4; opacity:.38; }
-  .me-hero h1{ position:relative; margin:0 0 9px; font-size:26px; font-weight:700; letter-spacing:-.02em; color:#F8F6EC; }
-  .me-hero p{ position:relative; margin:0; font-size:13.5px; color:rgba(231,231,221,.74); max-width:48ch; }
-  .me-hero-text{ position:relative; padding-bottom:22px; }
+  .me-hero-top{ position:relative; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .me-hero h1{ margin:0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:17px; font-weight:700; letter-spacing:-.01em; color:#F8F6EC; }
+  .me-hero-pick{ position:relative; flex:none; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.16);
+    border-radius:999px; padding:6px 14px; font:inherit; font-size:11.5px; font-weight:600; color:#F3EFE3; cursor:pointer; }
+  .me-hero-pick:hover{ background:rgba(255,255,255,.17); }
+  .me-toolgrid-hero{ position:relative; display:grid; grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); gap:8px; }
+  .me-toolgrid-hero button{ background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.14); border-radius:12px;
+    padding:10px 12px; display:flex; flex-direction:column; gap:5px; align-items:flex-start; cursor:pointer;
+    font:inherit; text-align:left; transition:background .15s ease, border-color .15s ease; }
+  .me-toolgrid-hero button:hover{ background:rgba(255,255,255,.17); border-color:rgba(255,255,255,.26); }
+  .me-toolgrid-hero button .nm{ font-size:12.5px; font-weight:700; color:#F5F3EA; }
+  .me-toolgrid-hero button .bd{ font-size:9.5px; font-weight:700; color:#9FE3B8; background:rgba(111,203,128,.18); border-radius:999px; padding:1px 7px; }
+  .me-toolgrid-hero .empty{ grid-column:1/-1; display:flex; align-items:center; gap:8px; font-size:12px; color:rgba(243,239,227,.8);
+    padding:12px 14px; border:1.5px dashed rgba(255,255,255,.22); border-radius:12px; background:rgba(255,255,255,.05); }
+  .me-toolgrid-hero .empty::before{ content:"✦"; color:#9FE3B8; font-weight:700; }
+  .me-opts-hero{ position:relative; color:#F3EFE3; border-top-color:rgba(255,255,255,.16) !important; }
+  .me-opts-hero input{ accent-color:#6FCB80; }
 
   body.me-in .hero{ display:none; }
   body.me-in #dashCatalog{ display:none; }
   body.me-in .content{ max-width:1280px; }
   body.me-in .topbar-title{ display:none; }
 
-  .me-hero .me-sync{ position:absolute; top:16px; right:18px; z-index:1; font-size:11px; font-weight:500; color:#F3EFE3;
+  .me-hero-top-actions{ flex:none; display:flex; align-items:center; gap:8px; }
+  .me-hero .me-sync{ font-size:11px; font-weight:500; color:#F3EFE3;
     background:rgba(255,255,255,.14); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.14);
     border-radius:999px; padding:4px 11px; white-space:nowrap; }
   .me-hero .me-sync:empty{ display:none; }
@@ -900,11 +913,15 @@
           <div id="meApp" hidden>
             <div class="me-herorow">
               <div class="me-hero">
-                <span class="me-sync" id="meSync"></span>
-                <div class="me-hero-text">
+                <div class="me-hero-top">
                   <h1 id="meGreetH1">안녕하세요 👋</h1>
-                  <p id="meGreetP">오늘도 BUYEST와 함께, 더 특별한 가치를 만들어가요.</p>
+                  <div class="me-hero-top-actions">
+                    <span class="me-sync" id="meSync"></span>
+                    <button type="button" id="meToolsEdit" class="me-hero-pick">고르기</button>
+                  </div>
                 </div>
+                <div id="mePicks" class="me-toolgrid me-toolgrid-hero"></div>
+                <div id="meOpts" class="me-opts me-opts-hero" hidden></div>
               </div>
             </div>
 
@@ -948,15 +965,6 @@
                   </div>
 
                   <ul id="meTaskList" class="me-tasklist"></ul>
-                </div>
-
-                <div class="me-panel me-tools">
-                  <div class="me-panel-h">
-                    <div><h3>자주 쓰는 도구</h3><p>자주 사용하는 업무 도구를 더 빠르게 이용하세요.</p></div>
-                    <button type="button" id="meToolsEdit" class="me-link">고르기</button>
-                  </div>
-                  <div id="mePicks" class="me-toolgrid"></div>
-                  <div id="meOpts" class="me-opts" hidden></div>
                 </div>
 
                 <div class="me-panel me-cal">
