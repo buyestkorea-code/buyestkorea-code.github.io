@@ -697,6 +697,12 @@
   .me-cal-cell .d{ display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; margin-bottom:3px; border-radius:7px; font-size:12.5px; font-weight:800; flex:none; }
   .me-cal-cell.sun .d{ color:var(--danger); } .me-cal-cell.sat .d{ color:#2E6FA3; }
   .me-cal-cell.today.sun .d, .me-cal-cell.today.sat .d{ color:var(--accent-ink); }
+  /* 공휴일: 평일이어도 날짜 숫자를 일요일과 같은 빨간색으로, 이름은 그 옆에 작게 */
+  .me-cal-cell.holiday .d{ color:var(--danger); }
+  .me-cal-cell.today.holiday .d{ color:var(--accent-ink); }
+  .me-cal-holiday{ display:block; font-size:9.5px; font-weight:700; color:var(--danger); line-height:1.3;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:-1px 0 2px; }
+  .me-cal-cell.today .me-cal-holiday{ color:var(--danger); }
   .me-cal-evs{ display:flex; flex-direction:column; gap:3px; min-height:0; }
   .me-cal-ev{ display:flex; align-items:flex-start; gap:5px; font-size:11.5px; font-weight:700; line-height:1.45;
     border-radius:6px; padding:3px 7px 3px 8px; cursor:help;
@@ -1807,6 +1813,29 @@
     var CATS = [['mkt','마케팅'],['log','물류'],['ops','운영'],['cs','CS'],['etc','기타'],['off','휴가']];
     var CAT_LABEL = {}; CATS.forEach(function(c){ CAT_LABEL[c[0]] = c[1]; });
 
+    // 대한민국 법정공휴일(2025~2027, 대체공휴일 포함). 설날·추석·부처님오신날처럼
+    // 음력 기준인 날짜는 해마다 달라서 해가 바뀔 때마다 이 표를 더 채워줘야 한다
+    // (행정안전부/관공서 공휴일 규정 기준으로 확인 후 추가).
+    var KR_HOLIDAYS = {
+      '2025-01-01':'신정', '2025-01-28':'설날연휴', '2025-01-29':'설날', '2025-01-30':'설날연휴',
+      '2025-03-01':'삼일절', '2025-03-03':'대체공휴일', '2025-05-05':'어린이날·부처님오신날', '2025-05-06':'대체공휴일',
+      '2025-06-06':'현충일', '2025-08-15':'광복절', '2025-10-03':'개천절',
+      '2025-10-05':'추석연휴', '2025-10-06':'추석', '2025-10-07':'추석연휴', '2025-10-08':'대체공휴일',
+      '2025-10-09':'한글날', '2025-12-25':'크리스마스',
+      '2026-01-01':'신정', '2026-02-16':'설날연휴', '2026-02-17':'설날', '2026-02-18':'설날연휴',
+      '2026-03-01':'삼일절', '2026-03-02':'대체공휴일', '2026-05-05':'어린이날',
+      '2026-05-24':'부처님오신날', '2026-05-25':'대체공휴일', '2026-06-06':'현충일',
+      '2026-08-15':'광복절', '2026-08-17':'대체공휴일',
+      '2026-09-24':'추석연휴', '2026-09-25':'추석', '2026-09-26':'추석연휴',
+      '2026-10-03':'개천절', '2026-10-05':'대체공휴일', '2026-10-09':'한글날', '2026-12-25':'크리스마스',
+      '2027-01-01':'신정', '2027-02-06':'설날연휴', '2027-02-07':'설날', '2027-02-08':'설날연휴', '2027-02-09':'대체공휴일',
+      '2027-03-01':'삼일절', '2027-05-05':'어린이날', '2027-05-13':'부처님오신날', '2027-06-06':'현충일',
+      '2027-08-15':'광복절', '2027-08-16':'대체공휴일',
+      '2027-09-14':'추석연휴', '2027-09-15':'추석', '2027-09-16':'추석연휴',
+      '2027-10-03':'개천절', '2027-10-04':'대체공휴일', '2027-10-09':'한글날', '2027-10-11':'대체공휴일',
+      '2027-12-25':'크리스마스', '2027-12-27':'대체공휴일'
+    };
+
     var AUTH  = LS.get('buyest.dash.auth', null);          // {id, pass, role}
     var IS_ADMIN = !!(AUTH && AUTH.role === 'admin');
     var state = normState(LS.get('buyest.dash.cache', null));
@@ -2286,12 +2315,18 @@
       for(var i = 0; i < 42; i++){
         var d = new Date(gridStart); d.setDate(d.getDate() + i);
         var ds = ymd(d), dow = d.getDay();
+        var holiday = KR_HOLIDAYS[ds];
         var cell = document.createElement('div');
         cell.className = 'me-cal-cell'
           + (d.getMonth() !== calMonth.getMonth() ? ' dim' : '')
           + (ds === TODAY ? ' today' : '')
-          + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '');
+          + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '')
+          + (holiday ? ' holiday' : '');
         var dn = document.createElement('span'); dn.className='d'; dn.textContent = d.getDate(); cell.appendChild(dn);
+        if(holiday){
+          var hn = document.createElement('span'); hn.className = 'me-cal-holiday'; hn.textContent = holiday; hn.title = holiday;
+          cell.appendChild(hn);
+        }
         var its = itemsOn(ds);
         var evsBox = document.createElement('div'); evsBox.className = 'me-cal-evs'; cell.appendChild(evsBox);
         its.slice(0, 3).forEach(function(it){
@@ -2335,7 +2370,9 @@
     function openDayPanel(dstr){
       var d = new Date(dstr + 'T00:00:00');
       var its = itemsOn(dstr).slice().sort(function(a,b){ return (a.kind||'').localeCompare(b.kind||''); });
-      dayPanelTitle.textContent = (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + WK[d.getDay()] + ') · 일정 ' + its.length + '건';
+      var dHoliday = KR_HOLIDAYS[dstr];
+      dayPanelTitle.textContent = (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + WK[d.getDay()] + ')'
+        + (dHoliday ? ' · ' + dHoliday : '') + ' · 일정 ' + its.length + '건';
       dayPanelList.innerHTML = '';
       its.forEach(function(it){
         var li = document.createElement('li'); li.style.color = evColor(it.kind); li.style.background = 'var(--k-' + it.kind + '-bg)';
