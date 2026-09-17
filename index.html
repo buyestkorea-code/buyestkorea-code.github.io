@@ -830,6 +830,18 @@
   .me-notices .x{ border:none; background:none; color:var(--ink-muted); font-size:14px; line-height:1; cursor:pointer; flex:none; opacity:0; }
   .me-notices li:hover .x{ opacity:.7; }
   .me-notices .none{ color:var(--ink-muted); padding:4px; font-size:12.5px; }
+
+  .me-leaves{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; }
+  .me-leaves li{ padding:2px 4px; }
+  .me-leaves .lv-top{ display:flex; align-items:baseline; gap:6px; margin-bottom:5px; }
+  .me-leaves .lv-label{ font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .me-leaves .lv-frac{ margin-left:auto; flex:none; font-size:11.5px; color:var(--ink-muted); font-variant-numeric:tabular-nums; }
+  .me-leaves .x{ border:none; background:none; color:var(--ink-muted); font-size:14px; line-height:1; cursor:pointer; flex:none; opacity:0; padding:0 0 0 2px; }
+  .me-leaves li:hover .x{ opacity:.7; }
+  .me-leaves .lv-bar{ height:6px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
+  .me-leaves .lv-fill{ height:100%; background:var(--accent); border-radius:99px; }
+  .me-leaves .lv-fill.over{ background:var(--danger); }
+  .me-leaves .none{ color:var(--ink-muted); padding:4px; font-size:12.5px; }
   #meMemo{ width:100%; box-sizing:border-box; resize:vertical; min-height:96px; padding:11px 12px; border:1px solid var(--border); border-radius:11px; font:inherit; font-size:13px; line-height:1.6; background:var(--surface); color:var(--ink); }
   #meMemo:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
   .me-memofoot{ display:flex; justify-content:space-between; margin-top:7px; }
@@ -1150,6 +1162,11 @@
                 <div class="me-panel me-rail">
                   <div class="me-panel-h"><h3>다가오는 일정</h3></div>
                   <ul id="meUpcoming" class="me-agenda"></ul>
+                </div>
+
+                <div class="me-panel me-rail">
+                  <div class="me-panel-h"><h3>월차 및 휴가 관리</h3><button type="button" id="meLeaveAdd" class="me-link" hidden>+ 등록</button></div>
+                  <ul id="meLeave" class="me-leaves"></ul>
                 </div>
 
                 <div class="me-panel me-rail">
@@ -1910,6 +1927,7 @@
       document.body.classList.toggle('me-admin', inn && IS_ADMIN);
       $('meAdmin').hidden = !(inn && IS_ADMIN);
       $('meNoticeAdd').hidden = !(inn && IS_ADMIN);
+      $('meLeaveAdd').hidden = !(inn && IS_ADMIN);
       $('meSearch').hidden = !inn;
       $('meTopDate').hidden = !inn;
       $('meUser').hidden = !inn;
@@ -2480,6 +2498,47 @@
       });
     }
 
+    /* ---------------- 월차 및 휴가 관리 ---------------- */
+    // 매년 부여일수가 사람마다/시기마다 달라 자동 집계 대신, 관리자가 "이름 12/15"
+    // 처럼 자유 텍스트로 등록하면 맨 끝의 "사용/총" 숫자만 뽑아 막대그래프로 보여준다.
+    var leaveEl = $('meLeave');
+    var LEAVE_FRAC_RE = /^(.*\S)\s+(\d+)\s*\/\s*(\d+)\s*$/;
+    function loadLeaves(){
+      api('leave_list').then(function(res){ if(res && res.ok) renderLeaves(res.items || []); }).catch(function(){});
+    }
+    function renderLeaves(items){
+      leaveEl.innerHTML = items.length ? '' : '<li class="none">등록된 항목이 없어요.</li>';
+      items.forEach(function(n){
+        var used = Number(n.used) || 0, total = Number(n.total) || 0;
+        var pct = total > 0 ? Math.min(100, Math.round((used/total)*100)) : 0;
+        var li = document.createElement('li');
+        var top = document.createElement('div'); top.className = 'lv-top';
+        var lbl = document.createElement('span'); lbl.className = 'lv-label'; lbl.textContent = n.label; lbl.title = n.label;
+        var frac = document.createElement('span'); frac.className = 'lv-frac'; frac.textContent = used + '/' + total;
+        top.appendChild(lbl); top.appendChild(frac);
+        if(IS_ADMIN){
+          var x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×'; x.setAttribute('aria-label','삭제');
+          x.addEventListener('click', function(){ api('leave_del',{id:n.id}).then(function(r){ if(r&&r.ok) loadLeaves(); }); });
+          top.appendChild(x);
+        }
+        var bar = document.createElement('div'); bar.className = 'lv-bar';
+        var fill = document.createElement('div'); fill.className = 'lv-fill' + (used > total ? ' over' : ''); fill.style.width = pct + '%';
+        bar.appendChild(fill);
+        li.appendChild(top); li.appendChild(bar);
+        li.title = (total - used) + '일 남음';
+        leaveEl.appendChild(li);
+      });
+    }
+    $('meLeaveAdd').addEventListener('click', function(){
+      var t = prompt('예: 조경호 휴가 12/15  (맨 끝 "사용/총" 숫자만 반영돼요)');
+      if(!t || !t.trim()) return;
+      var m = LEAVE_FRAC_RE.exec(t.trim());
+      if(!m){ alert('맨 끝에 "사용/총" 형식(예: 12/15)이 있어야 해요'); return; }
+      api('leave_add', {label:m[1], used:parseInt(m[2],10), total:parseInt(m[3],10)}).then(function(r){
+        r&&r.ok?loadLeaves():alert((r&&r.error)||'실패');
+      });
+    });
+
     /* ---------------- 공지사항 ---------------- */
     var noticeEl = $('meNotice');
     function loadNotices(){
@@ -2505,7 +2564,7 @@
       if(t && t.trim()) api('notice_add',{title:t.trim()}).then(function(r){ r&&r.ok?loadNotices():alert((r&&r.error)||'실패'); });
     });
 
-    function bootWorkspace(){ renderCal(); loadCal(); renderAgenda(); loadNotices(); loadAdmin(); loadMembers(); migrateLegacyTodos(); loadMetrics(); }
+    function bootWorkspace(){ renderCal(); loadCal(); renderAgenda(); loadNotices(); loadLeaves(); loadAdmin(); loadMembers(); migrateLegacyTodos(); loadMetrics(); }
 
     /* ---------------- 로그인 / 회원가입 ---------------- */
     function setGateMode(m, keepMsg){
