@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>갈리아노양식 변경</title>
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1150px; margin: 32px auto; padding: 0 20px; background: #fafafa; color: #222; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.lead { color: #555; margin-top: 6px; font-size: 13.5px; line-height: 1.6; }
+  .row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; margin: 16px 0; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: #666; font-weight: 600; }
+  input[type=file] { font-size: 13px; }
+  .btn { font-size: 15px; padding: 10px 22px; border: none; border-radius: 6px; cursor: pointer; margin-right: 8px; }
+  .btn-primary { background: #111827; color: #fff; }
+  .btn-green { background: #0f766e; color: #fff; }
+  .btn:disabled { background: #d1d5db; color: #6b7280; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12.5px; background: #fff; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; white-space: nowrap; }
+  th { background: #f3f4f6; position: sticky; top: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.desc { white-space: normal; max-width: 320px; }
+  .tbl-wrap { max-height: 62vh; overflow: auto; border: 1px solid #e5e7eb; border-radius: 6px; margin-top: 12px; }
+  #status { color: #6b7280; margin: 10px 0; font-size: 13px; }
+  #result { margin-top: 12px; padding: 10px 12px; border-radius: 6px; font-size: 13px; white-space: pre-wrap; }
+  #result.ok { background: #f0fdf4; color: #15803d; }
+  #result.err { background: #fef2f2; color: #b91c1c; }
+  #result.warn { background: #fffbeb; color: #92400e; }
+</style>
+</head>
+<body>
+  <h1>갈리아노양식 변경</h1>
+  <p class="lead">
+    갈리아노(Galiano) <b>PROFORMA INVOICE PDF</b>를 올리면 품목별 품번·컬러코드·원산지·수량·원가(Whls Price)·마진율(Mu/Disc)을
+    읽어서 바이스트 매입 엑셀 양식(PROFORMA NO. / Code / Descriptions / MADE / Q'TY / COST / MARK / COST+MARK / TOTAL)으로 바로 변환합니다.<br>
+    모든 처리는 이 브라우저 안에서만 이뤄지고 파일은 서버로 전송되지 않습니다.<br>
+    <b>스캔본(이미지) PDF는 지원하지 않습니다</b> — 그런 경우 사이드바의 "인보이스 자동인식" 도구를 이용해주세요.
+  </p>
+
+  <div class="row">
+    <div class="field">
+      <label>갈리아노 PROFORMA INVOICE (.pdf)</label>
+      <input type="file" id="pdfFile" accept=".pdf">
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="runBtn" onclick="run()" disabled>변환</button>
+  <button class="btn btn-green" id="dlBtn" onclick="download()" style="display:none;">엑셀 다운로드</button>
+
+  <div id="status"></div>
+  <div id="result"></div>
+  <div class="tbl-wrap" id="tblWrap" style="display:none;"><table id="tbl"></table></div>
+
+<script src="assets/libs/pdf.min.js"></script>
+<script src="assets/libs/xlsx.min.js"></script>
+<script>
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/libs/pdf.worker.min.js';
+
+let pdfFile = null, resultItems = [], proformaNo = '', srcBase = 'galiano';
+
+document.getElementById('pdfFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  pdfFile = f;
+  srcBase = f.name.replace(/\.[^.]+$/, '');
+  document.getElementById('runBtn').disabled = false;
+});
+
+/* ---- 텍스트 레이아웃 그대로 줄 재구성 (index.html의 groupTextIntoLines와 동일 로직) ---- */
+function groupTextIntoLines(items) {
+  const filtered = items.filter(it => it.str && it.str.trim() !== '').map(it => {
+    const tr = it.transform;
+    return { str: it.str, x: tr[4], y: tr[5], w: it.width || (it.str.length * 5) };
+  });
+  filtered.sort((a, b) => (b.y - a.y) || (a.x - b.x));
+  const lines = []; let cur = null; const Y_TOL = 3.2;
+  filtered.forEach(it => {
+    if (!cur || Math.abs(it.y - cur.y) > Y_TOL) { cur = { y: it.y, items: [it] }; lines.push(cur); }
+    else cur.items.push(it);
+  });
+  return lines.map(l => {
+    l.items.sort((a, b) => a.x - b.x);
+    let out = '', prevEnd = null;
+    l.items.forEach(it => {
+      if (prevEnd !== null && (it.x - prevEnd) > 1) out += ' ';
+      out += it.str;
+      prevEnd = it.x + it.w;
+    });
+    return out;
+  });
+}
+
+async function extractPagesLines(file) {
+  const buf = await file.arrayBuffer();
+  const pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+  const pagesLines = [];
+  for (let p = 1; p <= pdfDoc.numPages; p++) {
+    const page = await pdfDoc.getPage(p);
+    const tc = await page.getTextContent();
+    pagesLines.push(groupTextIntoLines(tc.items));
+  }
+  return pagesLines;
+}
+
+function numEU(s) {
+  if (s == null) return 0;
+  return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+/* 품목 한 줄 패턴 - 예:
+   "8107463 BURBERRY 162 GIACCHE - Made in: Thailand - Composition: NR 3 568,20 EUR 1.250,00 8,0% 613,66EUR 1.840,98EUR N8" */
+const ITEM_RE = /^(.*?)\s*-\s*Made in:\s*([^-]*?)\s*-\s*Composition:\s*(.*?)\s+NR\s+(\d+)\s+([\d.,]+)\s*EUR\s+([\d.,]+)\s+([\d.,]+)%\s+([\d.,]+)\s*EUR\s+([\d.,]+)\s*EUR\s+N\S*\s*$/;
+
+function splitPrefix(prefix) {
+  const toks = prefix.trim().split(/\s+/);
+  let i = 0;
+  const codeToks = [];
+  while (i < toks.length && /\d/.test(toks[i])) { codeToks.push(toks[i]); i++; }
+  const brandToks = [];
+  while (i < toks.length && !/^\d{3}$/.test(toks[i])) { brandToks.push(toks[i]); i++; }
+  const type = toks.slice(i + 1).join(' ');
+  return { code: codeToks.join(' '), brand: brandToks.join(' '), type };
+}
+
+function parseGalianoProforma(pagesLines) {
+  const items = [];
+  pagesLines.forEach(lines => {
+    for (let i = 0; i < lines.length; i++) {
+      const m = ITEM_RE.exec(lines[i].trim());
+      if (!m) continue;
+      const { code, brand, type } = splitPrefix(m[1]);
+      if (!code) continue;
+      const country = m[2].trim();
+      let composition = m[3].trim();
+      const qty = parseInt(m[4], 10);
+      const whls = numEU(m[5]);
+      const disc = numEU(m[7]) / 100;
+      // Composition 텍스트가 다음 줄(들)로 이어지는 경우 "Color " 줄이 나올 때까지 이어붙인다.
+      let j = i + 1, colorCode = '';
+      const compLines = [];
+      while (j < lines.length) {
+        const cm = /^Color\s+(\S+)/.exec(lines[j].trim());
+        if (cm) { colorCode = cm[1]; break; }
+        if (ITEM_RE.test(lines[j].trim())) break;
+        compLines.push(lines[j].trim());
+        j++;
+      }
+      if (compLines.length) composition = composition ? composition + ' ' + compLines.join(' ') : compLines.join(' ');
+      items.push({ code, brand, type, country, composition, qty, whls, disc, colorCode });
+    }
+  });
+  return items;
+}
+
+function findProformaNo(pagesLines) {
+  for (const lines of pagesLines) {
+    for (const line of lines) {
+      const m = /(\d+)\s*\/\s*P\b/.exec(line);
+      if (m) return m[1];
+    }
+  }
+  return '';
+}
+
+async function run() {
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const dlBtn = document.getElementById('dlBtn');
+  result.textContent = ''; result.className = '';
+  dlBtn.style.display = 'none';
+  document.getElementById('tblWrap').style.display = 'none';
+  status.textContent = 'PDF 읽는 중...';
+
+  try {
+    const pagesLines = await extractPagesLines(pdfFile);
+    const totalLineCount = pagesLines.reduce((s, l) => s + l.length, 0);
+    if (totalLineCount < 5) {
+      throw new Error('PDF에서 텍스트를 거의 못 읽었어요. 스캔본(이미지) PDF일 수 있어요 — 이런 경우 "인보이스 자동인식" 도구를 이용해주세요.');
+    }
+    proformaNo = findProformaNo(pagesLines);
+    const items = parseGalianoProforma(pagesLines);
+    if (!items.length) {
+      throw new Error('품목을 하나도 못 찾았어요. 갈리아노 PROFORMA INVOICE 양식이 맞는지, 텍스트가 있는 PDF인지 확인해주세요.');
+    }
+    resultItems = items;
+    render(items);
+    status.textContent = `PROFORMA ${proformaNo || '(번호 미확인)'} · 총 ${items.length}개 품목·컬러 조합`;
+    result.className = 'ok';
+    result.textContent = '✅ 변환 완료. 아래 표를 확인한 뒤 엑셀로 받으세요.';
+    dlBtn.style.display = 'inline-block';
+  } catch (e) {
+    status.textContent = '';
+    result.className = 'err';
+    result.textContent = '오류: ' + e.message;
+  }
+}
+
+function render(items) {
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  const body = items.map((it, i) => {
+    const costMark = it.whls * (1 + it.disc);
+    const total = costMark * it.qty;
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${esc(it.code)}/${esc(it.colorCode)}</td>
+      <td class="desc">${esc(it.type)} - Made in: ${esc(it.country)} - Composition: ${esc(it.composition)}</td>
+      <td>${esc(it.country)}</td>
+      <td class="num">${it.qty}</td>
+      <td class="num">${it.whls.toFixed(2)}</td>
+      <td class="num">${(it.disc * 100).toFixed(1)}%</td>
+      <td class="num">${costMark.toFixed(2)}</td>
+      <td class="num">${total.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tbl').innerHTML =
+    `<thead><tr><th>#</th><th>Code</th><th>Descriptions</th><th>MADE</th><th>Q'TY</th><th>COST</th><th>MARK</th><th>COST+MARK</th><th>TOTAL</th></tr></thead><tbody>${body}</tbody>`;
+  document.getElementById('tblWrap').style.display = 'block';
+}
+
+const EUR_FMT = '_-[$€-2]\\ * #,##0.00_-;\\-[$€-2]\\ * #,##0.00_-;_-[$€-2]\\ * \\-??_-;_-@_-';
+
+function download() {
+  const items = resultItems;
+  const wb = XLSX.utils.book_new();
+  const ws = {};
+  const set = (addr, v, opts) => { ws[addr] = Object.assign({ v }, opts || {}); };
+
+  set('C8', 'PROFORMA ' + (proformaNo || ''));
+  const headers = ["PROFORMA NO.", "Code", "Descriptions", "MADE", "Q'TY", "COST", "MARK", "COST+MARK", "TOTAL"];
+  const headerCols = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+  headerCols.forEach((col, i) => set(col + '9', headers[i], { t: 's' }));
+
+  const firstRow = 10;
+  let qtySum = 0, totalSum = 0;
+  items.forEach((it, idx) => {
+    const r = firstRow + idx;
+    const costMark = it.whls * (1 + it.disc);
+    const total = costMark * it.qty;
+    qtySum += it.qty; totalSum += total;
+    set('B' + r, Number(proformaNo) || proformaNo, { t: 'n' });
+    set('C' + r, it.code + '/' + it.colorCode, { t: 's' });
+    set('D' + r, it.type + ' - Made in: ' + it.country + ' - Composition: \n' + it.composition, { t: 's' });
+    set('E' + r, it.country, { t: 's' });
+    set('F' + r, it.qty, { t: 'n' });
+    set('G' + r, it.whls, { t: 'n', z: EUR_FMT });
+    set('H' + r, it.disc, { t: 'n', z: '0%' });
+    set('I' + r, costMark, { t: 'n', f: `G${r}*(H${r}/1)+G${r}`, z: EUR_FMT });
+    set('J' + r, total, { t: 'n', f: `I${r}*F${r}`, z: EUR_FMT });
+  });
+
+  const lastRow = firstRow + items.length - 1;
+  const totalRow = lastRow + 2;
+  set('C' + totalRow, '합계', { t: 's' });
+  set('F' + totalRow, qtySum, { t: 'n', f: `SUM(F${firstRow}:F${lastRow})` });
+  set('J' + totalRow, totalSum, { t: 'n', f: `SUM(J${firstRow}:J${lastRow})`, z: EUR_FMT });
+
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: totalRow, c: 9 } });
+  ws['!cols'] = [{ wch: 4 }, { wch: 13 }, { wch: 18 }, { wch: 34 }, { wch: 12 }, { wch: 8 }, { wch: 11 }, { wch: 8 }, { wch: 13 }, { wch: 13 }];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'PROFORMA');
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  XLSX.writeFile(wb, `PROFORMA_${proformaNo || srcBase}_매입엑셀_${stamp}.xlsx`, { cellStyles: true });
+}
+</script>
+</body>
+</html>

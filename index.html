@@ -936,6 +936,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/><path d="M9.5 12.5h5M9.5 16h5"/></svg></span>
         인보이스 자동인식<span class="chip chip-ready">사용가능</span>
       </button>
+      <button class="nav-item" data-nav="galianoProforma">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/><path d="m9 13 2 2 4-4"/></svg></span>
+        갈리아노양식 변경<span class="chip chip-ready">사용가능</span>
+      </button>
     </nav>
 
     <nav class="nav-group">
@@ -1234,6 +1238,11 @@
             <div class="tool-card-top"><div class="ic">&#8618;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>인보이스 자동인식</h3>
             <p>갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일 인보이스에서 거래처를 자동 인식하고 품목을 추출합니다. 스캔본은 브라우저 안에서 OCR로 처리합니다.</p>
+          </button>
+          <button class="tool-card" data-nav="galianoProforma">
+            <div class="tool-card-top"><div class="ic">&#10003;</div><span class="chip chip-ready">사용가능</span></div>
+            <h3>갈리아노양식 변경</h3>
+            <p>갈리아노 PROFORMA INVOICE PDF를 올리면 품번/컬러/원산지/수량/단가/마진율을 읽어 바이스트 매입 엑셀 양식(Code·Descriptions·MADE·Q'TY·COST·MARK 등)으로 바로 변환합니다.</p>
           </button>
         </div>
 
@@ -1593,6 +1602,10 @@
         <iframe src="stock-add-convert.html" title="재고추가변환" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <section data-view="galianoProforma">
+        <iframe src="galiano-proforma-excel.html" title="갈리아노양식 변경" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <!-- ============ STUDIO ============ -->
       <section data-view="buyestSoldOut">
         <iframe src="ecount-sync-delta.html" title="바이스트사이트 품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
@@ -1665,7 +1678,7 @@
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', sabangEcount:'사방넷-이카운트 매칭',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
     barcodeStock:'바코드 재고조회',
-    orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
   };
 
   function closeDrawer(){
