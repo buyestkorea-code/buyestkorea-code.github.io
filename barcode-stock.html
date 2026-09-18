@@ -19,6 +19,8 @@
   .card-label { font-size: 12px; font-weight: 700; color: var(--ink-muted); margin-bottom: 8px; display: block; }
   .list-status { font-size: 12.5px; color: var(--ink-muted); margin-top: 6px; }
   .list-status.ok { color: var(--ok-fg); }
+  .updated-badge { font-size: 11px; font-weight: 700; color: var(--accent); background: #f0fdfa; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .updated-badge:empty { display: none; }
 
   /* 카메라를 붙이기 전에도 고정 높이를 미리 잡아둔다 — html5-qrcode가 시작 시점에 이 박스의
      크기를 측정해서 비디오 크기를 정하는데, 비어있다고 접혀있으면(0x0) 스트림은 켜져도
@@ -74,9 +76,12 @@
   <p class="lead">매장 바코드를 스캔하면 스타일코드를 뽑아서 이카운트 실시간 재고를 <b>사이즈별로</b> 보여줍니다. 카메라로 찍거나, 전용 스캐너·키보드로 직접 입력해도 됩니다.</p>
 
   <div class="card">
-    <label class="card-label">키즈매장재고 리스트 업로드 (필수 — 바코드·품목명 열이 있는 파일)</label>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <label class="card-label" style="margin-bottom:0;">키즈매장재고 리스트 (한 번 올리면 다음부터 모든 휴대폰에서 자동으로 불러옵니다)</label>
+      <span id="listUpdatedBadge" class="updated-badge"></span>
+    </div>
     <input type="file" id="listFile" accept=".xlsx,.xls,.csv">
-    <div class="list-status" id="listStatus">먼저 리스트를 올려야 바코드를 스타일코드로 바꿀 수 있어요. (품목명이 "스타일코드_사이즈" 형식인 열 필요)</div>
+    <div class="list-status" id="listStatus">불러오는 중…</div>
   </div>
 
   <div class="card">
@@ -103,14 +108,46 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script>
 const API_URL = 'https://buyest.co.kr/barcode_stock_lookup_api.php';
+const LIST_API_URL = 'https://buyest.co.kr/barcode_list_api.php';
 const S = v => (v === null || v === undefined) ? '' : String(v).trim();
 const escHtml = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 
-// ---- 키즈매장재고 리스트 업로드: 바코드 -> 품목명("스타일코드_사이즈") 대조표 ----
-// 주의: 이 리스트는 실제로는 엑셀 바이너리가 아니라 HTML 표를 .xls로 저장한 파일인 경우가
-// 많다(여러 국내 POS/ERP가 이렇게 내보냄) — 그래서 우선 내용을 훑어 HTML이면 표를 직접
-// 파싱하고, 진짜 xlsx/xls 바이너리일 때만 SheetJS로 읽는다.
+// ---- 키즈매장재고 리스트: 바코드 -> 품목명("스타일코드_사이즈") 대조표 ----
+// 한 번 업로드하면 서버에 저장해두고(barcode_list_api.php), 다음부터는 페이지 열 때마다
+// 자동으로 불러온다 — 직원마다 휴대폰에서 매번 다시 올릴 필요 없게.
 let codeMap = new Map(); // 바코드 원문 -> { name: "품목명" }
+
+function fmtUpdatedAt(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+function setUpdatedBadge(iso) {
+  const el = document.getElementById('listUpdatedBadge');
+  el.textContent = iso ? `업데이트 ${fmtUpdatedAt(iso)}` : '';
+}
+
+async function loadSavedList() {
+  const statusEl = document.getElementById('listStatus');
+  try {
+    const res = await fetch(LIST_API_URL);
+    const data = await res.json();
+    if (!data.ok || !data.rows || !data.rows.length) {
+      statusEl.textContent = '아직 저장된 리스트가 없습니다. 파일을 한 번 올려주세요.';
+      statusEl.className = 'list-status';
+      return;
+    }
+    codeMap = new Map();
+    for (const r of data.rows) codeMap.set(r.barcode, { name: r.name });
+    setUpdatedBadge(data.updated_at);
+    statusEl.textContent = `${data.count}건 자동으로 불러왔습니다. 목록을 바꾸려면 새 파일을 올려주세요.`;
+    statusEl.className = 'list-status ok';
+  } catch (err) {
+    statusEl.textContent = '저장된 리스트를 불러오지 못했습니다: ' + err.message;
+    statusEl.className = 'list-status';
+  }
+}
+loadSavedList();
 
 document.getElementById('listFile').addEventListener('change', async e => {
   const f = e.target.files[0];
@@ -138,6 +175,7 @@ document.getElementById('listFile').addEventListener('change', async e => {
     }
 
     codeMap = new Map();
+    const parsedRows = [];
     let cBar = -1, cName = -1, started = false, count = 0;
     for (const row of rows) {
       if (!row) continue;
@@ -154,10 +192,33 @@ document.getElementById('listFile').addEventListener('change', async e => {
       const nm = cName >= 0 ? S(row[cName]) : '';
       if (!bar || !nm) continue;
       codeMap.set(bar, { name: nm });
+      parsedRows.push({ barcode: bar, name: nm });
       count++;
     }
-    statusEl.textContent = count ? `${count}건 불러왔습니다. 이제 바코드를 스캔하면 스타일코드로 바꿔서 조회합니다.` : '리스트에서 "바코드"·"품목명" 열을 못 찾았어요. 파일 형식을 확인해주세요.';
-    statusEl.className = 'list-status' + (count ? ' ok' : '');
+
+    if (!count) {
+      statusEl.textContent = '리스트에서 "바코드"·"품목명" 열을 못 찾았어요. 파일 형식을 확인해주세요.';
+      statusEl.className = 'list-status';
+      return;
+    }
+
+    statusEl.textContent = `${count}건 불러왔습니다. 서버에 저장하는 중…`;
+    statusEl.className = 'list-status ok';
+    try {
+      const saveRes = await fetch(LIST_API_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: parsedRows })
+      });
+      const saveData = await saveRes.json();
+      if (saveData.ok) {
+        setUpdatedBadge(new Date().toISOString());
+        statusEl.textContent = `${count}건 저장 완료 — 이제 다른 직원 휴대폰에서도 자동으로 불러옵니다.`;
+      } else {
+        statusEl.textContent = `${count}건 불러왔지만 서버 저장에 실패했습니다(이 화면에서만 사용 가능): ${saveData.error || ''}`;
+      }
+    } catch (saveErr) {
+      statusEl.textContent = `${count}건 불러왔지만 서버 저장에 실패했습니다(이 화면에서만 사용 가능): ${saveErr.message}`;
+    }
   } catch (err) {
     statusEl.textContent = '리스트를 읽지 못했습니다: ' + err.message;
     statusEl.className = 'list-status';
