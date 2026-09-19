@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>상품 카드 이미지</title>
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1150px; margin: 32px auto; padding: 0 20px; background: #fafafa; color: #222; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.lead { color: #555; margin-top: 6px; font-size: 13.5px; line-height: 1.6; }
+  textarea { width: 100%; box-sizing: border-box; height: 130px; font: 14px/1.6 "Malgun Gothic", sans-serif; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical; }
+  .btn { font-size: 15px; padding: 10px 22px; border: none; border-radius: 6px; cursor: pointer; margin-right: 8px; }
+  .btn-primary { background: #111827; color: #fff; }
+  .btn-green { background: #0f766e; color: #fff; }
+  .btn-sm { font-size: 13px; padding: 7px 14px; background: #fff; border: 1px solid #d1d5db; color: #111827; }
+  .btn:disabled { background: #d1d5db; color: #6b7280; cursor: not-allowed; }
+  #status { color: #6b7280; margin: 10px 0; font-size: 13px; min-height: 18px; }
+  #status.err { color: #b91c1c; white-space: pre-wrap; }
+  .item { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; margin-top: 14px; }
+  .item-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; font-size: 13px; }
+  .item-head .q { font-weight: 700; flex: 1 1 320px; }
+  .chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+  .c-ok { background: #f0fdf4; color: #15803d; }
+  .c-warn { background: #fef3c7; color: #92400e; }
+  .c-bad { background: #fef2f2; color: #b91c1c; }
+  .cands { font-size: 13px; margin: 0 0 10px; display: flex; flex-direction: column; gap: 4px; }
+  .cands label { cursor: pointer; }
+  .stage { overflow: hidden; border: 1px solid #e5e7eb; border-radius: 6px; }
+  .stage-inner { transform-origin: top left; }
+
+  /* 카드 본체 — BUYEST 상품 상세 화면 구성 */
+  .pcard { width: 1160px; box-sizing: border-box; background: #fff; padding: 44px 48px 40px; display: flex; gap: 56px; font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; color: #111; }
+  .pcard .pic { width: 520px; height: 520px; flex: none; background: #fff; display: flex; align-items: center; justify-content: center; }
+  .pcard .pic img { max-width: 100%; max-height: 100%; }
+  .pcard .pic .noimg { color: #9ca3af; font-size: 18px; }
+  .pcard .info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .pcard .brand { font-size: 24px; font-weight: 500; letter-spacing: .01em; }
+  .pcard .name { font-size: 26px; margin: 22px 0 0; line-height: 1.35; font-weight: 500; }
+  .pcard .price { font-size: 36px; font-weight: 500; margin: 36px 0 28px; }
+  .pcard .price small { font-size: 20px; margin-left: 2px; }
+  .pcard hr { border: 0; border-top: 1px solid #e5e7eb; margin: 0; width: 100%; }
+  .pcard dl { margin: 0; padding: 18px 0; display: grid; grid-template-columns: 120px 1fr; row-gap: 14px; font-size: 17px; }
+  .pcard dt { color: #111; }
+  .pcard dd { margin: 0; }
+  .pcard dd.pt { color: #e11d74; }
+  .pcard .chipbox { display: inline-block; border: 1px solid #d1d5db; border-radius: 8px; padding: 9px 14px; font-size: 15px; }
+  .pcard .sizesel { margin-top: 22px; border: 1px solid #111; border-radius: 6px; padding: 18px 34px; font-size: 17px; display: flex; justify-content: space-between; }
+  .pcard .total { margin-top: 26px; display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; }
+  .pcard .total b { color: #ef0000; font-size: 30px; }
+  .sold { color: #b91c1c; font-size: 14px; margin-left: 8px; }
+</style>
+</head>
+<body>
+  <h1>상품 카드 이미지</h1>
+  <p class="lead">
+    상품명을 한 줄에 하나씩 붙여넣으면 → BUYEST 사이트에서 상품을 찾아 <b>상품 화면 그대로의 PNG 이미지</b>로 만들어줍니다.<br>
+    상품명 끝의 <b>품번</b>으로 찾기 때문에 앞부분 한글 설명이 조금 달라도 됩니다.
+  </p>
+
+  <textarea id="input" placeholder="키즈 엘사 반팔 니트 네이비 MP141027 421&#10;키즈 체크 발레리나 플랫 슈즈 샌드 8112248"></textarea>
+  <div style="margin-top:12px">
+    <button class="btn btn-primary" id="go">상품 찾기</button>
+    <button class="btn btn-green" id="saveAll" disabled>전체 PNG 저장</button>
+  </div>
+  <div id="status"></div>
+  <div id="list"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+const API_URL = 'https://buyest.co.kr/product_card_api.php';
+const CARD_W = 1160;
+const FIXED = { card: '카드무이자', ship: '택배배송', fee: '무료배송' };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const won = n => Number(n).toLocaleString('ko-KR');
+let items = []; // {query, matches, picked}
+
+function cardHTML(m) {
+  const pic = m.image ? `<img src="${m.image}">` : `<div class="noimg">이미지 없음</div>`;
+  return `<div class="pcard">
+    <div class="pic">${pic}</div>
+    <div class="info">
+      <div class="brand">${esc(m.brand)} &gt;</div>
+      <div class="name">${esc(m.name)}</div>
+      <div class="price">${won(m.price)}<small>원</small></div>
+      <hr>
+      <dl><dt>브랜드</dt><dd>${esc(m.brand)}</dd><dt>원산지</dt><dd>${esc(m.origin)}</dd></dl>
+      <hr>
+      <dl>
+        <dt>카드혜택</dt><dd>${FIXED.card}</dd>
+        <dt>배송정보</dt><dd><span class="chipbox">${FIXED.ship}</span></dd>
+        <dt>배송비</dt><dd>${FIXED.fee}</dd>
+        <dt>적립금</dt><dd class="pt">${won(m.point)}P</dd>
+      </dl>
+      <hr>
+      <div class="sizesel"><span>사이즈</span><span>⌄</span></div>
+      <div class="total"><span>총 구매금액</span><b>${won(m.price)}원</b></div>
+    </div>
+  </div>`;
+}
+
+function stateChip(m) {
+  if (m.display !== 'Y') return '<span class="sold">미노출 상품</span>';
+  if (m.product_empty === 'N') return '<span class="sold">품절 상품</span>';
+  return '';
+}
+
+function render() {
+  $('list').innerHTML = items.map((it, i) => {
+    const m = it.matches[it.picked];
+    const chip = it.status === 'none' ? '<span class="chip c-bad">못 찾음</span>'
+      : it.status === 'multiple' ? '<span class="chip c-warn">후보 여러 개 — 골라주세요</span>'
+      : '<span class="chip c-ok">찾음</span>';
+    const cands = it.status === 'multiple'
+      ? `<div class="cands">${it.matches.map((c, j) => `<label><input type="radio" name="p${i}" value="${j}" ${j === it.picked ? 'checked' : ''}> ${esc(c.name)} <span style="color:#6b7280">(pid ${c.pid})</span></label>`).join('')}</div>` : '';
+    const body = m ? `<div class="stage" id="stage${i}"><div class="stage-inner">${cardHTML(m)}</div></div>` : '';
+    const btns = m ? `<button class="btn btn-sm" data-act="dl" data-i="${i}">PNG 저장</button> <button class="btn btn-sm" data-act="copy" data-i="${i}">이미지 복사</button>` : '';
+    return `<div class="item"><div class="item-head"><span class="q">${esc(it.query)}</span>${chip}${m ? stateChip(m) : ''}${btns}</div>${cands}${body}</div>`;
+  }).join('');
+  fitStages();
+  $('saveAll').disabled = !items.some(it => it.matches[it.picked]);
+}
+
+function fitStages() {
+  items.forEach((it, i) => {
+    const st = $('stage' + i);
+    if (!st) return;
+    const inner = st.firstElementChild;
+    const s = Math.min(1, st.clientWidth / CARD_W);
+    inner.style.transform = `scale(${s})`;
+    st.style.height = (inner.firstElementChild.offsetHeight * s) + 'px';
+  });
+}
+window.addEventListener('resize', fitStages);
+
+$('list').addEventListener('change', e => {
+  if (e.target.type !== 'radio') return;
+  const i = +e.target.name.slice(1);
+  items[i].picked = +e.target.value;
+  render();
+});
+
+async function toCanvas(m) {
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-10000px;top:0;';
+  host.innerHTML = cardHTML(m);
+  document.body.appendChild(host);
+  try {
+    await new Promise(r => requestAnimationFrame(r));
+    return await html2canvas(host.firstElementChild, { scale: 2, backgroundColor: '#ffffff', useCORS: false });
+  } finally { host.remove(); }
+}
+
+function fileName(m) { return m.name.replace(/[\\/:*?"<>|]/g, '').trim() + '.png'; }
+function blobOf(canvas) { return new Promise(r => canvas.toBlob(r, 'image/png')); }
+
+async function download(i) {
+  const m = items[i].matches[items[i].picked];
+  const blob = await blobOf(await toCanvas(m));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName(m);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+async function copyImg(i) {
+  const m = items[i].matches[items[i].picked];
+  const blob = await blobOf(await toCanvas(m));
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+}
+
+$('list').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  b.disabled = true;
+  try {
+    if (b.dataset.act === 'dl') await download(+b.dataset.i);
+    else { await copyImg(+b.dataset.i); $('status').className = ''; $('status').textContent = '이미지를 복사했습니다. 카톡·메일 등에 붙여넣기 하세요.'; }
+  } catch (err) {
+    $('status').className = 'err'; $('status').textContent = '이미지 생성 실패: ' + err.message;
+  }
+  b.disabled = false;
+});
+
+$('saveAll').addEventListener('click', async () => {
+  $('saveAll').disabled = true;
+  for (let i = 0; i < items.length; i++) {
+    if (!items[i].matches[items[i].picked]) continue;
+    $('status').className = ''; $('status').textContent = `PNG 저장 중… ${i + 1}/${items.length}`;
+    await download(i);
+    await new Promise(r => setTimeout(r, 400));
+  }
+  $('status').textContent = '전체 저장 완료';
+  $('saveAll').disabled = false;
+});
+
+$('go').addEventListener('click', async () => {
+  const lines = $('input').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!lines.length) { $('status').className = 'err'; $('status').textContent = '상품명을 한 줄에 하나씩 입력해 주세요.'; return; }
+  $('go').disabled = true; $('status').className = ''; $('status').textContent = '상품을 찾는 중…';
+  try {
+    const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lines }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '서버 응답 오류');
+    items = data.results.map(r => ({ ...r, picked: 0 }));
+    const none = items.filter(it => it.status === 'none').length;
+    $('status').textContent = `${items.length}건 조회 — 찾음 ${items.length - none}건, 못 찾음 ${none}건`;
+    render();
+  } catch (err) {
+    $('status').className = 'err';
+    $('status').textContent = '조회 실패: ' + err.message + '\n서버에 product_card_api.php가 배포됐는지 확인해 주세요.';
+  }
+  $('go').disabled = false;
+});
+</script>
+</body>
+</html>
