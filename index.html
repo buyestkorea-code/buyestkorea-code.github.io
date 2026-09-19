@@ -2527,16 +2527,16 @@
             if(it.kind !== 'off') return;
             var m = LEAVE_FRAC_RE.exec((it.title || '').trim());
             if(!m) return;
-            var used = parseInt(m[1],10), total = parseInt(m[2],10), cur = latest[it.author];
-            if(!cur || it.day > cur.day || (it.day === cur.day && used > cur.used)) latest[it.author] = {day:it.day, used:used, total:total};
+            var used = parseInt(m[1],10), total = parseInt(m[2],10), key = it.author + '|' + total, cur = latest[key];
+            if(!cur || it.day > cur.day || (it.day === cur.day && used > cur.used)) latest[key] = {name:it.author, day:it.day, used:used, total:total, title:it.title};
           });
         }
         renderLeaves(latest);
       }).catch(function(){});
     }
     function renderLeaves(latest){
-      var rows = Object.keys(latest).map(function(name){ return {name:name, used:latest[name].used, total:latest[name].total}; })
-        .sort(function(a,b){ return b.used - a.used || a.name.localeCompare(b.name); });
+      var rows = Object.keys(latest).map(function(k){ return latest[k]; })
+        .sort(function(a,b){ return a.name.localeCompare(b.name) || b.total - a.total; });
       leaveEl.innerHTML = rows.length ? '' : '<li class="none">' + leaveYear + '년 휴가 일정 중 "12/15" 형식 제목이 없어요.</li>';
       rows.forEach(function(n){
         var pct = n.total > 0 ? Math.min(100, Math.round((n.used/n.total)*100)) : 0;
@@ -2549,7 +2549,7 @@
         var fill = document.createElement('div'); fill.className = 'lv-fill' + (n.used > n.total ? ' over' : ''); fill.style.width = pct + '%';
         bar.appendChild(fill);
         li.appendChild(top); li.appendChild(bar);
-        li.title = Math.max(0, n.total - n.used) + '회 남음';
+        li.title = n.title + ' — ' + Math.max(0, n.total - n.used) + '회 남음';
         leaveEl.appendChild(li);
       });
     }
