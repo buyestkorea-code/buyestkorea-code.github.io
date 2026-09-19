@@ -842,6 +842,12 @@
   .me-leaves .lv-fill{ height:100%; background:var(--accent); border-radius:99px; }
   .me-leaves .lv-fill.over{ background:var(--danger); }
   .me-leaves .none{ color:var(--ink-muted); padding:4px; font-size:12.5px; }
+  .me-leave-yearbar{ margin-left:auto; flex:none; display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--ink); }
+  .me-yr-btn{ width:20px; height:20px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--ink-muted); cursor:pointer; font-size:12px; line-height:1; display:flex; align-items:center; justify-content:center; padding:0; }
+  .me-yr-btn:hover{ background:var(--surface-2); color:var(--ink); }
+  .me-leave-desc{ margin:-8px 0 10px; }
+  #meLeaveForm select{ flex:1 1 auto; min-width:0; }
+  #meLeaveForm input[type=number]{ width:84px; flex:none; }
   #meMemo{ width:100%; box-sizing:border-box; resize:vertical; min-height:96px; padding:11px 12px; border:1px solid var(--border); border-radius:11px; font:inherit; font-size:13px; line-height:1.6; background:var(--surface); color:var(--ink); }
   #meMemo:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
   .me-memofoot{ display:flex; justify-content:space-between; margin-top:7px; }
@@ -873,7 +879,7 @@
   .topbar-meta{ display:none; }
   body:not(.me-in):not(.me-guest) .topbar-title{ margin-right:auto; }
 
-  #meApp[hidden], #meGate[hidden], #meTopAuth[hidden], #meAdmin[hidden], #meCalAddPanel[hidden], #meNoticeAdd[hidden], #meOpts[hidden], #mePwForm[hidden], #meAdminSearch[hidden], #meSearch[hidden], #meTopDate[hidden], #meUser[hidden], #meUserMenu[hidden], #meCalDayPanel[hidden]{ display:none !important; }
+  #meApp[hidden], #meGate[hidden], #meTopAuth[hidden], #meAdmin[hidden], #meCalAddPanel[hidden], #meNoticeAdd[hidden], #meOpts[hidden], #mePwForm[hidden], #meLeaveForm[hidden], #meAdminSearch[hidden], #meSearch[hidden], #meTopDate[hidden], #meUser[hidden], #meUserMenu[hidden], #meCalDayPanel[hidden]{ display:none !important; }
 </style>
 
 <div class="app">
@@ -1165,7 +1171,19 @@
                 </div>
 
                 <div class="me-panel me-rail">
-                  <div class="me-panel-h"><h3>월차 및 휴가 관리</h3><button type="button" id="meLeaveAdd" class="me-link" hidden>+ 등록</button></div>
+                  <div class="me-panel-h"><h3>월차 및 휴가 관리</h3>
+                    <div class="me-leave-yearbar">
+                      <button type="button" id="meLeaveYearPrev" class="me-yr-btn" aria-label="이전 해">&lsaquo;</button>
+                      <span id="meLeaveYearLabel"></span>
+                      <button type="button" id="meLeaveYearNext" class="me-yr-btn" aria-label="다음 해">&rsaquo;</button>
+                    </div>
+                  </div>
+                  <p class="me-sub me-leave-desc">전체 공유 캘린더의 '휴가' 일정을 연도별로 집계해요. 총 부여일수는 관리자가 직접 등록해요.</p>
+                  <form id="meLeaveForm" class="me-inline" hidden>
+                    <select id="meLeaveName" aria-label="직원"></select>
+                    <input type="number" id="meLeaveTotal" min="0" max="99" placeholder="총 일수" aria-label="총 부여일수" />
+                    <button type="submit">+</button>
+                  </form>
                   <ul id="meLeave" class="me-leaves"></ul>
                 </div>
 
@@ -1927,7 +1945,7 @@
       document.body.classList.toggle('me-admin', inn && IS_ADMIN);
       $('meAdmin').hidden = !(inn && IS_ADMIN);
       $('meNoticeAdd').hidden = !(inn && IS_ADMIN);
-      $('meLeaveAdd').hidden = !(inn && IS_ADMIN);
+      $('meLeaveForm').hidden = !(inn && IS_ADMIN);
       $('meSearch').hidden = !inn;
       $('meTopDate').hidden = !inn;
       $('meUser').hidden = !inn;
@@ -2499,43 +2517,100 @@
     }
 
     /* ---------------- 월차 및 휴가 관리 ---------------- */
-    // 매년 부여일수가 사람마다/시기마다 달라 자동 집계 대신, 관리자가 "이름 12/15"
-    // 처럼 자유 텍스트로 등록하면 맨 끝의 "사용/총" 숫자만 뽑아 막대그래프로 보여준다.
-    var leaveEl = $('meLeave');
-    var LEAVE_FRAC_RE = /^(.*\S)\s+(\d+)\s*\/\s*(\d+)\s*$/;
-    function loadLeaves(){
-      api('leave_list').then(function(res){ if(res && res.ok) renderLeaves(res.items || []); }).catch(function(){});
+    // 총 부여일수(정원)는 사람마다/시기마다 달라 관리자가 직접 등록해서 관리하지만,
+    // 실제 "사용" 일수는 전체 공유 캘린더에 이미 쌓인 '휴가' 일정을 선택한 연도
+    // 기준으로 직접 세어서(자동 집계) 보여준다 — 등록자(author)별, 여러 날짜에
+    // 걸친 일정은 그 해에 걸리는 날짜 수만큼 계산한다.
+    var leaveEl = $('meLeave'), leaveYearLabel = $('meLeaveYearLabel');
+    var leaveYear = new Date().getFullYear();
+    var leaveQuotas = []; // [{id, label(=username), total}]
+    var leaveMembers = [];
+
+    function loadLeaveMembers(){
+      api('member_list').then(function(res){
+        if(!res || !res.ok) return;
+        leaveMembers = res.members || [];
+        var sel = $('meLeaveName'), cur = sel.value;
+        sel.innerHTML = '';
+        leaveMembers.forEach(function(m){
+          var o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o);
+        });
+        if(leaveMembers.indexOf(cur) !== -1) sel.value = cur;
+      }).catch(function(){});
     }
-    function renderLeaves(items){
-      leaveEl.innerHTML = items.length ? '' : '<li class="none">등록된 항목이 없어요.</li>';
-      items.forEach(function(n){
-        var used = Number(n.used) || 0, total = Number(n.total) || 0;
-        var pct = total > 0 ? Math.min(100, Math.round((used/total)*100)) : 0;
+
+    function computeLeaveUsage(year, cb){
+      api('cal_list', {from: year + '-01-01', to: year + '-12-31'}).then(function(res){
+        var used = {};
+        if(res && res.ok){
+          (res.items || []).forEach(function(it){
+            if(it.kind !== 'off') return;
+            var start = it.day > (year+'-01-01') ? it.day : (year+'-01-01');
+            var end = (it.end_day || it.day);
+            end = end < (year+'-12-31') ? end : (year+'-12-31');
+            var days = Math.round((new Date(end+'T00:00:00') - new Date(start+'T00:00:00')) / 86400000) + 1;
+            if(days < 1) return;
+            used[it.author] = (used[it.author] || 0) + days;
+          });
+        }
+        cb(used);
+      }).catch(function(){ cb({}); });
+    }
+
+    function loadLeaves(){
+      leaveYearLabel.textContent = leaveYear + '년';
+      api('leave_list').then(function(res){
+        leaveQuotas = (res && res.ok) ? (res.items || []) : [];
+        computeLeaveUsage(leaveYear, function(used){ renderLeaves(used); });
+      }).catch(function(){});
+    }
+    function renderLeaves(used){
+      var names = {};
+      leaveQuotas.forEach(function(q){ names[q.label] = 1; });
+      Object.keys(used).forEach(function(a){ names[a] = 1; });
+      var rows = Object.keys(names).map(function(name){
+        var q = leaveQuotas.filter(function(x){ return x.label === name; })[0];
+        return {name:name, id: q && q.id, total: q ? Number(q.total)||0 : null, usedDays: used[name] || 0};
+      }).sort(function(a,b){ return b.usedDays - a.usedDays || a.name.localeCompare(b.name); });
+
+      leaveEl.innerHTML = rows.length ? '' : '<li class="none">' + leaveYear + '년에는 등록된 휴가/부여일수가 없어요.</li>';
+      rows.forEach(function(n){
+        var hasQuota = n.total != null;
+        var total = hasQuota ? n.total : 0;
+        var pct = hasQuota && total > 0 ? Math.min(100, Math.round((n.usedDays/total)*100)) : 0;
         var li = document.createElement('li');
         var top = document.createElement('div'); top.className = 'lv-top';
-        var lbl = document.createElement('span'); lbl.className = 'lv-label'; lbl.textContent = n.label; lbl.title = n.label;
-        var frac = document.createElement('span'); frac.className = 'lv-frac'; frac.textContent = used + '/' + total;
+        var lbl = document.createElement('span'); lbl.className = 'lv-label'; lbl.textContent = n.name; lbl.title = n.name;
+        var frac = document.createElement('span'); frac.className = 'lv-frac';
+        frac.textContent = hasQuota ? (n.usedDays + '/' + total) : (n.usedDays + '일 사용');
         top.appendChild(lbl); top.appendChild(frac);
-        if(IS_ADMIN){
-          var x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×'; x.setAttribute('aria-label','삭제');
+        if(IS_ADMIN && n.id){
+          var x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×'; x.setAttribute('aria-label','부여일수 삭제');
           x.addEventListener('click', function(){ api('leave_del',{id:n.id}).then(function(r){ if(r&&r.ok) loadLeaves(); }); });
           top.appendChild(x);
         }
-        var bar = document.createElement('div'); bar.className = 'lv-bar';
-        var fill = document.createElement('div'); fill.className = 'lv-fill' + (used > total ? ' over' : ''); fill.style.width = pct + '%';
-        bar.appendChild(fill);
-        li.appendChild(top); li.appendChild(bar);
-        li.title = (total - used) + '일 남음';
+        if(hasQuota){
+          var bar = document.createElement('div'); bar.className = 'lv-bar';
+          var fill = document.createElement('div'); fill.className = 'lv-fill' + (n.usedDays > total ? ' over' : ''); fill.style.width = pct + '%';
+          bar.appendChild(fill);
+          li.appendChild(top); li.appendChild(bar);
+          li.title = Math.max(0, total - n.usedDays) + '일 남음';
+        } else {
+          li.appendChild(top);
+          li.title = '총 부여일수가 아직 등록되지 않았어요';
+        }
         leaveEl.appendChild(li);
       });
     }
-    $('meLeaveAdd').addEventListener('click', function(){
-      var t = prompt('예: 조경호 휴가 12/15  (맨 끝 "사용/총" 숫자만 반영돼요)');
-      if(!t || !t.trim()) return;
-      var m = LEAVE_FRAC_RE.exec(t.trim());
-      if(!m){ alert('맨 끝에 "사용/총" 형식(예: 12/15)이 있어야 해요'); return; }
-      api('leave_add', {label:m[1], used:parseInt(m[2],10), total:parseInt(m[3],10)}).then(function(r){
-        r&&r.ok?loadLeaves():alert((r&&r.error)||'실패');
+    $('meLeaveYearPrev').addEventListener('click', function(){ leaveYear--; loadLeaves(); });
+    $('meLeaveYearNext').addEventListener('click', function(){ leaveYear++; loadLeaves(); });
+    $('meLeaveForm').addEventListener('submit', function(e){
+      e.preventDefault();
+      var name = $('meLeaveName').value, total = parseInt($('meLeaveTotal').value, 10);
+      if(!name || !(total >= 0)){ alert('직원과 총 부여일수를 확인해주세요'); return; }
+      api('leave_add', {label:name, used:0, total:total}).then(function(r){
+        if(r && r.ok){ $('meLeaveTotal').value = ''; loadLeaves(); }
+        else alert((r && r.error) || '실패');
       });
     });
 
@@ -2564,7 +2639,7 @@
       if(t && t.trim()) api('notice_add',{title:t.trim()}).then(function(r){ r&&r.ok?loadNotices():alert((r&&r.error)||'실패'); });
     });
 
-    function bootWorkspace(){ renderCal(); loadCal(); renderAgenda(); loadNotices(); loadLeaves(); loadAdmin(); loadMembers(); migrateLegacyTodos(); loadMetrics(); }
+    function bootWorkspace(){ renderCal(); loadCal(); renderAgenda(); loadNotices(); loadLeaveMembers(); loadLeaves(); loadAdmin(); loadMembers(); migrateLegacyTodos(); loadMetrics(); }
 
     /* ---------------- 로그인 / 회원가입 ---------------- */
     function setGateMode(m, keepMsg){
