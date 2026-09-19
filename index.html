@@ -2514,7 +2514,8 @@
     // N/M을 통계로 보여준다. (아이디가 본인 이름이라 author를 사람으로 본다)
     var leaveEl = $('meLeave'), leaveYearLabel = $('meLeaveYearLabel');
     var leaveYear = new Date().getFullYear();
-    var LEAVE_FRAC_RE = /(\d+)\s*\/\s*(\d+)\s*$/;
+    // 제목 어디에 있든 마지막 "N/M"을 읽는다 — "박성우 오후반차 (12/15)", "조경호 연차 (야간 5/5)" 등
+    var LEAVE_FRAC_RE = /(\d+)\s*\/\s*(\d+)(?![\s\S]*\d\s*\/\s*\d)/;
 
     function loadLeaves(){
       leaveYearLabel.textContent = leaveYear + '년';
