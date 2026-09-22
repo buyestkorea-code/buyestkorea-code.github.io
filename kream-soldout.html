@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>크림 품절 정리</title>
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1150px; margin: 32px auto; padding: 0 20px; background: #fafafa; color: #222; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.lead { color: #555; margin-top: 6px; font-size: 13.5px; line-height: 1.6; }
+  .row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; margin: 16px 0; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: #666; font-weight: 600; }
+  input[type=file] { font-size: 13px; }
+  .btn { font-size: 15px; padding: 10px 22px; border: none; border-radius: 6px; cursor: pointer; margin-right: 8px; }
+  .btn-primary { background: #111827; color: #fff; }
+  .btn-green { background: #0f766e; color: #fff; }
+  .btn:disabled { background: #d1d5db; color: #6b7280; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; background: #fff; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 7px 8px; text-align: left; }
+  th { background: #f3f4f6; position: sticky; top: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tbl-wrap { max-height: 58vh; overflow: auto; border: 1px solid #e5e7eb; border-radius: 6px; margin-top: 12px; }
+  #status { color: #6b7280; margin: 10px 0; font-size: 13px; }
+  #result { margin-top: 12px; padding: 10px 12px; border-radius: 6px; font-size: 13px; }
+  #result.ok { background: #f0fdf4; color: #15803d; }
+  #result.err { background: #fef2f2; color: #b91c1c; white-space: pre-wrap; }
+  .chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+  .c-soldout { background: #fef2f2; color: #b91c1c; }
+  .c-restock { background: #eff6ff; color: #1d4ed8; }
+  .c-qty { background: #fef3c7; color: #92400e; }
+  .stat-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .stat { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 12px; font-size: 12.5px; color: #444; }
+  .stat b { color: #111; font-size: 14px; }
+</style>
+</head>
+<body>
+  <h1>크림 품절 정리</h1>
+  <p class="lead">
+    크림등록상품 엑셀(매일 업데이트되는 마스터 파일) + 이카운트 재고변동표를 올리면 → 품번·사이즈 기준으로 자동 매칭해 <b>재고 컬럼을 이카운트 잔량으로 갱신</b>합니다.<br>
+    매칭 기준: 크림 상품명(예: <code>A09FW733-BLACK</code>)의 <code>-</code>를 공백으로 바꾼 값이 이카운트 품목명 끝부분과 일치 + 사이즈(규격) 일치. 오늘 실제로 값이 바뀐 행만 변동내역에 담깁니다.
+  </p>
+
+  <div class="row">
+    <div class="field">
+      <label>1. 크림등록상품 엑셀 (.xlsx)</label>
+      <input type="file" id="kreamFile" accept=".xlsx,.xls">
+    </div>
+    <div class="field">
+      <label>2. 이카운트 재고변동표 (.xlsx)</label>
+      <input type="file" id="ecFile" accept=".xlsx,.xls">
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="runBtn" onclick="run()" disabled>매칭 실행</button>
+  <button class="btn btn-green" id="dlDeltaBtn" onclick="downloadDelta()" style="display:none;">변동내역 다운로드</button>
+  <button class="btn btn-green" id="dlFullBtn" onclick="downloadFull()" style="display:none;">오늘자 크림등록상품 전체 다운로드</button>
+
+  <div id="status"></div>
+  <div id="result"></div>
+  <div class="stat-row" id="statRow"></div>
+  <div class="tbl-wrap" id="tblWrap" style="display:none;"><table id="tbl"></table></div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script>
+let kreamWB = null, kreamFileName = '', ecWB = null;
+let deltaRows = [];
+
+document.getElementById('kreamFile').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  kreamFileName = f.name.replace(/\.[^.]+$/, '');
+  kreamWB = XLSX.read(await f.arrayBuffer(), { type: 'array', cellText: false });
+  refreshRunBtn();
+});
+document.getElementById('ecFile').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  ecWB = XLSX.read(await f.arrayBuffer(), { type: 'array', raw: true });
+  refreshRunBtn();
+});
+
+function refreshRunBtn() {
+  document.getElementById('runBtn').disabled = !kreamWB || !ecWB;
+}
+
+const S = v => (v === null || v === undefined) ? '' : String(v).trim();
+
+// 상품명 끝에서부터 한글이 아닌 토큰이 이어지는 구간을 "품번"으로 본다 (MD 품절 도구와 동일 규칙).
+function codeSuffix(name) {
+  const cleaned = String(name || '').replace(/\s*\([^)]*\)\s*$/, '');
+  const toks = cleaned.trim().split(/\s+/).filter(Boolean);
+  let i = toks.length;
+  while (i > 0 && !/[가-힣]/.test(toks[i - 1])) i--;
+  return toks.slice(i).join(' ');
+}
+function normKey(s) {
+  return String(s || '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+}
+function normSpec(v) {
+  let s = S(v).toUpperCase();
+  s = s.replace(/\(/g, ' ').replace(/\)/g, ' ').replace(/\s+/g, ' ').trim();
+  if (/^\d+\.0$/.test(s)) s = s.slice(0, -2);
+  return s;
+}
+function specsMatch(a, b) {
+  const x = normSpec(a), y = normSpec(b);
+  if (x === y) return true;
+  const free = v => v === '' || v === 'TU' || v === 'FREE' || v === 'ONE SIZE' || v === 'OS';
+  if (free(x) && free(y)) return true;
+  return false;
+}
+
+function headerColMap(headerRow) {
+  const col = {};
+  (headerRow || []).forEach((v, i) => {
+    if (v === null || v === undefined) return;
+    const key = String(v).split('\n')[0].trim();
+    if (key && !(key in col)) col[key] = i;
+  });
+  return col;
+}
+function findHeaderRowIdx(aoa, matchFn) {
+  for (let i = 0; i < aoa.length; i++) if (aoa[i] && matchFn(aoa[i])) return i;
+  return -1;
+}
+
+/* 이카운트 재고변동표 → [{code,name,spec,remain}] */
+function parseEcountDelta(wb) {
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
+  const hIdx = findHeaderRowIdx(aoa, r => r[0] === '품목코드');
+  if (hIdx === -1) throw new Error('이카운트 재고변동표에서 헤더 행("품목코드")을 찾을 수 없습니다.');
+  const col = headerColMap(aoa[hIdx]);
+  ['품목코드', '품목명', '규격', '잔량'].forEach(need => {
+    if (!(need in col)) throw new Error(`이카운트 재고변동표에 "${need}" 열이 없습니다.`);
+  });
+  const items = [];
+  for (let r = hIdx + 1; r < aoa.length; r++) {
+    const row = aoa[r];
+    const code = row && row[col['품목코드']];
+    if (!code || !/^\d+$/.test(String(code).trim())) continue;
+    items.push({
+      code: String(code).trim(),
+      name: S(row[col['품목명']]),
+      spec: row[col['규격']] == null ? '' : String(row[col['규격']]),
+      remain: row[col['잔량']] == null ? 0 : (Number(row[col['잔량']]) || 0)
+    });
+  }
+  if (!items.length) throw new Error('이카운트 재고변동표에서 인식된 품목이 없습니다.');
+  return items;
+}
+
+/* 크림등록상품 시트에서 헤더 위치와 컬럼 인덱스를 찾는다. */
+function findKreamSheet(wb) {
+  for (const name of wb.SheetNames) {
+    const ws = wb.Sheets[name];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true, range: 0 });
+    const hIdx = findHeaderRowIdx(aoa.slice(0, 5), r => r.indexOf('크림 상품명') !== -1);
+    if (hIdx !== -1) {
+      const col = headerColMap(aoa[hIdx]);
+      ['특이사항', '크림 상품명', '상품명', '사이즈', '재고'].forEach(need => {
+        if (!(need in col)) throw new Error(`크림등록상품 엑셀에 "${need}" 열이 없습니다.`);
+      });
+      return { sheetName: name, ws, headerIdx: hIdx, col };
+    }
+  }
+  throw new Error('크림등록상품 엑셀에서 "크림 상품명" 헤더를 찾을 수 없습니다.');
+}
+
+async function run() {
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  status.textContent = ''; result.textContent = ''; result.className = '';
+  document.getElementById('dlDeltaBtn').style.display = 'none';
+  document.getElementById('dlFullBtn').style.display = 'none';
+  document.getElementById('tblWrap').style.display = 'none';
+  document.getElementById('statRow').innerHTML = '';
+  status.textContent = '엑셀 파싱 중...';
+
+  try {
+    const ecItems = parseEcountDelta(ecWB);
+    const codeMap = {};
+    ecItems.forEach(it => {
+      const key = normKey(codeSuffix(it.name));
+      if (!key) return;
+      if (!codeMap[key]) codeMap[key] = [];
+      codeMap[key].push(it);
+    });
+
+    const { ws, headerIdx, col } = findKreamSheet(kreamWB);
+    const range = XLSX.utils.decode_range(ws['!ref']);
+
+    let lastBrand = '', lastKreamName = '', lastName = '';
+    deltaRows = [];
+    let matchedCount = 0, ambiguousCount = 0;
+
+    for (let r = headerIdx + 1; r <= range.e.r; r++) {
+      const get = c => {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        const cell = ws[ref];
+        return cell ? cell.v : null;
+      };
+      const rawBrand = get(col['특이사항']);
+      const rawKreamName = get(col['크림 상품명']);
+      const rawName = get(col['상품명']);
+      const size = get(col['사이즈']);
+
+      if (S(rawBrand)) lastBrand = S(rawBrand);
+      if (S(rawKreamName)) lastKreamName = S(rawKreamName);
+      if (S(rawName)) lastName = S(rawName);
+
+      if (!lastKreamName || !S(size)) continue; // 완전히 빈 행
+
+      const key = normKey(lastKreamName);
+      const candidates = (codeMap[key] || []).filter(it => specsMatch(it.spec, size));
+      if (!candidates.length) continue; // 오늘 변동표에 없는 상품 - 건드리지 않음
+
+      let picked = candidates[0];
+      if (candidates.length > 1) {
+        const vals = new Set(candidates.map(c => c.remain));
+        if (vals.size > 1) ambiguousCount++;
+      }
+
+      const oldRef = XLSX.utils.encode_cell({ r, c: col['재고'] });
+      const oldCell = ws[oldRef];
+      const oldVal = (oldCell && oldCell.v != null) ? Number(oldCell.v) || 0 : null;
+      const newVal = picked.remain;
+
+      if (oldVal === newVal) continue; // 값 그대로 - 변동 없음
+
+      // 재고 셀 갱신 (숫자로)
+      ws[oldRef] = { t: 'n', v: newVal };
+      if (range.e.c < col['재고']) range.e.c = col['재고'];
+
+      let statusLabel = '수량변경';
+      if (newVal === 0 && oldVal !== 0) statusLabel = '품절';
+      else if ((oldVal === null || oldVal === 0) && newVal > 0) statusLabel = '재입고';
+
+      matchedCount++;
+      deltaRows.push({
+        brand: lastBrand, kreamName: lastKreamName, name: lastName, size: S(size),
+        oldVal, newVal, statusLabel, ecCode: picked.code, ecName: picked.name
+      });
+    }
+
+    ws['!ref'] = XLSX.utils.encode_range(range);
+
+    status.textContent = `크림 등록상품 ${range.e.r - headerIdx}행 · 이카운트 변동표 ${ecItems.length}건 중 ${matchedCount}건 변동`;
+    result.className = 'ok';
+    result.textContent = `✅ 매칭 완료. 재고 컬럼에 이카운트 잔량을 반영했습니다.${ambiguousCount ? ` (⚠️ 후보 중복 ${ambiguousCount}건 - 첫 후보로 처리됨, 표에서 확인해주세요.)` : ''}`;
+
+    renderTable(deltaRows);
+    renderStats(deltaRows);
+    document.getElementById('dlDeltaBtn').style.display = deltaRows.length ? 'inline-block' : 'none';
+    document.getElementById('dlFullBtn').style.display = 'inline-block';
+  } catch (e) {
+    status.textContent = '';
+    result.className = 'err';
+    result.textContent = '오류: ' + e.message;
+  }
+}
+
+function renderStats(rows) {
+  const cnt = s => rows.filter(r => r.statusLabel === s).length;
+  document.getElementById('statRow').innerHTML = `
+    <div class="stat">총 변동 <b>${rows.length}</b></div>
+    <div class="stat">품절 <b>${cnt('품절')}</b></div>
+    <div class="stat">재입고 <b>${cnt('재입고')}</b></div>
+    <div class="stat">수량변경 <b>${cnt('수량변경')}</b></div>`;
+}
+
+function renderTable(rows) {
+  const esc = s => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  const chip = s => ({ '품절': 'c-soldout', '재입고': 'c-restock', '수량변경': 'c-qty' }[s] || 'c-qty');
+  const body = rows.map((r, i) => `<tr>
+    <td>${i + 1}</td>
+    <td>${esc(r.brand)}</td>
+    <td>${esc(r.kreamName)}</td>
+    <td>${esc(r.size)}</td>
+    <td class="num">${r.oldVal === null ? '—' : r.oldVal}</td>
+    <td class="num">${r.newVal}</td>
+    <td><span class="chip ${chip(r.statusLabel)}">${esc(r.statusLabel)}</span></td>
+    <td>${esc(r.ecName)}</td>
+  </tr>`).join('');
+  document.getElementById('tbl').innerHTML =
+    `<thead><tr><th>#</th><th>특이사항</th><th>크림 상품명</th><th>사이즈</th><th>이전재고</th><th>신규재고</th><th>상태</th><th>이카운트 품목명</th></tr></thead><tbody>${body}</tbody>`;
+  document.getElementById('tblWrap').style.display = 'block';
+}
+
+function todayStamp() {
+  return new Date().toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+function downloadDelta() {
+  const aoa = [['특이사항', '크림 상품명', '상품명', '사이즈', '이전재고', '신규재고', '상태', '이카운트품목코드', '이카운트품목명']];
+  deltaRows.forEach(r => aoa.push([r.brand, r.kreamName, r.name, r.size, r.oldVal, r.newVal, r.statusLabel, r.ecCode, r.ecName]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '변동내역');
+  XLSX.writeFile(wb, `크림품절_변동내역_${todayStamp()}.xlsx`);
+}
+
+function downloadFull() {
+  XLSX.writeFile(kreamWB, `${kreamFileName}_${todayStamp()}.xlsx`);
+}
+</script>
+</body>
+</html>
