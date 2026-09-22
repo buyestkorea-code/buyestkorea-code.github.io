@@ -134,10 +134,9 @@ const state = {
   events: [],
   event: null,            // {id, name, ...}
   pin: null,
-  corners: [],
-  corner: null,           // {id, name, ...}
-  items: [],              // 현재 코너 품목 캐시
-  recent: [],             // 최근 스캔/거래 (코너 화면 로컬 표시용)
+  corner: null,           // 행사당 자동생성되는 단일 코너(내부용, 화면엔 안 보임)
+  items: [],              // 현재 행사 품목 캐시
+  recent: [],             // 최근 스캔/거래 (화면 로컬 표시용)
   scanned: null,           // 마지막 조회 결과 {found, item|barcode}
   mode: 'sale',            // sale | return | exchange | manual
   exchangeStep: null,      // 'return' | 'sale' (교환 진행중 단계)
@@ -155,7 +154,7 @@ async function renderEvents(){
   const app = document.getElementById('app');
   app.innerHTML = `
     <h1>행사 POS</h1>
-    <p class="lead">행사(백화점 팝업 등)를 선택하거나 새로 만드세요. 행사 안에 코너별로 재고를 올리고 바코드로 판매·반품을 기록합니다.</p>
+    <p class="lead">행사(백화점 팝업 등)를 선택하거나 새로 만드세요. 행사마다 재고파일 하나를 올리고 바코드로 판매·반품·교환을 기록합니다.</p>
     <div class="bar"><div class="spacer"></div><button class="btn btn-primary" onclick="openCreateEvent()">+ 새 행사</button></div>
     <div id="eventsGrid" class="grid"><div class="hint">불러오는 중...</div></div>
   `;
@@ -171,7 +170,6 @@ async function renderEvents(){
     <div class="tile" onclick="enterEvent(${ev.id})">
       <h3>${esc(ev.name)}</h3>
       <div class="meta">${ev.start_date?esc(ev.start_date):'기간 미정'} ${ev.end_date?'~ '+esc(ev.end_date):''}</div>
-      <div class="meta">코너 ${ev.corner_count}개</div>
       ${ev.memo ? `<div class="meta">${esc(ev.memo)}</div>` : ''}
     </div>
   `).join('');
@@ -202,7 +200,7 @@ async function submitCreateEvent(){
   closeModal();
   showModal(`
     <h2>행사가 만들어졌어요</h2>
-    <p class="lead">이 PIN을 각 코너 담당자에게 알려주세요. (분실 시 행사 목록 화면에서 다시 확인은 안 되니 따로 적어두세요.)</p>
+    <p class="lead">이 PIN을 행사 담당자에게 알려주세요. (분실 시 행사 목록 화면에서 다시 확인은 안 되니 따로 적어두세요.)</p>
     <div style="text-align:center;font-size:40px;font-weight:800;letter-spacing:8px;margin:20px 0;">${res.pin}</div>
     <div class="bar"><div class="spacer"></div><button class="btn btn-primary" onclick="closeModal(); renderEvents();">확인</button></div>
   `);
@@ -237,79 +235,49 @@ async function submitPin(eventId){
   loadEvent(eventId);
 }
 
+/* 행사 하나 = 재고파일 하나. 예전엔 행사 안에 "코너"를 여러 개 만들어 각각 재고를 올리는
+   구조였는데, 사용자 확인 결과 그런 구분이 필요 없고 행사 단위로만 나누면 된다고 확정됨 —
+   그래서 코너 선택 UI는 없애고, 행사마다 코너를 자동으로 1개만 만들어(이벤트명과 동일) 뒤에서
+   투명하게 씀 (서버 API는 내부적으로 corner_id를 여전히 쓰지만 화면엔 안 보임). */
 async function loadEvent(eventId){
   const list = state.events.length ? state.events : (await apiGet('events',{})).events;
   state.event = list.find(e => e.id === eventId) || {id:eventId};
-  const res = await apiGet('corners', {event_id: eventId, pin: state.pin});
+
+  let res = await apiGet('corners', {event_id: eventId, pin: state.pin});
   if (!res.ok){ toast(res.error||'불러오기 실패','err'); return; }
-  state.corners = res.corners;
-  renderEventScreen();
+  let corners = res.corners;
+  if (corners.length === 0){
+    const cr = await apiPost('create_corner', {event_id: eventId, pin: state.pin, name: state.event.name || '재고'});
+    if (!cr.ok){ toast(cr.error||'초기화 실패','err'); return; }
+    res = await apiGet('corners', {event_id: eventId, pin: state.pin});
+    corners = res.corners;
+  }
+  state.corner = corners[0];
+
+  const itemsRes = await apiGet('items', {corner_id: state.corner.id, pin: state.pin});
+  state.items = itemsRes.items || [];
+
+  goScan();
 }
 
-function renderEventScreen(){
-  state.screen = 'event';
-  const app = document.getElementById('app');
-  app.innerHTML = `
-    <div class="crumb"><b onclick="renderEvents()">행사 목록</b> / ${esc(state.event.name)}</div>
-    <h1 style="margin-top:8px;">${esc(state.event.name)}</h1>
-    <div class="tabs">
-      <div class="tab active" id="tabCorners" onclick="showEventTab('corners')">코너</div>
-      <div class="tab" id="tabDaily" onclick="showEventTab('daily')">일별 현황</div>
-      <div class="tab" id="tabExport" onclick="showEventTab('export')">마감 다운로드</div>
-    </div>
-    <div id="eventTabBody"></div>
-    <div class="bar" style="margin-top:24px;"><button class="btn btn-outline" style="color:var(--red);" onclick="confirmDeleteEvent()">이 행사 전체 삭제</button></div>
-  `;
-  showEventTab('corners');
-}
-
-function showEventTab(tab){
-  ['Corners','Daily','Export'].forEach(t => document.getElementById('tab'+t).classList.toggle('active', t.toLowerCase()===tab));
-  if (tab==='corners') renderCornersTab();
-  if (tab==='daily') renderDailyTab();
-  if (tab==='export') renderExportTab();
-}
-
-/* ---- 코너 탭 ---- */
-function renderCornersTab(){
-  const body = document.getElementById('eventTabBody');
-  body.innerHTML = `
-    <div class="bar"><div class="spacer"></div><button class="btn btn-primary" onclick="openCreateCorner()">+ 새 코너</button></div>
-    <div id="cornersGrid" class="grid"></div>
-  `;
-  const grid = document.getElementById('cornersGrid');
-  if (state.corners.length===0){ grid.innerHTML = '<div class="hint">코너가 없어요. "+ 새 코너"로 만드세요 (예: 1층 여성관).</div>'; return; }
-  grid.innerHTML = state.corners.map(c => `
-    <div class="tile" onclick="enterCorner(${c.id})">
-      <h3>${esc(c.name)}</h3>
-      <div class="meta">품목 ${c.item_count}개 · 거래 ${c.txn_count}건</div>
-    </div>
-  `).join('');
-}
-function openCreateCorner(){
-  showModal(`
-    <h2>새 코너</h2>
-    <div class="field"><label>코너 이름 (예: 1층 여성 잡화)</label><input id="mCornerName" placeholder="코너 이름"></div>
-    <div class="bar"><div class="spacer"></div><button class="btn btn-outline" onclick="closeModal()">취소</button><button class="btn btn-primary" onclick="submitCreateCorner()">만들기</button></div>
-  `);
-}
-async function submitCreateCorner(){
-  const name = S(document.getElementById('mCornerName').value);
-  if (!name){ toast('코너 이름을 입력해주세요','err'); return; }
-  const res = await apiPost('create_corner', {event_id: state.event.id, pin: state.pin, name});
-  if (!res.ok){ toast(res.error||'생성 실패','err'); return; }
-  closeModal();
-  await loadEvent(state.event.id);
-}
-
-async function enterCorner(cornerId){
-  const c = state.corners.find(x=>x.id===cornerId);
-  state.corner = c;
-  const res = await apiGet('items', {corner_id: cornerId, pin: state.pin});
-  if (!res.ok){ toast(res.error||'불러오기 실패','err'); return; }
-  state.items = res.items;
+function goScan(){
   if (state.items.length === 0) renderUploadScreen();
   else renderScanScreen();
+}
+
+/* 스캔/업로드/일별현황/마감다운로드 화면 공통 상단(행사명 + 탭 + 행사삭제) */
+function topNav(active){
+  return `
+    <div class="crumb"><b onclick="renderEvents()">행사 목록</b> / ${esc(state.event.name)}
+      <button class="btn btn-outline" style="margin-left:8px;padding:3px 10px;font-size:11px;color:var(--red);" onclick="confirmDeleteEvent()">행사 삭제</button>
+    </div>
+    <h1 style="margin-top:8px;">${esc(state.event.name)}</h1>
+    <div class="tabs">
+      <div class="tab ${active==='scan'?'active':''}" onclick="goScan()">스캔</div>
+      <div class="tab ${active==='daily'?'active':''}" onclick="renderDailyScreen()">일별 현황</div>
+      <div class="tab ${active==='export'?'active':''}" onclick="renderExportScreen()">마감 다운로드</div>
+    </div>
+  `;
 }
 
 /* ============================================================
@@ -318,9 +286,7 @@ async function enterCorner(cornerId){
 function renderUploadScreen(){
   state.screen = 'upload';
   const app = document.getElementById('app');
-  app.innerHTML = `
-    <div class="crumb"><b onclick="renderEvents()">행사 목록</b> / <b onclick="renderEventScreen()">${esc(state.event.name)}</b> / ${esc(state.corner.name)}</div>
-    <h1 style="margin-top:8px;">${esc(state.corner.name)} — 재고파일 업로드</h1>
+  app.innerHTML = topNav('scan') + `
     <p class="lead">분류명(브랜드)/품목명/바코드/재고량/단가 컬럼이 있는 엑셀을 올리세요. 헤더 위치와 컬럼 순서는 자동으로 찾습니다.</p>
     <div class="card">
       <input type="file" id="invFile" accept=".xlsx,.xls">
@@ -424,10 +390,8 @@ function renderScanScreen(){
   state.exchangeStep = null;
   const st = cornerStats();
   const app = document.getElementById('app');
-  app.innerHTML = `
-    <div class="crumb"><b onclick="renderEvents()">행사 목록</b> / <b onclick="renderEventScreen()">${esc(state.event.name)}</b> / ${esc(state.corner.name)}
-      <button class="btn btn-outline" style="margin-left:8px;padding:3px 10px;font-size:11px;" onclick="renderUploadScreen()">재고파일 다시 올리기</button>
-    </div>
+  app.innerHTML = topNav('scan') + `
+    <div class="bar" style="margin-top:-6px;"><div class="spacer"></div><button class="btn btn-outline" style="padding:5px 12px;font-size:12px;" onclick="renderUploadScreen()">재고파일 다시 올리기</button></div>
     <div class="stat-row" style="margin-top:10px;">
       <div class="stat">품목수<b>${st.itemCount}</b></div>
       <div class="stat">현재 총 재고<b>${st.totalQty}</b></div>
@@ -593,7 +557,7 @@ async function submitUnregisteredReturn(barcode){
   // 재고파일에 없는 바코드의 반품 — manual_sale과 동일 원장에 type return, item_id 없이 기록되도록
   // 서버는 scan_return에서 item 못찾으면 unregistered를 리턴하므로, 수기 반품 전용 처리로 manual_sale API를 qty +1 용도로 재사용하지 않고
   // 별도 안내: 이런 경우는 드물게 발생 — item 없이 직접 반품 기록을 남기고 싶으면 관리자에게 문의하도록 안내.
-  toast('재고파일에 없는 바코드는 먼저 코너 담당자와 실물 확인이 필요해요. 비고와 함께 화면을 캡처해두세요.', 'err');
+  toast('재고파일에 없는 바코드는 먼저 실물 확인이 필요해요. 비고와 함께 화면을 캡처해두세요.', 'err');
 }
 async function submitManualSale(barcode){
   const manual_name = S(document.getElementById('manName').value);
@@ -738,10 +702,12 @@ async function toggleCamera(){
 /* ============================================================
    일별 현황
    ============================================================ */
-async function renderDailyTab(){
-  const body = document.getElementById('eventTabBody');
-  body.innerHTML = '<div class="hint">불러오는 중...</div>';
+async function renderDailyScreen(){
+  state.screen = 'daily';
+  const app = document.getElementById('app');
+  app.innerHTML = topNav('daily') + `<div id="dailyBody"><div class="hint">불러오는 중...</div></div>`;
   const res = await apiGet('daily_summary', {event_id: state.event.id, pin: state.pin});
+  const body = document.getElementById('dailyBody');
   if (!res.ok){ body.innerHTML = `<div class="hint">${esc(res.error||'불러오기 실패')}</div>`; return; }
   if (res.days.length===0){ body.innerHTML = '<div class="hint">아직 거래 내역이 없어요.</div>'; return; }
   body.innerHTML = `
@@ -754,10 +720,11 @@ async function renderDailyTab(){
 /* ============================================================
    마감 다운로드 (엑셀)
    ============================================================ */
-function renderExportTab(){
-  const body = document.getElementById('eventTabBody');
-  body.innerHTML = `
-    <p class="lead">행사 전체(모든 코너) 거래원장 + 재고대사표를 엑셀로 받습니다. 회수 시 실물 재고와 "현재전산재고"를 대조하세요.</p>
+function renderExportScreen(){
+  state.screen = 'export';
+  const app = document.getElementById('app');
+  app.innerHTML = topNav('export') + `
+    <p class="lead">거래원장 + 재고대사표를 엑셀로 받습니다. 회수 시 실물 재고와 "현재전산재고"를 대조하세요.</p>
     <button class="btn btn-primary btn-big" onclick="downloadExport()">엑셀 다운로드</button>
   `;
 }
@@ -770,7 +737,6 @@ async function downloadExport(){
 
   // 시트1: 거래원장
   const ledgerRows = res.txns.map(t => ({
-    '코너': t.corner_name,
     '날짜': fmtDate(t.created_at),
     '구분': typeLabel[t.type] + (t.exchange_group?'(교환)':'') + (t.voided?' [취소됨]':''),
     '품명': t.manual_name || '',
@@ -799,7 +765,6 @@ async function downloadExport(){
       return `${lbl}${qty}(${fmtMD(t.created_at)})${flag}`;
     }).join(', ');
     return {
-      '코너': it.corner_name,
       '브랜드': it.brand,
       '품목명': it.item_name,
       '사이즈': it.size,
@@ -814,7 +779,7 @@ async function downloadExport(){
 
   // 시트3: 미등록 수기판매만 모아서
   const manualRows = res.txns.filter(t => t.type==='manual_sale').map(t => ({
-    '코너': t.corner_name, '날짜': fmtDate(t.created_at), '바코드': t.barcode,
+    '날짜': fmtDate(t.created_at), '바코드': t.barcode,
     '품명': t.manual_name, '사이즈': t.manual_size, '최종금액': t.final_amount,
     '비고': t.note || '', '취소여부': t.voided?'취소됨':'',
   }));
@@ -832,7 +797,7 @@ async function downloadExport(){
 function confirmDeleteEvent(){
   showModal(`
     <h2 style="color:var(--red);">행사 전체 삭제</h2>
-    <p class="lead">"${esc(state.event.name)}"의 코너·재고·거래 내역이 모두 영구 삭제됩니다. 되돌릴 수 없어요. 계속하려면 행사 이름을 그대로 입력하세요.</p>
+    <p class="lead">"${esc(state.event.name)}"의 재고·거래 내역이 모두 영구 삭제됩니다. 되돌릴 수 없어요. 계속하려면 행사 이름을 그대로 입력하세요.</p>
     <div class="field"><input id="mDelConfirm" placeholder="${esc(state.event.name)}"></div>
     <div class="bar"><div class="spacer"></div><button class="btn btn-outline" onclick="closeModal()">취소</button><button class="btn btn-red" onclick="submitDeleteEvent()">영구 삭제</button></div>
   `);
