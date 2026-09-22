@@ -95,7 +95,20 @@ const N = v => { const n = Number(String(v??'').replace(/,/g,'')); return isFini
 function esc(s){ return S(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fmtDate(ts){ const d = new Date(ts*1000); return d.toLocaleDateString('ko-KR',{month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
 function fmtMD(ts){ const d = new Date(ts*1000); return String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0'); }
+function fmtTime(ts){ return new Date(ts*1000).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
+function fmtFull(ts){ const d = new Date(ts*1000); return d.toLocaleDateString('ko-KR') + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
 function money(n){ return N(n).toLocaleString('ko-KR'); }
+const TYPE_LABEL_KO = {sale:'판매', return:'반품', manual_sale:'수기판매'};
+const TYPE_LABEL_CHIP = {sale:['판매','c-sale'], return:['반품','c-return'], manual_sale:['수기판매','c-manual']};
+/* 거래 한 건의 표시용 품명/사이즈 — 등록품목이면 재고파일에서 온 브랜드+품명/사이즈,
+   수기판매(미등록바코드)면 그때 입력한 manual_name/manual_size */
+function txnDisplayName(t){
+  if (t.item_id) return [t.item_brand, t.item_item_name].filter(Boolean).join(' ') || ('#' + t.barcode);
+  return t.manual_name || ('#' + t.barcode);
+}
+function txnDisplaySize(t){
+  return t.item_id ? (t.item_size || '') : (t.manual_size || '');
+}
 function toast(msg, type){
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = type||'';
@@ -639,14 +652,13 @@ async function loadRecent(){
   const wrap = document.getElementById('recentList');
   if (!wrap) return;
   if (!res.ok || res.txns.length===0){ wrap.innerHTML = '<div class="hint">아직 거래 내역이 없어요.</div>'; return; }
-  const typeLabel = {sale:['판매','c-sale'], return:['반품','c-return'], manual_sale:['수기판매','c-manual']};
   wrap.innerHTML = res.txns.slice(0,60).map(t => {
-    const [label, cls] = typeLabel[t.type] || [t.type,''];
-    const name = t.item_id ? '' : (t.manual_name || '');
+    const [label, cls] = TYPE_LABEL_CHIP[t.type] || [t.type,''];
+    const size = txnDisplaySize(t);
     return `
       <div class="recent-item">
         <span class="chip ${t.voided? 'c-void':cls}">${label}${t.voided?'(취소됨)':''}</span>
-        <span class="grow">${esc(name)} ${t.barcode?('#'+esc(t.barcode)):''} ${money(t.final_amount)}원 ${t.note?('· '+esc(t.note)):''}</span>
+        <span class="grow">${esc(txnDisplayName(t))}${size?' ('+esc(size)+')':''} ${money(t.final_amount)}원 ${t.note?('· '+esc(t.note)):''}</span>
         <span>${fmtDate(t.created_at)}</span>
         ${!t.voided ? `<button class="void-btn" onclick="voidTxn(${t.id})">취소</button>` : ''}
       </div>`;
@@ -695,19 +707,96 @@ async function toggleCamera(){
 /* ============================================================
    일별 현황
    ============================================================ */
+let dailyDaysCache = [];
 async function renderDailyScreen(){
   state.screen = 'daily';
   const app = document.getElementById('app');
-  app.innerHTML = topNav('daily') + `<div id="dailyBody"><div class="hint">불러오는 중...</div></div>`;
+  app.innerHTML = topNav('daily') + `
+    <div class="bar" style="margin-top:-6px;"><div class="spacer"></div><button class="btn btn-outline" style="padding:5px 12px;font-size:12px;" onclick="downloadDailyDetail()">엑셀로 다운로드 (일별요약+상세내역)</button></div>
+    <div id="dailyBody"><div class="hint">불러오는 중...</div></div>
+  `;
   const res = await apiGet('daily_summary', {event_id: state.event.id});
   const body = document.getElementById('dailyBody');
   if (!res.ok){ body.innerHTML = `<div class="hint">${esc(res.error||'불러오기 실패')}</div>`; return; }
+  dailyDaysCache = res.days;
   if (res.days.length===0){ body.innerHTML = '<div class="hint">아직 거래 내역이 없어요.</div>'; return; }
   body.innerHTML = `
     <div class="tbl-wrap"><table>
-      <thead><tr><th>날짜</th><th>판매</th><th>수기판매</th><th>반품</th><th>판매금액</th><th>반품금액</th></tr></thead>
-      <tbody>${res.days.map(d=>`<tr><td>${esc(d.d)}</td><td>${d.sale_cnt}</td><td>${d.manual_cnt}</td><td>${d.return_cnt}</td><td>${money(d.sale_amount)}</td><td>${money(d.return_amount)}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>날짜</th><th>판매</th><th>수기판매</th><th>반품</th><th>판매금액</th><th>반품금액</th><th></th></tr></thead>
+      <tbody>${res.days.map(d => `
+        <tr>
+          <td>${esc(d.d)}</td><td>${d.sale_cnt}</td><td>${d.manual_cnt}</td><td>${d.return_cnt}</td>
+          <td>${money(d.sale_amount)}</td><td>${money(d.return_amount)}</td>
+          <td><button class="btn btn-outline" id="ddbtn-${d.d}" style="padding:3px 10px;font-size:12px;" onclick="toggleDayDetail('${d.d}')">더보기</button></td>
+        </tr>
+        <tr id="dd-${d.d}" style="display:none;"><td colspan="7" style="background:#fafafa;"></td></tr>
+      `).join('')}</tbody>
     </table></div>`;
+}
+
+const dayDetailLoaded = {};
+async function toggleDayDetail(dateStr){
+  const row = document.getElementById('dd-' + dateStr);
+  const btn = document.getElementById('ddbtn-' + dateStr);
+  if (!row) return;
+  const isOpen = row.style.display !== 'none';
+  if (isOpen){ row.style.display = 'none'; if (btn) btn.textContent = '더보기'; return; }
+  row.style.display = '';
+  if (btn) btn.textContent = '접기';
+  if (dayDetailLoaded[dateStr]) return; // 이미 한 번 불러왔으면 재요청 안 함
+
+  const td = row.querySelector('td');
+  td.innerHTML = '<div class="hint">불러오는 중...</div>';
+  const res = await apiGet('txns', {event_id: state.event.id, date: dateStr});
+  if (!res.ok){ td.innerHTML = `<div class="hint">${esc(res.error||'불러오기 실패')}</div>`; return; }
+  if (res.txns.length===0){ td.innerHTML = '<div class="hint">그 날짜 거래 내역이 없어요.</div>'; return; }
+  const rows = res.txns.slice().sort((a,b)=>a.created_at-b.created_at);
+  td.innerHTML = `
+    <table style="width:100%;font-size:12.5px;">
+      <thead><tr><th>시간</th><th>구분</th><th>품명</th><th>사이즈</th><th>바코드</th><th>수량</th><th>금액</th><th>비고</th></tr></thead>
+      <tbody>${rows.map(t => {
+        const [label, cls] = TYPE_LABEL_CHIP[t.type] || [t.type, ''];
+        return `<tr${t.voided ? ' style="opacity:.5;text-decoration:line-through;"' : ''}>
+          <td>${fmtTime(t.created_at)}</td>
+          <td><span class="chip ${t.voided?'c-void':cls}">${label}${t.voided?'(취소)':''}</span></td>
+          <td>${esc(txnDisplayName(t))}</td>
+          <td>${esc(txnDisplaySize(t))}</td>
+          <td>${esc(t.barcode)}</td>
+          <td>${t.qty_delta}</td>
+          <td>${money(t.final_amount)}</td>
+          <td>${esc(t.note||'')}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  dayDetailLoaded[dateStr] = true;
+}
+
+async function downloadDailyDetail(){
+  toast('데이터를 모으는 중...', 'ok');
+  const res = await apiGet('txns', {event_id: state.event.id});
+  if (!res.ok){ toast(res.error||'실패','err'); return; }
+
+  const summaryRows = dailyDaysCache.map(d => ({
+    '날짜': d.d, '판매': d.sale_cnt, '수기판매': d.manual_cnt, '반품': d.return_cnt,
+    '판매금액': d.sale_amount, '반품금액': d.return_amount,
+  }));
+
+  const detailRows = res.txns.slice().sort((a,b)=>a.created_at-b.created_at).map(t => ({
+    '날짜': fmtFull(t.created_at).split(' ')[0],
+    '시간': fmtTime(t.created_at),
+    '구분': TYPE_LABEL_KO[t.type] + (t.exchange_group?'(교환)':'') + (t.voided?' [취소됨]':''),
+    '품명': txnDisplayName(t),
+    '사이즈': txnDisplaySize(t),
+    '바코드': t.barcode,
+    '수량': t.qty_delta,
+    '금액': t.final_amount,
+    '비고': t.note || '',
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), '일별요약');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows), '상세내역');
+  XLSX.writeFile(wb, `${state.event.name}_일별현황_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 /* ============================================================
@@ -726,14 +815,12 @@ async function downloadExport(){
   const res = await apiGet('export', {event_id: state.event.id});
   if (!res.ok){ toast(res.error||'실패','err'); return; }
 
-  const typeLabel = {sale:'판매', return:'반품', manual_sale:'수기판매'};
-
   // 시트1: 거래원장
   const ledgerRows = res.txns.map(t => ({
     '날짜': fmtDate(t.created_at),
-    '구분': typeLabel[t.type] + (t.exchange_group?'(교환)':'') + (t.voided?' [취소됨]':''),
-    '품명': t.manual_name || '',
-    '사이즈': t.manual_size || '',
+    '구분': TYPE_LABEL_KO[t.type] + (t.exchange_group?'(교환)':'') + (t.voided?' [취소됨]':''),
+    '품명': txnDisplayName(t),
+    '사이즈': txnDisplaySize(t),
     '바코드': t.barcode,
     '수량': t.qty_delta,
     '정가': t.price,
