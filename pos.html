@@ -96,7 +96,10 @@ function esc(s){ return S(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>
 function fmtDate(ts){ const d = new Date(ts*1000); return d.toLocaleDateString('ko-KR',{month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
 function fmtMD(ts){ const d = new Date(ts*1000); return String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0'); }
 function fmtTime(ts){ return new Date(ts*1000).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
-function fmtFull(ts){ const d = new Date(ts*1000); return d.toLocaleDateString('ko-KR') + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
+/* YYYY-MM-DD 고정 포맷 — 서버 daily_summary의 FROM_UNIXTIME(...,'%Y-%m-%d')와 맞춰야 날짜별로 묶임.
+   주의: toLocaleDateString('ko-KR')은 "2026. 9. 23."처럼 점+공백이 섞여 나와서 split(' ')로 자르면
+   날짜가 깨짐 — 반드시 이 함수처럼 연/월/일을 직접 조립할 것. */
+function fmtYMD(ts){ const d = new Date(ts*1000); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function money(n){ return N(n).toLocaleString('ko-KR'); }
 const TYPE_LABEL_KO = {sale:'판매', return:'반품', manual_sale:'수기판매'};
 const TYPE_LABEL_CHIP = {sale:['판매','c-sale'], return:['반품','c-return'], manual_sale:['수기판매','c-manual']};
@@ -712,7 +715,7 @@ async function renderDailyScreen(){
   state.screen = 'daily';
   const app = document.getElementById('app');
   app.innerHTML = topNav('daily') + `
-    <div class="bar" style="margin-top:-6px;"><div class="spacer"></div><button class="btn btn-outline" style="padding:5px 12px;font-size:12px;" onclick="downloadDailyDetail()">엑셀로 다운로드 (일별요약+상세내역)</button></div>
+    <div class="bar" style="margin-top:-6px;"><div class="spacer"></div><button class="btn btn-outline" style="padding:5px 12px;font-size:12px;" onclick="downloadDailyDetail()">엑셀로 다운로드 (날짜별 요약+상세 한 시트)</button></div>
     <div id="dailyBody"><div class="hint">불러오는 중...</div></div>
   `;
   const res = await apiGet('daily_summary', {event_id: state.event.id});
@@ -776,26 +779,35 @@ async function downloadDailyDetail(){
   const res = await apiGet('txns', {event_id: state.event.id});
   if (!res.ok){ toast(res.error||'실패','err'); return; }
 
-  const summaryRows = dailyDaysCache.map(d => ({
-    '날짜': d.d, '판매': d.sale_cnt, '수기판매': d.manual_cnt, '반품': d.return_cnt,
-    '판매금액': d.sale_amount, '반품금액': d.return_amount,
-  }));
+  // 날짜별로 묶기 — fmtYMD가 서버 daily_summary의 날짜 문자열(YYYY-MM-DD)과 같은 형식이어야 매칭됨
+  const byDate = {};
+  res.txns.forEach(t => {
+    const ymd = fmtYMD(t.created_at);
+    (byDate[ymd] = byDate[ymd] || []).push(t);
+  });
 
-  const detailRows = res.txns.slice().sort((a,b)=>a.created_at-b.created_at).map(t => ({
-    '날짜': fmtFull(t.created_at).split(' ')[0],
-    '시간': fmtTime(t.created_at),
-    '구분': TYPE_LABEL_KO[t.type] + (t.exchange_group?'(교환)':'') + (t.voided?' [취소됨]':''),
-    '품명': txnDisplayName(t),
-    '사이즈': txnDisplaySize(t),
-    '바코드': t.barcode,
-    '수량': t.qty_delta,
-    '금액': t.final_amount,
-    '비고': t.note || '',
-  }));
+  // 시트 1개에 날짜별 "요약 한 줄 + 그 날짜 상세 내역"을 순서대로 이어붙임(날짜 오름차순)
+  const rows = [];
+  dailyDaysCache.forEach(d => {
+    rows.push({
+      '날짜': d.d, '구분': '일계',
+      '시간': '', '품명': '', '사이즈': '', '바코드': '', '수량': '', '금액': '', '비고': '',
+      '판매건수': d.sale_cnt, '수기판매건수': d.manual_cnt, '반품건수': d.return_cnt,
+      '판매금액합계': d.sale_amount, '반품금액합계': d.return_amount,
+    });
+    const dayTxns = (byDate[d.d] || []).slice().sort((a,b)=>a.created_at-b.created_at);
+    dayTxns.forEach(t => {
+      rows.push({
+        '날짜': '', '구분': TYPE_LABEL_KO[t.type] + (t.exchange_group?'(교환)':'') + (t.voided?' [취소됨]':''),
+        '시간': fmtTime(t.created_at), '품명': txnDisplayName(t), '사이즈': txnDisplaySize(t),
+        '바코드': t.barcode, '수량': t.qty_delta, '금액': t.final_amount, '비고': t.note || '',
+        '판매건수': '', '수기판매건수': '', '반품건수': '', '판매금액합계': '', '반품금액합계': '',
+      });
+    });
+  });
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), '일별요약');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows), '상세내역');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '일별현황');
   XLSX.writeFile(wb, `${state.event.name}_일별현황_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
