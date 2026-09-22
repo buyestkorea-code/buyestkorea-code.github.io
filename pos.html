@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>행사 POS</title>
+<style>
+  :root{
+    --bg:#fafafa; --card:#fff; --ink:#111827; --sub:#6b7280; --line:#e5e7eb;
+    --pri:#111827; --green:#0f766e; --red:#b91c1c; --blue:#1d4ed8; --amber:#92400e;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,"Malgun Gothic",sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:16px;}
+  h1{font-size:19px;margin:0 0 4px;}
+  h2{font-size:16px;margin:0 0 8px;}
+  p.lead{color:var(--sub);font-size:13px;margin:4px 0 16px;line-height:1.6;}
+  .bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .bar .spacer{flex:1;}
+  .crumb{font-size:13px;color:var(--sub);}
+  .crumb b{color:var(--ink);cursor:pointer;text-decoration:underline;}
+  .btn{font-size:14px;padding:9px 16px;border:none;border-radius:7px;cursor:pointer;font-weight:600;}
+  .btn-primary{background:var(--pri);color:#fff;}
+  .btn-green{background:var(--green);color:#fff;}
+  .btn-red{background:var(--red);color:#fff;}
+  .btn-outline{background:#fff;color:var(--ink);border:1px solid var(--line);}
+  .btn:disabled{background:#d1d5db;color:#6b7280;cursor:not-allowed;}
+  .btn-big{font-size:18px;padding:16px 20px;border-radius:10px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;cursor:pointer;transition:.15s;}
+  .tile:hover{border-color:var(--pri);box-shadow:0 2px 8px rgba(0,0,0,.06);}
+  .tile h3{margin:0 0 6px;font-size:15px;}
+  .tile .meta{font-size:12px;color:var(--sub);}
+  .tile-add{display:flex;align-items:center;justify-content:center;color:var(--sub);border-style:dashed;font-size:14px;min-height:70px;}
+  .field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
+  .field label{font-size:12px;color:var(--sub);font-weight:600;}
+  input,select,textarea{font-size:15px;padding:9px 10px;border:1px solid var(--line);border-radius:7px;font-family:inherit;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;}
+  .row > *{flex:1;min-width:140px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;}
+  th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;}
+  th{background:#f3f4f6;position:sticky;top:0;}
+  .tbl-wrap{max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:8px;}
+  .chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;}
+  .c-sale{background:#f0fdf4;color:#15803d;}
+  .c-return{background:#eff6ff;color:#1d4ed8;}
+  .c-manual{background:#fef3c7;color:#92400e;}
+  .c-void{background:#f3f4f6;color:#9ca3af;text-decoration:line-through;}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;}
+  .modal{background:#fff;border-radius:12px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow:auto;}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;border-radius:8px;font-size:14px;z-index:100;display:none;}
+  #toast.err{background:var(--red);}
+  #toast.ok{background:var(--green);}
+
+  /* ---- 스캔 화면 ---- */
+  .scan-box{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;}
+  #barcodeInput{font-size:26px;padding:16px;width:100%;text-align:center;letter-spacing:1px;border:2px solid var(--pri);border-radius:10px;}
+  .scan-actions{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
+  .scan-actions .btn{flex:1;min-width:110px;}
+  .item-card{margin-top:14px;padding:16px;border-radius:12px;border:2px solid var(--line);}
+  .item-card.hit{border-color:var(--green);background:#f0fdf4;}
+  .item-card.miss{border-color:var(--red);background:#fef2f2;}
+  .item-card .name{font-size:19px;font-weight:800;}
+  .item-card .meta{font-size:14px;color:var(--sub);margin-top:2px;}
+  .item-card .qty{font-size:15px;margin-top:6px;font-weight:700;}
+  .qty.low{color:var(--red);}
+  .stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--sub);}
+  .stat b{display:block;font-size:20px;color:var(--ink);}
+  .recent-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .recent-item .grow{flex:1;}
+  .recent-item .void-btn{color:var(--red);cursor:pointer;font-size:12px;text-decoration:underline;background:none;border:none;}
+  .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+  .tab{padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;background:#fff;border:1px solid var(--line);}
+  .tab.active{background:var(--pri);color:#fff;border-color:var(--pri);}
+  #camWrap{display:none;margin-top:10px;}
+  #camReader{width:100%;max-width:420px;margin:0 auto;}
+  .hint{font-size:12px;color:var(--sub);margin-top:6px;}
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<div id="app"></div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+const REPORT_API = 'https://buyest.co.kr/pos_report_api.php';
+const EXECUTE_API = 'https://buyest.co.kr/pos_execute_api.php';
+
+const S = v => (v===null||v===undefined) ? '' : String(v).trim();
+const N = v => { const n = Number(String(v??'').replace(/,/g,'')); return isFinite(n) ? n : 0; };
+function esc(s){ return S(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtDate(ts){ const d = new Date(ts*1000); return d.toLocaleDateString('ko-KR',{month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
+function fmtMD(ts){ const d = new Date(ts*1000); return String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0'); }
+function money(n){ return N(n).toLocaleString('ko-KR'); }
+function toast(msg, type){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = type||'';
+  t.style.display = 'block';
+  clearTimeout(t._h);
+  t._h = setTimeout(()=>{ t.style.display='none'; }, 2600);
+}
+
+/* ---------- API 헬퍼 ---------- */
+async function apiGet(action, params){
+  try {
+    const q = new URLSearchParams({action, ...params});
+    const res = await fetch(REPORT_API + '?' + q.toString());
+    if (!res.ok) return {ok:false, error:`서버 오류 (HTTP ${res.status})`};
+    return await res.json();
+  } catch (e) {
+    return {ok:false, error:'서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요.'};
+  }
+}
+async function apiPost(action, body){
+  try {
+    const res = await fetch(EXECUTE_API, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action, ...body})
+    });
+    if (!res.ok) return {ok:false, error:`서버 오류 (HTTP ${res.status})`};
+    return await res.json();
+  } catch (e) {
+    return {ok:false, error:'서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요.'};
+  }
+}
+
+/* ---------- 상태 ---------- */
+const state = {
+  screen: 'events',      // events | event | upload | scan | daily | export
+  events: [],
+  event: null,            // {id, name, ...}
+  pin: null,
+  corners: [],
+  corner: null,           // {id, name, ...}
+  items: [],              // 현재 코너 품목 캐시
+  recent: [],             // 최근 스캔/거래 (코너 화면 로컬 표시용)
+  scanned: null,           // 마지막 조회 결과 {found, item|barcode}
+  mode: 'sale',            // sale | return | exchange | manual
+  exchangeStep: null,      // 'return' | 'sale' (교환 진행중 단계)
+  exchangeReturn: null,
+  camActive: false,
+};
+
+function pinKey(eventId){ return 'pos_pin_' + eventId; }
+
+/* ============================================================
+   화면 1: 행사 목록
+   ============================================================ */
+async function renderEvents(){
+  state.screen = 'events';
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <h1>행사 POS</h1>
+    <p class="lead">행사(백화점 팝업 등)를 선택하거나 새로 만드세요. 행사 안에 코너별로 재고를 올리고 바코드로 판매·반품을 기록합니다.</p>
+    <div class="bar"><div class="spacer"></div><button class="btn btn-primary" onclick="openCreateEvent()">+ 새 행사</button></div>
+    <div id="eventsGrid" class="grid"><div class="hint">불러오는 중...</div></div>
+  `;
+  const res = await apiGet('events', {});
+  const grid = document.getElementById('eventsGrid');
+  if (!res.ok){ grid.innerHTML = `<div class="hint" style="color:var(--red);">${esc(res.error||'행사 목록을 못 불러왔어요')}</div>`; return; }
+  state.events = res.events;
+  if (state.events.length === 0){
+    grid.innerHTML = '<div class="hint">아직 등록된 행사가 없어요. "+ 새 행사"로 시작하세요.</div>';
+    return;
+  }
+  grid.innerHTML = state.events.map(ev => `
+    <div class="tile" onclick="enterEvent(${ev.id})">
+      <h3>${esc(ev.name)}</h3>
+      <div class="meta">${ev.start_date?esc(ev.start_date):'기간 미정'} ${ev.end_date?'~ '+esc(ev.end_date):''}</div>
+      <div class="meta">코너 ${ev.corner_count}개</div>
+      ${ev.memo ? `<div class="meta">${esc(ev.memo)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function openCreateEvent(){
+  showModal(`
+    <h2>새 행사 만들기</h2>
+    <div class="field"><label>행사 이름 (예: 10월 롯데백화점 동래)</label><input id="mEvName" placeholder="행사 이름"></div>
+    <div class="row">
+      <div class="field"><label>시작일</label><input id="mEvStart" type="date"></div>
+      <div class="field"><label>종료일</label><input id="mEvEnd" type="date"></div>
+    </div>
+    <div class="field"><label>메모</label><input id="mEvMemo" placeholder="선택사항"></div>
+    <div class="bar"><div class="spacer"></div><button class="btn btn-outline" onclick="closeModal()">취소</button><button class="btn btn-primary" onclick="submitCreateEvent()">만들기</button></div>
+  `);
+}
+async function submitCreateEvent(){
+  const name = S(document.getElementById('mEvName').value);
+  if (!name){ toast('행사 이름을 입력해주세요','err'); return; }
+  const res = await apiPost('create_event', {
+    name,
+    start_date: document.getElementById('mEvStart').value || null,
+    end_date: document.getElementById('mEvEnd').value || null,
+    memo: S(document.getElementById('mEvMemo').value),
+  });
+  if (!res.ok){ toast(res.error||'생성 실패','err'); return; }
+  closeModal();
+  showModal(`
+    <h2>행사가 만들어졌어요</h2>
+    <p class="lead">이 PIN을 각 코너 담당자에게 알려주세요. (분실 시 행사 목록 화면에서 다시 확인은 안 되니 따로 적어두세요.)</p>
+    <div style="text-align:center;font-size:40px;font-weight:800;letter-spacing:8px;margin:20px 0;">${res.pin}</div>
+    <div class="bar"><div class="spacer"></div><button class="btn btn-primary" onclick="closeModal(); renderEvents();">확인</button></div>
+  `);
+}
+
+/* ============================================================
+   PIN 확인 후 행사 진입
+   ============================================================ */
+async function enterEvent(eventId){
+  const saved = sessionStorage.getItem(pinKey(eventId));
+  if (saved){
+    const ok = await apiGet('verify_pin', {event_id:eventId, pin:saved});
+    if (ok.ok && ok.valid){ state.pin = saved; return loadEvent(eventId); }
+  }
+  showModal(`
+    <h2>PIN 입력</h2>
+    <p class="lead">이 행사 담당자에게 받은 4자리 PIN을 입력하세요.</p>
+    <div class="field"><input id="mPin" maxlength="10" style="font-size:22px;text-align:center;letter-spacing:4px;" placeholder="0000" autofocus></div>
+    <div class="bar"><div class="spacer"></div><button class="btn btn-outline" onclick="closeModal()">취소</button><button class="btn btn-primary" onclick="submitPin(${eventId})">확인</button></div>
+  `);
+  const el = document.getElementById('mPin');
+  el.focus();
+  el.addEventListener('keydown', e => { if (e.key==='Enter') submitPin(eventId); });
+}
+async function submitPin(eventId){
+  const pin = S(document.getElementById('mPin').value);
+  const res = await apiGet('verify_pin', {event_id:eventId, pin});
+  if (!res.ok || !res.valid){ toast('PIN이 맞지 않아요','err'); return; }
+  sessionStorage.setItem(pinKey(eventId), pin);
+  state.pin = pin;
+  closeModal();
+  loadEvent(eventId);
+}
+
+async function loadEvent(eventId){
+  const list = state.events.length ? state.events : (await apiGet('events',{})).events;
+  state.event = list.find(e => e.id === eventId) || {id:eventId};
+  const res = await apiGet('corners', {event_id: eventId, pin: state.pin});
+  if (!res.ok){ toast(res.error||'불러오기 실패','err'); return; }
+  state.corners = res.corners;
+  renderEventScreen();
+}
+
+function renderEventScreen(){
+  state.screen = 'event';
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="crumb"><b onclick="renderEvents()">행사 목록</b> / ${esc(state.event.name)}</div>
+    <h1 style="margin-top:8px;">${esc(state.event.name)}</h1>
+    <div class="tabs">
+      <div class="tab active" id="tabCorners" onclick="showEventTab('corners')">코너</div>
+      <div class="tab" id="tabDaily" onclick="showEventTab('daily')">일별 현황</div>
+      <div class="tab" id="tabExport" onclick="showEventTab('export')">마감 다운로드</div>
+    </div>
+    <div id="eventTabBody"></div>
+    <div class="bar" style="margin-top:24px;"><button class="btn btn-outline" style="color:var(--red);" onclick="confirmDeleteEvent()">이 행사 전체 삭제</button></div>
+  `;
+  showEventTab('corners');
+}
+
+function showEventTab(tab){
+  ['Corners','Daily','Export'].forEach(t => document.getElementById('tab'+t).classList.toggle('active', t.toLowerCase()===tab));
+  if (tab==='corners') renderCornersTab();
+  if (tab==='daily') renderDailyTab();
+  if (tab==='export') renderExportTab();
+}
+
+/* ---- 코너 탭 ---- */
+function renderCornersTab(){
+  const body = document.getElementById('eventTabBody');
+  body.innerHTML = `
+    <div class="bar"><div class="spacer"></div><button class="btn btn-primary" onclick="openCreateCorner()">+ 새 코너</button></div>
+    <div id="cornersGrid" class="grid"></div>
+  `;
+  const grid = document.getElementById('cornersGrid');
+  if (state.corners.length===0){ grid.innerHTML = '<div class="hint">코너가 없어요. "+ 새 코너"로 만드세요 (예: 1층 여성관).</div>'; return; }
+  grid.innerHTML = state.corners.map(c => `
+    <div class="tile" onclick="enterCorner(${c.id})">
+      <h3>${esc(c.name)}</h3>
+      <div class="meta">품목 ${c.item_count}개 · 거래 ${c.txn_count}건</div>
+    </div>
+  `).join('');
+}
+function openCreateCorner(){
+  showModal(`
+    <h2>새 코너</h2>
+    <div class="field"><label>코너 이름 (예: 1층 여성 잡화)</label><input id="mCornerName" placeholder="코너 이름"></div>
+    <div class="bar"><div class="spacer"></div><button class="btn btn-outline" onclick="closeModal()">취소</button><button class="btn btn-primary" onclick="submitCreateCorner()">만들기</button></div>
+  `);
+}
+async function submitCreateCorner(){
+  const name = S(document.getElementById('mCornerName').value);
+  if (!name){ toast('코너 이름을 입력해주세요','err'); return; }
+  const res = await apiPost('create_corner', {event_id: state.event.id, pin: state.pin, name});
+  if (!res.ok){ toast(res.error||'생성 실패','err'); return; }
+  closeModal();
+  await loadEvent(state.event.id);
+}
+
+async function enterCorner(cornerId){
+  const c = state.corners.find(x=>x.id===cornerId);
+  state.corner = c;
+  const res = await apiGet('items', {corner_id: cornerId, pin: state.pin});
+  if (!res.ok){ toast(res.error||'불러오기 실패','err'); return; }
+  state.items = res.items;
+  if (state.items.length === 0) renderUploadScreen();
+  else renderScanScreen();
+}
+
+/* ============================================================
+   재고파일 업로드 화면
+   ============================================================ */
+function renderUploadScreen(){
+  state.screen = 'upload';
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="crumb"><b onclick="renderEvents()">행사 목록</b> / <b onclick="renderEventScreen()">${esc(state.event.name)}</b> / ${esc(state.corner.name)}</div>
+    <h1 style="margin-top:8px;">${esc(state.corner.name)} — 재고파일 업로드</h1>
+    <p class="lead">분류명(브랜드)/품목명/바코드/재고량/단가 컬럼이 있는 엑셀을 올리세요. 헤더 위치와 컬럼 순서는 자동으로 찾습니다.</p>
+    <div class="card">
+      <input type="file" id="invFile" accept=".xlsx,.xls">
+      <div id="invPreviewWrap" style="margin-top:14px;"></div>
+    </div>
+  `;
+  document.getElementById('invFile').addEventListener('change', handleInventoryFile);
+}
+
+let pendingUploadRows = null;
+async function handleInventoryFile(e){
+  const f = e.target.files[0];
+  if (!f) return;
+  const wb = XLSX.read(await f.arrayBuffer(), {type:'array'});
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:true});
+  const rows = parseInventoryExcel(aoa);
+  pendingUploadRows = rows;
+  const wrap = document.getElementById('invPreviewWrap');
+  if (rows.length===0){
+    wrap.innerHTML = '<div class="hint" style="color:var(--red);">바코드 컬럼을 찾지 못했어요. 양식을 확인해주세요.</div>';
+    return;
+  }
+  wrap.innerHTML = `
+    <div class="hint">${rows.length}건 인식됨 (미리보기 상위 8건)</div>
+    <div class="tbl-wrap" style="max-height:260px;margin-top:8px;">
+      <table><thead><tr><th>브랜드</th><th>품목명</th><th>사이즈</th><th>바코드</th><th>재고량</th><th>단가</th></tr></thead>
+      <tbody>${rows.slice(0,8).map(r=>`<tr><td>${esc(r.brand)}</td><td>${esc(r.item_name)}</td><td>${esc(r.size)}</td><td>${esc(r.barcode)}</td><td>${r.init_qty}</td><td>${money(r.price)}</td></tr>`).join('')}</tbody></table>
+    </div>
+    <div class="bar" style="margin-top:14px;"><button class="btn btn-primary" onclick="submitUpload()">이 내용으로 업로드</button></div>
+  `;
+}
+
+/* 분류명/품목명/바코드/재고량/단가 헤더를 찾아 매핑, 분류명은 병합셀이라 fill-down */
+function parseInventoryExcel(aoa){
+  let headerIdx = -1, colMap = {};
+  for (let i=0;i<aoa.length;i++){
+    const row = aoa[i]||[];
+    const idx = {};
+    row.forEach((cell,ci) => {
+      const t = S(cell);
+      if (t==='분류명') idx.brand = ci;
+      if (t==='품목명') idx.item_name = ci;
+      if (t==='바코드') idx.barcode = ci;
+      if (t==='재고량') idx.init_qty = ci;
+      if (t==='단가') idx.price = ci;
+    });
+    if (idx.item_name!==undefined && idx.barcode!==undefined){ headerIdx = i; colMap = idx; break; }
+  }
+  if (headerIdx === -1) return [];
+
+  const out = [];
+  let curBrand = '';
+  for (let i=headerIdx+1;i<aoa.length;i++){
+    const row = aoa[i];
+    if (!row) continue;
+    const allEmpty = row.every(c => S(c)==='');
+    if (allEmpty) continue;
+    if (colMap.brand!==undefined && S(row[colMap.brand])!=='') curBrand = S(row[colMap.brand]);
+    const barcode = S(row[colMap.barcode]);
+    if (!barcode) continue;
+    const itemName = S(row[colMap.item_name]);
+    const li = itemName.lastIndexOf('_');
+    const size = li>=0 ? itemName.slice(li+1) : '';
+    const styleCode = li>=0 ? itemName.slice(0,li) : itemName;
+    out.push({
+      brand: curBrand,
+      item_name: itemName,
+      style_code: styleCode,
+      size: size,
+      barcode: barcode,
+      init_qty: colMap.init_qty!==undefined ? N(row[colMap.init_qty]) : 0,
+      price: colMap.price!==undefined ? N(row[colMap.price]) : 0,
+    });
+  }
+  return out;
+}
+
+async function submitUpload(){
+  if (!pendingUploadRows || pendingUploadRows.length===0) return;
+  const res = await apiPost('upload_items', {corner_id: state.corner.id, pin: state.pin, items: pendingUploadRows});
+  if (!res.ok){ toast(res.error||'업로드 실패','err'); return; }
+  toast(`신규 ${res.inserted}건, 갱신 ${res.updated}건 업로드됐어요`, 'ok');
+  const itemsRes = await apiGet('items', {corner_id: state.corner.id, pin: state.pin});
+  state.items = itemsRes.items || [];
+  renderScanScreen();
+}
+
+/* ============================================================
+   스캔(POS) 화면
+   ============================================================ */
+function cornerStats(){
+  const totalQty = state.items.reduce((a,i)=>a+i.cur_qty,0);
+  const soldQty = state.items.reduce((a,i)=>a+i.sold_qty,0);
+  return {itemCount: state.items.length, totalQty, soldQty};
+}
+
+function renderScanScreen(){
+  state.screen = 'scan';
+  state.scanned = null;
+  state.mode = 'sale';
+  state.exchangeStep = null;
+  const st = cornerStats();
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="crumb"><b onclick="renderEvents()">행사 목록</b> / <b onclick="renderEventScreen()">${esc(state.event.name)}</b> / ${esc(state.corner.name)}
+      <button class="btn btn-outline" style="margin-left:8px;padding:3px 10px;font-size:11px;" onclick="renderUploadScreen()">재고파일 다시 올리기</button>
+    </div>
+    <div class="stat-row" style="margin-top:10px;">
+      <div class="stat">품목수<b>${st.itemCount}</b></div>
+      <div class="stat">현재 총 재고<b>${st.totalQty}</b></div>
+      <div class="stat">누적 판매<b>${st.soldQty}</b></div>
+    </div>
+
+    <div class="scan-box">
+      <div class="scan-actions" style="margin-bottom:10px;">
+        <button class="btn ${state.mode==='sale'?'btn-primary':'btn-outline'}" onclick="setMode('sale')">판매</button>
+        <button class="btn ${state.mode==='return'?'btn-primary':'btn-outline'}" onclick="setMode('return')">반품</button>
+        <button class="btn ${state.mode==='exchange'?'btn-primary':'btn-outline'}" onclick="setMode('exchange')">교환</button>
+      </div>
+      <div id="modeHint" class="hint"></div>
+      <input id="barcodeInput" placeholder="바코드 스캔 또는 입력 후 Enter" autocomplete="off">
+      <div class="scan-actions">
+        <button class="btn btn-outline" onclick="toggleCamera()">📷 폰 카메라로 스캔</button>
+      </div>
+      <div id="camWrap"><div id="camReader"></div></div>
+      <div id="scanResult"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>오늘 스캔 내역</h2>
+      <div id="recentList"></div>
+    </div>
+  `;
+  focusBarcode();
+  document.getElementById('barcodeInput').addEventListener('keydown', e => {
+    if (e.key==='Enter'){ e.preventDefault(); onScanSubmit(); }
+  });
+  updateModeHint();
+  loadRecent();
+}
+
+function focusBarcode(){
+  const el = document.getElementById('barcodeInput');
+  if (el) el.focus();
+}
+function setMode(m){
+  state.mode = m; state.scanned = null; state.exchangeStep = null; state.exchangeReturn = null;
+  document.getElementById('barcodeInput').value='';
+  document.getElementById('scanResult').innerHTML='';
+  document.querySelectorAll('.scan-actions .btn').forEach(()=>{});
+  renderScanScreen(); // 버튼 활성상태 갱신을 위해 다시 그림(상태는 위에서 리셋했으므로 안전)
+}
+function updateModeHint(){
+  const hint = document.getElementById('modeHint');
+  if (!hint) return;
+  if (state.mode==='sale') hint.textContent = '판매할 상품의 바코드를 스캔하세요.';
+  if (state.mode==='return') hint.textContent = '반품할 상품의 바코드를 스캔하세요.';
+  if (state.mode==='exchange') hint.textContent = state.exchangeStep==='sale'
+    ? '이제 새로 가져갈(교환) 상품의 바코드를 스캔하세요.'
+    : '먼저 반품(돌려받을) 상품의 바코드를 스캔하세요.';
+}
+
+async function onScanSubmit(){
+  const input = document.getElementById('barcodeInput');
+  const barcode = S(input.value);
+  if (!barcode) return;
+  input.value = '';
+
+  if (state.mode === 'exchange'){
+    return handleExchangeScan(barcode);
+  }
+  await lookupAndShow(barcode, state.mode);
+}
+
+async function lookupAndShow(barcode, intent){
+  const res = await apiGet('item_lookup', {corner_id: state.corner.id, pin: state.pin, barcode});
+  const box = document.getElementById('scanResult');
+  if (!res.ok){ toast(res.error||'조회 실패','err'); focusBarcode(); return; }
+
+  if (!res.found){
+    box.innerHTML = renderUnregisteredCard(barcode, res.prev_manual, intent);
+    focusBarcode();
+    return;
+  }
+  const item = res.item;
+  box.innerHTML = renderItemCard(item, intent);
+  focusBarcode();
+}
+
+function renderItemCard(item, intent){
+  const low = item.cur_qty <= 0;
+  return `
+    <div class="item-card hit">
+      <div class="name">${esc(item.brand)} ${esc(item.item_name)}</div>
+      <div class="meta">사이즈 ${esc(item.size)} · 바코드 ${esc(item.barcode)}</div>
+      <div class="qty ${low?'low':''}">현재고 ${item.cur_qty}개 ${low?'(0 이하 — 확인 후 진행)':''}</div>
+      ${intent==='sale' ? `
+        <div class="row" style="margin-top:12px;">
+          <div class="field"><label>판매가</label><input id="scanPrice" type="number" value="${item.price}"></div>
+          <div class="field"><label>할인</label>
+            <select id="scanDiscType" onchange="document.getElementById('scanDiscVal').disabled = this.value==='none'">
+              <option value="none">없음</option><option value="percent">% 할인</option><option value="amount">금액 차감</option>
+            </select>
+          </div>
+          <div class="field"><label>할인값</label><input id="scanDiscVal" type="number" value="0" disabled></div>
+        </div>
+        <div class="field"><label>비고</label><input id="scanNote" placeholder="특이사항 (선택)"></div>
+        <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitSale(${item.id}, '${esc(item.barcode)}')">판매 확정</button>
+      ` : `
+        <div class="field"><label>비고</label><input id="scanNote" placeholder="반품 사유 등 (선택)"></div>
+        <button class="btn btn-green btn-big" style="width:100%;margin-top:8px;" onclick="submitReturn('${esc(item.barcode)}')">반품 확정</button>
+      `}
+    </div>
+  `;
+}
+
+function renderUnregisteredCard(barcode, prevManual, intent){
+  const prefName = prevManual ? prevManual.manual_name : '';
+  const prefSize = prevManual ? prevManual.manual_size : '';
+  const prefPrice = prevManual ? prevManual.price : 0;
+  if (intent === 'return'){
+    return `
+      <div class="item-card miss">
+        <div class="name">미등록상품</div>
+        <div class="meta">바코드 ${esc(barcode)} — 재고파일에 없어요. 그래도 반품 처리하려면 아래에서 진행하세요.</div>
+        <div class="field"><label>비고</label><input id="scanNote" placeholder="사유"></div>
+        <button class="btn btn-outline btn-big" style="width:100%;margin-top:8px;" onclick="submitUnregisteredReturn('${esc(barcode)}')">미등록 바코드로 반품 기록</button>
+      </div>`;
+  }
+  return `
+    <div class="item-card miss">
+      <div class="name">미등록상품</div>
+      <div class="meta">바코드 ${esc(barcode)} — 재고파일에 없어요. 수기로 입력해서 판매로 저장할 수 있어요.</div>
+      <div class="field"><label>품명</label><input id="manName" value="${esc(prefName)}" placeholder="상품명"></div>
+      <div class="row">
+        <div class="field"><label>사이즈</label><input id="manSize" value="${esc(prefSize)}"></div>
+        <div class="field"><label>판매가</label><input id="manPrice" type="number" value="${prefPrice||0}"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>할인</label>
+          <select id="manDiscType" onchange="document.getElementById('manDiscVal').disabled = this.value==='none'">
+            <option value="none">없음</option><option value="percent">% 할인</option><option value="amount">금액 차감</option>
+          </select>
+        </div>
+        <div class="field"><label>할인값</label><input id="manDiscVal" type="number" value="0" disabled></div>
+      </div>
+      <div class="field"><label>비고</label><input id="manNote" placeholder="특이사항 (선택)"></div>
+      <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitManualSale('${esc(barcode)}')">수기 판매로 저장</button>
+    </div>`;
+}
+
+async function submitSale(itemId, barcode){
+  const price = N(document.getElementById('scanPrice').value);
+  const discType = document.getElementById('scanDiscType').value;
+  const discVal = N(document.getElementById('scanDiscVal').value);
+  const note = S(document.getElementById('scanNote').value);
+  const res = await apiPost('scan_sale', {corner_id: state.corner.id, pin: state.pin, barcode, price, discount_type: discType, discount_value: discVal, note});
+  if (!res.ok){ toast(res.error||'처리 실패','err'); return; }
+  toast('판매 처리됐어요', 'ok');
+  await afterTxn();
+}
+async function submitReturn(barcode){
+  const note = S(document.getElementById('scanNote').value);
+  const res = await apiPost('scan_return', {corner_id: state.corner.id, pin: state.pin, barcode, note});
+  if (!res.ok){ toast(res.error||'처리 실패','err'); return; }
+  toast('반품 처리됐어요', 'ok');
+  await afterTxn();
+}
+async function submitUnregisteredReturn(barcode){
+  // 재고파일에 없는 바코드의 반품 — manual_sale과 동일 원장에 type return, item_id 없이 기록되도록
+  // 서버는 scan_return에서 item 못찾으면 unregistered를 리턴하므로, 수기 반품 전용 처리로 manual_sale API를 qty +1 용도로 재사용하지 않고
+  // 별도 안내: 이런 경우는 드물게 발생 — item 없이 직접 반품 기록을 남기고 싶으면 관리자에게 문의하도록 안내.
+  toast('재고파일에 없는 바코드는 먼저 코너 담당자와 실물 확인이 필요해요. 비고와 함께 화면을 캡처해두세요.', 'err');
+}
+async function submitManualSale(barcode){
+  const manual_name = S(document.getElementById('manName').value);
+  if (!manual_name){ toast('품명을 입력해주세요','err'); return; }
+  const manual_size = S(document.getElementById('manSize').value);
+  const price = N(document.getElementById('manPrice').value);
+  const discount_type = document.getElementById('manDiscType').value;
+  const discount_value = N(document.getElementById('manDiscVal').value);
+  const note = S(document.getElementById('manNote').value);
+  const res = await apiPost('manual_sale', {corner_id: state.corner.id, pin: state.pin, barcode, manual_name, manual_size, price, discount_type, discount_value, note});
+  if (!res.ok){ toast(res.error||'처리 실패','err'); return; }
+  toast('수기 판매로 저장됐어요', 'ok');
+  await afterTxn();
+}
+
+async function handleExchangeScan(barcode){
+  const box = document.getElementById('scanResult');
+  if (state.exchangeStep !== 'sale'){
+    // 1단계: 반품받을 상품
+    const res = await apiGet('item_lookup', {corner_id: state.corner.id, pin: state.pin, barcode});
+    if (!res.ok || !res.found){ toast('반품 상품이 재고파일에 없어요. 교환 대신 개별 반품/판매로 처리해주세요.','err'); focusBarcode(); return; }
+    state.exchangeReturn = res.item;
+    state.exchangeStep = 'sale';
+    updateModeHint();
+    box.innerHTML = `
+      <div class="item-card hit">
+        <div class="name">반품: ${esc(res.item.brand)} ${esc(res.item.item_name)} (${esc(res.item.size)})</div>
+        <div class="meta">이제 새로 가져갈 상품의 바코드를 스캔하세요.</div>
+      </div>`;
+    focusBarcode();
+    return;
+  }
+  // 2단계: 새로 판매할 상품
+  const res = await apiGet('item_lookup', {corner_id: state.corner.id, pin: state.pin, barcode});
+  if (!res.ok || !res.found){ toast('교환 상품이 재고파일에 없어요.','err'); focusBarcode(); return; }
+  const item = res.item;
+  box.innerHTML = `
+    <div class="item-card hit">
+      <div class="name">반품: ${esc(state.exchangeReturn.item_name)} (${esc(state.exchangeReturn.size)})</div>
+      <div class="name" style="margin-top:6px;">→ 교환: ${esc(item.brand)} ${esc(item.item_name)} (${esc(item.size)})</div>
+      <div class="row" style="margin-top:12px;">
+        <div class="field"><label>교환 판매가</label><input id="exPrice" type="number" value="${item.price}"></div>
+        <div class="field"><label>할인</label>
+          <select id="exDiscType" onchange="document.getElementById('exDiscVal').disabled = this.value==='none'">
+            <option value="none">없음</option><option value="percent">% 할인</option><option value="amount">금액 차감</option>
+          </select>
+        </div>
+        <div class="field"><label>할인값</label><input id="exDiscVal" type="number" value="0" disabled></div>
+      </div>
+      <div class="field"><label>비고</label><input id="exNote" placeholder="선택"></div>
+      <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitExchange('${esc(item.barcode)}')">교환 확정</button>
+    </div>`;
+  focusBarcode();
+}
+async function submitExchange(saleBarcode){
+  const sale_price = N(document.getElementById('exPrice').value);
+  const discount_type = document.getElementById('exDiscType').value;
+  const discount_value = N(document.getElementById('exDiscVal').value);
+  const note = S(document.getElementById('exNote').value);
+  const res = await apiPost('exchange', {
+    corner_id: state.corner.id, pin: state.pin,
+    return_barcode: state.exchangeReturn.barcode, sale_barcode: saleBarcode,
+    sale_price, discount_type, discount_value, note
+  });
+  if (!res.ok){ toast(res.error||'교환 처리 실패','err'); return; }
+  toast('교환 처리됐어요', 'ok');
+  state.exchangeStep = null; state.exchangeReturn = null;
+  updateModeHint();
+  await afterTxn();
+}
+
+async function afterTxn(){
+  document.getElementById('scanResult').innerHTML = '';
+  const itemsRes = await apiGet('items', {corner_id: state.corner.id, pin: state.pin});
+  state.items = itemsRes.items || [];
+  const st = cornerStats();
+  document.querySelectorAll('.stat b')[0].textContent = st.itemCount;
+  document.querySelectorAll('.stat b')[1].textContent = st.totalQty;
+  document.querySelectorAll('.stat b')[2].textContent = st.soldQty;
+  await loadRecent();
+  focusBarcode();
+}
+
+async function loadRecent(){
+  const res = await apiGet('txns', {corner_id: state.corner.id, pin: state.pin});
+  const wrap = document.getElementById('recentList');
+  if (!wrap) return;
+  if (!res.ok || res.txns.length===0){ wrap.innerHTML = '<div class="hint">아직 거래 내역이 없어요.</div>'; return; }
+  const typeLabel = {sale:['판매','c-sale'], return:['반품','c-return'], manual_sale:['수기판매','c-manual']};
+  wrap.innerHTML = res.txns.slice(0,60).map(t => {
+    const [label, cls] = typeLabel[t.type] || [t.type,''];
+    const name = t.item_id ? '' : (t.manual_name || '');
+    return `
+      <div class="recent-item">
+        <span class="chip ${t.voided? 'c-void':cls}">${label}${t.voided?'(취소됨)':''}</span>
+        <span class="grow">${esc(name)} ${t.barcode?('#'+esc(t.barcode)):''} ${money(t.final_amount)}원 ${t.note?('· '+esc(t.note)):''}</span>
+        <span>${fmtDate(t.created_at)}</span>
+        ${!t.voided ? `<button class="void-btn" onclick="voidTxn(${t.id})">취소</button>` : ''}
+      </div>`;
+  }).join('');
+}
+async function voidTxn(txnId){
+  if (!confirm('이 거래를 취소할까요? (기록은 남고 재고 계산에서만 제외됩니다)')) return;
+  const res = await apiPost('void', {txn_id: txnId, pin: state.pin});
+  if (!res.ok){ toast(res.error||'취소 실패','err'); return; }
+  toast('취소됐어요','ok');
+  await afterTxn();
+}
+
+/* ---- 카메라 스캔 ---- */
+let html5Qr = null;
+async function toggleCamera(){
+  const wrap = document.getElementById('camWrap');
+  if (state.camActive){
+    if (html5Qr) { try { await html5Qr.stop(); html5Qr.clear(); } catch(e){} }
+    state.camActive = false;
+    wrap.style.display = 'none';
+    focusBarcode();
+    return;
+  }
+  if (typeof Html5Qrcode === 'undefined'){ toast('카메라 스캔 라이브러리를 불러오지 못했어요','err'); return; }
+  wrap.style.display = 'block';
+  state.camActive = true;
+  html5Qr = new Html5Qrcode('camReader');
+  try {
+    await html5Qr.start(
+      {facingMode:'environment'},
+      {fps:10, qrbox:{width:260,height:140}},
+      (decodedText) => {
+        document.getElementById('barcodeInput').value = decodedText;
+        onScanSubmit();
+      },
+      () => {}
+    );
+  } catch(e){
+    toast('카메라를 열 수 없어요: ' + e, 'err');
+    state.camActive = false;
+    wrap.style.display = 'none';
+  }
+}
+
+/* ============================================================
+   일별 현황
+   ============================================================ */
+async function renderDailyTab(){
+  const body = document.getElementById('eventTabBody');
+  body.innerHTML = '<div class="hint">불러오는 중...</div>';
+  const res = await apiGet('daily_summary', {event_id: state.event.id, pin: state.pin});
+  if (!res.ok){ body.innerHTML = `<div class="hint">${esc(res.error||'불러오기 실패')}</div>`; return; }
+  if (res.days.length===0){ body.innerHTML = '<div class="hint">아직 거래 내역이 없어요.</div>'; return; }
+  body.innerHTML = `
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>날짜</th><th>판매</th><th>수기판매</th><th>반품</th><th>판매금액</th><th>반품금액</th></tr></thead>
+      <tbody>${res.days.map(d=>`<tr><td>${esc(d.d)}</td><td>${d.sale_cnt}</td><td>${d.manual_cnt}</td><td>${d.return_cnt}</td><td>${money(d.sale_amount)}</td><td>${money(d.return_amount)}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+/* ============================================================
+   마감 다운로드 (엑셀)
+   ============================================================ */
+function renderExportTab(){
+  const body = document.getElementById('eventTabBody');
+  body.innerHTML = `
+    <p class="lead">행사 전체(모든 코너) 거래원장 + 재고대사표를 엑셀로 받습니다. 회수 시 실물 재고와 "현재전산재고"를 대조하세요.</p>
+    <button class="btn btn-primary btn-big" onclick="downloadExport()">엑셀 다운로드</button>
+  `;
+}
+async function downloadExport(){
+  toast('데이터를 모으는 중...', 'ok');
+  const res = await apiGet('export', {event_id: state.event.id, pin: state.pin});
+  if (!res.ok){ toast(res.error||'실패','err'); return; }
+
+  const typeLabel = {sale:'판매', return:'반품', manual_sale:'수기판매'};
+
+  // 시트1: 거래원장
+  const ledgerRows = res.txns.map(t => ({
+    '코너': t.corner_name,
+    '날짜': fmtDate(t.created_at),
+    '구분': typeLabel[t.type] + (t.exchange_group?'(교환)':'') + (t.voided?' [취소됨]':''),
+    '품명': t.manual_name || '',
+    '사이즈': t.manual_size || '',
+    '바코드': t.barcode,
+    '수량': t.qty_delta,
+    '정가': t.price,
+    '할인구분': t.discount_type,
+    '할인값': t.discount_value,
+    '최종금액': t.final_amount,
+    '비고': t.note || '',
+  }));
+
+  // 시트2: 재고대사 (품목별 초기재고/거래내역/현재고 + 비고)
+  const txnByItem = {};
+  res.txns.forEach(t => {
+    if (!t.item_id) return;
+    (txnByItem[t.item_id] = txnByItem[t.item_id] || []).push(t);
+  });
+  const reconcileRows = res.items.map(it => {
+    const list = (txnByItem[it.id] || []).slice().sort((a,b)=>a.created_at-b.created_at);
+    const history = list.map(t => {
+      const lbl = t.type==='sale' ? '판매' : (t.type==='return' ? '반품' : '수기판매');
+      const qty = Math.abs(t.qty_delta);
+      const flag = t.voided ? '[취소]' : '';
+      return `${lbl}${qty}(${fmtMD(t.created_at)})${flag}`;
+    }).join(', ');
+    return {
+      '코너': it.corner_name,
+      '브랜드': it.brand,
+      '품목명': it.item_name,
+      '사이즈': it.size,
+      '바코드': it.barcode,
+      '기존재고(초기)': it.init_qty,
+      '거래내역': history,
+      '현재전산재고': it.cur_qty,
+      '실사재고': '',
+      '비고': it.note || '',
+    };
+  });
+
+  // 시트3: 미등록 수기판매만 모아서
+  const manualRows = res.txns.filter(t => t.type==='manual_sale').map(t => ({
+    '코너': t.corner_name, '날짜': fmtDate(t.created_at), '바코드': t.barcode,
+    '품명': t.manual_name, '사이즈': t.manual_size, '최종금액': t.final_amount,
+    '비고': t.note || '', '취소여부': t.voided?'취소됨':'',
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(reconcileRows), '재고대사');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ledgerRows), '거래원장');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(manualRows), '미등록수기판매');
+  XLSX.writeFile(wb, `${res.event.name}_마감정산_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+/* ============================================================
+   행사 삭제
+   ============================================================ */
+function confirmDeleteEvent(){
+  showModal(`
+    <h2 style="color:var(--red);">행사 전체 삭제</h2>
+    <p class="lead">"${esc(state.event.name)}"의 코너·재고·거래 내역이 모두 영구 삭제됩니다. 되돌릴 수 없어요. 계속하려면 행사 이름을 그대로 입력하세요.</p>
+    <div class="field"><input id="mDelConfirm" placeholder="${esc(state.event.name)}"></div>
+    <div class="bar"><div class="spacer"></div><button class="btn btn-outline" onclick="closeModal()">취소</button><button class="btn btn-red" onclick="submitDeleteEvent()">영구 삭제</button></div>
+  `);
+}
+async function submitDeleteEvent(){
+  const v = S(document.getElementById('mDelConfirm').value);
+  if (v !== state.event.name){ toast('행사 이름이 일치하지 않아요','err'); return; }
+  const res = await apiPost('delete_event', {event_id: state.event.id, pin: state.pin});
+  if (!res.ok){ toast(res.error||'삭제 실패','err'); return; }
+  sessionStorage.removeItem(pinKey(state.event.id));
+  closeModal();
+  toast('삭제됐어요','ok');
+  renderEvents();
+}
+
+/* ---------- 모달 ---------- */
+function showModal(html){
+  let bg = document.getElementById('modalBg');
+  if (!bg){
+    bg = document.createElement('div'); bg.id='modalBg'; bg.className='modal-bg';
+    bg.innerHTML = '<div class="modal" id="modalBody"></div>';
+    document.body.appendChild(bg);
+  }
+  document.getElementById('modalBody').innerHTML = html;
+  bg.style.display = 'flex';
+}
+function closeModal(){
+  const bg = document.getElementById('modalBg');
+  if (bg) bg.style.display = 'none';
+}
+
+/* ---------- 시작 ---------- */
+renderEvents();
+</script>
+</body>
+</html>

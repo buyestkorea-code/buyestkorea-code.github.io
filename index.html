@@ -944,6 +944,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/></svg></span>
         주문서 창고위치찾기<span class="chip chip-ready">사용가능</span>
       </button>
+      <button class="nav-item" data-nav="eventPos">
+        <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/><path d="M9 16h2M13 16h2"/></svg></span>
+        행사 POS<span class="chip chip-ready">사용가능</span>
+      </button>
     </nav>
 
     <nav class="nav-group">
@@ -1638,6 +1642,10 @@
         <iframe src="stock-add-convert.html" title="재고추가변환" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <section data-view="eventPos">
+        <iframe src="pos.html" title="행사 POS" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <section data-view="productCard">
         <iframe src="product-card.html" title="상품 카드 이미지" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
@@ -1718,7 +1726,7 @@
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', sabangEcount:'사방넷-이카운트 매칭',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
     barcodeStock:'바코드 재고조회',
-    orderStock:'주문서 창고위치찾기', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
   };
 
   function closeDrawer(){
