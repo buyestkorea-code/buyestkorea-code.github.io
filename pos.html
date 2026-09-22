@@ -286,6 +286,7 @@ function topNav(active){
     <div class="tabs">
       <div class="tab ${active==='scan'?'active':''}" onclick="goScan()">스캔</div>
       <div class="tab ${active==='daily'?'active':''}" onclick="renderDailyScreen()">일별 현황</div>
+      <div class="tab ${active==='stocktake'?'active':''}" onclick="renderStocktakeScreen()">실재고 확인</div>
       <div class="tab ${active==='export'?'active':''}" onclick="renderExportScreen()">마감 다운로드</div>
     </div>
   `;
@@ -812,6 +813,164 @@ async function downloadDailyDetail(){
 }
 
 /* ============================================================
+   실재고 확인 — 행사 끝난 뒤 회수된 실물을 바코드로 스캔해서
+   "전산상 남아있어야 할 재고(cur_qty)"와 "실제로 확인된 수량(counted_qty)"을 맞춰본다.
+   판매/반품 원장(pos_txn)과는 완전히 별개인 pos_count 원장을 씀 — 스캔해도 재고수량 자체는
+   안 바뀌고, 그냥 "실물로 확인했다"는 기록만 쌓인다.
+   ============================================================ */
+function stocktakeStats(items){
+  let matched = 0, mismatched = 0, uncounted = 0;
+  items.forEach(it => {
+    if (it.counted_qty === 0 && it.cur_qty !== 0) uncounted++;
+    else if (it.counted_qty === it.cur_qty) matched++;
+    else mismatched++;
+  });
+  return { matched, mismatched, uncounted, total: items.length };
+}
+
+async function renderStocktakeScreen(){
+  state.screen = 'stocktake';
+  const app = document.getElementById('app');
+  const st = stocktakeStats(state.items);
+  app.innerHTML = topNav('stocktake') + `
+    <p class="lead">행사 끝나고 회수된 실물을 바코드로 하나씩 스캔하세요. 전산상 남아있어야 할 수량과 실제 확인된 수량을 바로 대조합니다.</p>
+    <div class="stat-row">
+      <div class="stat">전체 품목<b>${st.total}</b></div>
+      <div class="stat">일치<b style="color:var(--green);">${st.matched}</b></div>
+      <div class="stat">불일치<b style="color:var(--red);">${st.mismatched}</b></div>
+      <div class="stat">미확인<b style="color:var(--amber);">${st.uncounted}</b></div>
+    </div>
+
+    <div class="scan-box">
+      <input id="countInput" placeholder="바코드 스캔 또는 입력 후 Enter" autocomplete="off">
+      <div class="scan-actions">
+        <button class="btn btn-outline" onclick="toggleCamera()">📷 폰 카메라로 스캔</button>
+      </div>
+      <div id="camWrap"><div id="camReader"></div></div>
+      <div id="countResult"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>품목별 대조표</h2>
+      <div id="stocktakeTableWrap"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>실재고 확인 스캔 내역</h2>
+      <div id="countRecentList"></div>
+    </div>
+  `;
+  document.getElementById('countInput').focus();
+  document.getElementById('countInput').addEventListener('keydown', e => {
+    if (e.key==='Enter'){ e.preventDefault(); onCountSubmit(); }
+  });
+  renderStocktakeTable();
+  loadCountRecent();
+}
+
+function renderStocktakeTable(){
+  const wrap = document.getElementById('stocktakeTableWrap');
+  if (!wrap) return;
+  if (state.items.length === 0){ wrap.innerHTML = '<div class="hint">품목이 없어요.</div>'; return; }
+  // 불일치/미확인부터 보이게 정렬
+  const rows = state.items.slice().sort((a,b) => {
+    const da = a.counted_qty - a.cur_qty, db = b.counted_qty - b.cur_qty;
+    if ((da!==0) !== (db!==0)) return (da!==0) ? -1 : 1;
+    return 0;
+  });
+  wrap.innerHTML = `
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>브랜드</th><th>품명</th><th>사이즈</th><th>바코드</th><th>전산 예상재고</th><th>실물 확인수량</th><th>차이</th></tr></thead>
+      <tbody>${rows.map(it => {
+        const diff = it.counted_qty - it.cur_qty;
+        const rowStyle = diff === 0 ? '' : `style="background:${diff>0?'#fef3c7':'#fef2f2'};"`;
+        return `<tr ${rowStyle}>
+          <td>${esc(it.brand)}</td><td>${esc(it.item_name)}</td><td>${esc(it.size)}</td><td>${esc(it.barcode)}</td>
+          <td>${it.cur_qty}</td><td>${it.counted_qty}</td>
+          <td>${diff>0?'+':''}${diff}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+}
+
+async function onCountSubmit(){
+  const input = document.getElementById('countInput');
+  const barcode = S(input.value);
+  if (!barcode) return;
+  input.value = '';
+
+  const res = await apiGet('count_lookup', {corner_id: state.corner.id, barcode});
+  const box = document.getElementById('countResult');
+  if (!res.ok){ toast(res.error||'조회 실패','err'); document.getElementById('countInput').focus(); return; }
+
+  if (!res.found){
+    box.innerHTML = `
+      <div class="item-card miss">
+        <div class="name">미등록상품</div>
+        <div class="meta">바코드 ${esc(barcode)} — 이 코너 재고파일에 없는 상품이 실물로 나왔어요.</div>
+        <div class="field"><label>비고</label><input id="countNote" placeholder="예: 다른 코너 상품 섞여옴"></div>
+        <button class="btn btn-outline btn-big" style="width:100%;margin-top:8px;" onclick="submitCount('${esc(barcode)}')">그래도 발견 기록 남기기</button>
+      </div>`;
+    document.getElementById('countInput').focus();
+    return;
+  }
+  const it = res.item;
+  const diff = it.counted_qty - it.cur_qty;
+  box.innerHTML = `
+    <div class="item-card ${diff===0?'hit':'miss'}">
+      <div class="name">${esc(it.brand)} ${esc(it.item_name)}</div>
+      <div class="meta">사이즈 ${esc(it.size)} · 바코드 ${esc(it.barcode)}</div>
+      <div class="qty">전산 예상재고 ${it.cur_qty}개 · 지금까지 확인 ${it.counted_qty}개</div>
+      <div class="field"><label>비고</label><input id="countNote" placeholder="선택사항"></div>
+      <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitCount('${esc(barcode)}')">실물 확인 (+1)</button>
+    </div>`;
+  document.getElementById('countInput').focus();
+}
+
+async function submitCount(barcode){
+  const note = S(document.getElementById('countNote')?.value || '');
+  const res = await apiPost('confirm_count', {corner_id: state.corner.id, actor: state.actor, barcode, note});
+  if (!res.ok){ toast(res.error||'처리 실패','err'); return; }
+  toast('확인했어요', 'ok');
+  document.getElementById('countResult').innerHTML = '';
+  const itemsRes = await apiGet('items', {corner_id: state.corner.id});
+  state.items = itemsRes.items || [];
+  const stEl = document.querySelectorAll('.stat-row .stat b');
+  const st = stocktakeStats(state.items);
+  if (stEl.length){ stEl[0].textContent=st.total; stEl[1].textContent=st.matched; stEl[2].textContent=st.mismatched; stEl[3].textContent=st.uncounted; }
+  renderStocktakeTable();
+  await loadCountRecent();
+  document.getElementById('countInput').focus();
+}
+
+async function loadCountRecent(){
+  const res = await apiGet('counts', {corner_id: state.corner.id});
+  const wrap = document.getElementById('countRecentList');
+  if (!wrap) return;
+  if (!res.ok || res.counts.length===0){ wrap.innerHTML = '<div class="hint">아직 확인한 내역이 없어요.</div>'; return; }
+  wrap.innerHTML = res.counts.slice(0,60).map(c => {
+    const name = c.item_id ? [c.item_brand, c.item_item_name].filter(Boolean).join(' ') : ('미등록 #' + c.barcode);
+    return `
+      <div class="recent-item">
+        <span class="chip ${c.voided?'c-void':'c-sale'}">확인${c.voided?'(취소됨)':''}</span>
+        <span class="grow">${esc(name)}${c.item_size?' ('+esc(c.item_size)+')':''} ${c.note?('· '+esc(c.note)):''}</span>
+        <span>${fmtDate(c.created_at)}</span>
+        ${!c.voided ? `<button class="void-btn" onclick="voidCount(${c.id})">취소</button>` : ''}
+      </div>`;
+  }).join('');
+}
+async function voidCount(countId){
+  if (!confirm('이 확인 기록을 취소할까요?')) return;
+  const res = await apiPost('void_count', {count_id: countId, actor: state.actor});
+  if (!res.ok){ toast(res.error||'취소 실패','err'); return; }
+  toast('취소됐어요','ok');
+  const itemsRes = await apiGet('items', {corner_id: state.corner.id});
+  state.items = itemsRes.items || [];
+  renderStocktakeTable();
+  await loadCountRecent();
+}
+
+/* ============================================================
    마감 다운로드 (엑셀)
    ============================================================ */
 function renderExportScreen(){
@@ -856,6 +1015,7 @@ async function downloadExport(){
       const flag = t.voided ? '[취소]' : '';
       return `${lbl}${qty}(${fmtMD(t.created_at)})${flag}`;
     }).join(', ');
+    const counted = it.counted_qty || 0;
     return {
       '브랜드': it.brand,
       '품목명': it.item_name,
@@ -864,7 +1024,8 @@ async function downloadExport(){
       '기존재고(초기)': it.init_qty,
       '거래내역': history,
       '현재전산재고': it.cur_qty,
-      '실사재고': '',
+      '실사확인수량': counted,
+      '차이': counted - it.cur_qty,
       '비고': it.note || '',
     };
   });
@@ -919,6 +1080,36 @@ function closeModal(){
   const bg = document.getElementById('modalBg');
   if (bg) bg.style.display = 'none';
 }
+
+/* ---------- 동시작업 지원: 2~3명이 각자 기기에서 같은 코너를 동시에 스캔할 때, 다른 기기에서
+   방금 판매/확인한 내용이 내 화면 숫자/최근내역에도 자동으로 반영되게 주기적으로 새로고침.
+   입력 중인 바코드칸/스캔결과 카드는 절대 건드리지 않고 통계·최근내역만 갱신 — 진행 중인
+   입력을 방해하지 않는다. ---------- */
+setInterval(async () => {
+  if (!state.corner) return;
+  try {
+    if (state.screen === 'scan') {
+      const itemsRes = await apiGet('items', {corner_id: state.corner.id});
+      if (itemsRes.ok) {
+        state.items = itemsRes.items;
+        const st = cornerStats();
+        const statEls = document.querySelectorAll('.stat-row .stat b');
+        if (statEls.length === 3){ statEls[0].textContent=st.itemCount; statEls[1].textContent=st.totalQty; statEls[2].textContent=st.soldQty; }
+      }
+      await loadRecent();
+    } else if (state.screen === 'stocktake') {
+      const itemsRes = await apiGet('items', {corner_id: state.corner.id});
+      if (itemsRes.ok) {
+        state.items = itemsRes.items;
+        const st = stocktakeStats(state.items);
+        const statEls = document.querySelectorAll('.stat-row .stat b');
+        if (statEls.length === 4){ statEls[0].textContent=st.total; statEls[1].textContent=st.matched; statEls[2].textContent=st.mismatched; statEls[3].textContent=st.uncounted; }
+        renderStocktakeTable();
+      }
+      await loadCountRecent();
+    }
+  } catch (e) { /* 다음 주기에 다시 시도 — 네트워크 잠깐 끊겨도 화면 자체는 안 죽게 */ }
+}, 12000);
 
 /* ---------- 시작 ---------- */
 (function start(){
