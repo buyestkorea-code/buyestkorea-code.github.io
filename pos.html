@@ -253,6 +253,9 @@ async function loadEvent(eventId){
 }
 
 function goScan(){
+  state.mode = 'sale';
+  state.exchangeStep = null;
+  state.exchangeReturn = null;
   if (state.items.length === 0) renderUploadScreen();
   else renderScanScreen();
 }
@@ -363,7 +366,7 @@ async function submitUpload(){
   toast(`신규 ${res.inserted}건, 갱신 ${res.updated}건 업로드됐어요`, 'ok');
   const itemsRes = await apiGet('items', {corner_id: state.corner.id});
   state.items = itemsRes.items || [];
-  renderScanScreen();
+  goScan();
 }
 
 /* ============================================================
@@ -378,8 +381,6 @@ function cornerStats(){
 function renderScanScreen(){
   state.screen = 'scan';
   state.scanned = null;
-  state.mode = 'sale';
-  state.exchangeStep = null;
   const st = cornerStats();
   const app = document.getElementById('app');
   app.innerHTML = topNav('scan') + `
