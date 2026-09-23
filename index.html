@@ -912,6 +912,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 15a4 4 0 0 1 0-6h2"/><path d="M15 9a4 4 0 0 1 0 6h-2"/><path d="M9 12h6"/></svg></span>
         사방넷-이카운트 매칭<span class="chip chip-ready">사용가능</span>
       </button>
+      <button class="nav-item" data-nav="sabangBaseregi">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/><path d="m14.5 15.5 2 2 3.5-3.5"/></svg></span>
+        사방넷 기초등록<span class="chip chip-ready">사용가능</span>
+      </button>
       <button class="nav-item" data-nav="stockMove">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M12.6 3H20a1 1 0 0 1 1 1v7.4a1 1 0 0 1-.29.7l-8.3 8.3a1 1 0 0 1-1.42 0l-7.4-7.4a1 1 0 0 1 0-1.42l8.3-8.3a1 1 0 0 1 .71-.28Z"/><circle cx="16" cy="8" r="1.3"/></svg></span>
         MD 품절<span class="chip chip-ready">사용가능</span>
@@ -1233,6 +1237,11 @@
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>사방넷-이카운트 매칭</h3>
             <p>사방넷 상품대량수정 엑셀과 이카운트 품목등록 엑셀을 품번 기준으로 매칭해 브랜드·품번·옵션·원산지·판매가를 채워 넣습니다.</p>
+          </button>
+          <button class="tool-card" data-nav="sabangBaseregi">
+            <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
+            <h3>사방넷 기초등록</h3>
+            <p>자사몰 등록 엑셀을 사방넷 업로드 양식으로 자동 변환합니다. 브랜드·카테고리·색상 미매칭은 화면에서 바로 입력/저장하면 다음부터 자동 반영됩니다.</p>
           </button>
           <button class="tool-card" data-nav="stockMove">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
@@ -1651,6 +1660,10 @@
         <iframe src="stock-add-convert.html" title="재고추가변환" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <section data-view="sabangBaseregi">
+        <iframe src="sabang-baseregi.html" title="사방넷 기초등록" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <section data-view="eventPos">
         <iframe src="pos.html" title="행사 POS" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
@@ -1736,7 +1749,7 @@
   var hamburger = document.getElementById('hamburger');
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
-    dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', sabangEcount:'사방넷-이카운트 매칭',
+    dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
     barcodeStock:'바코드 재고조회', kreamSoldOut:'크림 품절 정리',
     orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'

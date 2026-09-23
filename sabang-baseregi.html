@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>사방넷 기초등록</title>
+<style>
+  :root{ --bg:#fafafa; --card:#fff; --ink:#111827; --sub:#6b7280; --line:#e5e7eb; --pri:#111827; --green:#0f766e; --red:#b91c1c; --amber:#92400e; }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,"Malgun Gothic",sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:18px;max-width:1400px;}
+  h1{font-size:19px;margin:0 0 4px;}
+  p.lead{color:var(--sub);font-size:13px;margin:4px 0 16px;line-height:1.6;}
+  .row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin:14px 0;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:12px;color:var(--sub);font-weight:600;}
+  input[type=file]{font-size:13px;}
+  input,select{font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-family:inherit;}
+  .btn{font-size:14px;padding:9px 18px;border:none;border-radius:7px;cursor:pointer;font-weight:600;margin-right:8px;}
+  .btn-primary{background:var(--pri);color:#fff;}
+  .btn-green{background:var(--green);color:#fff;}
+  .btn-small{font-size:12px;padding:5px 10px;border-radius:5px;}
+  .btn:disabled{background:#d1d5db;color:#6b7280;cursor:not-allowed;}
+  #status{color:var(--sub);margin:8px 0;font-size:13px;}
+  #result{margin:10px 0;padding:10px 12px;border-radius:6px;font-size:13px;display:none;}
+  #result.ok{background:#f0fdf4;color:#15803d;display:block;}
+  #result.err{background:#fef2f2;color:#b91c1c;white-space:pre-wrap;display:block;}
+  .stat-row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:12.5px;color:var(--sub);}
+  .stat b{display:block;font-size:18px;color:var(--ink);}
+  .stat.warn b{color:var(--red);}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;}
+  th,td{border-bottom:1px solid var(--line);padding:6px 7px;text-align:left;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
+  th{background:#f3f4f6;position:sticky;top:0;z-index:1;}
+  .tbl-wrap{max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:10px;}
+  tr.row-issue{background:#fef2f2;}
+  .badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;background:#fef2f2;color:var(--red);cursor:pointer;}
+  .badge.fixed{background:#f0fdf4;color:#15803d;cursor:default;}
+  .fixpop{position:fixed;z-index:80;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:14px;width:300px;}
+  .fixpop h4{margin:0 0 8px;font-size:13px;}
+  .fixpop .frow{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;}
+  .fixpop .frow label{font-size:11px;color:var(--sub);}
+  .fixpop .frow input,.fixpop .frow select{width:100%;}
+  .fixpop .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:6px;}
+  #overlay{position:fixed;inset:0;z-index:70;}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:100;display:none;}
+  #toast.err{background:var(--red);} #toast.ok{background:var(--green);}
+  .loginNote{font-size:11.5px;color:var(--amber);margin-top:4px;}
+</style>
+</head>
+<body>
+  <h1>사방넷 기초등록</h1>
+  <p class="lead">
+    자사몰 등록 엑셀을 업로드하면 사방넷 업로드 양식(BUYEST_MD)으로 자동 변환합니다.<br>
+    브랜드·카테고리·색상이 매칭 안 되는 행은 <span class="badge">미매칭</span> 배지로 표시됩니다 — 클릭해서 값을 입력하고 저장하면 서버에 영구 저장되어 다음번부터는 자동으로 매칭됩니다.
+  </p>
+
+  <div class="row">
+    <div class="field">
+      <label>자사몰 등록 엑셀 (.xlsx)</label>
+      <input type="file" id="srcFile" accept=".xlsx,.xls">
+    </div>
+    <button class="btn btn-primary" id="runBtn" onclick="run()" disabled>변환</button>
+    <button class="btn btn-green" id="dlBtn" onclick="downloadResult()" style="display:none;">사방넷 양식 다운로드</button>
+  </div>
+  <div id="loginNote" class="loginNote" style="display:none;">※ 로그인하지 않아 미매칭 값 저장은 안 됩니다 (인트라넷 홈에서 로그인 후 새로고침).</div>
+
+  <div id="status"></div>
+  <div id="result"></div>
+  <div class="stat-row" id="statRow" style="display:none;"></div>
+  <div class="tbl-wrap" id="tblWrap" style="display:none;"><table id="tbl"></table></div>
+
+  <div id="overlay" style="display:none;" onclick="closeFixPop()"></div>
+  <div id="fixPop" class="fixpop" style="display:none;"></div>
+  <div id="toast"></div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script>
+const API_URL = 'https://buyest.co.kr/sb_api.php';
+
+/* ---------------- 로그인(actor) ---------------- */
+function getAuth(){
+  try {
+    const raw = localStorage.getItem('buyest.dash.auth');
+    if (!raw) return null;
+    const a = JSON.parse(raw);
+    return (a && a.id) ? a : null;
+  } catch (e) { return null; }
+}
+const AUTH = getAuth();
+if (!AUTH) document.getElementById('loginNote').style.display = 'block';
+
+/* ---------------- 참조표 로딩 ---------------- */
+let REF = null;
+async function loadRef() {
+  const res = await fetch(API_URL + '?action=get_tables');
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || '참조표 로딩 실패');
+  REF = {
+    brand_alias: data.brand_alias,
+    category_keyword: data.category_keyword,
+    color_map: data.color_map,
+    forbidden_word: data.forbidden_word,
+    attr_template: data.attr_template,
+  };
+}
+
+/* ---------------- 변환 엔진 (BUYEST_MD.xlsx 수식 로직 포팅) ---------------- */
+function escRe(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function buildConverter(ref) {
+  const forbidden = ref.forbidden_word.map(r => [r.word, r.replacement || '']);
+  const categoryKeywords = ref.category_keyword; // {label,gender,keyword,code}
+  const colorMap = ref.color_map;                // {before_color,after_color}
+  const brandAlias = ref.brand_alias;             // {alias,main_brand,en_brand,search_words}
+  const attrTemplate = (ref.attr_template || []).map(r => ({ name: r.name, code: r.code, vals: JSON.parse(r.values_json) }));
+  const originSwitchLower = { '한국': '대한민국', 'italy': '이탈리아', '아르마니아': '아르메니아' };
+
+  function applyForbidden(text) {
+    let out = text;
+    for (const [w, r] of forbidden) out = out.split(w).join(r);
+    return out;
+  }
+  function productName(A, G) {
+    if (!A) return '';
+    const isKidsWoman = /^여성/.test(A) && /(^|,|\s)(10A|10Y|12A|12Y|14A|14Y)($|,|\s)/.test(G || '');
+    if (isKidsWoman) {
+      let x = applyForbidden(A);
+      x = x.trim().replace(/\s+/g, ' ');
+      return x.replace(/^여성/, '키즈 여성');
+    }
+    let x = A.replace(/^\[([^\]]+)\]\s*/, '$1 ');
+    x = applyForbidden(x);
+    return x.trim().replace(/\s+/g, ' ');
+  }
+  function seasonAndModel(A) {
+    if (!A) return { model: '', modelNo: '' };
+    const t = A.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    const seasonM = t.match(/^(\[(?:스크래치\d*)\]|스크래치\d*|\d{2}(?:SS|FW)|\d+주년)/);
+    let season2 = seasonM ? seasonM[1] : '';
+    season2 = season2.replace(/[\[\]]/g, '');
+    const modelM = t.match(/([0-9A-Za-z_./-]+(?:\s+[0-9A-Za-z_./-]+)*)$/);
+    const model = modelM ? modelM[1] : '';
+    return { model: season2 ? `${season2} ${model}` : model, modelNo: model };
+  }
+  function brandName(C) {
+    if (!C) return '';
+    for (const row of brandAlias) {
+      const re = new RegExp('^\\d*\\s*' + escRe(row.alias) + '(\\s|$)');
+      if (re.test(C)) return row.main_brand;
+    }
+    return '';
+  }
+  function siteSearchWord(brand) {
+    if (!brand) return '';
+    const row = brandAlias.find(r => r.main_brand === brand);
+    return row ? (row.search_words || '') : '';
+  }
+  function englishName(brand, L) {
+    if (!L) return '';
+    const row = brandAlias.find(r => r.main_brand === brand);
+    return (row && row.en_brand) ? `${row.en_brand} ${L}` : L;
+  }
+  function genderCode(A, B) {
+    if (!B) return '';
+    if (/WOMEN|여성용 KIDS/.test(B)) return 2;
+    if (/여성/.test(A || '')) return 2;
+    if (/MEN/.test(B)) return 1;
+    if (/KIDS|키즈/.test(A || '')) return 5;
+    if (/KIDS/.test(B)) return 5;
+    return '';
+  }
+  const genderLabel = { 1: '남성', 2: '여성', 5: '아동' };
+  function categoryCode(A, genderCodeVal) {
+    if (!A) return '';
+    const g = genderLabel[genderCodeVal] || '';
+    if (!g) return '';
+    for (const row of categoryKeywords) {
+      if (row.gender !== g) continue;
+      let re;
+      try { re = new RegExp(row.keyword, 'i'); } catch (e) { continue; }
+      if (re.test(A)) return row.code;
+    }
+    return '';
+  }
+  function originName(D) {
+    if (!D) return { value: '', matched: true };
+    const t = D.replace(/적출국\s*/g, '').trim();
+    const first = (t.split(',')[0] || '').trim();
+    const mapped = originSwitchLower[first.toLowerCase()];
+    return mapped !== undefined ? { value: mapped, matched: true } : { value: first, matched: false };
+  }
+  function seasonCode(A) {
+    if (!A) return '';
+    if (/^\d{2}FW/.test(A)) return 5;
+    if (/^\d{2}SS/.test(A)) return 6;
+    return 7;
+  }
+  function productionYear(A) {
+    if (!A) return '';
+    const m = A.match(/(\d{2})(SS|FW)/);
+    return m ? '20' + m[1] : '';
+  }
+  function stateCode(E) { return E ? (E === '판매' ? 2 : 3) : ''; }
+  function optionFields(G) {
+    if (!G || G === '단품') return { title: '', detail: '' };
+    return { title: '사이즈', detail: G.replace(/ /g, '').replace(/\//g, '-') };
+  }
+  function detailHtml(I) {
+    if (!I) return '';
+    return `<div style="text-align: center;">\n    <img src="${I}">\n</div>\n<div style="text-align: center;">\n    <img src="https://buyest.co.kr/data/editor/f778ed9065fe64833876901f125967ab.jpg">\n</div>`;
+  }
+  function bigCategory(R) {
+    if (!R) return '';
+    if (R.includes('>01>')) return '의류';
+    if (R.includes('>02>')) return '가방';
+    if (R.includes('>03>')) return '잡화';
+    if (R.includes('>04>')) return '신발';
+    return '';
+  }
+  function colorValue(A) {
+    if (!A) return '';
+    const t = A.slice(-40).toUpperCase();
+    let best = null;
+    for (const row of colorMap) {
+      const before = String(row.before_color || '').toUpperCase();
+      if (!before) continue;
+      const re = new RegExp('(^|[^A-Z가-힣])' + escRe(before) + '([^A-Z가-힣]|$)', 'i');
+      if (re.test(t) && (!best || before.length > best.beforeLen)) {
+        best = { before: row.before_color, after: row.after_color, beforeLen: before.length };
+      }
+    }
+    if (!best) return '';
+    return best.after || best.before;
+  }
+  function materialAttr(J) {
+    if (!J) return '';
+    let x = J.split('/').join('\n');
+    return x.split('(재사용 섬유가 사용되었음)').join('\n(재사용 섬유가 사용되었음)');
+  }
+  function attrCode(AO) {
+    if (!AO) return '';
+    const row = attrTemplate.find(r => r.name === AO);
+    return row ? row.code : '';
+  }
+  // 속성값3~16 (14개), ★브랜드/★국가는 값3~5(index0~2)만 치환
+  function attrValues(attrCodeVal, brand, origin) {
+    const row = attrTemplate.find(r => r.code === attrCodeVal);
+    if (!row) return new Array(14).fill('');
+    return row.vals.map((v, i) => {
+      let s = v == null ? '' : String(v);
+      if (i <= 2) s = s.split('★브랜드').join(brand || '').split('★국가').join(origin || '');
+      return s;
+    });
+  }
+
+  return { productName, seasonAndModel, brandName, siteSearchWord, englishName, genderCode,
+    categoryCode, originName, seasonCode, productionYear, stateCode, optionFields, detailHtml,
+    bigCategory, colorValue, materialAttr, attrCode, attrValues };
+}
+
+function convertRow(conv, input) {
+  const { A, B, C, D, E, F, G, H, I, J } = input;
+  const L = conv.productName(A, G);
+  const { model: M, modelNo: N } = conv.seasonAndModel(A);
+  const O = conv.brandName(C);
+  const P = conv.siteSearchWord(O);
+  const AM = conv.englishName(O, L);
+  const X = conv.genderCode(A, B);
+  const R = conv.categoryCode(A, X);
+  const originRes = conv.originName(D);
+  const T = originRes.value;
+  const W = conv.seasonCode(A);
+  const U = conv.productionYear(A);
+  const Y = conv.stateCode(E);
+  const { title: AF, detail: AG } = conv.optionFields(G);
+  const AJ = conv.detailHtml(I);
+  const AO = conv.bigCategory(R);
+  const AP = conv.attrCode(AO);
+  const AR = conv.colorValue(A);
+  const AQ = conv.materialAttr(J);
+  const fnum = (F === '' || F == null || isNaN(Number(F))) ? '' : Number(F);
+  const AC = fnum === '' ? '' : Math.round(fnum * 0.87);
+  const AD = fnum;
+  const AE = fnum === '' ? '' : Math.round(fnum * 1.17);
+  const attrVals = conv.attrValues(AP, O, T); // [값3..값16]
+
+  const unmatched = [];
+  if (C && !O) unmatched.push({ field: '브랜드명', kind: 'brand', value: C });
+  if (A && !R) unmatched.push({ field: '카테고리', kind: 'category', value: A });
+  if (A && !AR) unmatched.push({ field: '색상', kind: 'color', value: A });
+
+  const row = { A, B, C, D, E, F, G, H, I, J,
+    L, M, N, O, P, Q: 5, R, S: O, T, U, W, X, Y,
+    Z: 1, AA: 1, AB: 1, AC, AD, AE, AF, AG,
+    AH: H, AI: H, AJ, AK: 'Y', AL: 3, AM, AN: M, AO, AP, AQ, AR,
+    unmatched };
+  // AS~BF = 속성값3~16
+  const attrCols = ['AS','AT','AU','AV','AW','AX','AY','AZ','BA','BB','BC','BD','BE','BF'];
+  attrCols.forEach((col, i) => { row[col] = attrVals[i]; });
+  return row;
+}
+
+/* ---------------- 자사몰 엑셀 파싱 (헤더명 자동인식) ---------------- */
+const S = v => (v === null || v === undefined) ? '' : String(v).trim();
+
+function pickCol(headerRow, patterns) {
+  for (let i = 0; i < headerRow.length; i++) {
+    const h = S(headerRow[i]).replace(/\s/g, '');
+    for (const p of patterns) if (p.test(h)) return i;
+  }
+  return -1;
+}
+
+function parseSourceExcel(wb) {
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+  if (!aoa.length) throw new Error('빈 엑셀입니다.');
+  const header = aoa[0];
+  const col = {
+    name: pickCol(header, [/^상품명$/]),
+    category: pickCol(header, [/^카테고리$/]),
+    brand: pickCol(header, [/^브랜드명$/]),
+    origin: pickCol(header, [/^원산지$/]),
+    state: pickCol(header, [/^상품상태$/]),
+    price: pickCol(header, [/^판매가$/]),
+    option: pickCol(header, [/^옵션$/]),
+    imgBig: pickCol(header, [/큰이미지/]),
+    imgDetail: pickCol(header, [/상세.*이미지/]),
+    material: pickCol(header, [/^소재$/]),
+  };
+  const missing = Object.entries(col).filter(([k, v]) => v < 0).map(([k]) => k);
+  if (missing.length) throw new Error('엑셀에서 다음 열을 못 찾았어요: ' + missing.join(', ') + ' (헤더명을 확인해주세요)');
+
+  const rows = [];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r];
+    const name = S(row[col.name]);
+    if (!name) continue;
+    rows.push({
+      A: name, B: S(row[col.category]), C: S(row[col.brand]), D: S(row[col.origin]),
+      E: S(row[col.state]), F: S(row[col.price]), G: S(row[col.option]),
+      H: S(row[col.imgBig]), I: S(row[col.imgDetail]), J: S(row[col.material]),
+    });
+  }
+  return rows;
+}
+
+/* ---------------- 실행 ---------------- */
+let RESULT_ROWS = [];
+let srcBase = 'sabang';
+
+document.getElementById('srcFile').addEventListener('change', e => {
+  document.getElementById('runBtn').disabled = !e.target.files[0];
+});
+
+async function run() {
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  result.className = ''; result.textContent = '';
+  document.getElementById('dlBtn').style.display = 'none';
+  document.getElementById('tblWrap').style.display = 'none';
+  document.getElementById('statRow').style.display = 'none';
+  status.textContent = '엑셀 읽는 중...';
+  try {
+    const f = document.getElementById('srcFile').files[0];
+    srcBase = f.name.replace(/\.[^.]+$/, '');
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const rows = parseSourceExcel(wb);
+    if (!rows.length) throw new Error('변환할 상품이 없어요.');
+
+    status.textContent = '참조표 불러오는 중...';
+    await loadRef();
+
+    status.textContent = '변환 중...';
+    const conv = buildConverter(REF);
+    RESULT_ROWS = rows.map(r => convertRow(conv, r));
+
+    render();
+    const issueCount = RESULT_ROWS.filter(r => r.unmatched.length).length;
+    status.textContent = `총 ${RESULT_ROWS.length}행 변환 완료`;
+    result.className = 'ok';
+    result.textContent = issueCount ? `✅ 변환 완료. 미매칭 ${issueCount}건은 표에서 빨간 배지를 눌러 값을 입력/저장해주세요.` : '✅ 변환 완료. 미매칭 없음, 바로 다운로드하세요.';
+    document.getElementById('dlBtn').style.display = 'inline-block';
+  } catch (e) {
+    status.textContent = '';
+    result.className = 'err';
+    result.textContent = '오류: ' + e.message;
+  }
+}
+
+function renderStats() {
+  const total = RESULT_ROWS.length;
+  const issues = RESULT_ROWS.filter(r => r.unmatched.length).length;
+  const brandIssue = RESULT_ROWS.filter(r => r.unmatched.some(u => u.kind === 'brand')).length;
+  const catIssue = RESULT_ROWS.filter(r => r.unmatched.some(u => u.kind === 'category')).length;
+  const colorIssue = RESULT_ROWS.filter(r => r.unmatched.some(u => u.kind === 'color')).length;
+  const box = document.getElementById('statRow');
+  box.style.display = 'flex';
+  box.innerHTML = `
+    <div class="stat"><b>${total}</b>전체 상품</div>
+    <div class="stat ${issues ? 'warn' : ''}"><b>${issues}</b>미매칭 상품</div>
+    <div class="stat"><b>${brandIssue}</b>브랜드 미매칭</div>
+    <div class="stat"><b>${catIssue}</b>카테고리 미매칭</div>
+    <div class="stat"><b>${colorIssue}</b>색상 미매칭</div>
+  `;
+}
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+
+function render() {
+  renderStats();
+  const body = RESULT_ROWS.map((r, i) => {
+    const badges = r.unmatched.map(u => `<span class="badge" onclick="openFix(event, ${i}, '${u.kind}')">${u.field} 미매칭</span>`).join(' ');
+    return `<tr class="${r.unmatched.length ? 'row-issue' : ''}" data-idx="${i}">
+      <td>${i + 1}</td>
+      <td>${esc(r.A)}</td>
+      <td>${esc(r.C)}</td>
+      <td>${esc(r.O) || '<span style="color:#b91c1c;">—</span>'}</td>
+      <td>${esc(r.R) || '<span style="color:#b91c1c;">—</span>'}</td>
+      <td>${esc(r.AR) || '<span style="color:#b91c1c;">—</span>'}</td>
+      <td>${esc(r.T)}</td>
+      <td>${esc(r.AD)}</td>
+      <td>${badges}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tbl').innerHTML =
+    `<thead><tr><th>#</th><th>원본 상품명</th><th>사이트 브랜드</th><th>매칭 브랜드</th><th>카테고리 최종코드</th><th>매칭 색상</th><th>원산지</th><th>판매가</th><th>미매칭</th></tr></thead><tbody>${body}</tbody>`;
+  document.getElementById('tblWrap').style.display = 'block';
+}
+
+/* ---------------- 미매칭 수정 팝업 ---------------- */
+function closeFixPop() {
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('fixPop').style.display = 'none';
+}
+
+function openFix(ev, idx, kind) {
+  ev.stopPropagation();
+  const row = RESULT_ROWS[idx];
+  const pop = document.getElementById('fixPop');
+  const rect = ev.target.getBoundingClientRect();
+  let html = '';
+  if (kind === 'brand') {
+    html = `<h4>브랜드 매칭 저장</h4>
+      <div class="frow"><label>사이트 브랜드명(별칭)</label><input id="fx_alias" value="${esc(row.C)}"></div>
+      <div class="frow"><label>대표 브랜드명</label><input id="fx_main" placeholder="예: 구찌"></div>
+      <div class="frow"><label>영문 브랜드명(선택)</label><input id="fx_en" placeholder="예: GUCCI"></div>`;
+  } else if (kind === 'category') {
+    html = `<h4>카테고리 매칭 저장</h4>
+      <p style="font-size:11.5px;color:var(--sub);margin:0 0 8px;">상품명: ${esc(row.A)}</p>
+      <div class="frow"><label>성별</label>
+        <select id="fx_gender"><option value="남성">남성</option><option value="여성">여성</option><option value="아동">아동</option></select>
+      </div>
+      <div class="frow"><label>매칭 키워드(정규식 가능)</label><input id="fx_keyword" placeholder="예: 블레이저"></div>
+      <div class="frow"><label>최종코드</label><input id="fx_code" placeholder="예: 1>01>002>0003"></div>`;
+  } else if (kind === 'color') {
+    html = `<h4>색상 매칭 저장</h4>
+      <p style="font-size:11.5px;color:var(--sub);margin:0 0 8px;">상품명: ${esc(row.A)}</p>
+      <div class="frow"><label>변환전 색상(상품명에 등장하는 그대로)</label><input id="fx_before" placeholder="예: 딥그린"></div>
+      <div class="frow"><label>변환후 색상(속성값에 들어갈 값)</label><input id="fx_after" placeholder="예: 딥그린"></div>`;
+  }
+  html += `<div class="actions"><button class="btn btn-small" onclick="closeFixPop()">취소</button><button class="btn btn-green btn-small" onclick="saveFix(${idx},'${kind}')">저장</button></div>`;
+  pop.innerHTML = html;
+  pop.style.display = 'block';
+  document.getElementById('overlay').style.display = 'block';
+  const top = Math.min(rect.bottom + 6, window.innerHeight - 320);
+  pop.style.top = Math.max(8, top) + 'px';
+  pop.style.left = Math.min(rect.left, window.innerWidth - 320) + 'px';
+}
+
+async function saveFix(idx, kind) {
+  if (!AUTH) { toast('로그인 후 저장할 수 있어요.', true); return; }
+  try {
+    let payload, applied;
+    if (kind === 'brand') {
+      const alias = document.getElementById('fx_alias').value.trim();
+      const main = document.getElementById('fx_main').value.trim();
+      const en = document.getElementById('fx_en').value.trim();
+      if (!alias || !main) throw new Error('별칭과 대표 브랜드명을 입력해주세요.');
+      payload = { action: 'save_brand', actor: AUTH.id, alias, main_brand: main, en_brand: en };
+      applied = { kind, alias, main };
+    } else if (kind === 'category') {
+      const gender = document.getElementById('fx_gender').value;
+      const keyword = document.getElementById('fx_keyword').value.trim();
+      const code = document.getElementById('fx_code').value.trim();
+      if (!keyword || !code) throw new Error('키워드와 최종코드를 입력해주세요.');
+      payload = { action: 'save_category', actor: AUTH.id, gender, keyword, code };
+      applied = { kind, gender, keyword, code };
+    } else if (kind === 'color') {
+      const before = document.getElementById('fx_before').value.trim();
+      const after = document.getElementById('fx_after').value.trim();
+      if (!before || !after) throw new Error('변환전/변환후 색상을 입력해주세요.');
+      payload = { action: 'save_color', actor: AUTH.id, before_color: before, after_color: after };
+      applied = { kind, before, after };
+    }
+    const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '저장 실패');
+
+    // 로컬 참조표에도 즉시 반영 + 전체 재계산
+    if (kind === 'brand') REF.brand_alias.push({ alias: applied.alias, main_brand: applied.main, en_brand: '', search_words: '' });
+    if (kind === 'category') REF.category_keyword.push({ label: applied.keyword, gender: applied.gender, keyword: applied.keyword, code: applied.code });
+    if (kind === 'color') REF.color_map.push({ before_color: applied.before, after_color: applied.after });
+    const conv = buildConverter(REF);
+    RESULT_ROWS = RESULT_ROWS.map(r => convertRow(conv, r));
+    render();
+    closeFixPop();
+    toast('저장 완료 — 다음번부터 자동 매칭됩니다.', false);
+  } catch (e) {
+    toast('오류: ' + e.message, true);
+  }
+}
+
+let toastTimer = null;
+function toast(msg, isErr) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = isErr ? 'err' : 'ok';
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+/* ---------------- 다운로드 ---------------- */
+const OUT_HEADERS = [
+  ['A','사이트 상품명'],['B','사이트 카테고리'],['C','사이트 브랜드명'],['D','사이트 원산지'],['E','상품상태'],
+  ['F','필웨이가'],['G','사이트 옵션'],['H','대표 이미지주소(큰이미지)'],['I','상세 설명 이미지주소'],['J','소재'],
+  ['L','상품명'],['M','모델명'],['N','모델NO'],['O','브랜드명'],['P','사이트검색어'],['Q','상품구분'],
+  ['R','마이카테고리'],['S','제조사'],['T','원산지(제조국)'],['U','생산연도'],['W','시즌'],['X','남녀구분'],
+  ['Y','상품상태'],['Z','판매지역'],['AA','세금구분'],['AB','배송비구분'],['AC','원가'],['AD','판매가'],
+  ['AE','TAG가'],['AF','옵션제목(1)'],['AG','옵션상세명칭(1)'],['AH','대표이미지'],['AI','부가이미지6'],
+  ['AJ','상품상세설명'],['AK','재고관리사용여부'],['AL','옵션수정여부'],['AM','영문 상품명'],['AN','추가 상품상세설명_1'],
+  ['AO','속성 참고용'],['AP','속성분류코드'],
+  ['AQ','속성값1'],['AR','속성값2'],['AS','속성값3'],['AT','속성값4'],['AU','속성값5'],['AV','속성값6'],
+  ['AW','속성값7'],['AX','속성값8'],['AY','속성값9'],['AZ','속성값10'],['BA','속성값11'],['BB','속성값12'],
+  ['BC','속성값13'],['BD','속성값14'],['BE','속성값15'],['BF','속성값16'],
+];
+function downloadResult() {
+  const aoa = [OUT_HEADERS.map(h => h[1])];
+  for (const r of RESULT_ROWS) aoa.push(OUT_HEADERS.map(h => r[h[0]] ?? ''));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '사방넷양식');
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  XLSX.writeFile(wb, `${srcBase}_사방넷양식_${stamp}.xlsx`);
+}
+</script>
+</body>
+</html>
