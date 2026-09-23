@@ -818,14 +818,18 @@ async function downloadDailyDetail(){
    판매/반품 원장(pos_txn)과는 완전히 별개인 pos_count 원장을 씀 — 스캔해도 재고수량 자체는
    안 바뀌고, 그냥 "실물로 확인했다"는 기록만 쌓인다.
    ============================================================ */
+/* '일치'는 실제로 스캔해서 확인된 것만 쳐준다 — 이미 다 팔려서 전산재고가 0인 품목은
+   한 번도 안 찍었어도 counted_qty(0)===cur_qty(0)가 우연히 맞아버려서 '확인 안 했는데 일치'로
+   잘못 잡히던 버그가 있었음. 그런 건 '재고없음(확인대상 아님)'으로 따로 뺀다. */
 function stocktakeStats(items){
-  let matched = 0, mismatched = 0, uncounted = 0;
+  let matched = 0, mismatched = 0, uncounted = 0, none = 0;
   items.forEach(it => {
-    if (it.counted_qty === 0 && it.cur_qty !== 0) uncounted++;
+    if (it.cur_qty === 0 && it.counted_qty === 0) none++;
+    else if (it.counted_qty === 0) uncounted++;
     else if (it.counted_qty === it.cur_qty) matched++;
     else mismatched++;
   });
-  return { matched, mismatched, uncounted, total: items.length };
+  return { matched, mismatched, uncounted, none, total: items.length };
 }
 
 async function renderStocktakeScreen(){
@@ -839,6 +843,7 @@ async function renderStocktakeScreen(){
       <div class="stat">일치<b style="color:var(--green);">${st.matched}</b></div>
       <div class="stat">불일치<b style="color:var(--red);">${st.mismatched}</b></div>
       <div class="stat">미확인<b style="color:var(--amber);">${st.uncounted}</b></div>
+      <div class="stat">재고없음(확인대상 아님)<b style="color:var(--sub);">${st.none}</b></div>
     </div>
 
     <div class="scan-box">
@@ -937,7 +942,7 @@ async function submitCount(barcode){
   state.items = itemsRes.items || [];
   const stEl = document.querySelectorAll('.stat-row .stat b');
   const st = stocktakeStats(state.items);
-  if (stEl.length){ stEl[0].textContent=st.total; stEl[1].textContent=st.matched; stEl[2].textContent=st.mismatched; stEl[3].textContent=st.uncounted; }
+  if (stEl.length===5){ stEl[0].textContent=st.total; stEl[1].textContent=st.matched; stEl[2].textContent=st.mismatched; stEl[3].textContent=st.uncounted; stEl[4].textContent=st.none; }
   renderStocktakeTable();
   await loadCountRecent();
   document.getElementById('countInput').focus();
@@ -1103,7 +1108,7 @@ setInterval(async () => {
         state.items = itemsRes.items;
         const st = stocktakeStats(state.items);
         const statEls = document.querySelectorAll('.stat-row .stat b');
-        if (statEls.length === 4){ statEls[0].textContent=st.total; statEls[1].textContent=st.matched; statEls[2].textContent=st.mismatched; statEls[3].textContent=st.uncounted; }
+        if (statEls.length === 5){ statEls[0].textContent=st.total; statEls[1].textContent=st.matched; statEls[2].textContent=st.mismatched; statEls[3].textContent=st.uncounted; statEls[4].textContent=st.none; }
         renderStocktakeTable();
       }
       await loadCountRecent();
