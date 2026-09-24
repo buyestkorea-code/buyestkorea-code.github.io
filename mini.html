@@ -199,6 +199,12 @@
   });
 
   // 이전에 입장한 기록이 남아 있는데 서버가 이미 끊었다면 → 로그인 화면을 보여주지 않고 메인으로
+  var tkAtLoad = toolkitId();
+  if(getToken() && tkAtLoad && tkAtLoad.id === STRICT_USER){
+    // buyest: 남아 있던 입장 기록은 이어받지 않고 서버에서도 끊는다 → 항상 비밀번호부터
+    var oldTok = getToken(); setToken('');
+    try{ fetch(API, {method:'POST', keepalive:true, headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'logout', token:oldTok})}); }catch(e){}
+  }
   if(getToken()){
     cover.hidden = false;
     call({action:'poll', token:getToken(), after:0}).then(function(r){

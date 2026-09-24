@@ -1814,7 +1814,14 @@
   }
   // 폰을 잠그거나 다른 앱으로 나가면 채팅 화면을 즉시 가리고, 3분 넘게 지나 돌아오면 채팅 화면을 없애고 메인 화면으로 보낸다
   var miniChatHiddenAt = 0;
+  // 채팅 입장 기록(토큰)을 폰에서 지우고 서버에도 로그아웃을 알린다 — 같은 출처라 이 화면에서 직접 지울 수 있다
+  function killChatSession(){
+    var tok = '';
+    try{ tok = sessionStorage.getItem('chat.token') || ''; sessionStorage.removeItem('chat.token'); }catch(e){}
+    if(tok){ try{ fetch('https://buyest.co.kr/toolkit_chat_api.php', {method:'POST', keepalive:true, headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'logout', token:tok})}); }catch(e){} }
+  }
   function leaveMiniChat(){
+    killChatSession();
     var box = document.getElementById('miniChatBox');
     if(box){ box.textContent = ''; box.style.visibility = ''; }
     showView('dashboard');
@@ -1846,6 +1853,7 @@
     if(ok){
       if(active){
         if(!box.firstChild){
+          try{ var au0 = JSON.parse(localStorage.getItem('buyest.dash.auth')); if(au0 && au0.id === 'buyest') killChatSession(); }catch(e){}
           var f = document.createElement('iframe');
           f.title = '개발중메뉴';
           f.setAttribute('allow', 'camera; microphone; clipboard-write');
