@@ -53,8 +53,8 @@
   <div id="entry-box" class="login-card">
     <h1>개발예정</h1>
     <p class="hint">비밀번호를 입력하여 입장하는 방식으로 현재 개발중입니다.<br>현재는 접속이 불가능합니다.</p>
-    <div class="fld"><input id="nick-box" type="text" readonly autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next"></div>
-    <div class="fld" id="code-fld"><input id="code-box" type="text" readonly autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go"></div>
+    <div class="fld"><input id="nick-box" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next"></div>
+    <div class="fld" id="code-fld"><input id="code-box" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go"></div>
     <button type="button" id="login-btn">입장하기</button>
     <p id="login-error" class="error" hidden></p>
   </div>
@@ -87,8 +87,6 @@
   var loginScreen = $('login-screen'), chatScreen = $('chat-screen'), cover = $('cover');
   var loginError = $('login-error'), loginBtn = $('login-btn');
   var passInput = $('code-box'), nickBox = $('nick-box');
-  // 읽기전용으로 시작했다가 누르는 순간 입력 가능하게 — 자동완성/암호 저장 제안을 막는 용도
-  [passInput, nickBox].forEach(function(el){ el.addEventListener('focus', function(){ el.removeAttribute('readonly'); }); });
   passInput.addEventListener('input', function(){ $('code-fld').classList.toggle('filled', !!passInput.value); });
   var list = $('message-list'), form = $('message-form'), textInput = $('text-input');
   var imageInput = $('image-input'), imageBtn = $('image-btn');
