@@ -1828,6 +1828,8 @@
     var box = document.getElementById('miniChatBox');
     if(!box || !box.firstChild || box.firstChild.tagName !== 'IFRAME') return;
     if(document.hidden){
+      // buyest 계정은 화면을 벗어나는 즉시 채팅방을 닫고 메인으로 (유예 없음)
+      try{ var au = JSON.parse(localStorage.getItem('buyest.dash.auth')); if(au && au.id === 'buyest'){ leaveMiniChat(); return; } }catch(e){}
       miniChatHiddenAt = Date.now();
       box.style.visibility = 'hidden';
       return;

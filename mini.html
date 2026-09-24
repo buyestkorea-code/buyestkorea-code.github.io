@@ -47,7 +47,8 @@
   <form id="login-form" class="login-card" autocomplete="off">
     <h1>개발예정</h1>
     <p class="hint">비밀번호를 입력하여 입장하는 방식으로 현재 개발중입니다.<br>현재는 접속이 불가능합니다.</p>
-    <input id="pass-input" type="password" placeholder="비밀번호" autocomplete="off" required>
+    <input id="blank-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="">
+    <input id="pass-input" type="password" placeholder="개발비밀번호" autocomplete="off" required>
     <button type="submit" id="login-btn">입장하기</button>
     <p id="login-error" class="error" hidden></p>
   </form>
@@ -74,6 +75,7 @@
   var IDLE_LIMIT_MS = 3 * 60 * 1000;
   var TTL_MS = 24 * 60 * 60 * 1000;
   var ALLOWED = ['buyest', 'buyest1'];
+  var STRICT_USER = 'buyest';
 
   var $ = function(id){ return document.getElementById(id); };
   var loginScreen = $('login-screen'), chatScreen = $('chat-screen'), cover = $('cover');
@@ -232,9 +234,20 @@
   });
 
   // 폰 잠금/앱 전환 시 즉시 가리고, 3분 넘게 지나 돌아오면 로그아웃(→ 툴킷 메인)
-  function hideNow(){ if(chatScreen.hidden) return; if(!hiddenAt) hiddenAt = Date.now(); cover.hidden = false; }
+  // buyest 계정만: 이 화면을 벗어나는 순간 무조건 로그아웃(유예 없음) → 툴킷 메인으로. 서버도 20초 넘게 신호가 없으면 끊는다.
+  function strictLogout(){
+    var tok = getToken();
+    if(tok){ try{ fetch(API, {method:'POST', keepalive:true, headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'logout', token:tok})}); }catch(e){} }
+    forceLogout('');
+  }
+  function hideNow(){
+    if(chatScreen.hidden) return;
+    if(me === STRICT_USER) return strictLogout();
+    if(!hiddenAt) hiddenAt = Date.now(); cover.hidden = false;
+  }
   function backNow(){
     if(chatScreen.hidden){ cover.hidden = true; hiddenAt = 0; return; }
+    if(me === STRICT_USER) return strictLogout();
     var away = hiddenAt ? Date.now() - hiddenAt : 0; hiddenAt = 0;
     if(away >= IDLE_LIMIT_MS){ return forceLogout(IDLE_MESSAGE); }
     call({action:'poll', token:getToken(), after:lastId}).then(function(r){
