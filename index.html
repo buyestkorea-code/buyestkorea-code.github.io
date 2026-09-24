@@ -1853,6 +1853,19 @@
     box.style.visibility = '';
     if(away >= 3 * 60 * 1000) leaveMiniChat();
   });
+  // 앱 전환 미리보기 대비: 채팅 화면이 열려 있는 동안 이 창이 포커스를 잃으면(채팅 iframe으로 포커스가 옮겨간 경우는 제외) 채팅 영역을 즉시 가린다
+  window.addEventListener('blur', function(){
+    var box = document.getElementById('miniChatBox');
+    if(!box || !box.firstChild || box.firstChild.tagName !== 'IFRAME') return;
+    setTimeout(function(){
+      if(document.activeElement && document.activeElement.tagName === 'IFRAME') return;  // 채팅 안을 눌렀을 뿐
+      box.style.visibility = 'hidden';
+    }, 0);
+  });
+  window.addEventListener('focus', function(){
+    var box = document.getElementById('miniChatBox');
+    if(box && !document.hidden && !miniChatHiddenAt) box.style.visibility = '';
+  });
   function renderMiniChat(active){
     var box = document.getElementById('miniChatBox');
     if(!box) return;
