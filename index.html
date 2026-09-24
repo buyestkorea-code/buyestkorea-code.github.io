@@ -1851,7 +1851,7 @@
     var away = miniChatHiddenAt ? Date.now() - miniChatHiddenAt : 0;
     miniChatHiddenAt = 0;
     box.style.visibility = '';
-    if(away >= 3 * 60 * 1000) leaveMiniChat();
+    if(away >= 30 * 60 * 1000) leaveMiniChat();  // buyest1: 30분
   });
   // 앱 전환 미리보기 대비: 채팅 화면이 열려 있는 동안 이 창이 포커스를 잃으면(채팅 iframe으로 포커스가 옮겨간 경우는 제외) 채팅 영역을 즉시 가린다
   window.addEventListener('blur', function(){
