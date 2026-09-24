@@ -1858,7 +1858,7 @@
           f.title = '개발중메뉴';
           f.setAttribute('allow', 'camera; microphone; clipboard-write');
           f.style.cssText = 'display:block;width:100%;height:calc(100vh - 140px);height:calc(100dvh - 76px);border:0;';
-          f.src = MINI_CHAT_URL;
+          f.src = MINI_CHAT_URL + '?v=' + Date.now();  // 채팅 화면은 항상 최신본으로(폰 캐시 방지)
           box.appendChild(f);
         }
       } else {
