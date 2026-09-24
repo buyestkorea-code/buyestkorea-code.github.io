@@ -1812,9 +1812,18 @@
   function miniChatAllowed(){
     try{ var a = JSON.parse(localStorage.getItem('buyest.dash.auth')); return !!a && MINI_CHAT_IDS.indexOf(a.id) !== -1; }catch(e){ return false; }
   }
-  // 폰을 잠그거나 다른 앱으로 나가면 채팅 화면을 즉시 가리고, 3분 넘게 지나 돌아오면 채팅 화면을 통째로 새로 만든다
-  // (새로 만들면 서버가 이미 세션을 끊었으므로 비밀번호 입력 화면만 나온다)
+  // 폰을 잠그거나 다른 앱으로 나가면 채팅 화면을 즉시 가리고, 3분 넘게 지나 돌아오면 채팅 화면을 없애고 메인 화면으로 보낸다
   var miniChatHiddenAt = 0;
+  function leaveMiniChat(){
+    var box = document.getElementById('miniChatBox');
+    if(box){ box.textContent = ''; box.style.visibility = ''; }
+    showView('dashboard');
+  }
+  // 채팅방이 3분 자리비움으로 로그아웃되면 알려온다 → 로그인 화면을 보여주지 않고 툴킷 메인으로 돌아간다
+  window.addEventListener('message', function(ev){
+    if(ev.origin !== 'https://mini-chat-yhkz.onrender.com') return;
+    if(ev.data && ev.data.type === 'chat-logout') leaveMiniChat();
+  });
   document.addEventListener('visibilitychange', function(){
     var box = document.getElementById('miniChatBox');
     if(!box || !box.firstChild || box.firstChild.tagName !== 'IFRAME') return;
@@ -1825,8 +1834,8 @@
     }
     var away = miniChatHiddenAt ? Date.now() - miniChatHiddenAt : 0;
     miniChatHiddenAt = 0;
-    if(away >= 3 * 60 * 1000){ box.textContent = ''; renderMiniChat(true); }
     box.style.visibility = '';
+    if(away >= 3 * 60 * 1000) leaveMiniChat();
   });
   function renderMiniChat(active){
     var box = document.getElementById('miniChatBox');
@@ -1988,7 +1997,8 @@
     var parts = raw.split(':');
     var name = parts[0];
     var roadmapTarget = parts[1] || null;
-    if(VALID_VIEWS[name] && name !== 'dashboard' && !guestBlocked(name)) showView(name, roadmapTarget, false);
+    if(name === 'miniChat'){ try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){} }  // 비밀 메뉴는 새로고침/앱 복귀 때 자동으로 열지 않는다
+    else if(VALID_VIEWS[name] && name !== 'dashboard' && !guestBlocked(name)) showView(name, roadmapTarget, false);
   })();
 
   /* ---------------- 인트라넷 대시보드 (로그인 · 캘린더 · 공지 · 개인메모) ---------------- */
