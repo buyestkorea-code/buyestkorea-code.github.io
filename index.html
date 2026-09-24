@@ -988,6 +988,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 19v-6"/><path d="M12 19V9"/><path d="M16 19v-3"/></svg></span>
         네이버 가격비교<span class="chip chip-soon">준비중</span>
       </button>
+      <button class="nav-item" data-nav="miniChat">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9.5h8M8 12.5h5"/></svg></span>
+        개발중메뉴<span class="chip chip-soon" id="miniChatChip">개발중</span>
+      </button>
     </nav>
 
     <div class="side-tag">
@@ -1668,6 +1672,10 @@
         <iframe src="pos.html" title="행사 POS" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <section data-view="miniChat">
+        <div id="miniChatBox"></div>
+      </section>
+
       <section data-view="productCard">
         <iframe src="product-card.html" title="상품 카드 이미지" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
@@ -1752,8 +1760,46 @@
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', stocktake:'재고조사 (바코드 실사)',
     barcodeStock:'바코드 재고조회', kreamSoldOut:'크림 품절 정리',
-    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', miniChat:'개발중메뉴', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
   };
+
+  /* ---------------- 개발중메뉴 (개발자 buyest1 전용, 내부적으로는 비밀 채팅방) ----------------
+     ※ 이 화면 차단은 브라우저 안에서만 동작하는 표시용 제한이다. 실제 입장 보안은 채팅 서버가 담당한다
+       (방 비밀번호 · 오답 5회 시 15분 차단 · 3분 자리비움 시 자동 로그아웃 · 이 사이트 밖에서 열기 차단).
+     채팅 서버는 Render에서 돌아가고, 새 창 없이 이 화면 안(iframe)에서 열린다.
+     다른 메뉴로 나가면 iframe을 비워서 "이 페이지에 머무는 중"이 아니게 만든다(서버가 3분 뒤 세션을 끊는다). */
+  var MINI_CHAT_URL = 'https://mini-chat-yhkz.onrender.com/';
+  var MINI_CHAT_DEV_ID = 'buyest1';
+  function miniChatAllowed(){
+    try{ var a = JSON.parse(localStorage.getItem('buyest.dash.auth')); return !!a && a.id === MINI_CHAT_DEV_ID; }catch(e){ return false; }
+  }
+  function renderMiniChat(active){
+    var box = document.getElementById('miniChatBox');
+    if(!box) return;
+    var ok = miniChatAllowed();
+    if(ok){
+      if(active){
+        if(!box.firstChild){
+          var f = document.createElement('iframe');
+          f.title = '개발중메뉴';
+          f.setAttribute('allow', 'camera; microphone; clipboard-write');
+          f.style.cssText = 'display:block;width:100%;height:calc(100vh - 140px);height:calc(100dvh - 76px);border:0;';
+          f.src = MINI_CHAT_URL;
+          box.appendChild(f);
+        }
+      } else {
+        box.textContent = '';
+      }
+      return;
+    }
+    box.textContent = '';
+    if(!active) return;
+    box.style.cssText = 'max-width:520px;margin:48px auto;padding:32px 28px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);text-align:center;';
+    var h = document.createElement('h2'); h.style.cssText = 'margin:0 0 10px;font-size:20px;'; h.textContent = '개발중 · 이용불가';
+    var p = document.createElement('p'); p.style.cssText = 'margin:0;color:var(--ink-muted);line-height:1.6;font-size:14px;';
+    p.textContent = '이 메뉴는 현재 개발 중이라 아직 사용할 수 없습니다.';
+    box.appendChild(h); box.appendChild(p);
+  }
 
   function closeDrawer(){
     sidebar.classList.remove('open'); scrim.classList.remove('open');
@@ -1781,6 +1827,7 @@
       el.classList.toggle('active', el.getAttribute('data-nav') === name);
     });
     topbarTitle.textContent = TITLES[name] || '';
+    renderMiniChat(name === 'miniChat');
     closeDrawer();
     window.scrollTo(0,0);
     if(name === 'roadmap' && roadmapTarget){
@@ -1802,7 +1849,7 @@
   // 로그인 없이도 쓸 수 있는 기능은 '재고조사(바코드 실사)'뿐 — 나머지 도구는 로그인해야
   // 열리도록 막는다. localStorage를 직접 읽어서 판단하므로(아래 인트라넷 IIFE가 아직 실행
   // 되기 전인 첫 로드 시점에도) 순서에 상관없이 항상 정확하다.
-  var GUEST_ALLOWED = {dashboard:1, stocktake:1, barcodeStock:1, roadmap:1};
+  var GUEST_ALLOWED = {miniChat:1, dashboard:1, stocktake:1, barcodeStock:1, roadmap:1};
   function isLoggedInNow(){
     try{ return !!JSON.parse(localStorage.getItem('buyest.dash.auth')); }catch(e){ return false; }
   }
