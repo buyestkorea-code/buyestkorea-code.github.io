@@ -21,7 +21,12 @@
   .login-card .hint{ margin:0 0 8px; font-size:13px; color:var(--muted); text-align:center; line-height:1.6; }
   .login-card input{ padding:12px 14px; border-radius:10px; border:1px solid #2a3942; background:#202c33; color:var(--text); font-size:16px; }
   .login-card input[readonly]{ opacity:.6; }
-  #pass-input{ -webkit-text-security:disc; text-security:disc; }
+  .fld{ position:relative; }
+  .fld input{ width:100%; }
+  #code-box{ -webkit-text-security:disc; text-security:disc; }
+  /* 안내 글자는 입력칸 속성이 아니라 CSS로 그린다 → 아이폰이 이 칸을 비밀번호 칸으로 오해해 암호 저장을 묻지 않게 */
+  #code-fld::before{ content:'개발비밀번호'; position:absolute; left:15px; top:50%; transform:translateY(-50%); color:#6b7c85; font-size:16px; pointer-events:none; }
+  #code-fld.filled::before{ display:none; }
   .login-card button{ padding:12px; border-radius:10px; border:none; background:var(--accent); color:#04211b; font-weight:600; font-size:15px; cursor:pointer; }
   .login-card button:disabled{ opacity:.6; }
   .error{ color:var(--danger); font-size:13px; margin:0; text-align:center; }
@@ -45,15 +50,14 @@
 <div id="cover" hidden></div>
 
 <div id="login-screen" class="screen">
-  <form id="login-form" class="login-card" autocomplete="off" novalidate>
+  <div id="entry-box" class="login-card">
     <h1>개발예정</h1>
     <p class="hint">비밀번호를 입력하여 입장하는 방식으로 현재 개발중입니다.<br>현재는 접속이 불가능합니다.</p>
-    <input id="blank-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="" data-lpignore="true" data-1p-ignore="true">
-    <!-- 일반 비밀번호가 아니라 입장번호이므로 type=password 를 쓰지 않는다(아이폰 "암호 저장/자동입력" 방지). 글자는 CSS로 가린다. -->
-    <input id="pass-input" type="text" placeholder="개발비밀번호" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other" required>
-    <button type="submit" id="login-btn">입장하기</button>
+    <div class="fld"><input id="nick-box" type="text" readonly autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next"></div>
+    <div class="fld" id="code-fld"><input id="code-box" type="text" readonly autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go"></div>
+    <button type="button" id="login-btn">입장하기</button>
     <p id="login-error" class="error" hidden></p>
-  </form>
+  </div>
 </div>
 
 <div id="chat-screen" class="screen" hidden>
@@ -81,8 +85,11 @@
 
   var $ = function(id){ return document.getElementById(id); };
   var loginScreen = $('login-screen'), chatScreen = $('chat-screen'), cover = $('cover');
-  var loginForm = $('login-form'), loginError = $('login-error'), loginBtn = $('login-btn');
-  var passInput = $('pass-input');
+  var loginError = $('login-error'), loginBtn = $('login-btn');
+  var passInput = $('code-box'), nickBox = $('nick-box');
+  // 읽기전용으로 시작했다가 누르는 순간 입력 가능하게 — 자동완성/암호 저장 제안을 막는 용도
+  [passInput, nickBox].forEach(function(el){ el.addEventListener('focus', function(){ el.removeAttribute('readonly'); }); });
+  passInput.addEventListener('input', function(){ $('code-fld').classList.toggle('filled', !!passInput.value); });
   var list = $('message-list'), form = $('message-form'), textInput = $('text-input');
   var imageInput = $('image-input'), imageBtn = $('image-btn');
 
@@ -115,7 +122,7 @@
     if(pollTimer){ clearTimeout(pollTimer); pollTimer = null; }
     list.textContent = ''; lastId = 0; me = '';
     chatScreen.hidden = true; loginScreen.hidden = false; cover.hidden = true;
-    passInput.value = '';
+    passInput.value = ''; $('code-fld').classList.remove('filled');
     if(message){ loginError.textContent = message; loginError.hidden = false; }
     if(had) leaveToToolkit();
   }
@@ -186,19 +193,21 @@
 
   // 입장
 
-  loginForm.addEventListener('submit', function(e){
-    e.preventDefault();
+  function doLogin(){
     loginError.hidden = true; loginBtn.disabled = true;
     // 툴킷에 buyest/buyest1로 로그인되어 있어야 하고(서버가 다시 확인), 방 비밀번호를 직접 입력해야 한다
     var tk = toolkitId();
     if(!tk || ALLOWED.indexOf(tk.id) === -1){ loginBtn.disabled = false; loginError.textContent = '입장할 수 없습니다.'; loginError.hidden = false; return; }
-    call({action:'login', user:tk.id, pass:tk.pass, room:passInput.value, nick:$('blank-input').value}).then(function(r){
+    call({action:'login', user:tk.id, pass:tk.pass, room:passInput.value, nick:nickBox.value}).then(function(r){
       loginBtn.disabled = false;
-      if(!r || !r.ok){ loginError.textContent = (r && r.error) || '입장에 실패했습니다.'; loginError.hidden = false; passInput.value = ''; return; }
-      setToken(r.token); passInput.value = '';
+      if(!r || !r.ok){ loginError.textContent = (r && r.error) || '입장에 실패했습니다.'; loginError.hidden = false; passInput.value = ''; $('code-fld').classList.remove('filled'); return; }
+      setToken(r.token); passInput.value = ''; nickBox.value = ''; $('code-fld').classList.remove('filled');
       enter(r.user);
     }).catch(function(){ loginBtn.disabled = false; loginError.textContent = '서버에 연결할 수 없습니다.'; loginError.hidden = false; });
-  });
+  }
+  loginBtn.addEventListener('click', doLogin);
+  passInput.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); doLogin(); } });
+  nickBox.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); passInput.focus(); } });
 
   // 이전에 입장한 기록이 남아 있는데 서버가 이미 끊었다면 → 로그인 화면을 보여주지 않고 메인으로
   var tkAtLoad = toolkitId();
