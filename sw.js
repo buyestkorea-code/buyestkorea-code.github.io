@@ -4,7 +4,7 @@
             느릴 때도 앱은 뜨도록.
    절대 하지 않는 것: toolkit_dashboard_api.php 응답 캐싱 — 로그인/캘린더/할일처럼
    실시간으로 바뀌어야 하는 데이터라 여기서 캐시하면 오래된 값을 보여주게 된다. */
-var CACHE_NAME = 'buyest-toolkit-shell-v2';
+var CACHE_NAME = 'buyest-toolkit-shell-v3';
 var SHELL_FILES = [
   './index.html',
   './assets/manifest.json',

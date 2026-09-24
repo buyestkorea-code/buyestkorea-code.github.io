@@ -13,6 +13,13 @@
     window.addEventListener('load', function(){
       navigator.serviceWorker.register('sw.js').catch(function(){ /* 설치 없이도 사이트는 그대로 동작 */ });
     });
+    // 새 버전(서비스워커)이 배포되어 넘겨받으면 화면을 한 번만 자동으로 새로고침해서 옛 화면이 남지 않게 한다
+    var hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', function(){
+      if(!hadController) return;  // 처음 설치일 땐 새로고침하지 않는다
+      try{ if(sessionStorage.getItem('sw.reloaded')) return; sessionStorage.setItem('sw.reloaded', '1'); }catch(e){}
+      location.reload();
+    });
   }
 </script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
