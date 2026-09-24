@@ -1807,7 +1807,7 @@
        (방 비밀번호 · 오답 5회 시 15분 차단 · 3분 자리비움 시 자동 로그아웃 · 이 사이트 밖에서 열기 차단).
      채팅 서버는 Render에서 돌아가고, 새 창 없이 이 화면 안(iframe)에서 열린다.
      다른 메뉴로 나가면 iframe을 비워서 "이 페이지에 머무는 중"이 아니게 만든다(서버가 3분 뒤 세션을 끊는다). */
-  var MINI_CHAT_URL = 'https://mini-chat-yhkz.onrender.com/';
+  var MINI_CHAT_URL = 'mini.html';
   var MINI_CHAT_IDS = ['buyest', 'buyest1'];
   function miniChatAllowed(){
     try{ var a = JSON.parse(localStorage.getItem('buyest.dash.auth')); return !!a && MINI_CHAT_IDS.indexOf(a.id) !== -1; }catch(e){ return false; }
@@ -1821,7 +1821,7 @@
   }
   // 채팅방이 3분 자리비움으로 로그아웃되면 알려온다 → 로그인 화면을 보여주지 않고 툴킷 메인으로 돌아간다
   window.addEventListener('message', function(ev){
-    if(ev.origin !== 'https://mini-chat-yhkz.onrender.com') return;
+    if(ev.origin !== location.origin) return;
     if(ev.data && ev.data.type === 'chat-logout') leaveMiniChat();
   });
   document.addEventListener('visibilitychange', function(){
