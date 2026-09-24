@@ -12,6 +12,8 @@
   html,body{ height:100%; margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; }
   .screen{ height:100vh; height:100dvh; width:100%; display:flex; }
   .screen[hidden]{ display:none; }
+  /* 대화 영역은 평소엔 흐리게 두고, 화면을 만지는 동안(+몇 초)만 보인다 → 앱 전환 미리보기에 찍혀도 읽을 수 없다 */
+  .message-list.veil{ -webkit-filter:blur(20px); filter:blur(20px); }
   #cover{ position:fixed; inset:0; z-index:9999; background:var(--bg); }
   #cover[hidden]{ display:none; }
 
@@ -25,7 +27,7 @@
   .fld input{ width:100%; }
   #code-box{ -webkit-text-security:disc; text-security:disc; }
   /* 안내 글자는 입력칸 속성이 아니라 CSS로 그린다 → 아이폰이 이 칸을 비밀번호 칸으로 오해해 암호 저장을 묻지 않게 */
-  #code-fld::before{ content:'개발비밀번호'; position:absolute; left:15px; top:50%; transform:translateY(-50%); color:#6b7c85; font-size:16px; pointer-events:none; }
+  #code-fld::before{ content:'개발'; position:absolute; left:15px; top:50%; transform:translateY(-50%); color:#6b7c85; font-size:16px; pointer-events:none; }
   #code-fld.filled::before{ display:none; }
   .login-card button{ padding:12px; border-radius:10px; border:none; background:var(--accent); color:#04211b; font-weight:600; font-size:15px; cursor:pointer; }
   .login-card button:disabled{ opacity:.6; }
@@ -186,6 +188,7 @@
     me = user;
     loginScreen.hidden = true; chatScreen.hidden = false;
     lastId = 0; list.textContent = '';
+    reveal();
     poll();
   }
 
@@ -257,6 +260,7 @@
   }
   function hideNow(){
     if(chatScreen.hidden) return;
+    veil(true);
     if(me === STRICT_USER) return strictLogout();
     if(!hiddenAt) hiddenAt = Date.now(); cover.hidden = false;
   }
@@ -270,10 +274,20 @@
       cover.hidden = true; poll();
     }).catch(function(){ forceLogout(IDLE_MESSAGE); });
   }
+  // ---- 대화 흐림 처리: 화면을 만지거나 글을 쓰면 REVEAL_MS 동안만 선명하게 ----
+  var REVEAL_MS = 6000, veilTimer = null;
+  function veil(on){ list.classList.toggle('veil', on); if(on && veilTimer){ clearTimeout(veilTimer); veilTimer = null; } }
+  function reveal(){
+    list.classList.remove('veil');
+    if(veilTimer) clearTimeout(veilTimer);
+    veilTimer = setTimeout(function(){ veil(true); }, REVEAL_MS);
+  }
+  ['touchstart','mousedown','keydown','input','wheel'].forEach(function(ev){ chatScreen.addEventListener(ev, reveal, {passive:true, capture:true}); });
+  list.addEventListener('scroll', reveal, {passive:true});
   // 앱 전환 화면(홈에서 위로 올려 실행 중 앱 목록을 볼 때)의 미리보기에 대화가 찍히지 않게, 창이 포커스를 잃는 즉시(숨김 이벤트보다 먼저) 가린다.
   // 포커스가 돌아오고 한 번도 숨김 상태가 아니었다면 다시 보여준다. 숨김 상태를 거쳤다면 기존 복귀 로직(서버 확인)을 따른다.
   var blurCovered = false;
-  function blurNow(){ if(chatScreen.hidden) return; cover.hidden = false; blurCovered = true; }
+  function blurNow(){ if(chatScreen.hidden) return; veil(true); cover.hidden = false; blurCovered = true; }
   function focusNow(){ if(!blurCovered) return; blurCovered = false; if(!document.hidden && !hiddenAt && !chatScreen.hidden) cover.hidden = true; }
   window.addEventListener('blur', blurNow);
   window.addEventListener('focus', focusNow);
