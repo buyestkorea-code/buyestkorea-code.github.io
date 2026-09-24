@@ -15,8 +15,17 @@
     });
   }
 </script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendard-variable-dynamic-subset.min.css" media="print" onload="this.media='all'">
 <style>
-  @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendard-variable-dynamic-subset.min.css");
+  #bootSplash{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#F3F1EC;color:#20241F;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;transition:opacity .35s ease;}
+  @media (prefers-color-scheme:dark){ #bootSplash{background:#141917;color:#EAEEEA;} }
+  #bootSplash.done{opacity:0;pointer-events:none;}
+  #bootSplash b{font-size:22px;letter-spacing:.14em;}
+  #bootSplash small{font-size:12px;opacity:.6;margin-top:-10px;}
+  #bootBar{width:min(260px,70vw);height:6px;border-radius:99px;background:rgba(127,127,127,.25);overflow:hidden;}
+  #bootFill{height:100%;width:100%;background:#2F5D53;border-radius:99px;transform-origin:left;transform:scaleX(.02);transition:transform .25s ease-out;}
+  #bootPct{font-size:13px;font-variant-numeric:tabular-nums;opacity:.75;}
   :root{
     --bg:#F3F1EC;
     --surface:#FFFFFF;
@@ -880,6 +889,32 @@
   #meApp[hidden], #meGate[hidden], #meTopAuth[hidden], #meAdmin[hidden], #meCalAddPanel[hidden], #meNoticeAdd[hidden], #meOpts[hidden], #mePwForm[hidden], #meAdminSearch[hidden], #meSearch[hidden], #meTopDate[hidden], #meUser[hidden], #meUserMenu[hidden], #meCalDayPanel[hidden]{ display:none !important; }
 </style>
 
+<div id="bootSplash" role="status" aria-live="polite">
+  <b>BUYEST</b><small>Toolkit</small>
+  <div id="bootBar"><div id="bootFill"></div></div>
+  <span id="bootPct">0%</span>
+</div>
+<script>
+(function(){
+  // 실제 로딩 단계(서식 → 라이브러리 → 화면 준비 → 완료)에 맞춰 채우고, 단계 사이는 천천히 자동으로 올라간다
+  var cur = 0, target = 5, done = false, t0 = Date.now();
+  var fill = document.getElementById('bootFill'), pct = document.getElementById('bootPct'), box = document.getElementById('bootSplash');
+  function paint(){ var v = Math.round(cur); fill.style.transform = 'scaleX(' + (v/100) + ')'; pct.textContent = v + '%'; }
+  var timer = setInterval(function(){
+    if(done) return;
+    cur += (Math.min(target + 12, 92) - cur) * 0.08;  // 다음 단계 목표보다 조금 앞까지만 천천히
+    if(cur < target) cur = target;
+    paint();
+  }, 120);
+  window.__bootStep = function(n){ if(n > target) target = n; };
+  window.__bootDone = function(){
+    if(done) return; done = true; clearInterval(timer);
+    cur = 100; paint();
+    setTimeout(function(){ box.classList.add('done'); setTimeout(function(){ box.parentNode && box.parentNode.removeChild(box); }, 400); }, 250);
+  };
+  setTimeout(window.__bootDone, 15000);  // 어떤 경우에도 화면을 가리고 있지 않도록
+})();
+</script>
 <div class="app">
   <aside class="sidebar" id="sidebar" aria-label="도구 메뉴">
     <div class="brand">
@@ -1726,9 +1761,10 @@
   </div>
 </div>
 
-<script src="assets/libs/xlsx.min.js"></script>
-<script src="assets/libs/pdf.min.js"></script>
-<script src="assets/libs/tesseract.min.js"></script>
+<script>window.__bootStep && window.__bootStep(40);</script>
+<script src="assets/libs/xlsx.min.js" defer></script>
+<script src="assets/libs/pdf.min.js" defer></script>
+<script src="assets/libs/tesseract.min.js" defer></script>
 <!-- pdf.worker.min.js / tesseract-worker.min.js / tesseract-core.wasm.js / eng.traineddata.b64.txt
      는 더 이상 이 파일에 통째로 박아넣지 않고 assets/libs/ 에 별도 파일로 두고,
      실제 PDF/OCR 처리를 시작할 때만 fetch로 불러옵니다 (초기 로딩 10MB -> 약 0.5MB). -->
@@ -1739,6 +1775,8 @@
 
   var FONT_STACK = '"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif';
 
+  // pdf/xlsx/tesseract 라이브러리는 defer로 뒤에 실행되므로, 워커 경로 설정은 로딩이 끝난 뒤에 한다
+  document.addEventListener('DOMContentLoaded', function(){
   if(window.pdfjsLib){
     try{
       // 예전엔 이 파일 안에 워커 전체를 박아넣고 Blob으로 감쌌음 — 이제는 별도 파일이라
@@ -1746,6 +1784,7 @@
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/libs/pdf.worker.min.js';
     }catch(e){ /* getDocument() will surface an error when actually used */ }
   }
+  });
 
   // 배포/캐시 문제로 "고쳤는데도 그대로다" 라는 신고가 반복될 때, 지금 화면이 실제로
   // 어느 빌드를 쓰고 있는지 즉시 확인할 수 있게 진단 메시지에 넣어 보여준다.
@@ -2809,6 +2848,9 @@
       applyMode('gate');
     }
   })();
+
+  window.__bootStep && window.__bootStep(75);
+  window.addEventListener('load', function(){ window.__bootDone && window.__bootDone(); });
 
   /* ---------------- Shared helpers ---------------- */
   function el(tag, attrs, children){
