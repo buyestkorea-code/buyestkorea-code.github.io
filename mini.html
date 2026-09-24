@@ -25,10 +25,13 @@
   .login-card input[readonly]{ opacity:.6; }
   .fld{ position:relative; }
   .fld input{ width:100%; }
-  #code-box{ -webkit-text-security:disc; text-security:disc; }
+  /* 입장번호는 입력칸(input)이 아니라 화면 숫자패드로 받는다 → 아이폰이 암호 저장/자동입력을 물어볼 대상 자체가 없다 */
+  #code-fld{ height:46px; border-radius:10px; border:1px solid #2a3942; background:#202c33; display:flex; align-items:center; padding:0 15px; letter-spacing:6px; font-size:20px; color:var(--text); user-select:none; -webkit-user-select:none; }
+  .pad{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .login-card .pad button{ padding:13px 0; border-radius:10px; border:none; background:#202c33; color:var(--text); font-size:20px; font-weight:500; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+  .login-card .pad button:active{ background:#2a3942; }
   /* 안내 글자는 입력칸 속성이 아니라 CSS로 그린다 → 아이폰이 이 칸을 비밀번호 칸으로 오해해 암호 저장을 묻지 않게 */
-  #code-fld::before{ content:'개발'; position:absolute; left:15px; top:50%; transform:translateY(-50%); color:#6b7c85; font-size:16px; pointer-events:none; }
-  #code-fld.filled::before{ display:none; }
+  #code-fld:empty::before{ content:'개발'; color:#6b7c85; font-size:16px; letter-spacing:normal; }
   .login-card button{ padding:12px; border-radius:10px; border:none; background:var(--accent); color:#04211b; font-weight:600; font-size:15px; cursor:pointer; }
   .login-card button:disabled{ opacity:.6; }
   .error{ color:var(--danger); font-size:13px; margin:0; text-align:center; }
@@ -56,7 +59,13 @@
     <h1>개발예정</h1>
     <p class="hint">비밀번호를 입력하여 입장하는 방식으로 현재 개발중입니다.<br>현재는 접속이 불가능합니다.</p>
     <div class="fld"><input id="nick-box" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next"></div>
-    <div class="fld" id="code-fld"><input id="code-box" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go"></div>
+    <div id="code-fld" aria-live="polite"></div>
+    <div class="pad" id="pad">
+      <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+      <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+      <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+      <button type="button" data-k="C">지움</button><button type="button" data-k="0">0</button><button type="button" data-k="B">⌫</button>
+    </div>
     <button type="button" id="login-btn">입장하기</button>
     <p id="login-error" class="error" hidden></p>
   </div>
@@ -88,8 +97,21 @@
   var $ = function(id){ return document.getElementById(id); };
   var loginScreen = $('login-screen'), chatScreen = $('chat-screen'), cover = $('cover');
   var loginError = $('login-error'), loginBtn = $('login-btn');
-  var passInput = $('code-box'), nickBox = $('nick-box');
-  passInput.addEventListener('input', function(){ $('code-fld').classList.toggle('filled', !!passInput.value); });
+  var nickBox = $('nick-box');
+  // 숫자패드로 입력한 입장번호 (화면에는 점으로만 표시)
+  var passInput = {
+    _v: '',
+    get value(){ return this._v; },
+    set value(x){ this._v = String(x || ''); $('code-fld').textContent = new Array(this._v.length + 1).join('●'); },
+    focus: function(){}
+  };
+  $('pad').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    var k = b.getAttribute('data-k');
+    if(k === 'C') passInput.value = '';
+    else if(k === 'B') passInput.value = passInput.value.slice(0, -1);
+    else if(passInput.value.length < 20) passInput.value = passInput.value + k;
+  });
   var list = $('message-list'), form = $('message-form'), textInput = $('text-input');
   var imageInput = $('image-input'), imageBtn = $('image-btn');
 
@@ -122,7 +144,7 @@
     if(pollTimer){ clearTimeout(pollTimer); pollTimer = null; }
     list.textContent = ''; lastId = 0; me = '';
     chatScreen.hidden = true; loginScreen.hidden = false; cover.hidden = true;
-    passInput.value = ''; $('code-fld').classList.remove('filled');
+    passInput.value = '';
     if(message){ loginError.textContent = message; loginError.hidden = false; }
     if(had) leaveToToolkit();
   }
@@ -201,14 +223,13 @@
     if(!tk || ALLOWED.indexOf(tk.id) === -1){ loginBtn.disabled = false; loginError.textContent = '입장할 수 없습니다.'; loginError.hidden = false; return; }
     call({action:'login', user:tk.id, pass:tk.pass, room:passInput.value, nick:nickBox.value}).then(function(r){
       loginBtn.disabled = false;
-      if(!r || !r.ok){ loginError.textContent = (r && r.error) || '입장에 실패했습니다.'; loginError.hidden = false; passInput.value = ''; $('code-fld').classList.remove('filled'); return; }
-      setToken(r.token); passInput.value = ''; nickBox.value = ''; $('code-fld').classList.remove('filled');
+      if(!r || !r.ok){ loginError.textContent = (r && r.error) || '입장에 실패했습니다.'; loginError.hidden = false; passInput.value = ''; return; }
+      setToken(r.token); passInput.value = ''; nickBox.value = '';
       enter(r.user);
     }).catch(function(){ loginBtn.disabled = false; loginError.textContent = '서버에 연결할 수 없습니다.'; loginError.hidden = false; });
   }
   loginBtn.addEventListener('click', doLogin);
-  passInput.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); doLogin(); } });
-  nickBox.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); passInput.focus(); } });
+  nickBox.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); nickBox.blur(); } });
 
   // 이전에 입장한 기록이 남아 있는데 서버가 이미 끊었다면 → 로그인 화면을 보여주지 않고 메인으로
   var tkAtLoad = toolkitId();
