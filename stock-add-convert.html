@@ -28,6 +28,10 @@
   .c-soldout { background: #fef2f2; color: #b91c1c; }
   .c-new { background: #eff6ff; color: #1d4ed8; }
   .c-check { background: #fef3c7; color: #92400e; }
+  .dropzone { border: 1.5px dashed #d1d5db; border-radius: 8px; padding: 20px 16px; text-align: center; color: #6b7280; cursor: pointer; transition: border-color .12s, background .12s; min-width: 260px; }
+  .dropzone:hover, .dropzone.drag { border-color: #111827; background: #f3f4f6; color: #222; }
+  .dropzone.has-file { border-style: solid; border-color: #0f766e; }
+  .dropzone input[type=file] { display: none; }
 </style>
 </head>
 <body>
@@ -40,11 +44,17 @@
   <div class="row">
     <div class="field">
       <label>1. 재고추가 파일 (.xlsx)</label>
-      <input type="file" id="stockFile" accept=".xlsx,.xls">
+      <div class="dropzone" id="stockDrop" tabindex="0" role="button" aria-label="재고추가 파일 선택">
+        <div id="stockDropText">클릭 또는 끌어다 놓기 (Ctrl+V 가능)</div>
+        <input type="file" id="stockFile" accept=".xlsx,.xls">
+      </div>
     </div>
     <div class="field">
       <label>2. 이카운트 품목 엑셀 (.xlsx) — 품목코드 / 품목명[규격]</label>
-      <input type="file" id="ecFile" accept=".xlsx,.xls">
+      <div class="dropzone" id="ecDrop" tabindex="0" role="button" aria-label="이카운트 품목 엑셀 선택">
+        <div id="ecDropText">클릭 또는 끌어다 놓기 (Ctrl+V 가능)</div>
+        <input type="file" id="ecFile" accept=".xlsx,.xls">
+      </div>
     </div>
   </div>
 
@@ -65,18 +75,40 @@ document.getElementById('stockFile').addEventListener('change', async e => {
   if (!f) return;
   srcBase = f.name.replace(/\.[^.]+$/, '');
   stockWB = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+  document.getElementById('stockDrop').classList.add('has-file');
+  document.getElementById('stockDropText').textContent = '✓ ' + f.name;
   refreshRunBtn();
 });
 document.getElementById('ecFile').addEventListener('change', async e => {
   const f = e.target.files[0];
   if (!f) return;
   ecWB = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+  document.getElementById('ecDrop').classList.add('has-file');
+  document.getElementById('ecDropText').textContent = '✓ ' + f.name;
   refreshRunBtn();
 });
 
 function refreshRunBtn() {
   document.getElementById('runBtn').disabled = !stockWB || !ecWB;
 }
+
+function wireDropzone(zoneId, inputId){
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  ['dragenter','dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.remove('drag'); }));
+  zone.addEventListener('drop', e => {
+    if (e.dataTransfer.files[0]) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  zone.addEventListener('paste', e => {
+    const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (f) { const dt = new DataTransfer(); dt.items.add(f); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+}
+wireDropzone('stockDrop', 'stockFile');
+wireDropzone('ecDrop', 'ecFile');
 
 const S = v => (v === null || v === undefined) ? '' : String(v).trim();
 function num(v) {

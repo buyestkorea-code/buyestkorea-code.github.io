@@ -38,6 +38,10 @@
   input[type=text] { width: 100%; font-size: 17px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; text-align: center; font-weight: 700; letter-spacing: .3px; }
   input[type=text]:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
   input[type=file] { font-size: 13px; width: 100%; }
+  .dropzone { border: 1.5px dashed var(--line); border-radius: 8px; padding: 14px 12px; text-align: center; color: var(--ink-muted); cursor: pointer; transition: border-color .12s, background .12s; font-size: 12.5px; }
+  .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: #f0fdfa; color: var(--ink); }
+  .dropzone.has-file { border-style: solid; border-color: var(--accent); }
+  .dropzone input[type=file] { display: none; }
 
   .result { border-radius: 12px; padding: 16px; display: none; }
   .result.show { display: block; }
@@ -80,7 +84,10 @@
       <label class="card-label" style="margin-bottom:0;">키즈매장재고 리스트 (한 번 올리면 다음부터 모든 휴대폰에서 자동으로 불러옵니다)</label>
       <span id="listUpdatedBadge" class="updated-badge"></span>
     </div>
-    <input type="file" id="listFile" accept=".xlsx,.xls,.csv">
+    <div class="dropzone" id="listDrop" tabindex="0" role="button" aria-label="재고 리스트 파일 선택">
+      <div id="listDropText">클릭 또는 파일을 끌어다 놓으세요</div>
+      <input type="file" id="listFile" accept=".xlsx,.xls,.csv">
+    </div>
     <div class="list-status" id="listStatus">불러오는 중…</div>
   </div>
 
@@ -109,6 +116,26 @@
 <script>
 const API_URL = 'https://buyest.co.kr/barcode_stock_lookup_api.php';
 const LIST_API_URL = 'https://buyest.co.kr/barcode_list_api.php';
+
+function wireDropzone(zoneId, inputId){
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  input.addEventListener('change', () => {
+    if (input.files[0]) { zone.classList.add('has-file'); document.getElementById(zoneId + 'Text').textContent = '✓ ' + input.files[0].name; }
+  });
+  ['dragenter','dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.remove('drag'); }));
+  zone.addEventListener('drop', e => {
+    if (e.dataTransfer.files[0]) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  zone.addEventListener('paste', e => {
+    const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (f) { const dt = new DataTransfer(); dt.items.add(f); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+}
+wireDropzone('listDrop', 'listFile');
 const S = v => (v === null || v === undefined) ? '' : String(v).trim();
 const escHtml = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 

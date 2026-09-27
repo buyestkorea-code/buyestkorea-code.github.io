@@ -45,6 +45,10 @@
   #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:100;display:none;}
   #toast.err{background:var(--red);} #toast.ok{background:var(--green);}
   .loginNote{font-size:11.5px;color:var(--amber);margin-top:4px;}
+  .dropzone{border:1.5px dashed var(--line);border-radius:8px;padding:22px 16px;text-align:center;color:var(--sub);cursor:pointer;transition:border-color .12s,background .12s;min-width:280px;}
+  .dropzone:hover,.dropzone.drag{border-color:var(--pri);background:#f3f4f6;color:var(--ink);}
+  .dropzone.has-file{border-style:solid;border-color:var(--green);}
+  .dropzone input[type=file]{display:none;}
 </style>
 </head>
 <body>
@@ -57,7 +61,10 @@
   <div class="row">
     <div class="field">
       <label>자사몰 등록 엑셀 (.xlsx)</label>
-      <input type="file" id="srcFile" accept=".xlsx,.xls">
+      <div class="dropzone" id="srcDrop" tabindex="0" role="button" aria-label="자사몰 등록 엑셀 선택">
+        <div id="srcDropText">클릭하거나 파일을 끌어다 놓으세요 (Ctrl+V 붙여넣기도 가능)</div>
+        <input type="file" id="srcFile" accept=".xlsx,.xls">
+      </div>
     </div>
     <button class="btn btn-primary" id="runBtn" onclick="run()" disabled>변환</button>
     <button class="btn btn-green" id="dlBtn" onclick="downloadResult()" style="display:none;">사방넷 양식 다운로드</button>
@@ -349,8 +356,27 @@ function parseSourceExcel(wb) {
 let RESULT_ROWS = [];
 let srcBase = 'sabang';
 
-document.getElementById('srcFile').addEventListener('change', e => {
-  document.getElementById('runBtn').disabled = !e.target.files[0];
+function setupDropzone(zoneId, inputId, onFile) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  input.addEventListener('change', () => { if (input.files[0]) onFile(input.files[0]); });
+  ['dragenter', 'dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.remove('drag'); }));
+  zone.addEventListener('drop', e => {
+    const f = e.dataTransfer.files[0];
+    if (f) { input.files = e.dataTransfer.files; onFile(f); }
+  });
+  zone.addEventListener('paste', e => {
+    const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (f) { const dt = new DataTransfer(); dt.items.add(f); input.files = dt.files; onFile(f); }
+  });
+}
+setupDropzone('srcDrop', 'srcFile', file => {
+  document.getElementById('runBtn').disabled = false;
+  document.getElementById('srcDrop').classList.add('has-file');
+  document.getElementById('srcDropText').textContent = '✓ ' + file.name;
 });
 
 async function run() {

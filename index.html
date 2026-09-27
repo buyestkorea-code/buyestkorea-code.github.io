@@ -2972,6 +2972,10 @@
       var f = e.dataTransfer.files[0];
       if(f) onFile(f);
     });
+    zone.addEventListener('paste', function(e){
+      var f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+      if(f) onFile(f);
+    });
   }
   function downloadBlob(blob, filename){
     var url = URL.createObjectURL(blob);
@@ -4171,6 +4175,10 @@
     ['dragenter','dragover'].forEach(function(evt){ dropZone.addEventListener(evt, function(e){ e.preventDefault(); dropZone.classList.add('drag'); }); });
     ['dragleave','drop'].forEach(function(evt){ dropZone.addEventListener(evt, function(e){ e.preventDefault(); dropZone.classList.remove('drag'); }); });
     dropZone.addEventListener('drop', function(e){ addFiles(Array.prototype.slice.call(e.dataTransfer.files)); });
+    dropZone.addEventListener('paste', function(e){
+      var files = e.clipboardData && e.clipboardData.files;
+      if (files && files.length) addFiles(Array.prototype.slice.call(files));
+    });
 
     function addFiles(files){
       files.forEach(function(f){ invcFiles.push({file:f, vendor: detectVendor(f.name)}); });
@@ -5099,6 +5107,10 @@
         dz.classList.remove("drag");
         if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
       });
+      dz.addEventListener("paste", function(e){
+        var f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+        if (f) onFile(f);
+      });
     }
 
     wireDropzoneSE("seSabangDrop", 'input[type="file"]', handleSabangFile);
@@ -5679,6 +5691,10 @@
         dz.classList.remove('drag');
         if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
       });
+      dz.addEventListener('paste', function(e){
+        var f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+        if (f) onFile(f);
+      });
     }
 
     wireDropzoneRVM('rvmSabangDrop', 'input[type="file"]', handleRvmSabangFile);
@@ -6115,6 +6131,10 @@
         e.preventDefault();
         dz.classList.remove('drag');
         if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+      });
+      dz.addEventListener('paste', function(e){
+        var f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+        if (f) onFile(f);
       });
     }
 

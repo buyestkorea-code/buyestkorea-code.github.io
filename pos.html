@@ -54,6 +54,10 @@
 
   /* ---- 스캔 화면 ---- */
   .scan-box{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;}
+  .dropzone{border:1.5px dashed var(--line);border-radius:10px;padding:26px 16px;text-align:center;color:var(--sub);cursor:pointer;transition:border-color .12s,background .12s;}
+  .dropzone:hover,.dropzone.drag{border-color:var(--pri);background:#f3f4f6;color:var(--ink);}
+  .dropzone.has-file{border-style:solid;border-color:var(--green);}
+  .dropzone input[type=file]{display:none;}
   #barcodeInput{font-size:26px;padding:16px;width:100%;text-align:center;letter-spacing:1px;border:2px solid var(--pri);border-radius:10px;}
   .scan-actions{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
   .scan-actions .btn{flex:1;min-width:110px;}
@@ -93,6 +97,22 @@ const EXECUTE_API = 'https://buyest.co.kr/pos_execute_api.php';
 const S = v => (v===null||v===undefined) ? '' : String(v).trim();
 const N = v => { const n = Number(String(v??'').replace(/,/g,'')); return isFinite(n) ? n : 0; };
 function esc(s){ return S(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+/* 클릭/드래그앤드롭/붙여넣기(Ctrl+V)로 파일을 고르는 드롭존. 기존 input의 change 리스너를 그대로 재사용한다. */
+function wireDropzone(zoneId, inputId){
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  ['dragenter','dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.remove('drag'); }));
+  zone.addEventListener('drop', e => {
+    if (e.dataTransfer.files[0]) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  zone.addEventListener('paste', e => {
+    const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (f) { const dt = new DataTransfer(); dt.items.add(f); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+}
 function fmtDate(ts){ const d = new Date(ts*1000); return d.toLocaleDateString('ko-KR',{month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
 function fmtMD(ts){ const d = new Date(ts*1000); return String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0'); }
 function fmtTime(ts){ return new Date(ts*1000).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
@@ -301,11 +321,18 @@ function renderUploadScreen(){
   app.innerHTML = topNav('scan') + `
     <p class="lead">분류명(브랜드)/품목명/바코드/재고량/단가 컬럼이 있는 엑셀을 올리세요. 헤더 위치와 컬럼 순서는 자동으로 찾습니다.</p>
     <div class="card">
-      <input type="file" id="invFile" accept=".xlsx,.xls">
+      <div class="dropzone" id="invDrop" tabindex="0" role="button" aria-label="재고파일 선택">
+        <div id="invDropText">클릭하거나 파일을 끌어다 놓으세요 (Ctrl+V 붙여넣기도 가능)</div>
+        <input type="file" id="invFile" accept=".xlsx,.xls">
+      </div>
       <div id="invPreviewWrap" style="margin-top:14px;"></div>
     </div>
   `;
-  document.getElementById('invFile').addEventListener('change', handleInventoryFile);
+  document.getElementById('invFile').addEventListener('change', e => {
+    if (e.target.files[0]) document.getElementById('invDrop').classList.add('has-file');
+    handleInventoryFile(e);
+  });
+  wireDropzone('invDrop', 'invFile');
 }
 
 let pendingUploadRows = null;

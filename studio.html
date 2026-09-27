@@ -255,7 +255,7 @@
       <p id="stageDesc">제품 사진의 밝기와 디테일을 자연스럽게 보정합니다. 화이트 배경 촬영본에 가장 잘 맞습니다.</p>
     </div>
 
-    <label class="dropzone" id="dropzone">
+    <label class="dropzone" id="dropzone" tabindex="0">
       <input type="file" id="fileInput" accept="image/*" />
       <span class="dropzone-hint" id="dropzoneHint">클릭하거나 사진을 끌어다 놓으세요<br/>(JPG · PNG)</span>
     </label>
@@ -395,6 +395,10 @@
   dropzone.addEventListener("drop", (e) => {
     e.preventDefault();
     if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  dropzone.addEventListener("paste", (e) => {
+    const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (f) handleFile(f);
   });
   fileInput.addEventListener("change", (e) => {
     if (e.target.files[0]) handleFile(e.target.files[0]);

@@ -33,13 +33,20 @@
   .chip-soldout { background: #fef2f2; color: #b91c1c; }
   .chip-sale { background: #f0fdf4; color: #15803d; }
   .chip-mismatch { background: #fef3c7; color: #92400e; }
+  .dropzone { border: 1.5px dashed #d1d5db; border-radius: 8px; padding: 20px 16px; text-align: center; color: #6b7280; cursor: pointer; transition: border-color .12s, background .12s; max-width: 420px; }
+  .dropzone:hover, .dropzone.drag { border-color: #111827; background: #f3f4f6; color: #222; }
+  .dropzone.has-file { border-style: solid; border-color: #0f766e; }
+  .dropzone input[type=file] { display: none; }
 </style>
 </head>
 <body>
   <h1>이카운트 변동분 → BUYEST 품절 반영 <a href="soldout-manual.html" target="_blank" style="font-size:13px; font-weight:normal; color:#2563eb;">📖 사용법 보기</a></h1>
   <p>이카운트에서 다운받은 재고변동표 엑셀을 올리면, 그 품목들만 이카운트 API로 최신 재고를 다시 확인해요. 매핑 실패한 건 BUYEST 상품코드를 직접 입력해야 실행돼요.</p>
 
-  <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadFromExcel(this.files[0])">
+  <div class="dropzone" id="fileDrop" tabindex="0" role="button" aria-label="재고변동표 엑셀 선택">
+    <div id="fileDropText">클릭 또는 끌어다 놓기 (Ctrl+V 붙여넣기도 가능)</div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadFromExcel(this.files[0])">
+  </div>
   <button class="btn btn-refresh" id="refreshMapBtn" onclick="refreshMapping()" style="display:none">바이스트상품최신화</button>
   <button class="btn btn-secondary" id="saveMapBtn" onclick="saveMappings()" disabled style="display:none">매핑 저장 (직접 입력한 것만)</button>
   <button class="btn btn-danger" id="execBtn" onclick="execute()" disabled style="display:none">최종 실행 (실제 품절처리)</button>
@@ -58,6 +65,26 @@ const EXEC_URL = 'https://buyest.co.kr/ecount_sync_execute_api.php';
 const SAVE_MAP_URL = 'https://buyest.co.kr/ecount_sync_save_mapping_api.php';
 const REFRESH_MAP_URL = 'https://buyest.co.kr/ecount_sync_refresh_mapping_api.php';
 let currentItems = [];
+
+function wireDropzone(zoneId, inputId){
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  input.addEventListener('change', () => {
+    if (input.files[0]) { zone.classList.add('has-file'); document.getElementById(zoneId + 'Text').textContent = '✓ ' + input.files[0].name; }
+  });
+  ['dragenter','dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.remove('drag'); }));
+  zone.addEventListener('drop', e => {
+    if (e.dataTransfer.files[0]) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  zone.addEventListener('paste', e => {
+    const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (f) { const dt = new DataTransfer(); dt.items.add(f); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+}
+wireDropzone('fileDrop', 'fileInput');
 let showFailedOnly = false;
 
 const STATE_LABEL = { sale: '판매중', soldout: '품절' };

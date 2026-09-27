@@ -23,6 +23,10 @@
   #status { color: #6b7280; margin: 10px 0; font-size: 13.5px; }
   #err { color: #b91c1c; margin: 10px 0; white-space: pre-wrap; }
   .ok-msg { color: #15803d; }
+  .dropzone { border: 1.5px dashed #d1d5db; border-radius: 8px; padding: 20px 16px; text-align: center; color: #6b7280; cursor: pointer; transition: border-color .12s, background .12s; }
+  .dropzone:hover, .dropzone.drag { border-color: #111827; background: #f3f4f6; color: #222; }
+  .dropzone.has-file { border-style: solid; border-color: #0f766e; }
+  .dropzone input[type=file] { display: none; }
 </style>
 </head>
 <body>
@@ -32,7 +36,10 @@
   <div class="step">
     <h3>1. 이카운트 재고현황 엑셀 업로드</h3>
     <p style="font-size:13px;color:#6b7280;">이카운트 → 재고현황(또는 재고수불부) 메뉴에서 전체 품목 엑셀 다운로드 후 여기에 업로드하세요.</p>
-    <input type="file" id="ecFileInput" accept=".xlsx,.xls" onchange="loadEcountFile(this.files[0])">
+    <div class="dropzone" id="ecDrop" tabindex="0" role="button" aria-label="이카운트 재고현황 엑셀 선택">
+      <div id="ecDropText">클릭 또는 끌어다 놓기 (Ctrl+V 붙여넣기도 가능)</div>
+      <input type="file" id="ecFileInput" accept=".xlsx,.xls" onchange="loadEcountFile(this.files[0])">
+    </div>
     <div id="ecColumnPicker" style="display:none; margin-top:10px;">
       <span style="font-size:13px;">자동 인식이 안 됐어요 — 열을 직접 골라주세요: </span>
       품목코드 열: <select id="codeColSelect"></select>
@@ -61,6 +68,26 @@
 const SNAPSHOT_URL = 'https://buyest.co.kr/buyest_stock_snapshot_api.php';
 const TOOLKIT_API_URL = 'https://buyest.co.kr/toolkit_dashboard_api.php';
 const CHUNK = 10000;
+
+function wireDropzone(zoneId, inputId){
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  input.addEventListener('change', () => {
+    if (input.files[0]) { zone.classList.add('has-file'); document.getElementById(zoneId + 'Text').textContent = '✓ ' + input.files[0].name; }
+  });
+  ['dragenter','dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.remove('drag'); }));
+  zone.addEventListener('drop', e => {
+    if (e.dataTransfer.files[0]) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  zone.addEventListener('paste', e => {
+    const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (f) { const dt = new DataTransfer(); dt.items.add(f); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+}
+wireDropzone('ecDrop', 'ecFileInput');
 
 // 이 도구는 대시보드(index.html)의 iframe으로 열리지만 문서 자체는 따로라, 대시보드가
 // localStorage에 저장해둔 로그인 정보(같은 출처라 접근 가능)를 그대로 읽어서 결과 건수만

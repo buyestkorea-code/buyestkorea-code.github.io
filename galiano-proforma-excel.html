@@ -26,6 +26,10 @@
   #result.ok { background: #f0fdf4; color: #15803d; }
   #result.err { background: #fef2f2; color: #b91c1c; }
   #result.warn { background: #fffbeb; color: #92400e; }
+  .dropzone { border: 1.5px dashed #d1d5db; border-radius: 8px; padding: 20px 16px; text-align: center; color: #6b7280; cursor: pointer; transition: border-color .12s, background .12s; min-width: 300px; }
+  .dropzone:hover, .dropzone.drag { border-color: #111827; background: #f3f4f6; color: #222; }
+  .dropzone.has-file { border-style: solid; border-color: #0f766e; }
+  .dropzone input[type=file] { display: none; }
 </style>
 </head>
 <body>
@@ -40,7 +44,10 @@
   <div class="row">
     <div class="field">
       <label>갈리아노 PROFORMA INVOICE (.pdf)</label>
-      <input type="file" id="pdfFile" accept=".pdf">
+      <div class="dropzone" id="pdfDrop" tabindex="0" role="button" aria-label="PDF 파일 선택">
+        <div id="pdfDropText">클릭 또는 끌어다 놓기 (Ctrl+V 가능)</div>
+        <input type="file" id="pdfFile" accept=".pdf">
+      </div>
     </div>
   </div>
 
@@ -64,7 +71,26 @@ document.getElementById('pdfFile').addEventListener('change', e => {
   pdfFile = f;
   srcBase = f.name.replace(/\.[^.]+$/, '');
   document.getElementById('runBtn').disabled = false;
+  document.getElementById('pdfDrop').classList.add('has-file');
+  document.getElementById('pdfDropText').textContent = '✓ ' + f.name;
 });
+
+function wireDropzone(zoneId, inputId){
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  ['dragenter','dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.remove('drag'); }));
+  zone.addEventListener('drop', e => {
+    if (e.dataTransfer.files[0]) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  zone.addEventListener('paste', e => {
+    const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (f) { const dt = new DataTransfer(); dt.items.add(f); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+}
+wireDropzone('pdfDrop', 'pdfFile');
 
 /* ---- 텍스트 레이아웃 그대로 줄 재구성 (index.html의 groupTextIntoLines와 동일 로직) ---- */
 function groupTextIntoLines(items) {
