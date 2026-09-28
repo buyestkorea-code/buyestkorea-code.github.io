@@ -375,6 +375,26 @@ function showError(styleCode, name, msg) {
   box.innerHTML = `<div class="result-head"><div class="result-name">${escHtml(name)}</div><div class="result-code">${escHtml(styleCode)}</div></div><div class="result-note">조회 실패: ${escHtml(msg)}</div>`;
 }
 
+// 사이즈 정렬: 문자사이즈(XXS~XXXL 등)는 옷 사이즈 순서로, 숫자사이즈(신발 등)는 오름차순으로.
+// localeCompare만 쓰면 알파벳순(L,M,S,XL,XS,XXS)이 되어버려 옷 사이즈 표기와 안 맞았다(2026-09-28).
+function sizeRank(sizeRaw) {
+  const s = S(sizeRaw).toUpperCase();
+  if (/^\d+(\.\d+)?$/.test(s)) return { grp: 1, key: parseFloat(s) };
+  const m = s.match(/^(\d+)?(X*)(S|M|L)$/);
+  if (m) {
+    const core = m[3];
+    const n = m[1] ? parseInt(m[1], 10) : m[2].length;
+    if (core === 'M') return { grp: 0, key: 0 };
+    return { grp: 0, key: core === 'S' ? -(n + 1) : (n + 1) };
+  }
+  return { grp: 2, key: s };
+}
+function compareSizes(a, b) {
+  const ra = sizeRank(a), rb = sizeRank(b);
+  if (ra.grp !== rb.grp) return ra.grp - rb.grp;
+  return ra.grp === 2 ? String(ra.key).localeCompare(String(rb.key), 'ko', { numeric: true }) : ra.key - rb.key;
+}
+
 function renderItems(styleCode, name, items, truncated) {
   const box = document.getElementById('result');
   box.className = 'result show ready';
@@ -382,7 +402,7 @@ function renderItems(styleCode, name, items, truncated) {
   if (!items.length) {
     body = `<div class="result-note" style="color:var(--warn-fg);">이카운트에서 이 스타일코드와 일치하는 품목을 찾지 못했어요.</div>`;
   } else {
-    const sorted = items.slice().sort((a, b) => S(a.size).localeCompare(S(b.size), 'ko', { numeric: true }));
+    const sorted = items.slice().sort((a, b) => compareSizes(a.size, b.size));
     const rows = sorted.map(it => {
       const cls = it.qty === null || it.qty === undefined ? 'unknown' : it.qty > 0 ? 'ok' : 'zero';
       const qtyLabel = (it.qty === null || it.qty === undefined) ? '조회안됨' : it.qty;
