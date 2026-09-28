@@ -69,6 +69,8 @@ const SNAPSHOT_URL = 'https://buyest.co.kr/buyest_stock_snapshot_api.php';
 const TOOLKIT_API_URL = 'https://buyest.co.kr/toolkit_dashboard_api.php';
 const CHUNK = 10000;
 
+function esc(s){ return (s===null||s===undefined?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 function wireDropzone(zoneId, inputId){
   const zone = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
@@ -249,7 +251,7 @@ function renderTable() {
   let html = '<table><tr><th>이카운트코드</th><th>사이즈</th><th>바이스트상품코드</th><th>이카운트재고</th><th>이카운트상태</th><th>사이트상태</th><th>이슈</th></tr>';
   for (const m of mismatches) {
     html += `<tr>
-      <td>${m.ec_code}</td><td>${m.size || ''}</td><td>${m.buyest_product_code}</td>
+      <td>${esc(m.ec_code)}</td><td>${esc(m.size || '')}</td><td>${esc(m.buyest_product_code)}</td>
       <td>${m.ecount_qty}</td><td>${m.ecount_status}</td>
       <td>${m.site_status === 'sale' ? '판매중' : m.site_status === 'soldout' ? '품절' : (m.site_status || '-')}</td>
       <td>${tagFor(m.issue)}</td>
