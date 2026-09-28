@@ -71,15 +71,17 @@
   <div class="tbl-wrap" id="tblWrap" style="display:none;"><table id="tbl"></table></div>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
-let kreamWB = null, kreamFileName = '', ecWB = null;
-let deltaRows = [];
+let kreamWB = null, kreamBuf = null, kreamFileName = '', kreamSheetName = '', ecWB = null;
+let deltaRows = [], patchList = [];
 
 document.getElementById('kreamFile').addEventListener('change', async e => {
   const f = e.target.files[0];
   if (!f) return;
   kreamFileName = f.name.replace(/\.[^.]+$/, '');
-  kreamWB = XLSX.read(await f.arrayBuffer(), { type: 'array', cellText: false });
+  kreamBuf = await f.arrayBuffer();
+  kreamWB = XLSX.read(kreamBuf, { type: 'array', cellText: false });
   document.getElementById('kreamDrop').classList.add('has-file');
   document.getElementById('kreamDropText').textContent = '✓ ' + f.name;
   refreshRunBtn();
@@ -244,11 +246,13 @@ async function run() {
       codeMap[key].push(it);
     });
 
-    const { ws, headerIdx, col } = findKreamSheet(kreamWB);
+    const { sheetName, ws, headerIdx, col } = findKreamSheet(kreamWB);
+    kreamSheetName = sheetName;
     const range = XLSX.utils.decode_range(ws['!ref']);
 
     let lastBrand = '', lastKreamName = '', lastName = '';
     deltaRows = [];
+    patchList = [];
     let matchedCount = 0, ambiguousCount = 0;
 
     for (let r = headerIdx + 1; r <= range.e.r; r++) {
@@ -285,9 +289,10 @@ async function run() {
 
       if (oldVal === newVal) continue; // 값 그대로 - 변동 없음
 
-      // 재고 셀 갱신 (숫자로)
+      // 재고 셀 갱신 (숫자로) - 화면 표/통계용. 실제 다운로드 파일은 원본 바이너리를 직접 패치한다(아래 buildPatchedKreamBlob).
       ws[oldRef] = { t: 'n', v: newVal };
       if (range.e.c < col['재고']) range.e.c = col['재고'];
+      patchList.push({ r: r + 1, c: col['재고'], v: newVal });
 
       let statusLabel = '수량변경';
       if (newVal === 0 && oldVal !== 0) statusLabel = '품절';
@@ -357,8 +362,125 @@ function downloadDelta() {
   XLSX.writeFile(wb, `크림품절_변동내역_${todayStamp()}.xlsx`);
 }
 
-function downloadFull() {
-  XLSX.writeFile(kreamWB, `${kreamFileName}_${todayStamp()}.xlsx`);
+/* ===== 원본 파일을 그대로 두고 재고 셀만 패치하는 로직 =====
+   XLSX.writeFile로 새로 만들면 서식/스타일이 일부 유실될 수 있어서, 업로드한 원본
+   xlsx의 zip을 직접 열어 해당 시트 XML의 <c> 셀 값만 바꾸고 나머지 파일은 손대지 않는다. */
+function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+async function resolveSheetXmlPath(zip, sheetName) {
+  const wbXml = await zip.file('xl/workbook.xml').async('string');
+  const relsXml = await zip.file('xl/_rels/workbook.xml.rels').async('string');
+  const sheetTagRe = /<sheet\b[^>]*\/>/g;
+  let m, rId = null;
+  while ((m = sheetTagRe.exec(wbXml))) {
+    const tag = m[0];
+    const nameM = /name="([^"]*)"/.exec(tag);
+    const ridM = /r:id="([^"]*)"/.exec(tag);
+    if (nameM && nameM[1] === sheetName && ridM) { rId = ridM[1]; break; }
+  }
+  if (!rId) throw new Error('원본 파일의 workbook.xml에서 시트("' + sheetName + '")를 찾지 못했습니다.');
+  const relRe = new RegExp('<Relationship\\b[^>]*Id="' + escapeRegex(rId) + '"[^>]*\\/>');
+  const relM = relRe.exec(relsXml);
+  if (!relM) throw new Error('시트 경로(rels)를 찾지 못했습니다.');
+  const targetM = /Target="([^"]*)"/.exec(relM[0]);
+  if (!targetM) throw new Error('시트 경로(Target)를 찾지 못했습니다.');
+  let target = targetM[1];
+  return target.startsWith('/') ? target.slice(1) : 'xl/' + target;
+}
+
+function stripTypeAttr(attrs) {
+  return (attrs || '').replace(/\s+t="[^"]*"/, '');
+}
+
+// 행(inner) XML 문자열 안에서 ref 셀을 찾아 숫자값으로 바꾸고, 없으면 열 순서에 맞는 위치에 새로 삽입한다.
+function patchCellInRow(inner, ref, col, val) {
+  const escRef = escapeRegex(ref);
+  let re = new RegExp('<c r="' + escRef + '"([^>]*)\\/>');
+  let m = re.exec(inner);
+  if (m) {
+    const attrs = stripTypeAttr(m[1]);
+    return inner.slice(0, m.index) + '<c r="' + ref + '"' + attrs + '><v>' + val + '</v></c>' + inner.slice(m.index + m[0].length);
+  }
+  re = new RegExp('<c r="' + escRef + '"([^>]*)>([\\s\\S]*?)<\\/c>');
+  m = re.exec(inner);
+  if (m) {
+    const attrs = stripTypeAttr(m[1]);
+    return inner.slice(0, m.index) + '<c r="' + ref + '"' + attrs + '><v>' + val + '</v></c>' + inner.slice(m.index + m[0].length);
+  }
+  // 셀 자체가 없는 행(빈 셀은 생략됨) - 열 순서에 맞는 위치에 새로 삽입
+  const cellRe = /<c r="([A-Z]+)\d+"/g;
+  let insAt = inner.length, mm;
+  while ((mm = cellRe.exec(inner))) {
+    if (XLSX.utils.decode_col(mm[1]) > col) { insAt = mm.index; break; }
+  }
+  return inner.slice(0, insAt) + '<c r="' + ref + '"><v>' + val + '</v></c>' + inner.slice(insAt);
+}
+
+function patchSheetXml(xml, patches) {
+  const byRow = {};
+  patches.forEach(p => { (byRow[p.r] = byRow[p.r] || []).push(p); });
+
+  Object.keys(byRow).forEach(rowNumStr => {
+    const rowNum = Number(rowNumStr);
+    const openRe = new RegExp('(<row r="' + rowNum + '"[^>]*>)([\\s\\S]*?)(<\\/row>)');
+    const selfCloseRe = new RegExp('(<row r="' + rowNum + '"[^>]*)\\/>');
+
+    let m = openRe.exec(xml);
+    if (m) {
+      let inner = m[2];
+      byRow[rowNumStr].forEach(p => { inner = patchCellInRow(inner, XLSX.utils.encode_col(p.c) + p.r, p.c, p.v); });
+      xml = xml.slice(0, m.index) + m[1] + inner + m[3] + xml.slice(m.index + m[0].length);
+      return;
+    }
+    m = selfCloseRe.exec(xml);
+    if (m) {
+      let inner = '';
+      byRow[rowNumStr].forEach(p => { inner = patchCellInRow(inner, XLSX.utils.encode_col(p.c) + p.r, p.c, p.v); });
+      const newRow = m[1] + '>' + inner + '</row>';
+      xml = xml.slice(0, m.index) + newRow + xml.slice(m.index + m[0].length);
+      return;
+    }
+    throw new Error('원본 엑셀에서 ' + rowNum + '행을 찾지 못해 그 행은 반영하지 못했습니다. (파일이 바뀌었을 수 있어요 - 다시 업로드 후 시도해주세요)');
+  });
+  return xml;
+}
+
+async function buildPatchedKreamBlob() {
+  const zip = await JSZip.loadAsync(kreamBuf);
+  const sheetPath = await resolveSheetXmlPath(zip, kreamSheetName);
+  const sheetFile = zip.file(sheetPath);
+  if (!sheetFile) throw new Error('원본 파일 안에서 시트 XML(' + sheetPath + ')을 찾지 못했습니다.');
+  let xml = await sheetFile.async('string');
+  xml = patchSheetXml(xml, patchList);
+  zip.file(sheetPath, xml);
+  return zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 6 }
+  });
+}
+
+async function downloadFull() {
+  const dlBtn = document.getElementById('dlFullBtn');
+  const orig = dlBtn.textContent;
+  dlBtn.disabled = true; dlBtn.textContent = '원본 파일 반영 중...';
+  try {
+    const blob = await buildPatchedKreamBlob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${kreamFileName}_${todayStamp()}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (e) {
+    const result = document.getElementById('result');
+    result.className = 'err';
+    result.textContent = '원본 파일 반영 중 오류: ' + e.message;
+  } finally {
+    dlBtn.disabled = false; dlBtn.textContent = orig;
+  }
 }
 </script>
 </body>
