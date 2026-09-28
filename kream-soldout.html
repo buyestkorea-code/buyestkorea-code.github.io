@@ -155,6 +155,19 @@ function findHeaderRowIdx(aoa, matchFn) {
   for (let i = 0; i < aoa.length; i++) if (aoa[i] && matchFn(aoa[i])) return i;
   return -1;
 }
+// 헤더 문구가 파일마다 조금씩 바뀌는 열("상품번호 및 특이사항" vs "특이사항", "이카 재고" vs "재고")을
+// 위해 완전일치 대신 포함 여부로 찾는다. exclude가 있으면 그 문구가 같이 들어간 열(가격 열 등)은 제외.
+function findColContains(headerRow, substr, exclude) {
+  for (let i = 0; i < (headerRow || []).length; i++) {
+    const v = headerRow[i];
+    if (v === null || v === undefined) continue;
+    const t = String(v).split('\n')[0].trim();
+    if (t.indexOf(substr) === -1) continue;
+    if (exclude && t.indexOf(exclude) !== -1) continue;
+    return i;
+  }
+  return -1;
+}
 
 /* 이카운트 재고변동표 → [{code,name,spec,remain}] */
 function parseEcountDelta(wb) {
@@ -189,9 +202,21 @@ function findKreamSheet(wb) {
     const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true, range: 0 });
     const hIdx = findHeaderRowIdx(aoa.slice(0, 5), r => r.indexOf('크림 상품명') !== -1);
     if (hIdx !== -1) {
-      const col = headerColMap(aoa[hIdx]);
-      ['특이사항', '크림 상품명', '상품명', '사이즈', '재고'].forEach(need => {
-        if (!(need in col)) throw new Error(`크림등록상품 엑셀에 "${need}" 열이 없습니다.`);
+      const headerRow = aoa[hIdx];
+      const exact = headerColMap(headerRow);
+      // 열 이름이 파일마다 조금씩 바뀌어서("특이사항"→"상품번호 및 특이사항", "재고"→"이카 재고")
+      // 완전일치가 실패하면 포함검색으로 한번 더 찾는다.
+      const col = {
+        '특이사항': ('특이사항' in exact) ? exact['특이사항'] : findColContains(headerRow, '특이사항'),
+        '크림 상품명': exact['크림 상품명'],
+        '상품명': exact['상품명'],
+        '사이즈': exact['사이즈'],
+        '재고': ('재고' in exact) ? exact['재고'] : findColContains(headerRow, '재고', '가격')
+      };
+      Object.keys(col).forEach(need => {
+        if (col[need] === undefined || col[need] === -1) {
+          throw new Error(`크림등록상품 엑셀에 "${need}" 열을 찾을 수 없습니다. (헤더: ${headerRow.filter(Boolean).join(', ')})`);
+        }
       });
       return { sheetName: name, ws, headerIdx: hIdx, col };
     }
