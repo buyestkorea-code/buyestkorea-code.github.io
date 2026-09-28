@@ -252,10 +252,13 @@ document.getElementById('listFile').addEventListener('change', async e => {
   }
 });
 
-// "4078604_27" -> "4078604" (언더스코어 앞부분 = 스타일코드, 뒷부분 = 사이즈)
+// "4078604_27" -> "4078604" (마지막 언더스코어 뒷부분 = 사이즈, 그 앞은 전부 스타일코드).
+// "행_2619971021 001_L"처럼 스타일코드 자체에 언더스코어가 섞여 있는 경우가 있어(예: "행_" 접두사),
+// 첫 언더스코어로 자르면 스타일코드가 잘려서 엉뚱한 품목과 매칭된다 — 반드시 마지막 언더스코어 기준으로 잘라야 한다.
+// (같은 리스트 포맷을 쓰는 pos.html의 parseInventoryExcel과 동일한 규칙.)
 function extractStyleCode(name) {
   const s = S(name);
-  const us = s.indexOf('_');
+  const us = s.lastIndexOf('_');
   return (us >= 0 ? s.slice(0, us) : s).trim();
 }
 
