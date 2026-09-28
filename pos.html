@@ -96,7 +96,9 @@ const EXECUTE_API = 'https://buyest.co.kr/pos_execute_api.php';
 
 const S = v => (v===null||v===undefined) ? '' : String(v).trim();
 const N = v => { const n = Number(String(v??'').replace(/,/g,'')); return isFinite(n) ? n : 0; };
-function esc(s){ return S(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function esc(s){ return S(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+/* onclick="fn('...')" 처럼 홑따옴표 JS 문자열 안에 값을 끼워넣을 때 전용 — HTML 속성은 파서가 먼저 엔티티를 디코딩한 뒤 JS로 해석하므로, HTML 이스케이프만으로는 JS 문자열 탈출(XSS)을 막지 못한다. 백슬래시/홑따옴표를 JS 레벨로 먼저 이스케이프한 뒤 HTML 이스케이프를 적용한다. */
+function escJsAttr(s){ return esc(S(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
 /* 클릭/드래그앤드롭/붙여넣기(Ctrl+V)로 파일을 고르는 드롭존. 기존 input의 change 리스너를 그대로 재사용한다. */
 function wireDropzone(zoneId, inputId){
   const zone = document.getElementById(zoneId);
@@ -529,10 +531,10 @@ function renderItemCard(item, intent){
           <div class="field"><label>할인값</label><input id="scanDiscVal" type="number" value="0" disabled></div>
         </div>
         <div class="field"><label>비고</label><input id="scanNote" placeholder="특이사항 (선택)"></div>
-        <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitSale(${item.id}, '${esc(item.barcode)}')">판매 확정</button>
+        <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitSale(${item.id}, '${escJsAttr(item.barcode)}')">판매 확정</button>
       ` : `
         <div class="field"><label>비고</label><input id="scanNote" placeholder="반품 사유 등 (선택)"></div>
-        <button class="btn btn-green btn-big" style="width:100%;margin-top:8px;" onclick="submitReturn('${esc(item.barcode)}')">반품 확정</button>
+        <button class="btn btn-green btn-big" style="width:100%;margin-top:8px;" onclick="submitReturn('${escJsAttr(item.barcode)}')">반품 확정</button>
       `}
     </div>
   `;
@@ -548,7 +550,7 @@ function renderUnregisteredCard(barcode, prevManual, intent){
         <div class="name">미등록상품</div>
         <div class="meta">바코드 ${esc(barcode)} — 재고파일에 없어요. 그래도 반품 처리하려면 아래에서 진행하세요.</div>
         <div class="field"><label>비고</label><input id="scanNote" placeholder="사유"></div>
-        <button class="btn btn-outline btn-big" style="width:100%;margin-top:8px;" onclick="submitUnregisteredReturn('${esc(barcode)}')">미등록 바코드로 반품 기록</button>
+        <button class="btn btn-outline btn-big" style="width:100%;margin-top:8px;" onclick="submitUnregisteredReturn('${escJsAttr(barcode)}')">미등록 바코드로 반품 기록</button>
       </div>`;
   }
   return `
@@ -569,7 +571,7 @@ function renderUnregisteredCard(barcode, prevManual, intent){
         <div class="field"><label>할인값</label><input id="manDiscVal" type="number" value="0" disabled></div>
       </div>
       <div class="field"><label>비고</label><input id="manNote" placeholder="특이사항 (선택)"></div>
-      <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitManualSale('${esc(barcode)}')">수기 판매로 저장</button>
+      <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitManualSale('${escJsAttr(barcode)}')">수기 판매로 저장</button>
     </div>`;
 }
 
@@ -645,7 +647,7 @@ async function handleExchangeScan(barcode){
         <div class="field"><label>할인값</label><input id="exDiscVal" type="number" value="0" disabled></div>
       </div>
       <div class="field"><label>비고</label><input id="exNote" placeholder="선택"></div>
-      <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitExchange('${esc(item.barcode)}')">교환 확정</button>
+      <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitExchange('${escJsAttr(item.barcode)}')">교환 확정</button>
     </div>`;
   focusBarcode();
 }
@@ -941,7 +943,7 @@ async function onCountSubmit(){
         <div class="name">미등록상품</div>
         <div class="meta">바코드 ${esc(barcode)} — 이 코너 재고파일에 없는 상품이 실물로 나왔어요.</div>
         <div class="field"><label>비고</label><input id="countNote" placeholder="예: 다른 코너 상품 섞여옴"></div>
-        <button class="btn btn-outline btn-big" style="width:100%;margin-top:8px;" onclick="submitCount('${esc(barcode)}')">그래도 발견 기록 남기기</button>
+        <button class="btn btn-outline btn-big" style="width:100%;margin-top:8px;" onclick="submitCount('${escJsAttr(barcode)}')">그래도 발견 기록 남기기</button>
       </div>`;
     document.getElementById('countInput').focus();
     return;
@@ -954,7 +956,7 @@ async function onCountSubmit(){
       <div class="meta">사이즈 ${esc(it.size)} · 바코드 ${esc(it.barcode)}</div>
       <div class="qty">전산 예상재고 ${it.cur_qty}개 · 지금까지 확인 ${it.counted_qty}개</div>
       <div class="field"><label>비고</label><input id="countNote" placeholder="선택사항"></div>
-      <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitCount('${esc(barcode)}')">실물 확인 (+1)</button>
+      <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitCount('${escJsAttr(barcode)}')">실물 확인 (+1)</button>
     </div>`;
   document.getElementById('countInput').focus();
 }
