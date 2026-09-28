@@ -548,11 +548,20 @@ function toast(msg, isErr) {
 }
 
 /* ---------------- 다운로드 ---------------- */
+// 원본 BUYEST_MD 양식의 실제 열 배치를 그대로 따른다: K열은 원래도 빈 칸(입력열 A~J와
+// 계산열 L~ 사이 구분용), V열은 '제조일'인데 원본 수식엔 값이 없어 다운로드 시점 날짜로 채운다.
+function todayYYYYMMDD() {
+  const d = new Date();
+  return String(d.getFullYear()) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+}
 const OUT_HEADERS = [
   ['A','사이트 상품명'],['B','사이트 카테고리'],['C','사이트 브랜드명'],['D','사이트 원산지'],['E','상품상태'],
   ['F','필웨이가'],['G','사이트 옵션'],['H','대표 이미지주소(큰이미지)'],['I','상세 설명 이미지주소'],['J','소재'],
+  ['_K',''],
   ['L','상품명'],['M','모델명'],['N','모델NO'],['O','브랜드명'],['P','사이트검색어'],['Q','상품구분'],
-  ['R','마이카테고리'],['S','제조사'],['T','원산지(제조국)'],['U','생산연도'],['W','시즌'],['X','남녀구분'],
+  ['R','마이카테고리'],['S','제조사'],['T','원산지(제조국)'],['U','생산연도'],
+  ['_V','제조일'],
+  ['W','시즌'],['X','남녀구분'],
   ['Y','상품상태'],['Z','판매지역'],['AA','세금구분'],['AB','배송비구분'],['AC','원가'],['AD','판매가'],
   ['AE','TAG가'],['AF','옵션제목(1)'],['AG','옵션상세명칭(1)'],['AH','대표이미지'],['AI','부가이미지6'],
   ['AJ','상품상세설명'],['AK','재고관리사용여부'],['AL','옵션수정여부'],['AM','영문 상품명'],['AN','추가 상품상세설명_1'],
@@ -562,12 +571,16 @@ const OUT_HEADERS = [
   ['BC','속성값13'],['BD','속성값14'],['BE','속성값15'],['BF','속성값16'],
 ];
 function downloadResult() {
+  const stamp = todayYYYYMMDD();
   const aoa = [OUT_HEADERS.map(h => h[1])];
-  for (const r of RESULT_ROWS) aoa.push(OUT_HEADERS.map(h => r[h[0]] ?? ''));
+  for (const r of RESULT_ROWS) aoa.push(OUT_HEADERS.map(h => {
+    if (h[0] === '_K') return '';
+    if (h[0] === '_V') return stamp;
+    return r[h[0]] ?? '';
+  }));
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '사방넷양식');
-  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   XLSX.writeFile(wb, `${srcBase}_사방넷양식_${stamp}.xlsx`);
 }
 </script>
