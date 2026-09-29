@@ -1341,7 +1341,7 @@
           <button class="tool-card" data-nav="invoice">
             <div class="tool-card-top"><div class="ic">&#8618;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>인보이스 자동인식</h3>
-            <p>갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일 인보이스에서 거래처를 자동 인식하고 품목을 추출합니다. 스캔본은 브라우저 안에서 OCR로 처리합니다.</p>
+            <p>갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일·BEAT 인보이스에서 거래처를 자동 인식하고 품목을 추출합니다. 스캔본은 브라우저 안에서 OCR로 처리합니다.</p>
           </button>
           <button class="tool-card" data-nav="galianoProforma">
             <div class="tool-card-top"><div class="ic">&#10003;</div><span class="chip chip-ready">사용가능</span></div>
@@ -1666,9 +1666,9 @@
         <div class="workspace">
           <div class="panel">
             <h2>인보이스 자동인식</h2>
-            <p class="sub">파일명으로 거래처(갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일)를 자동 인식해 품목을 추출합니다. 스캔본 PDF(갈리아노·다니엘·스타일)는 브라우저 안에서 OCR로 텍스트를 읽습니다.</p>
+            <p class="sub">파일명으로 거래처(갈리아노·베네레·비니·쿠미니·다니엘·그루포킴·스타일·BEAT)를 자동 인식해 품목을 추출합니다. 스캔본 PDF(갈리아노·다니엘·스타일)는 브라우저 안에서 OCR로 텍스트를 읽습니다.</p>
             <div class="status-banner status-warn" style="margin-bottom:16px;">
-              <div><strong>스캔본(OCR) 문서는 페이지당 1~5분 이상 걸릴 수 있습니다.</strong> 스캔 방식에 따라 이미지를 해독하는 단계 자체가 원래 무겁습니다 — 진행 표시줄이 같은 페이지에 멈춰 있어도 멈춘 게 아니니 창을 닫지 말고 기다려주세요. 텍스트가 PDF에 이미 있는 베네레·비니·쿠미니·그루포킴은 몇 초 안에 끝납니다.<br><strong>인식 중에는 이 탭을 다른 탭으로 전환하거나 최소화하지 마세요.</strong> 브라우저는 화면에 보이지 않는 탭의 처리 속도를 크게 늦추기 때문에, 창을 백그라운드에 두면 시간이 훨씬 오래 걸리거나 시간 초과로 품목을 놓칠 수 있습니다.</div>
+              <div><strong>스캔본(OCR) 문서는 페이지당 1~5분 이상 걸릴 수 있습니다.</strong> 스캔 방식에 따라 이미지를 해독하는 단계 자체가 원래 무겁습니다 — 진행 표시줄이 같은 페이지에 멈춰 있어도 멈춘 게 아니니 창을 닫지 말고 기다려주세요. 텍스트가 PDF에 이미 있는 베네레·비니·쿠미니·그루포킴·BEAT는 몇 초 안에 끝납니다.<br><strong>인식 중에는 이 탭을 다른 탭으로 전환하거나 최소화하지 마세요.</strong> 브라우저는 화면에 보이지 않는 탭의 처리 속도를 크게 늦추기 때문에, 창을 백그라운드에 두면 시간이 훨씬 오래 걸리거나 시간 초과로 품목을 놓칠 수 있습니다.</div>
             </div>
 
             <div class="dropzone" id="invcDrop" tabindex="0" role="button" aria-label="인보이스 파일 선택">
@@ -3711,7 +3711,8 @@
     var KNOWN_BRANDS = ['MAX MARA','DIOR','BURBERRY','ALAIA','LORO PIANA','CELINE','FENDI',
       'CHLOE','GUCCI','PRADA','VALENTINO','VERSACE','MONCLER','BALENCIAGA',
       'SAINT LAURENT','BOTTEGA VENETA','GIVENCHY','MIU MIU','FERRAGAMO',
-      'BIRKENSTOCK','THE ANIMAL OBSERVATORY','VIVIENNE WESTWOOD'];
+      'BIRKENSTOCK','THE ANIMAL OBSERVATORY','VIVIENNE WESTWOOD',
+      'STONE ISLAND','BRUNELLO CUCINELLI','HERNO','ROGER VIVIER','ISSEY MIYAKE'];
     function guessBrand(desc){
       desc = desc || '';
       var du = desc.toUpperCase();
@@ -3910,6 +3911,46 @@
       return items;
     }
 
+    // BEAT: 한 줄 = "코드 설명... 국가 사이즈 수량 단가€ 금액€ N.I." (실측 완료, 2026-09-29).
+    // 국가/사이즈는 고정폭이 아니라서 정규식으로 통째로 못 쪼개고, 이미 있는 COUNTRY_WORDS로
+    // 국가를 찾아 그 뒤를 사이즈로 취급한다(국가를 못 찾으면 마지막 토큰만 사이즈로 취급).
+    // "수량"은 non-greedy 설명부(rest)가 "국가 사이즈"까지 저절로 삼키게 돼 있다 - rest 바로
+    // 뒤에 와야 하는 숫자 두 개(수량, 단가)가 "€"로 끝나는 조합으로 맞아떨어지는 지점을
+    // 정규식 엔진이 스스로 찾아가기 때문에, 사이즈에 "36½"처럼 순수 숫자가 아닌 문자가 섞여도
+    // (수량/단가 자리로 오인되지 못하고 rest에 남아) 안전하다.
+    var BEAT_HDR_PAT = /^(\S+)\s+(.+?)\s+([\d.,]+)\s+([\d.,]+)\s*€\s*([\d.,]+)\s*€\s*N\.I\.\s*$/;
+    function parseBeat(pagesLines){
+      var items = [];
+      pagesLines.forEach(function(lines){
+        for(var i=0;i<lines.length;i++){
+          var m = BEAT_HDR_PAT.exec(lines[i].trim());
+          if(!m) continue;
+          var code = m[1], rest = m[2], qty = numIt(m[3]), priceF = numIt(m[4]);
+          var country = findCountryInText(rest);
+          var desc = rest, size = '';
+          if(country){
+            var idx = rest.toUpperCase().lastIndexOf(country);
+            desc = rest.slice(0, idx).trim();
+            size = rest.slice(idx + country.length).trim();
+          } else {
+            var toks = rest.split(/\s+/);
+            size = toks.pop();
+            desc = toks.join(' ');
+          }
+          // 이어지는 소재%/Customs Code 줄은 실측상 항상 딱 1줄이라 1줄만 본다(2줄까지
+          // 보면 페이지 마지막 품목에서 안내문구까지 삼켜버리는 문제가 있었음).
+          var buf = [], j = i+1;
+          if(j < lines.length && !BEAT_HDR_PAT.test(lines[j].trim())){
+            buf.push(lines[j].trim()); j++;
+          }
+          var fullDesc = (desc + ' ' + buf.join(' ').split('Customs')[0]).trim();
+          items.push({model:code, name: fullDesc + (size ? ' (' + size + ')' : ''), qty:Math.round(qty), unitPrice:priceF, note:country, brand:guessBrand(fullDesc)});
+          i = j - 1;
+        }
+      });
+      return items;
+    }
+
     // 국가명은 UNITED KINGDOM처럼 두 단어일 수 있어 공백 포함 허용.
     // MADE IN 이후: 수량/단가 사이에 OCR 잡음(스캔 표 경계선 등으로 생긴 떠있는 "." 같은 글자)이
     // 낄 수 있다고 보고 건너뛰되, 반드시 공백으로 시작하게 해서 "148.28"(수량 없이 단가만 있는 줄)의
@@ -4077,7 +4118,8 @@
       '스타일': {label:'STYLE', ocr:true, ext:['.pdf']},
       '다니엘': {label:'DANIEL', ocr:true, ext:['.pdf']},
       '그루포킴': {label:'GRUPPO KIM', ocr:false, ext:['.pdf']},
-      '그로포킴': {label:'GRUPPO KIM', ocr:false, ext:['.pdf']}
+      '그로포킴': {label:'GRUPPO KIM', ocr:false, ext:['.pdf']},
+      'BEAT': {label:'BEAT', ocr:false, ext:['.pdf']}
     };
     var VENDOR_KEYS = Object.keys(VENDOR_PARSERS);
     function detectVendor(filename){
@@ -4384,6 +4426,7 @@
       else if(vendorKey === '비니') items = parseBini(pagesLines);
       else if(vendorKey === '스타일') items = parseStyle(pagesLines);
       else if(vendorKey === '다니엘') items = parseDaniel(pagesLines);
+      else if(vendorKey === 'BEAT') items = parseBeat(pagesLines);
       else items = parseGruppoKim(pagesLines);
       var stem2 = file.name.replace(/\.[^.]+$/, '');
       if(extracted.timedOutPages.length){
@@ -4750,6 +4793,7 @@
         else if(vendorKey === '비니') return parseBini(pagesLines);
         else if(vendorKey === '스타일') return parseStyle(pagesLines);
         else if(vendorKey === '다니엘') return parseDaniel(pagesLines);
+        else if(vendorKey === 'BEAT') return parseBeat(pagesLines);
         else return parseGruppoKim(pagesLines);
       },
       lastInvoiceEntries: function(){ return invcFiles; },
