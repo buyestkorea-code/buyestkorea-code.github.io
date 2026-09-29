@@ -224,6 +224,9 @@ function buildConverter(ref) {
     if (R.includes('>04>')) return '신발';
     return '';
   }
+  // 상품명은 보통 "...설명... 색상 모델코드" 순서라 색상은 모델코드 바로 앞, 즉 맨 뒤쪽에 온다.
+  // "골드 하트 와펜 패치 티셔츠 블랙 AX-..."처럼 설명 중간에 다른 색상 단어가 섞여 있을 수 있으니,
+  // 여러 개가 매칭되면 길이가 아니라 텍스트에서 더 뒤(모델코드에 더 가까운 쪽)에 있는 걸 우선한다.
   function colorValue(A) {
     if (!A) return '';
     const t = A.slice(-40).toUpperCase();
@@ -231,9 +234,13 @@ function buildConverter(ref) {
     for (const row of colorMap) {
       const before = String(row.before_color || '').toUpperCase();
       if (!before) continue;
-      const re = new RegExp('(^|[^A-Z가-힣])' + escRe(before) + '([^A-Z가-힣]|$)', 'i');
-      if (re.test(t) && (!best || before.length > best.beforeLen)) {
-        best = { before: row.before_color, after: row.after_color, beforeLen: before.length };
+      const re = new RegExp('(^|[^A-Z가-힣])(' + escRe(before) + ')([^A-Z가-힣]|$)', 'i');
+      const m = re.exec(t);
+      if (m) {
+        const idx = m.index + m[1].length;
+        if (!best || idx > best.idx || (idx === best.idx && before.length > best.beforeLen)) {
+          best = { before: row.before_color, after: row.after_color, beforeLen: before.length, idx };
+        }
       }
     }
     if (!best) return '';
