@@ -2628,7 +2628,10 @@
         }
         if(IS_ADMIN){
           var del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '×'; del.setAttribute('aria-label','삭제');
-          del.addEventListener('click', function(){ api('cal_del',{id:it.id}).then(function(r){ if(r&&r.ok){ loadCal().then(function(){ openDayPanel(dstr); }); } else alert((r&&r.error)||'삭제 실패'); }); });
+          del.addEventListener('click', function(){
+            if(!confirm('"' + it.title + '" 일정을 삭제할까요? 되돌릴 수 없어요.')) return;
+            api('cal_del',{id:it.id}).then(function(r){ if(r&&r.ok){ loadCal().then(function(){ openDayPanel(dstr); }); } else alert((r&&r.error)||'삭제 실패'); });
+          });
           li.appendChild(del);
         }
         dayPanelList.appendChild(li);
