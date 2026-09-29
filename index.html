@@ -3944,7 +3944,7 @@
             buf.push(lines[j].trim()); j++;
           }
           var fullDesc = (desc + ' ' + buf.join(' ').split('Customs')[0]).trim();
-          items.push({model:code, name: fullDesc + (size ? ' (' + size + ')' : ''), qty:Math.round(qty), unitPrice:priceF, note:country, brand:guessBrand(fullDesc)});
+          items.push({model:code, name: fullDesc, size: size, qty:Math.round(qty), unitPrice:priceF, note:country, brand:guessBrand(fullDesc)});
           i = j - 1;
         }
       });
@@ -4512,7 +4512,7 @@
 
       var table = document.getElementById('invcTable');
       table.innerHTML = '';
-      var cols = ['인보이스','BRAND','MODEL','품명','QTY','UNIT PRICE','합계','비고(원산지 등)'];
+      var cols = ['인보이스','BRAND','MODEL','품명','사이즈','QTY','UNIT PRICE','합계','비고(원산지 등)'];
       var thead = el('thead'); var htr = el('tr');
       cols.forEach(function(c){ htr.appendChild(el('th', (c==='QTY'||c==='UNIT PRICE'||c==='합계') ? {class:'num'} : null, [document.createTextNode(c)])); });
       thead.appendChild(htr); table.appendChild(thead);
@@ -4528,6 +4528,7 @@
           tr.appendChild(td(it.brand, true));
           tr.appendChild(td(it.model, true));
           tr.appendChild(td(it.name, true));
+          tr.appendChild(td(it.size, true));
           tr.appendChild(td(it.qty, true, true));
           tr.appendChild(td(it.unitPrice, true, true));
           tr.appendChild(td(Math.round(it.qty*it.unitPrice*100)/100, false, true));
@@ -4641,6 +4642,154 @@
       }
       invTplNormalizeBlockFormulas(doc, rowIdx, block);
     }
+
+    /* ---- 인보이스 사이즈표(가로 매트릭스) 변환 ----
+       BEAT처럼 파싱 단계에서 사이즈를 뽑아낸 벤더(item.size가 있는 항목)에 한해서, 같은
+       모델(+단가)의 여러 사이즈 줄을 한 줄로 합치고 사이즈별 수량을 열에 뿌린다.
+       item.size가 아예 없는 벤더(기존 벤더 전부)는 이 경로를 타지 않고 invTplFillBlock
+       그대로 쓴다 - 기존 동작 변경 없음. */
+    var BEAT_LETTER_SCALE = ['XXS','XS','S','M','L','XL','XXL','XXXL','XXXXL'];
+    function sizeColType(sizeStr){
+      var s = String(sizeStr||'').trim();
+      if(!s) return 'tu';
+      var su = s.toUpperCase();
+      if(su==='UNI'||su==='TU'||su==='OS'||su==='ONE SIZE'||su==='FREE') return 'tu';
+      if(BEAT_LETTER_SCALE.indexOf(su)!==-1) return 'letter';
+      if(/½/.test(s) || /\.5$/.test(s)) return 'shoe';
+      if(/^\d+$/.test(s)) return (parseInt(s,10) <= 9) ? 'small' : 'clothing';
+      return 'other';
+    }
+    // 실제 사용치를 감싸는 "표준 런"을 고른다 - 정확한 폭을 되짚어낼 규칙은 없어서(참고
+    // 자료에도 같은 브랜드/카테고리인데 폭이 제각각인 경우가 있었음) 여성/일반 34~50,
+    // 남성/아우터처럼 더 큰 사이즈가 필요하면 34~58 두 갈래만 쓴다. 잘못 골랐으면 다운로드
+    // 전 미리보기 표에서 사이즈 셀을 고쳐서 재생성하면 된다.
+    function sizeScaleFor(type, actualSizes){
+      if(type==='letter') return BEAT_LETTER_SCALE.slice();
+      if(type==='small'){
+        var maxN = 4;
+        actualSizes.forEach(function(s){ maxN = Math.max(maxN, parseInt(s,10)||0); });
+        var arr=[]; for(var i=0;i<=maxN;i++) arr.push(i);
+        return arr;
+      }
+      if(type==='clothing'){
+        var maxC = 0;
+        actualSizes.forEach(function(s){ maxC = Math.max(maxC, parseInt(s,10)||0); });
+        var top = maxC<=50 ? 50 : 58;
+        var arr2=[]; for(var v=34; v<=top; v+=2) arr2.push(v);
+        return arr2;
+      }
+      // shoe/other: 실제 쓰인 값만 그대로(중복 제거, 자연스러운 순서로 정렬)
+      var uniq = [];
+      actualSizes.forEach(function(s){ if(uniq.indexOf(s)===-1) uniq.push(s); });
+      uniq.sort(function(a,b){
+        var na = parseFloat(String(a).replace('½','.5')), nb = parseFloat(String(b).replace('½','.5'));
+        if(!isNaN(na) && !isNaN(nb)) return na-nb;
+        return String(a).localeCompare(String(b));
+      });
+      return uniq;
+    }
+    function groupInvoiceItemsForMatrix(items){
+      var groups = [], byKey = {};
+      items.forEach(function(it){
+        var key = it.model + '@' + it.unitPrice;
+        var g = byKey[key];
+        if(!g){
+          g = { brand: it.brand, model: it.model, unitPrice: it.unitPrice, note: it.note, name: it.name, sizes: {}, type: null };
+          byKey[key] = g; groups.push(g);
+        }
+        var t = sizeColType(it.size);
+        if(g.type === null || g.type === 'tu') g.type = t;
+        var sizeKey = (t==='tu') ? 'TU' : String(it.size).trim();
+        g.sizes[sizeKey] = (g.sizes[sizeKey] || 0) + (it.qty||0);
+      });
+      groups.forEach(function(g){
+        g.totalQty = 0;
+        Object.keys(g.sizes).forEach(function(k){ g.totalQty += g.sizes[k]; });
+        if(g.type !== 'tu'){
+          g.scale = sizeScaleFor(g.type, Object.keys(g.sizes));
+          g.scaleKey = g.type + ':' + g.scale.join(',');
+        }
+      });
+      return groups;
+    }
+    function matrixExtraHeaderRows(groups){
+      var extra = 0, activeKey = null, established = false;
+      groups.forEach(function(g){
+        if(g.type === 'tu') return;
+        if(!established){ activeKey = g.scaleKey; established = true; }
+        else if(g.scaleKey !== activeKey){ extra++; activeKey = g.scaleKey; }
+      });
+      return extra;
+    }
+    var INV_TAIL_LABELS = {23:'TOTAL',24:'UNIT PRICE',25:'EXTENDED PRICE ',26:'시즌',27:'작업여부',28:'원산지',29:'소재',30:'비고',31:'비고'};
+    function invTplWriteHeaderRow(doc, rowEl, scale){
+      setCellText(doc, rowEl, 1, 'BRAND');
+      setCellText(doc, rowEl, 2, 'BRAND');
+      setCellText(doc, rowEl, 3, 'INV. QTY');
+      setCellText(doc, rowEl, 4, 'MODEL');
+      setCellText(doc, rowEl, 5, 'TU');
+      for(var c=6;c<=22;c++) setCellText(doc, rowEl, c, '');
+      if(scale){
+        scale.forEach(function(v, i){
+          var col = 6+i;
+          if(col>22) return;
+          if(typeof v === 'number') setCellNumber(doc, rowEl, col, v);
+          else setCellText(doc, rowEl, col, v);
+        });
+      }
+      Object.keys(INV_TAIL_LABELS).forEach(function(c){ setCellText(doc, rowEl, parseInt(c,10), INV_TAIL_LABELS[c]); });
+    }
+    function invTplWriteMatrixDataRow(doc, rowEl, g){
+      setCellText(doc, rowEl, 1, g.brand || '');
+      setCellText(doc, rowEl, 2, g.brand || '');
+      setCellNumber(doc, rowEl, 3, g.totalQty);
+      setCellText(doc, rowEl, 4, g.model);
+      if(g.type === 'tu'){
+        setCellNumber(doc, rowEl, 5, g.totalQty);
+      } else {
+        g.scale.forEach(function(v,i){
+          var col = 6+i;
+          if(col>22) return;
+          var qty = g.sizes[String(v)];
+          if(qty) setCellNumber(doc, rowEl, col, qty);
+        });
+      }
+      setCellNumber(doc, rowEl, 24, g.unitPrice);
+      setCellText(doc, rowEl, 28, g.note || '');
+      setCellText(doc, rowEl, 31, g.name || '');
+    }
+    function invTplFillBlockMatrix(doc, rowIdx, block, titleText, groups){
+      setCellText(doc, rowIdx[block.titleRow], 1, titleText);
+      var sheetData = doc.getElementsByTagName('sheetData')[0];
+      var r = block.itemStart, first = true, activeScaleKey = null;
+      var dataRows = [];
+      groups.forEach(function(g){
+        var needsHeader = g.type !== 'tu' && g.scaleKey !== activeScaleKey;
+        if(first){
+          invTplWriteHeaderRow(doc, rowIdx[block.headerRow], g.type !== 'tu' ? g.scale : null);
+          if(g.type !== 'tu') activeScaleKey = g.scaleKey;
+          first = false;
+        } else if(needsHeader){
+          var newHeaderRow = invTplCopyRowStyle(rowIdx, block.headerRow, r);
+          sheetData.replaceChild(newHeaderRow, rowIdx[r]);
+          rowIdx[r] = newHeaderRow;
+          invTplWriteHeaderRow(doc, newHeaderRow, g.scale);
+          activeScaleKey = g.scaleKey;
+          r++;
+        }
+        invTplWriteMatrixDataRow(doc, rowIdx[r], g);
+        dataRows.push(r);
+        r++;
+      });
+      dataRows.forEach(function(rn){
+        setCellFormula(doc, rowIdx[rn], 23, 'SUM(E'+rn+':V'+rn+')');
+        setCellFormula(doc, rowIdx[rn], 25, 'X'+rn+'*W'+rn);
+      });
+      var s = block.itemStart, e = block.itemEnd;
+      setCellFormula(doc, rowIdx[block.sumRow], 3, 'SUM(C'+s+':C'+e+')');
+      setCellFormula(doc, rowIdx[block.sumRow], 23, 'SUM(W'+s+':W'+e+')');
+      setCellFormula(doc, rowIdx[block.sumRow], 25, 'SUM(Y'+s+':Y'+e+')');
+    }
     function invTplCopyRowStyle(rowIdx, srcRowNum, dstRowNum){
       var srcEl = rowIdx[srcRowNum];
       var newRow = srcEl.cloneNode(true);
@@ -4696,12 +4845,22 @@
       block.capacity += extra;
     }
     function invTplFillInvoices(doc, sharedStrings, invoices){
-      var order = invoices.map(function(_,i){ return i; }).sort(function(a,b){ return invoices[b].items.length - invoices[a].items.length; });
+      // item.size를 가진 벤더(현재 BEAT)만 사이즈표(매트릭스) 경로를 타고, size가 전혀
+      // 없는 기존 벤더는 invTplFillBlock 그대로 - 동작 변경 없음.
+      var plans = invoices.map(function(inv){
+        var hasSize = inv.items.some(function(it){ return it.size; });
+        if(!hasSize) return { matrix:false, n: inv.items.length };
+        var groups = groupInvoiceItemsForMatrix(inv.items);
+        var n = groups.length + matrixExtraHeaderRows(groups);
+        return { matrix:true, groups:groups, n:n };
+      });
+      var order = invoices.map(function(_,i){ return i; }).sort(function(a,b){ return plans[b].n - plans[a].n; });
       var usedIdx = {};
       var report = [];
       order.forEach(function(idx){
         var inv = invoices[idx];
-        var n = inv.items.length;
+        var plan = plans[idx];
+        var n = plan.n;
         var blocks = invTplFindBlocks(doc, sharedStrings);
         var rowIdx = buildRowIndexSE(doc);
         var availableIdx = [];
@@ -4722,7 +4881,8 @@
           invTplExpandBlock(doc, block, n - block.capacity);
           rowIdx = buildRowIndexSE(doc);
         }
-        invTplFillBlock(doc, rowIdx, block, inv.title, inv.items);
+        if(plan.matrix) invTplFillBlockMatrix(doc, rowIdx, block, inv.title, plan.groups);
+        else invTplFillBlock(doc, rowIdx, block, inv.title, inv.items);
         usedIdx[chosen] = true;
         report[idx] = {title:inv.title, n:n, status:'OK'};
       });
@@ -4769,7 +4929,11 @@
       var parsed = parseSheetSE(sheetXml, sharedStrings);
       var doc = parsed.doc;
       var report = invTplFillInvoices(doc, sharedStrings, invoices);
-      invTplNormalizeAllFormulas(doc, sharedStrings);
+      // (예전엔 여기서 invTplNormalizeAllFormulas로 전체를 한 번 더 정규화했는데, 그게
+      // invTplFindBlocks로 전체를 다시 스캔하면서 사이즈표 매트릭스가 블록 중간에 삽입한
+      // 헤더 행들을 "새 블록"으로 오인식해 합계 수식 범위를 엉뚱하게 덮어쓰는 버그가 있었다.
+      // invTplFillBlock/invTplFillBlockMatrix가 각자 채운 블록의 수식을 이미 정규화하므로
+      // 안 써도 된다 - 실측으로 확인함, 2026-09-29.)
       updateDimensionSE(doc);
       var serialized = new XMLSerializer().serializeToString(doc);
       if (serialized.indexOf('<?xml') !== 0) serialized = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + serialized;
@@ -4815,7 +4979,8 @@
         if (!byTitle[title]){ byTitle[title] = []; order.push(title); }
         byTitle[title].push({
           brand: cells[1].textContent, model: cells[2].textContent, name: cells[3].textContent,
-          qty: safeNumber(cells[4].textContent), unitPrice: safeNumber(cells[5].textContent), note: cells[7].textContent
+          size: cells[4].textContent.trim(),
+          qty: safeNumber(cells[5].textContent), unitPrice: safeNumber(cells[6].textContent), note: cells[8].textContent
         });
       });
       var invoices = order.map(function(t){ return {title:t, items: byTitle[t]}; });
@@ -4825,11 +4990,11 @@
       try{
         var result = await buildInvoiceTemplateFile(invoices);
         var noSpace = result.report.filter(function(r){ return r.status !== 'OK'; });
-        var header = ['INVOICE','BRAND','MODEL','NAME','QTY','UNIT PRICE','AMOUNT','NOTE'];
+        var header = ['INVOICE','BRAND','MODEL','NAME','SIZE','QTY','UNIT PRICE','AMOUNT','NOTE'];
         var aoa = [header];
         invoices.forEach(function(inv){
           inv.items.forEach(function(it){
-            aoa.push([inv.title, it.brand, it.model, it.name, it.qty, it.unitPrice, Math.round(it.qty*it.unitPrice*100)/100, it.note]);
+            aoa.push([inv.title, it.brand, it.model, it.name, it.size, it.qty, it.unitPrice, Math.round(it.qty*it.unitPrice*100)/100, it.note]);
           });
         });
         deliverFile({
