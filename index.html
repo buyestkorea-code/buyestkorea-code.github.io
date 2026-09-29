@@ -2521,7 +2521,11 @@
     function loadCal(){
       var from = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1); from.setDate(from.getDate()-7);
       var to = new Date(calMonth.getFullYear(), calMonth.getMonth()+1, 0); to.setDate(to.getDate()+7);
-      api('cal_list', {from:ymd(from), to:ymd(to)}).then(function(res){
+      // 호출부에서 loadCal().then(...)으로 최신 calItems가 반영된 뒤에 이어서 처리할 수
+      // 있도록 항상 프라미스를 반환한다(예: 삭제 후 하루보기 팝업을 다시 열 때 옛날
+      // 목록으로 여는 걸 막기 위함 — 예전엔 loadCal()이 끝나길 기다리지 않고 바로
+      // openDayPanel을 불러서, 지운 항목이 팝업에 그대로 남아있는 것처럼 보였다).
+      return api('cal_list', {from:ymd(from), to:ymd(to)}).then(function(res){
         if(res && res.ok){ calItems = res.items || []; renderCal(); renderAgenda(); }
       }).catch(function(){});
     }
@@ -2563,11 +2567,19 @@
           ev.style.background = 'var(--k-' + it.kind + '-bg)';
           var t = document.createElement('span'); t.className='t'; t.textContent = it.title;
           ev.appendChild(t);
-          // 삭제는 관리자만(아래 하루보기 팝업에서). 본인 글이거나 관리자면 클릭해서 바로 수정.
+          // 삭제는 관리자만 가능한데, "+N개 더보기"가 없는 날(일정 3개 이하)은 하루보기
+          // 팝업으로 갈 방법이 아예 없어서 관리자가 삭제를 못 하는 문제가 있었다.
+          // 관리자는 일정 개수와 상관없이 칩을 클릭하면 항상 하루보기 팝업(수정·삭제 둘 다
+          // 가능)으로 열리게 하고, 본인 글인 일반 직원은 기존처럼 바로 수정 폼이 열린다.
           if(it.author === (AUTH && AUTH.id) || IS_ADMIN){
             ev.classList.add('editable');
-            ev.title = '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title + ' — 클릭하면 수정';
-            ev.addEventListener('click', function(e2){ e2.stopPropagation(); openCalPanel(it.day, it); });
+            if(IS_ADMIN){
+              ev.title = '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title + ' — 클릭하면 수정·삭제';
+              ev.addEventListener('click', function(e2){ e2.stopPropagation(); openDayPanel(it.day); });
+            } else {
+              ev.title = '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title + ' — 클릭하면 수정';
+              ev.addEventListener('click', function(e2){ e2.stopPropagation(); openCalPanel(it.day, it); });
+            }
           } else {
             ev.title = '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title;
           }
@@ -2616,7 +2628,7 @@
         }
         if(IS_ADMIN){
           var del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '×'; del.setAttribute('aria-label','삭제');
-          del.addEventListener('click', function(){ api('cal_del',{id:it.id}).then(function(r){ if(r&&r.ok){ loadCal(); openDayPanel(dstr); } else alert((r&&r.error)||'삭제 실패'); }); });
+          del.addEventListener('click', function(){ api('cal_del',{id:it.id}).then(function(r){ if(r&&r.ok){ loadCal().then(function(){ openDayPanel(dstr); }); } else alert((r&&r.error)||'삭제 실패'); }); });
           li.appendChild(del);
         }
         dayPanelList.appendChild(li);
