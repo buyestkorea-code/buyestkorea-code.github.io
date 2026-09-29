@@ -229,7 +229,8 @@ function buildConverter(ref) {
   // 여러 개가 매칭되면 길이가 아니라 텍스트에서 더 뒤(모델코드에 더 가까운 쪽)에 있는 걸 우선한다.
   function colorValue(A) {
     if (!A) return '';
-    const t = A.slice(-40).toUpperCase();
+    const tOrig = A.slice(-40);
+    const t = tOrig.toUpperCase();
     let best = null;
     for (const row of colorMap) {
       const before = String(row.before_color || '').toUpperCase();
@@ -239,12 +240,25 @@ function buildConverter(ref) {
       if (m) {
         const idx = m.index + m[1].length;
         if (!best || idx > best.idx || (idx === best.idx && before.length > best.beforeLen)) {
-          best = { before: row.before_color, after: row.after_color, beforeLen: before.length, idx };
+          best = { before: row.before_color, after: row.after_color, beforeLen: before.length, idx, end: idx + before.length };
         }
       }
     }
     if (!best) return '';
-    return best.after || best.before;
+    let result = best.after || best.before;
+
+    // "블랙/칼리코"처럼 슬래시로 이어붙은 두 번째(또는 앞쪽) 색상은 참조표에 없어도 그대로 인정한다.
+    const TOKEN = /^[가-힣A-Za-z0-9]+/;
+    if (tOrig[best.end] === '/') {
+      const m2 = TOKEN.exec(tOrig.slice(best.end + 1));
+      if (m2) result += '/' + m2[0];
+    }
+    if (tOrig[best.idx - 1] === '/') {
+      const before = tOrig.slice(0, best.idx - 1);
+      const m3 = /[가-힣A-Za-z0-9]+$/.exec(before);
+      if (m3) result = m3[0] + '/' + result;
+    }
+    return result;
   }
   function materialAttr(J) {
     if (!J) return '';
