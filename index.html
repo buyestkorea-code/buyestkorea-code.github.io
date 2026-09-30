@@ -1609,7 +1609,7 @@
 
       <!-- ============ BARCODE STOCK LOOKUP ============ -->
       <section data-view="barcodeStock">
-        <iframe src="barcode-stock.html" title="바코드 재고조회" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <iframe data-src="barcode-stock.html" title="바코드 재고조회" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <!-- ============ SABANGNET ORDER TRANSFORM + STOCK MATCH ============ -->
@@ -1703,15 +1703,15 @@
       </section>
 
       <section data-view="stockAddConvert">
-        <iframe src="stock-add-convert.html" title="재고추가변환" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <iframe data-src="stock-add-convert.html" title="재고추가변환" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <section data-view="sabangBaseregi">
-        <iframe src="sabang-baseregi.html" title="사방넷 기초등록" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <iframe data-src="sabang-baseregi.html" title="사방넷 기초등록" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <section data-view="eventPos">
-        <iframe src="pos.html" title="행사 POS" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <iframe data-src="pos.html" title="행사 POS" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <section data-view="miniChat">
@@ -1719,29 +1719,29 @@
       </section>
 
       <section data-view="productCard">
-        <iframe src="product-card.html" title="상품 카드 이미지" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <iframe data-src="product-card.html" title="상품 카드 이미지" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <section data-view="galianoProforma">
-        <iframe src="galiano-proforma-excel.html" title="갈리아노양식 변경" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <iframe data-src="galiano-proforma-excel.html" title="갈리아노양식 변경" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <!-- ============ STUDIO ============ -->
       <section data-view="buyestSoldOut">
-        <iframe src="ecount-sync-delta.html" title="바이스트사이트 품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <iframe data-src="ecount-sync-delta.html" title="바이스트사이트 품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
 
       <section data-view="seasonSoldOut">
-        <iframe src="season-soldout.html" title="바이스트사이트 시즌품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <iframe data-src="season-soldout.html" title="바이스트사이트 시즌품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <section data-view="stockMismatch">
-        <iframe src="stock-mismatch.html" title="이카운트-사이트 재고 불일치 확인" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <iframe data-src="stock-mismatch.html" title="이카운트-사이트 재고 불일치 확인" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <section data-view="kreamSoldOut">
-        <iframe src="kream-soldout.html" title="크림 품절 정리" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <iframe data-src="kream-soldout.html" title="크림 품절 정리" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <!-- ============ ROADMAP ============ -->
@@ -1917,6 +1917,15 @@
     document.querySelectorAll('[data-view]').forEach(function(el){
       el.classList.toggle('active', el.getAttribute('data-view') === name);
     });
+    // 도구 화면(iframe)은 처음 그 메뉴를 열 때 딱 한 번만 불러온다. 예전엔 모든 iframe이
+    // src를 미리 갖고 있어서, 대시보드를 여는 순간 10개 도구 페이지(+각자의 pdf.js/xlsx.js
+    // 등)가 전부 한꺼번에 로드돼 접속 자체가 무거웠다 — data-src로 바꿔두고 실제로 그
+    // 메뉴를 클릭했을 때만 src를 채워 넣는다(한 번 채우면 그대로 유지, 다시 안 지움).
+    var activeSection = document.querySelector('[data-view="' + name + '"]');
+    if(activeSection){
+      var lazyFrame = activeSection.querySelector('iframe[data-src]');
+      if(lazyFrame){ lazyFrame.src = lazyFrame.getAttribute('data-src'); lazyFrame.removeAttribute('data-src'); }
+    }
     document.querySelectorAll('.nav-item[data-nav]').forEach(function(el){
       el.classList.toggle('active', el.getAttribute('data-nav') === name);
     });
