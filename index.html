@@ -4928,12 +4928,18 @@
       var sheetXml = toText(zip.files[sheetPath]);
       var parsed = parseSheetSE(sheetXml, sharedStrings);
       var doc = parsed.doc;
+      // 원본 템플릿은 엑셀의 "공유 수식"(하나의 셀에만 수식 전체가 있고 나머지는 그 셀을
+      // si로 참조)으로 저장돼 있다. 아무것도 안 채운 상태에서 지금 먼저 전체 블록을
+      // 정규화해 모든 칸을 "그 줄 번호가 그대로 박힌 독립 수식"으로 풀어둬야 한다 - 나중에
+      // invTplFillInvoices가 블록 중간에 새 헤더 행을 끼워넣거나 특정 줄만 골라 덮어쓰면,
+      // 공유 수식 그룹 중 일부 칸만 사라지면서 나머지가 존재하지 않는 원본을 참조하게 돼
+      // 엑셀이 "읽을 수 없는 내용" 경고를 띄우며 그 공유 수식 레코드를 통째로 제거해버린다
+      // (2026-09-30 실사용자가 다운로드한 파일에서 실제로 재현됨 - BEAT뿐 아니라 예전부터
+      // 있던 문제였음). 채워질 블록이 어디인지 모르는 지금(아직 아무것도 안 채운 원본)
+      // 시점에 전체를 한 번에 풀어두면, invTplFindBlocks가 내가 나중에 끼워넣은 헤더 행을
+      // "새 블록"으로 오인식할 걱정 없이 안전하게 돈다.
+      invTplNormalizeAllFormulas(doc, sharedStrings);
       var report = invTplFillInvoices(doc, sharedStrings, invoices);
-      // (예전엔 여기서 invTplNormalizeAllFormulas로 전체를 한 번 더 정규화했는데, 그게
-      // invTplFindBlocks로 전체를 다시 스캔하면서 사이즈표 매트릭스가 블록 중간에 삽입한
-      // 헤더 행들을 "새 블록"으로 오인식해 합계 수식 범위를 엉뚱하게 덮어쓰는 버그가 있었다.
-      // invTplFillBlock/invTplFillBlockMatrix가 각자 채운 블록의 수식을 이미 정규화하므로
-      // 안 써도 된다 - 실측으로 확인함, 2026-09-29.)
       updateDimensionSE(doc);
       var serialized = new XMLSerializer().serializeToString(doc);
       if (serialized.indexOf('<?xml') !== 0) serialized = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + serialized;
