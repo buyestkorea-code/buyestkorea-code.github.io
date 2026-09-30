@@ -259,11 +259,25 @@ document.getElementById('listFile').addEventListener('change', async e => {
 // 그 다음, 맨 앞의 "행_"/"부_"/"백_" 같은 매장 진열구역 표시(한글+언더스코어)는 실제 스타일코드가 아니라
 // 이 리스트에서만 쓰는 분류 태그라 사이트 상품검색과 전혀 안 맞는다 — 이것도 떼어내야 검색이 된다
 // (실측: "행_2619971021 001"로 검색하면 0건, "2619971021 001"로 검색하면 정상 매칭 — 2026-09-28 확인).
+//
+// ⚠️ 순서가 중요하다 (2026-09-30 사고): 반드시 "구역태그 제거 → 그 다음 남은 언더스코어를 사이즈로 판단" 순서여야 한다.
+// 리스트 파일에 따라 품목명에 사이즈가 아예 없는 경우가 있다(예: "행_1A107 00 53029 776").
+// 이때 마지막 언더스코어부터 자르면 태그 뒤 스타일코드 전체가 "사이즈"로 오인돼 잘려나가고 "행" 한 글자만 남는다.
+// 그러면 서버에 "행"이 전송돼 모든 바코드가 같은 엉뚱한 검색을 하고 이카운트 호출만 낭비한다(→ 412 차단의 한 원인).
+//   "행_1A107 00 53029 776" → "1A107 00 53029 776"   (사이즈 없음)
+//   "행_2619971021 001_L"   → "2619971021 001"        (사이즈 있음)
+//   "4078604_27"            → "4078604"
 function extractStyleCode(name) {
-  const s = S(name);
-  const us = s.lastIndexOf('_');
-  const core = (us >= 0 ? s.slice(0, us) : s).trim();
-  return core.replace(/^[가-힣]+_/, '').trim();
+  let s = S(name).trim().replace(/^[가-힣]+_/, '');   // ① 구역태그 먼저 제거
+  const us = s.lastIndexOf('_');                       // ② 남은 밑줄이 있을 때만 그 뒤를 사이즈로 취급
+  return (us >= 0 ? s.slice(0, us) : s).trim();
+}
+
+// 서버(이카운트)로 보내도 되는 스타일코드인지 사전 검사. 잘못된 값이 이카운트 호출까지 가지 않도록 한다.
+// (영문/숫자가 하나도 없거나 너무 짧으면 — 예: "행" — 조회하지 않는다.)
+function isValidStyleCode(code) {
+  const c = S(code);
+  return c.length >= 4 && /[0-9A-Za-z]/.test(c);
 }
 
 // ---- 카메라 스캔 (html5-qrcode) ----
@@ -349,11 +363,19 @@ async function lookup(raw) {
 
   showLoading(styleCode, name);
   try {
+    // 스타일코드를 못 뽑았으면 서버(이카운트)로 보내지 않는다 — 불필요한 호출이 쌓이면 이카운트가 412로 차단한다.
+    if (!isValidStyleCode(styleCode)) {
+      throw new Error('스타일코드를 읽지 못했어요. 리스트의 품목명 형식을 확인해주세요.');
+    }
     const res = await fetch(API_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ style_code: styleCode })
     });
-    const data = await res.json();
+    // res.json() 을 바로 쓰면 서버가 빈 응답을 줄 때 "Unexpected end of JSON input" 이라는 알아보기 힘든 오류가 난다.
+    const txt = await res.text();
+    let data = null;
+    try { data = JSON.parse(txt); } catch (e) {}
+    if (!data) throw new Error(txt.trim() ? '서버 응답을 해석하지 못했어요.' : '서버가 빈 응답을 보냈어요. 잠시 후 다시 시도해주세요.');
     if (!data.ok) throw new Error(data.error || '서버 오류');
     renderItems(styleCode, name, data.items || [], data.truncated);
     addHistory(styleCode, name, data.items || [], null);
