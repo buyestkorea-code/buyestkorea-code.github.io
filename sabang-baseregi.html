@@ -481,6 +481,31 @@ function closeFixPop() {
   document.getElementById('fixPop').style.display = 'none';
 }
 
+// 성별별로 이미 등록된 카테고리(최종코드) 목록을 라벨 기준 중복 제거해서 돌려준다.
+function uniqueCategories(gender) {
+  const seen = new Set();
+  const out = [];
+  for (const row of REF.category_keyword) {
+    if (row.gender !== gender) continue;
+    if (seen.has(row.code)) continue;
+    seen.add(row.code);
+    out.push({ label: row.label || row.keyword, code: row.code });
+  }
+  out.sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+  return out;
+}
+// 성별 변경/카테고리 변경 양쪽에서 호출 — 옵션 목록을 다시 그리고 최종코드 미리보기를 갱신한다.
+function refreshCategoryOptions() {
+  const genderSel = document.getElementById('fx_gender');
+  const catSel = document.getElementById('fx_category');
+  if (!genderSel || !catSel) return;
+  const prevValue = catSel.value;
+  const list = uniqueCategories(genderSel.value);
+  catSel.innerHTML = list.map(c => `<option value="${esc(c.code)}">${esc(c.label)}</option>`).join('');
+  if (list.some(c => c.code === prevValue)) catSel.value = prevValue;
+  document.getElementById('fx_code_preview').textContent = catSel.value;
+}
+
 function openFix(ev, idx, kind) {
   ev.stopPropagation();
   const row = RESULT_ROWS[idx];
@@ -496,10 +521,14 @@ function openFix(ev, idx, kind) {
     html = `<h4>카테고리 매칭 저장</h4>
       <p style="font-size:11.5px;color:var(--sub);margin:0 0 8px;">상품명: ${esc(row.A)}</p>
       <div class="frow"><label>성별</label>
-        <select id="fx_gender"><option value="남성">남성</option><option value="여성">여성</option><option value="아동">아동</option></select>
+        <select id="fx_gender" onchange="refreshCategoryOptions()"><option value="남성">남성</option><option value="여성">여성</option><option value="아동">아동</option></select>
       </div>
       <div class="frow"><label>매칭 키워드(정규식 가능)</label><input id="fx_keyword" placeholder="예: 블레이저"></div>
-      <div class="frow"><label>최종코드</label><input id="fx_code" placeholder="예: 1>01>002>0003"></div>`;
+      <div class="frow"><label>카테고리 선택</label><select id="fx_category" onchange="refreshCategoryOptions()"></select></div>
+      <div class="frow" style="background:#f3f4f6;border-radius:6px;padding:6px 8px;">
+        <span style="font-size:11.5px;color:var(--sub);">최종코드</span>
+        <span id="fx_code_preview" style="font-weight:600;"></span>
+      </div>`;
   } else if (kind === 'color') {
     html = `<h4>색상 매칭 저장</h4>
       <p style="font-size:11.5px;color:var(--sub);margin:0 0 8px;">상품명: ${esc(row.A)}</p>
@@ -508,6 +537,7 @@ function openFix(ev, idx, kind) {
   }
   html += `<div class="actions"><button class="btn btn-small" onclick="closeFixPop()">취소</button><button class="btn btn-green btn-small" onclick="saveFix(${idx},'${kind}')">저장</button></div>`;
   pop.innerHTML = html;
+  if (kind === 'category') refreshCategoryOptions();
   pop.style.display = 'block';
   document.getElementById('overlay').style.display = 'block';
   const top = Math.min(rect.bottom + 6, window.innerHeight - 320);
@@ -529,10 +559,12 @@ async function saveFix(idx, kind) {
     } else if (kind === 'category') {
       const gender = document.getElementById('fx_gender').value;
       const keyword = document.getElementById('fx_keyword').value.trim();
-      const code = document.getElementById('fx_code').value.trim();
-      if (!keyword || !code) throw new Error('키워드와 최종코드를 입력해주세요.');
-      payload = { action: 'save_category', actor: AUTH.id, gender, keyword, code };
-      applied = { kind, gender, keyword, code };
+      const catSel = document.getElementById('fx_category');
+      const code = catSel.value;
+      const label = catSel.selectedOptions[0] ? catSel.selectedOptions[0].textContent : keyword;
+      if (!keyword || !code) throw new Error('키워드를 입력하고 카테고리를 선택해주세요.');
+      payload = { action: 'save_category', actor: AUTH.id, gender, keyword, code, label };
+      applied = { kind, gender, keyword, code, label };
     } else if (kind === 'color') {
       const before = document.getElementById('fx_before').value.trim();
       const after = document.getElementById('fx_after').value.trim();
@@ -546,7 +578,7 @@ async function saveFix(idx, kind) {
 
     // 로컬 참조표에도 즉시 반영 + 전체 재계산
     if (kind === 'brand') REF.brand_alias.push({ alias: applied.alias, main_brand: applied.main, en_brand: '', search_words: '' });
-    if (kind === 'category') REF.category_keyword.push({ label: applied.keyword, gender: applied.gender, keyword: applied.keyword, code: applied.code });
+    if (kind === 'category') REF.category_keyword.push({ label: applied.label, gender: applied.gender, keyword: applied.keyword, code: applied.code });
     if (kind === 'color') REF.color_map.push({ before_color: applied.before, after_color: applied.after });
     const conv = buildConverter(REF);
     RESULT_ROWS = RESULT_ROWS.map(r => convertRow(conv, r));
