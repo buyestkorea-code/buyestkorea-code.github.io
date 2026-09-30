@@ -444,7 +444,7 @@ async function doLiveCheck() {
   const btn = document.getElementById('liveBtn'), msg = document.getElementById('liveMsg');
   const auth = getToolkitAuth();
   if (!auth) { msg.textContent = '실시간 확인은 툴킷 로그인이 필요해요. 툴킷 홈에서 로그인한 뒤 이 화면을 새로고침해주세요.'; return; }
-  btn.disabled = true; btn.textContent = '이카운트에서 확인 중… (사이즈 수만큼 몇 초 걸려요)'; msg.textContent = '';
+  btn.disabled = true; btn.textContent = '이카운트에서 확인 중… (사이즈 1개당 3초 정도 걸려요)'; msg.textContent = '';
   try {
     const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ style_code: lastLookup.styleCode, live: true, user: auth.id, pass: auth.pass }) });
