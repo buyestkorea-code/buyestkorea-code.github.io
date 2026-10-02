@@ -1021,14 +1021,13 @@ async function downloadDailyDetail(){
    "실제로 확인된 수량"을 품목별로 대조한다. 판매/반품 원장(pos_txn)과는 별개인 pos_count 원장을 써서
    스캔해도 재고 수량 자체는 안 바뀌고 "실물로 확인했다"는 기록만 쌓인다.
 
-   예상수량 = 행사 남은 재고(cur_qty) + 행사 중간에 본사로 회수한 수량(recall_qty)
-     · 판매/주문택배는 고객에게 나간 것이라 제외, 반품은 이미 cur_qty에 반영돼 있음
-     · 회수분은 이미 본사로 돌아와 있으니 "가져간 물건이 다 돌아왔는지" 볼 때는 포함하는 게 맞다
-       (화면 체크박스로 제외도 가능)
+   예상수량 = 행사 남은 재고(cur_qty)  — 기본값. 판매/주문택배는 고객에게 나간 것이라 제외, 반품은 이미 cur_qty에 반영됨.
+     · 회수(recall)분은 행사 중간에 이미 본사로 보낸 물량이라 최종 검수 때는 행사 재고에 없다 → 기본 제외
+       (사용자 확정 2026-10-03; 처음엔 포함이 기본이었다가 정정됨). 화면 체크박스로 포함도 가능.
    스캔하면 바로 1개 확인으로 기록된다(버튼 한 번 더 누르는 단계 없음) — 잘못 찍으면 결과 카드의
    "방금 확인 취소"로 되돌린다. 수천 개를 찍는 작업이라 속도가 중요해서 이렇게 함.
    ============================================================ */
-const stState = { includeRecall: true, filter: 'todo', brand: '', q: '', sound: true, unreg: 0,
+const stState = { includeRecall: false, filter: 'todo', brand: '', q: '', sound: true, unreg: 0,
                   lastCountId: null, lastCountBarcode: '', recentCounts: [], lastCam: {code:'', ts:0}, qTimer: null };
 
 const stExpected = it => it.cur_qty + (stState.includeRecall ? (it.recall_qty || 0) : 0);
@@ -1042,8 +1041,9 @@ function stStatus(it){
 }
 const ST_LABEL = {ok:'일치', short:'부족', unchecked:'미확인', over:'초과', none:'해당없음'};
 function stSummary(items){
-  const s = {ok:0, short:0, unchecked:0, over:0, none:0, expectedSum:0, confirmedSum:0, extraSum:0, curSum:0, recallSum:0};
+  const s = {ok:0, short:0, unchecked:0, over:0, none:0, expectedSum:0, confirmedSum:0, extraSum:0, curSum:0, recallSum:0, recallAll:0};
   items.forEach(it => {
+    s.recallAll += it.recall_qty || 0;
     s.curSum += it.cur_qty;                                        // 스캔 화면 '현재 총 재고'와 같은 값
     s.recallSum += stState.includeRecall ? (it.recall_qty || 0) : 0;
     const e = Math.max(stExpected(it), 0), c = it.counted_qty;
@@ -1076,7 +1076,7 @@ async function renderStocktakeScreen(){
   const brands = [...new Set(state.items.map(i => i.brand).filter(Boolean))];
   app.innerHTML = topNav('stocktake') + `
     <p class="lead">행사 끝나고 본사로 돌아온 실물을 바코드로 하나씩 스캔하세요. <b>스캔하면 바로 1개 확인으로 기록</b>되고, 잘못 찍었으면 결과 카드의 "방금 확인 취소"로 되돌릴 수 있어요.<br>
-    예상수량 = 행사 남은 재고 + 중간에 본사로 회수한 수량 (판매·주문택배로 나간 건 제외)</p>
+    예상수량 = 행사 남은 재고 (판매·주문택배로 나간 것과, 중간에 이미 본사로 회수한 것은 제외)</p>
 
     <div class="card">
       <div id="stProgress"></div>
@@ -1111,7 +1111,7 @@ async function renderStocktakeScreen(){
           ${brands.map(b => `<option value="${esc(b)}" ${stState.brand===b?'selected':''}>${esc(b)}</option>`).join('')}
         </select>
         <input id="stSearch" placeholder="품명/바코드 검색" value="${esc(stState.q)}" style="min-width:180px;" oninput="onStSearch(this.value)">
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" ${stState.includeRecall?'checked':''} onchange="stState.includeRecall=this.checked; updateStocktakePanels();"> 회수분(중간에 본사로 보낸 것)을 예상수량에 포함</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" ${stState.includeRecall?'checked':''} onchange="stState.includeRecall=this.checked; updateStocktakePanels();"> 회수분(중간에 본사로 보낸 것)도 예상수량에 포함</label>
       </div>
       <div id="stFilters" class="tabs" style="margin-bottom:8px;"></div>
       <div id="stocktakeTableWrap"></div>
@@ -1148,7 +1148,7 @@ function updateStocktakePanels(){
     </div>
     <div style="height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;"><div style="height:100%;width:${Math.min(pct,100)}%;background:var(--green);"></div></div>
     <div class="hint" style="margin-top:8px;line-height:1.7;">
-      <b>예상수량 ${s.expectedSum.toLocaleString('ko-KR')}개</b> = 행사 남은 재고 ${s.curSum.toLocaleString('ko-KR')}개${stState.includeRecall ? ` + 회수분 ${s.recallSum.toLocaleString('ko-KR')}개(중간에 본사로 보낸 것)` : ''}${s.expectedSum !== s.curSum + s.recallSum ? ` + 음수재고 보정 ${(s.expectedSum - s.curSum - s.recallSum).toLocaleString('ko-KR')}개` : ''}<br>
+      <b>예상수량 ${s.expectedSum.toLocaleString('ko-KR')}개</b> = 행사 남은 재고 ${s.curSum.toLocaleString('ko-KR')}개${stState.includeRecall ? ` + 회수분 ${s.recallSum.toLocaleString('ko-KR')}개(중간에 본사로 보낸 것)` : (s.recallAll ? ` <span style="color:var(--sub);">(회수분 ${s.recallAll.toLocaleString('ko-KR')}개는 이미 본사로 보낸 물량이라 제외)</span>` : '')}${s.expectedSum !== s.curSum + s.recallSum ? ` + 음수재고 보정 ${(s.expectedSum - s.curSum - s.recallSum).toLocaleString('ko-KR')}개` : ''}<br>
       위쪽 숫자(개)는 <b>수량</b>, 아래 필터 칩의 숫자는 <b>품목 수</b>예요. 같은 상품이 2개 이상인 품목이 있어서 서로 달라요.
     </div>`;
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -1443,10 +1443,9 @@ async function downloadExport(){
       '주문택배수량': it.courier_qty || 0,
       '회수수량': it.recall_qty || 0,
       '거래내역': history,
-      '현재전산재고(행사)': it.cur_qty,
-      '예상수량(회수분 포함)': it.cur_qty + (it.recall_qty || 0),
+      '현재전산재고(최종 검수 예상수량)': it.cur_qty,
       '실사확인수량': counted,
-      '차이': counted - (it.cur_qty + (it.recall_qty || 0)),
+      '차이': counted - it.cur_qty,
       '비고': it.note || '',
     };
   });
