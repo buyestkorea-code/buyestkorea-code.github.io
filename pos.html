@@ -76,6 +76,7 @@
   .recent-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
   .recent-item .grow{flex:1;}
   .recent-item .void-btn{color:var(--red);cursor:pointer;font-size:12px;text-decoration:underline;background:none;border:none;}
+  .recent-item .edit-btn, .edit-btn{color:var(--blue);cursor:pointer;font-size:12px;text-decoration:underline;background:none;border:none;}
   .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
   .tab{padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;background:#fff;border:1px solid var(--line);}
   .tab.active{background:var(--pri);color:#fff;border-color:var(--pri);}
@@ -755,6 +756,7 @@ async function loadRecent(){
   const wrap = document.getElementById('recentList');
   if (!wrap) return;
   if (!res.ok || res.txns.length===0){ wrap.innerHTML = '<div class="hint">아직 거래 내역이 없어요.</div>'; return; }
+  res.txns.forEach(t => { state.txnMap[t.id] = t; });
   wrap.innerHTML = res.txns.slice(0,60).map(t => {
     const [label, cls] = TYPE_LABEL_CHIP[t.type] || [t.type,''];
     const size = txnDisplaySize(t);
@@ -763,9 +765,92 @@ async function loadRecent(){
         <span class="chip ${t.voided? 'c-void':cls}">${label}${t.voided?'(취소됨)':''}</span>
         <span class="grow">${esc(txnDisplayName(t))}${size?' ('+esc(size)+')':''} ${isMoveType(t.type)?'':money(t.final_amount)+'원'} ${t.note?('· '+esc(t.note)):''}</span>
         <span>${fmtDate(t.created_at)}</span>
-        ${!t.voided ? `<button class="void-btn" onclick="voidTxn(${t.id})">취소</button>` : ''}
+        ${!t.voided ? `<button class="edit-btn" onclick="openEditTxn(${t.id})">수정</button><button class="void-btn" onclick="voidTxn(${t.id})">취소</button>` : ''}
       </div>`;
   }).join('');
+}
+
+/* ---- 거래 수정 (판매가/할인/비고, 수기 입력건 품명·사이즈, 판매↔주문택배↔회수 구분) ----
+   수량·품목은 안 바뀌고, 바뀌기 전/후 값은 서버 감사로그에 남는다. 취소된 거래는 수정 불가. */
+state.txnMap = {};
+function openEditTxn(txnId){
+  const t = state.txnMap[txnId];
+  if (!t || t.voided) return;
+  const isManual = !t.item_id;
+  const canChangeType = !isManual && !t.exchange_group && ['sale','courier','recall'].includes(t.type);
+  const hasMoney = t.type === 'sale' || t.type === 'manual_sale' || canChangeType; // 구분을 판매로 바꾸면 금액 입력이 필요
+  const showMoneyNow = t.type === 'sale' || t.type === 'manual_sale';
+  const [label] = TYPE_LABEL_CHIP[t.type] || [t.type];
+  showModal(`
+    <h2>거래 수정</h2>
+    <div class="hint" style="margin:0 0 10px;">${esc(txnDisplayName(t))}${txnDisplaySize(t) ? ' ('+esc(txnDisplaySize(t))+')' : ''} · 바코드 ${esc(t.barcode)} · ${label}<br>수량(재고)은 바뀌지 않아요.</div>
+    ${isManual && t.type !== 'return' ? `
+      <div class="row">
+        <div class="field"><label>품명</label><input id="etName" value="${esc(t.manual_name||'')}"></div>
+        <div class="field"><label>사이즈</label><input id="etSize" value="${esc(t.manual_size||'')}"></div>
+      </div>` : ''}
+    ${canChangeType ? `
+      <div class="field"><label>구분</label>
+        <select id="etType" onchange="onEditTypeChange()">
+          <option value="sale" ${t.type==='sale'?'selected':''}>판매</option>
+          <option value="courier" ${t.type==='courier'?'selected':''}>주문택배</option>
+          <option value="recall" ${t.type==='recall'?'selected':''}>회수</option>
+        </select>
+      </div>` : ''}
+    ${hasMoney ? `
+      <div id="etMoney" style="display:${showMoneyNow?'block':'none'};">
+        <div class="row">
+          <div class="field"><label>판매가</label><input id="etPrice" type="number" value="${t.price}"></div>
+          <div class="field"><label>할인</label>
+            <select id="etDiscType" onchange="document.getElementById('etDiscVal').disabled = this.value==='none'">
+              <option value="none" ${t.discount_type==='none'?'selected':''}>없음</option>
+              <option value="percent" ${t.discount_type==='percent'?'selected':''}>% 할인</option>
+              <option value="amount" ${t.discount_type==='amount'?'selected':''}>금액 차감</option>
+            </select>
+          </div>
+          <div class="field"><label>할인값</label><input id="etDiscVal" type="number" value="${t.discount_value}" ${t.discount_type==='none'?'disabled':''}></div>
+        </div>
+      </div>` : ''}
+    <div class="field"><label>비고</label><input id="etNote" value="${esc(t.note||'')}"></div>
+    <div class="bar"><div class="spacer"></div><button class="btn btn-outline" onclick="closeModal()">닫기</button><button class="btn btn-primary" onclick="submitEditTxn(${t.id})">저장</button></div>
+  `);
+}
+function onEditTypeChange(){
+  const sel = document.getElementById('etType');
+  const box = document.getElementById('etMoney');
+  if (sel && box) box.style.display = sel.value === 'sale' ? 'block' : 'none';
+}
+async function submitEditTxn(txnId){
+  const t = state.txnMap[txnId];
+  if (!t) return;
+  const body = {txn_id: txnId, actor: state.actor, note: S(document.getElementById('etNote').value)};
+  const typeSel = document.getElementById('etType');
+  const newType = typeSel ? typeSel.value : t.type;
+  if (typeSel) body.type = newType;
+  if (document.getElementById('etName')){
+    body.manual_name = S(document.getElementById('etName').value);
+    body.manual_size = S(document.getElementById('etSize').value);
+    if (!body.manual_name){ toast('품명을 입력해주세요','err'); return; }
+  }
+  if (document.getElementById('etPrice') && (newType === 'sale' || newType === 'manual_sale')){
+    body.price = N(document.getElementById('etPrice').value);
+    body.discount_type = document.getElementById('etDiscType').value;
+    body.discount_value = body.discount_type === 'none' ? 0 : N(document.getElementById('etDiscVal').value);
+  }
+  const res = await apiPost('update_txn', body);
+  if (!res.ok){ toast(res.error||'수정 실패','err'); return; }
+  closeModal();
+  toast(res.unchanged ? '바뀐 내용이 없어요' : '수정했어요', 'ok');
+  await refreshAfterTxnEdit(t);
+}
+async function refreshAfterTxnEdit(t){
+  if (state.screen === 'daily'){
+    const ymd = fmtYMD(t.created_at);
+    await renderDailyScreen();
+    await toggleDayDetail(ymd);   // 수정한 날짜 상세를 다시 펼쳐서 바로 확인
+  } else {
+    await afterTxn();
+  }
 }
 async function voidTxn(txnId){
   if (!confirm('이 거래를 취소할까요? (기록은 남고 재고 계산에서만 제외됩니다)')) return;
@@ -813,6 +898,7 @@ async function toggleCamera(){
 let dailyDaysCache = [];
 async function renderDailyScreen(){
   state.screen = 'daily';
+  Object.keys(dayDetailLoaded).forEach(k => delete dayDetailLoaded[k]);
   const app = document.getElementById('app');
   app.innerHTML = topNav('daily') + `
     <div class="bar" style="margin-top:-6px;"><div class="spacer"></div><button class="btn btn-outline" style="padding:5px 12px;font-size:12px;" onclick="downloadDailyDetail()">엑셀로 다운로드 (날짜별 요약+상세 한 시트)</button></div>
@@ -855,9 +941,10 @@ async function toggleDayDetail(dateStr){
   if (!res.ok){ td.innerHTML = `<div class="hint">${esc(res.error||'불러오기 실패')}</div>`; return; }
   if (res.txns.length===0){ td.innerHTML = '<div class="hint">그 날짜 거래 내역이 없어요.</div>'; return; }
   const rows = res.txns.slice().sort((a,b)=>a.created_at-b.created_at);
+  rows.forEach(t => { state.txnMap[t.id] = t; });
   td.innerHTML = `
     <table style="width:100%;font-size:12.5px;">
-      <thead><tr><th style="white-space:nowrap;">시간</th><th style="white-space:nowrap;">구분</th><th>품명</th><th style="white-space:nowrap;">사이즈</th><th style="white-space:nowrap;">바코드</th><th style="white-space:nowrap;">수량</th><th style="white-space:nowrap;">금액</th><th>비고</th></tr></thead>
+      <thead><tr><th style="white-space:nowrap;">시간</th><th style="white-space:nowrap;">구분</th><th>품명</th><th style="white-space:nowrap;">사이즈</th><th style="white-space:nowrap;">바코드</th><th style="white-space:nowrap;">수량</th><th style="white-space:nowrap;">금액</th><th>비고</th><th></th></tr></thead>
       <tbody>${rows.map(t => {
         const [label, cls] = TYPE_LABEL_CHIP[t.type] || [t.type, ''];
         return `<tr${t.voided ? ' style="opacity:.5;text-decoration:line-through;"' : ''}>
@@ -869,6 +956,7 @@ async function toggleDayDetail(dateStr){
           <td style="white-space:nowrap;">${t.qty_delta}</td>
           <td style="white-space:nowrap;">${isMoveType(t.type) ? '-' : money(t.final_amount)}</td>
           <td>${esc(t.note||'')}</td>
+          <td style="white-space:nowrap;">${t.voided ? '' : `<button class="edit-btn" onclick="openEditTxn(${t.id})">수정</button>`}</td>
         </tr>`;
       }).join('')}</tbody>
     </table>`;
