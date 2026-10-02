@@ -99,6 +99,7 @@
 
   <div class="card">
     <div id="reader"></div>
+    <div class="list-status" id="camStatus" style="text-align:center;min-height:18px;"></div>
     <button class="btn btn-primary" id="scanToggle">카메라로 스캔 시작</button>
     <div class="field">
       <label>또는 직접 입력 / 전용 스캐너로 스캔</label>
@@ -118,6 +119,7 @@
   </table>
 
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="assets/camera-scan.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script>
 const API_URL = 'https://buyest.co.kr/barcode_stock_lookup_api.php';
@@ -286,8 +288,11 @@ function isValidStyleCode(code) {
   return c.length >= 4 && /[0-9A-Za-z]/.test(c);
 }
 
-// ---- 카메라 스캔 (html5-qrcode) ----
-let html5Qr = null, scanning = false;
+// ---- 카메라 스캔 (html5-qrcode + assets/camera-scan.js 오인식 방지 래퍼) ----
+// 예전엔 한 프레임만 읽혀도 바로 서버(이카운트) 조회로 넘어가서, 흐릿한 프레임이 엉뚱한 값으로 읽히면 불필요한 조회가
+// 쌓이고(이카운트 412 차단 위험) 아무 바코드나 빨리 잡는 것처럼 보였다. 이제는 목록에 있는 바코드는 같은 값이 연속
+// 2회·0.35초, 목록에 없는 값은 4회·0.9초 이상 읽혀야 확정한다.
+let cam = null, scanning = false;
 let lastCode = '', lastTime = 0;
 
 document.getElementById('scanToggle').addEventListener('click', () => {
@@ -299,33 +304,33 @@ async function startScan() {
   const readerEl = document.getElementById('reader');
   // 카메라를 붙이기 전에 먼저 박스를 보이게 해서(고정 min-height 있음) 크기가 잡힌 상태로 시작한다.
   readerEl.classList.add('active');
+  const statusEl = document.getElementById('camStatus');
   try {
-    html5Qr = new Html5Qrcode('reader');
-    await html5Qr.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 280, height: 160 } },
-      decodedText => handleCode(decodedText),
-      () => {} // 프레임마다 못 읽으면 호출됨 — 무시
-    );
-    // 일부 브라우저(특히 iOS 사파리)는 playsinline이 없으면 전체화면 재생으로 튀어서
-    // 페이지 안에서 안 보이고 카메라만 켜진 것처럼 보인다 — 방어적으로 한 번 더 명시.
-    const videoEl = readerEl.querySelector('video');
-    if (videoEl) { videoEl.setAttribute('playsinline', 'true'); videoEl.muted = true; }
+    cam = RobustCameraScan.create({
+      elementId: 'reader',
+      isKnown: code => codeMap.has(code),
+      onStatus: (msg, kind) => {
+        statusEl.textContent = msg;
+        statusEl.style.color = kind === 'ok' ? 'var(--ok-fg)' : (kind === 'warn' ? 'var(--warn-fg)' : 'var(--ink-muted)');
+      },
+      onAccept: text => handleCode(text),
+    });
+    await cam.start();
     scanning = true;
     btn.textContent = '카메라 끄기';
     btn.classList.add('on');
   } catch (err) {
     readerEl.classList.remove('active');
-    alert('카메라를 열 수 없습니다. 브라우저 카메라 권한을 확인해주세요.\n(' + err + ')');
+    cam = null;
+    alert('카메라를 열 수 없습니다. 브라우저 카메라 권한을 확인해주세요.\n(' + (err && err.message ? err.message : err) + ')');
   }
 }
 
 async function stopScan() {
   const btn = document.getElementById('scanToggle');
-  if (html5Qr && scanning) {
-    try { await html5Qr.stop(); html5Qr.clear(); } catch (e) {}
-  }
+  if (cam) { try { await cam.stop(); } catch (e) {} cam = null; }
   scanning = false;
+  document.getElementById('camStatus').textContent = '';
   document.getElementById('reader').classList.remove('active');
   btn.textContent = '카메라로 스캔 시작';
   btn.classList.remove('on');

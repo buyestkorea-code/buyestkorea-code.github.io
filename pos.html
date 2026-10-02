@@ -98,6 +98,7 @@
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="assets/camera-scan.js"></script>
 <script>
 const REPORT_API = 'https://buyest.co.kr/pos_report_api.php';
 const EXECUTE_API = 'https://buyest.co.kr/pos_execute_api.php';
@@ -218,6 +219,7 @@ function renderLoginRequired(){
    화면 1: 행사 목록
    ============================================================ */
 async function renderEvents(){
+  stopCamera();
   state.screen = 'events';
   const app = document.getElementById('app');
   app.innerHTML = `
@@ -329,6 +331,7 @@ function topNav(active){
    재고파일 업로드 화면
    ============================================================ */
 function renderUploadScreen(){
+  stopCamera();
   state.screen = 'upload';
   const app = document.getElementById('app');
   app.innerHTML = topNav('scan') + `
@@ -458,6 +461,7 @@ function cornerStats(){
 const sizeText = s => S(s) || '-';
 
 function renderScanScreen(){
+  stopCamera();
   state.screen = 'scan';
   state.scanned = null;
   const st = cornerStats();
@@ -474,18 +478,18 @@ function renderScanScreen(){
 
     <div class="scan-box">
       <div class="scan-actions" style="margin-bottom:10px;">
-        <button class="btn ${state.mode==='sale'?'btn-primary':'btn-outline'}" onclick="setMode('sale')">판매</button>
-        <button class="btn ${state.mode==='return'?'btn-primary':'btn-outline'}" onclick="setMode('return')">반품</button>
-        <button class="btn ${state.mode==='exchange'?'btn-primary':'btn-outline'}" onclick="setMode('exchange')">교환</button>
-        <button class="btn ${state.mode==='courier'?'btn-primary':'btn-outline'}" onclick="setMode('courier')">주문택배</button>
-        <button class="btn ${state.mode==='recall'?'btn-primary':'btn-outline'}" onclick="setMode('recall')">회수</button>
+        <button class="btn ${state.mode==='sale'?'btn-primary':'btn-outline'}" data-mode="sale" onclick="setMode('sale')">판매</button>
+        <button class="btn ${state.mode==='return'?'btn-primary':'btn-outline'}" data-mode="return" onclick="setMode('return')">반품</button>
+        <button class="btn ${state.mode==='exchange'?'btn-primary':'btn-outline'}" data-mode="exchange" onclick="setMode('exchange')">교환</button>
+        <button class="btn ${state.mode==='courier'?'btn-primary':'btn-outline'}" data-mode="courier" onclick="setMode('courier')">주문택배</button>
+        <button class="btn ${state.mode==='recall'?'btn-primary':'btn-outline'}" data-mode="recall" onclick="setMode('recall')">회수</button>
       </div>
       <div id="modeHint" class="hint"></div>
       <input id="barcodeInput" placeholder="바코드 스캔 또는 입력 후 Enter" autocomplete="off">
       <div class="scan-actions">
         <button class="btn btn-outline" onclick="toggleCamera()">📷 폰 카메라로 스캔</button>
       </div>
-      <div id="camWrap"><div id="camReader"></div></div>
+      <div id="camWrap"><div id="camReader"></div><div id="camStatus" class="hint" style="text-align:center;min-height:18px;margin-top:6px;"></div></div>
       <div id="scanResult"></div>
     </div>
 
@@ -508,10 +512,15 @@ function focusBarcode(){
 }
 function setMode(m){
   state.mode = m; state.scanned = null; state.exchangeStep = null; state.exchangeReturn = null;
-  document.getElementById('barcodeInput').value='';
-  document.getElementById('scanResult').innerHTML='';
-  document.querySelectorAll('.scan-actions .btn').forEach(()=>{});
-  renderScanScreen(); // 버튼 활성상태 갱신을 위해 다시 그림(상태는 위에서 리셋했으므로 안전)
+  document.getElementById('barcodeInput').value = '';
+  document.getElementById('scanResult').innerHTML = '';
+  // 화면 전체를 다시 그리지 않고 버튼 모양/안내문만 바꾼다 — 카메라가 켜져 있어도 그대로 유지됨
+  document.querySelectorAll('.scan-actions [data-mode]').forEach(btn => {
+    const on = btn.dataset.mode === m;
+    btn.classList.toggle('btn-primary', on); btn.classList.toggle('btn-outline', !on);
+  });
+  updateModeHint();
+  focusBarcode();
 }
 function updateModeHint(){
   const hint = document.getElementById('modeHint');
@@ -867,43 +876,50 @@ async function voidTxn(txnId){
 }
 
 /* ---- 카메라 스캔 ---- */
-let html5Qr = null;
+/* 폰 카메라 스캔 — assets/camera-scan.js(오인식 방지: 바코드 종류 제한, 조준 박스, 연속 n회 + 일정 시간 같은 값이어야 확정,
+   확정 후 중복 차단)를 사용. 아는 바코드(재고파일에 있음)는 빨리, 모르는 값은 더 확실히 읽혀야 확정된다. */
+let posCam = null;
+function killCameraStreamsNow(){
+  // 화면을 갈아엎기 직전에도 카메라 불이 바로 꺼지도록 영상 트랙을 즉시 정지
+  document.querySelectorAll('#camReader video').forEach(v => {
+    const st = v.srcObject;
+    if (st && st.getTracks) st.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
+  });
+}
+async function stopCamera(){
+  killCameraStreamsNow();
+  const cam = posCam; posCam = null; state.camActive = false;
+  if (cam){ try { await cam.stop(); } catch(e){} }
+  const wrap = document.getElementById('camWrap');
+  if (wrap) wrap.style.display = 'none';
+}
 async function toggleCamera(){
   const wrap = document.getElementById('camWrap');
-  if (state.camActive){
-    if (html5Qr) { try { await html5Qr.stop(); html5Qr.clear(); } catch(e){} }
-    state.camActive = false;
-    wrap.style.display = 'none';
-    focusBarcode();
-    return;
-  }
-  if (typeof Html5Qrcode === 'undefined'){ toast('카메라 스캔 라이브러리를 불러오지 못했어요','err'); return; }
+  if (state.camActive){ await stopCamera(); (state.screen==='stocktake' ? document.getElementById('countInput') : document.getElementById('barcodeInput'))?.focus(); return; }
+  if (typeof Html5Qrcode === 'undefined' || typeof RobustCameraScan === 'undefined'){ toast('카메라 스캔 라이브러리를 불러오지 못했어요','err'); return; }
   wrap.style.display = 'block';
   state.camActive = true;
-  html5Qr = new Html5Qrcode('camReader');
+  const statusEl = () => document.getElementById('camStatus');
+  posCam = RobustCameraScan.create({
+    elementId: 'camReader',
+    isKnown: code => !!stItemByBarcode(code),
+    onStatus: (msg, kind) => {
+      const el = statusEl();
+      if (el){ el.textContent = msg; el.style.color = kind==='ok' ? 'var(--green)' : (kind==='warn' ? 'var(--amber)' : 'var(--sub)'); }
+    },
+    onAccept: (text) => {
+      if (state.screen === 'stocktake'){
+        document.getElementById('countInput').value = text; onCountSubmit();
+      } else if (state.screen === 'scan'){
+        document.getElementById('barcodeInput').value = text; onScanSubmit();
+      }
+    },
+  });
   try {
-    await html5Qr.start(
-      {facingMode:'environment'},
-      {fps:10, qrbox:{width:260,height:140}},
-      (decodedText) => {
-        if (state.screen === 'stocktake'){
-          // 카메라는 같은 바코드를 초당 여러 번 인식하므로, 실재고 확인(스캔=즉시 +1)에서는 같은 코드를 3초 안에 또 읽으면 무시
-          const now = Date.now();
-          if (stState.lastCam.code === decodedText && now - stState.lastCam.ts < 3000) return;
-          stState.lastCam = {code: decodedText, ts: now};
-          document.getElementById('countInput').value = decodedText;
-          onCountSubmit();
-          return;
-        }
-        document.getElementById('barcodeInput').value = decodedText;
-        onScanSubmit();
-      },
-      () => {}
-    );
+    await posCam.start();
   } catch(e){
-    toast('카메라를 열 수 없어요: ' + e, 'err');
-    state.camActive = false;
-    wrap.style.display = 'none';
+    toast('카메라를 열 수 없어요: ' + (e && e.message ? e.message : e), 'err');
+    await stopCamera();
   }
 }
 
@@ -912,6 +928,7 @@ async function toggleCamera(){
    ============================================================ */
 let dailyDaysCache = [];
 async function renderDailyScreen(){
+  stopCamera();
   state.screen = 'daily';
   Object.keys(dayDetailLoaded).forEach(k => delete dayDetailLoaded[k]);
   const app = document.getElementById('app');
@@ -1071,6 +1088,7 @@ function stBeep(kind){
 }
 
 async function renderStocktakeScreen(){
+  stopCamera();
   state.screen = 'stocktake';
   const app = document.getElementById('app');
   const brands = [...new Set(state.items.map(i => i.brand).filter(Boolean))];
@@ -1095,7 +1113,7 @@ async function renderStocktakeScreen(){
         <button class="btn btn-outline" onclick="toggleCamera()">📷 폰 카메라로 스캔</button>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;flex:0 0 auto;"><input type="checkbox" ${stState.sound?'checked':''} onchange="stState.sound=this.checked"> 소리</label>
       </div>
-      <div id="camWrap"><div id="camReader"></div></div>
+      <div id="camWrap"><div id="camReader"></div><div id="camStatus" class="hint" style="text-align:center;min-height:18px;margin-top:6px;"></div></div>
       <div id="countResult"></div>
     </div>
 
@@ -1389,6 +1407,7 @@ async function downloadStocktake(){
    마감 다운로드 (엑셀)
    ============================================================ */
 function renderExportScreen(){
+  stopCamera();
   state.screen = 'export';
   const app = document.getElementById('app');
   app.innerHTML = topNav('export') + `

@@ -1562,6 +1562,7 @@
 
               <div id="stScanWorkspace" style="display:none;">
                 <div class="stat-row" id="stStats"></div>
+                <div id="stProgress" style="margin:4px 0 12px;"></div>
 
                 <div class="dz-grid">
                   <div>
@@ -1569,6 +1570,8 @@
                       <label>바코드 스캔 (스캐너로 찍으면 자동 입력됩니다)</label>
                       <input type="text" class="textinput" id="stBarcodeInput" placeholder="여기에 스캔..." autocomplete="off" style="font-size:20px;text-align:center;font-weight:700;padding:14px;" />
                     </div>
+                    <div id="stLastScan" style="margin-top:8px;min-height:22px;"></div>
+                    <label style="font-size:12.5px;display:inline-flex;align-items:center;gap:6px;margin-top:6px;"><input type="checkbox" id="stSound" checked /> 스캔 소리</label>
                     <div class="dz-grid" style="margin-top:10px;">
                       <div class="field"><label>수량</label><input type="number" class="textinput" id="stQtyInput" value="1" min="0.01" step="1" /></div>
                       <div class="field"><label>담당자</label><input type="text" class="textinput" id="stCounterInput" placeholder="이름" /></div>
@@ -6632,40 +6635,63 @@
     var stScanEvents = []; // {id, barcode, qty, time, found, cancelled} - kept so a mis-scan can be undone individually
     var stScanEventIdCounter = 0;
 
+    /* [성능 개선 2026-10-03] 스캔 1번마다 (1) 전체 이벤트 재집계 (2) 기준 2000개 품목을 통째로 JSON 직렬화해서 localStorage 저장
+       (3) 표 2000행 전부 재생성 — 이게 매번 일어나서 2000품목 기준 스캔당 약 20ms, 229KB 저장이었다.
+       이제: 증분 집계(O(1)), 저장은 0.6초 디바운스 + 기준 품목 직렬화 캐시, 표는 해당 행만 갱신. */
+    function stApplyEvent(ev){
+      if(!ev.found && stUnregisteredOrder[ev.barcode] === undefined){
+        stUnregisteredOrder[ev.barcode] = stScanOrderCounter++;
+      }
+      if(!stCounts[ev.barcode]) stCounts[ev.barcode] = {qty:0, lastAt:null};
+      stCounts[ev.barcode].qty += ev.qty;
+      stCounts[ev.barcode].lastAt = ev.time;
+    }
     function stRecountFromEvents(){
       stCounts = {};
       stUnregisteredOrder = {};
       stScanOrderCounter = 0;
       stScanEvents.forEach(function(ev){
         if(ev.cancelled) return;
-        if(!ev.found && stUnregisteredOrder[ev.barcode] === undefined){
-          stUnregisteredOrder[ev.barcode] = stScanOrderCounter++;
-        }
-        if(!stCounts[ev.barcode]) stCounts[ev.barcode] = {qty:0, lastAt:null};
-        stCounts[ev.barcode].qty += ev.qty;
-        stCounts[ev.barcode].lastAt = ev.time;
+        stApplyEvent(ev);
       });
     }
+    var stBaseJsonCache = null;   // 기준 품목 직렬화 결과 (기준 파일이 바뀔 때만 다시 만든다)
+    var stExpectedTotal = 0;      // 기준 총수량 (기준 파일이 바뀔 때만 계산)
+    function stSetBase(items, meta){
+      stBaseItems = items; stBaseMeta = meta; stBaseJsonCache = null;
+      stExpectedTotal = 0;
+      if(items) Object.keys(items).forEach(function(bc){ stExpectedTotal += items[bc].expectedQty; });
+    }
 
-    /* ---------------- 진행 상황 자동 저장 (컴퓨터가 꺼지거나 탭이 닫혀도 이어서 하기) ---------------- */
+/* ---------------- 진행 상황 자동 저장 (컴퓨터가 꺼지거나 탭이 닫혀도 이어서 하기) ---------------- */
     var ST_SESSION_KEY = 'stocktake_session_v1';
-    function stSaveSession(){
+    var stSaveTimer = null;
+    function stSaveSessionNow(){
+      if(stSaveTimer){ clearTimeout(stSaveTimer); stSaveTimer = null; }
       if(!stBaseItems) return;
       try{
-        var payload = {
-          savedAt: new Date().toISOString(),
-          baseFileName: (stBaseMeta && stBaseMeta.fileName) || '',
-          baseMeta: stBaseMeta,
-          baseItems: stBaseItems,
-          scanEvents: stScanEvents.map(function(ev){
-            return {id:ev.id, barcode:ev.barcode, qty:ev.qty, time: ev.time ? new Date(ev.time).toISOString() : null, found:ev.found, cancelled:!!ev.cancelled};
-          }),
-          scanEventIdCounter: stScanEventIdCounter
-        };
-        localStorage.setItem(ST_SESSION_KEY, JSON.stringify(payload));
+        if(stBaseJsonCache === null) stBaseJsonCache = JSON.stringify(stBaseItems);
+        var events = JSON.stringify(stScanEvents.map(function(ev){
+          return {id:ev.id, barcode:ev.barcode, qty:ev.qty, time: ev.time ? new Date(ev.time).toISOString() : null, found:ev.found, cancelled:!!ev.cancelled};
+        }));
+        var json = '{"savedAt":' + JSON.stringify(new Date().toISOString()) +
+          ',"baseFileName":' + JSON.stringify((stBaseMeta && stBaseMeta.fileName) || '') +
+          ',"baseMeta":' + JSON.stringify(stBaseMeta || null) +
+          ',"baseItems":' + stBaseJsonCache +
+          ',"scanEvents":' + events +
+          ',"scanEventIdCounter":' + stScanEventIdCounter + '}';
+        localStorage.setItem(ST_SESSION_KEY, json);
       }catch(e){ /* localStorage 꽉 찼거나 비활성화된 경우 - 자동저장만 조용히 건너뜀 */ }
     }
+    // 스캔할 때마다 바로 쓰지 않고 0.6초 모아서 저장(연속 스캔 중엔 마지막에 한 번). 창을 닫거나 숨길 땐 즉시 저장.
+    function stSaveSession(){
+      if(stSaveTimer) clearTimeout(stSaveTimer);
+      stSaveTimer = setTimeout(stSaveSessionNow, 600);
+    }
+    window.addEventListener('pagehide', function(){ if(stSaveTimer) stSaveSessionNow(); });
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'hidden' && stSaveTimer) stSaveSessionNow(); });
     function stClearSession(){
+      if(stSaveTimer){ clearTimeout(stSaveTimer); stSaveTimer = null; }
       try{ localStorage.removeItem(ST_SESSION_KEY); }catch(e){}
     }
     function stLoadSession(){
@@ -6676,8 +6702,7 @@
       }catch(e){ return null; }
     }
     function stResumeSession(saved){
-      stBaseItems = saved.baseItems;
-      stBaseMeta = saved.baseMeta;
+      stSetBase(saved.baseItems, saved.baseMeta);
       stScanEventIdCounter = saved.scanEventIdCounter || 0;
       stScanEvents = (saved.scanEvents || []).map(function(ev){
         return {id:ev.id, barcode:ev.barcode, qty:ev.qty, time: ev.time ? new Date(ev.time) : new Date(), found:ev.found, cancelled:!!ev.cancelled};
@@ -6728,8 +6753,7 @@
       infoElId: 'stBaseInfo', mappingElId: 'stMapping',
       confirmLabel: '스캔 시작',
       onConfirm: function(items, meta){
-        stBaseItems = items;
-        stBaseMeta = meta;
+        stSetBase(items, meta);
         stCounts = {}; stUnregisteredOrder = {}; stScanEvents = []; stScanEventIdCounter = 0;
         document.getElementById('stScanSetup').style.display = 'none';
         document.getElementById('stScanWorkspace').style.display = 'block';
@@ -6737,7 +6761,7 @@
         document.getElementById('stScanFeedTable').querySelector('tbody').innerHTML = '';
         var counter = localStorage.getItem('stocktake_counter_name') || '';
         document.getElementById('stCounterInput').value = counter;
-        stSaveSession();
+        stSaveSessionNow();
         renderStStats(); renderStLiveTable();
         document.getElementById('stBarcodeInput').focus();
       }
@@ -6745,7 +6769,7 @@
     stRenderResumeBanner();
 
     document.getElementById('stNewBase').addEventListener('click', function(){
-      stBaseItems = null; stBaseMeta = null; stCounts = {}; stUnregisteredOrder = {}; stScanEvents = []; stScanEventIdCounter = 0;
+      stSetBase(null, null); stCounts = {}; stUnregisteredOrder = {}; stScanEvents = []; stScanEventIdCounter = 0;
       stClearSession();
       document.getElementById('stBaseFile').value = '';
       document.getElementById('stBaseInfo').innerHTML = '';
@@ -6777,18 +6801,27 @@
 
     function renderStStats(){
       var totalItems = Object.keys(stBaseItems).length + Object.keys(stUnregisteredOrder).length;
-      var scannedItems = 0, totalExpected = 0, totalCounted = 0;
-      Object.keys(stBaseItems).forEach(function(bc){ totalExpected += stBaseItems[bc].expectedQty; });
+      var scannedItems = 0, totalCounted = 0, confirmed = 0;
       Object.keys(stCounts).forEach(function(bc){
-        if(stCounts[bc].qty > 0) scannedItems++;
-        totalCounted += stCounts[bc].qty;
+        var q = stCounts[bc].qty;
+        if(q > 0) scannedItems++;
+        totalCounted += q;
+        if(stBaseItems[bc]) confirmed += Math.min(q, stBaseItems[bc].expectedQty);   // 기준 수량 안에서 확인된 만큼
       });
       var wrap = document.getElementById('stStats');
       wrap.innerHTML = '';
       wrap.appendChild(stStatCard(String(totalItems), '총 품목 수'));
       wrap.appendChild(stStatCard(String(scannedItems), '스캔 완료 품목'));
-      wrap.appendChild(stStatCard(String(totalExpected), '기준 총수량'));
+      wrap.appendChild(stStatCard(String(stExpectedTotal), '기준 총수량'));
       wrap.appendChild(stStatCard(String(totalCounted), '실사 총수량'));
+      var pct = stExpectedTotal > 0 ? Math.round(confirmed / stExpectedTotal * 1000) / 10 : 0;
+      var prog = document.getElementById('stProgress');
+      if(prog){
+        prog.innerHTML = '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;"><span><b>' +
+          confirmed.toLocaleString('ko-KR') + '</b> / ' + stExpectedTotal.toLocaleString('ko-KR') + '개 확인 (' + pct + '%)</span>' +
+          '<span style="color:var(--ink-muted);">기준 수량 안에서 스캔된 만큼 집계</span></div>' +
+          '<div style="height:9px;background:#e5e7eb;border-radius:999px;overflow:hidden;"><div style="height:100%;width:' + Math.min(pct,100) + '%;background:#0f766e;"></div></div>';
+      }
     }
 
     function stAllRows(){
@@ -6807,7 +6840,25 @@
       return rows;
     }
 
+    var stRowRefs = {};      // barcode -> {tr, tdCounted, tdDiff, tdStatus, expectedQty}  (필터 '전체'일 때 스캔한 행만 바로 갱신)
+    var stLiveTimer = null;
+    function stBuildRow(r){
+      var diff = r.counted - r.expectedQty;
+      var st = stStatusOf(r.expectedQty, r.counted, r.isUnregistered);
+      var tr = el('tr');
+      tr.appendChild(el('td', null, [document.createTextNode(r.barcode)]));
+      tr.appendChild(el('td', null, [document.createTextNode(r.name||'')]));
+      tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode(String(r.expectedQty))]));
+      var tdCounted = el('td', {class:'num tabular'}, [document.createTextNode(String(r.counted))]);
+      var tdDiff = el('td', {class:'num tabular'}, [document.createTextNode(String(diff))]);
+      var tdStatus = el('td');
+      tdStatus.appendChild(el('span', {class:'chip '+st.chip}, [document.createTextNode(st.tag)]));
+      tr.appendChild(tdCounted); tr.appendChild(tdDiff); tr.appendChild(tdStatus);
+      stRowRefs[r.barcode] = {tr:tr, tdCounted:tdCounted, tdDiff:tdDiff, tdStatus:tdStatus, expectedQty:r.expectedQty, isUnregistered:r.isUnregistered};
+      return tr;
+    }
     function renderStLiveTable(){
+      if(stLiveTimer){ clearTimeout(stLiveTimer); stLiveTimer = null; }
       var filter = document.getElementById('stFilter').value;
       var q = document.getElementById('stSearch').value.trim().toLowerCase();
       var rows = stAllRows().filter(function(r){
@@ -6823,6 +6874,7 @@
 
       var table = document.getElementById('stLiveTable');
       table.innerHTML = '';
+      stRowRefs = {};
       var thead = el('thead'); var htr = el('tr');
       ['바코드','품목명','기준','실사','차이','상태'].forEach(function(c, idx){
         htr.appendChild(el('th', (idx>=2&&idx<=4)?{class:'num'}:null, [document.createTextNode(c)]));
@@ -6831,28 +6883,78 @@
       var tbody = el('tbody');
       var frag = document.createDocumentFragment();
       var showLimit = 10000;
-      rows.slice(0,showLimit).forEach(function(r){
-        var diff = r.counted - r.expectedQty;
-        var st = stStatusOf(r.expectedQty, r.counted, r.isUnregistered);
-        var tr = el('tr');
-        tr.appendChild(el('td', null, [document.createTextNode(r.barcode)]));
-        tr.appendChild(el('td', null, [document.createTextNode(r.name||'')]));
-        tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode(String(r.expectedQty))]));
-        tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode(String(r.counted))]));
-        tr.appendChild(el('td', {class:'num tabular'}, [document.createTextNode(String(diff))]));
-        var tdStatus = el('td');
-        tdStatus.appendChild(el('span', {class:'chip '+st.chip}, [document.createTextNode(st.tag)]));
-        tr.appendChild(tdStatus);
-        frag.appendChild(tr);
-      });
+      rows.slice(0,showLimit).forEach(function(r){ frag.appendChild(stBuildRow(r)); });
       tbody.appendChild(frag);
       table.appendChild(tbody);
+      var oldMore = document.getElementById('stMoreRow'); if(oldMore) oldMore.parentNode.removeChild(oldMore);
       if(rows.length > showLimit){
-        var moreRow = el('div', {style:'padding:8px 12px;color:var(--ink-muted);font-size:12px;'});
+        var moreRow = el('div', {id:'stMoreRow', style:'padding:8px 12px;color:var(--ink-muted);font-size:12px;'});
         moreRow.textContent = '표시는 ' + showLimit.toLocaleString('ko-KR') + '행까지만 됩니다. 필터나 검색으로 좁혀서 확인하세요.';
         table.parentNode.appendChild(moreRow);
       }
     }
+    // 스캔 직후: 필터 '전체' + 검색 없음이면 그 행만 고쳐 쓰고(새 미등록 품목이면 끝에 한 줄 추가), 그 외엔 잠깐 모았다가 다시 그림
+    function stUpdateLiveAfterScan(barcode){
+      var filter = document.getElementById('stFilter').value;
+      var q = document.getElementById('stSearch').value.trim();
+      if(filter === 'all' && !q){
+        var counted = stCounts[barcode] ? stCounts[barcode].qty : 0;
+        var ref = stRowRefs[barcode];
+        var base = stBaseItems[barcode];
+        if(!ref){
+          if(base){ return; }   // 표시 한도(10000행) 밖의 행 — 표시 대상 아님
+          var tbody = document.getElementById('stLiveTable').querySelector('tbody');
+          if(!tbody) return;
+          tbody.appendChild(stBuildRow({barcode:barcode, name:'(미등록 품목)', expectedQty:0, counted:counted, isUnregistered:true}));
+          ref = stRowRefs[barcode];
+        } else {
+          var diff = counted - ref.expectedQty;
+          var st = stStatusOf(ref.expectedQty, counted, ref.isUnregistered);
+          ref.tdCounted.textContent = String(counted);
+          ref.tdDiff.textContent = String(diff);
+          ref.tdStatus.innerHTML = '';
+          ref.tdStatus.appendChild(el('span', {class:'chip '+st.chip}, [document.createTextNode(st.tag)]));
+        }
+        ref.tr.style.transition = 'none'; ref.tr.style.background = '#fef9c3';
+        setTimeout(function(){ ref.tr.style.transition = 'background .8s'; ref.tr.style.background = ''; }, 60);
+        return;
+      }
+      if(stLiveTimer) clearTimeout(stLiveTimer);
+      stLiveTimer = setTimeout(renderStLiveTable, 300);
+    }
+
+    var stAudio = null;
+    function stBeep(kind){
+      var cb = document.getElementById('stSound');
+      if(cb && !cb.checked) return;
+      try{
+        stAudio = stAudio || new (window.AudioContext || window.webkitAudioContext)();
+        var o = stAudio.createOscillator(), g = stAudio.createGain();
+        o.connect(g); g.connect(stAudio.destination);
+        o.type = 'sine'; o.frequency.value = kind==='ok' ? 880 : (kind==='over' ? 520 : 240);
+        g.gain.value = 0.08;
+        o.start(); o.stop(stAudio.currentTime + (kind==='ok' ? 0.08 : 0.25));
+      }catch(e){}
+    }
+    function stShowLastScan(barcode, found, qty){
+      var box = document.getElementById('stLastScan');
+      if(!box) return;
+      var counted = stCounts[barcode] ? stCounts[barcode].qty : 0;
+      var base = stBaseItems[barcode];
+      var html, color, bg;
+      if(!found){
+        html = '⚠️ <b>미등록 품목</b> ' + stEsc(barcode) + ' — 기준 파일에 없는 바코드예요 (+' + qty + ')';
+        color = '#b91c1c'; bg = '#fef2f2'; stBeep('warn');
+      } else {
+        var diff = counted - base.expectedQty;
+        var label = diff === 0 ? '✔ 일치' : (diff > 0 ? '⚠ 과다 +' + diff : '부족 ' + diff);
+        html = '<b>' + stEsc(base.name || barcode) + '</b> · 실사 ' + counted + ' / 기준 ' + base.expectedQty + ' — ' + label;
+        color = diff > 0 ? '#b91c1c' : (diff === 0 ? '#15803d' : '#374151'); bg = diff > 0 ? '#fef2f2' : (diff === 0 ? '#f0fdf4' : '#f3f4f6');
+        stBeep(diff > 0 ? 'over' : 'ok');
+      }
+      box.innerHTML = '<div style="padding:8px 12px;border-radius:8px;font-size:13.5px;background:' + bg + ';color:' + color + ';">' + html + '</div>';
+    }
+    function stEsc(v){ return String(v).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
     document.getElementById('stFilter').addEventListener('change', renderStLiveTable);
     var stSearchDebounce;
@@ -6866,6 +6968,7 @@
       if(!ev || ev.cancelled) return;
       ev.cancelled = true;
       tr.parentNode.removeChild(tr);
+      var lastScanBox = document.getElementById('stLastScan'); if(lastScanBox) lastScanBox.innerHTML = '';   // 취소했으면 방금 결과 카드는 비움
       stRecountFromEvents();
       stSaveSession();
       renderStStats(); renderStLiveTable();
@@ -6901,14 +7004,16 @@
       var now = new Date();
       var ev = {id: stScanEventIdCounter++, barcode:barcode, qty:qty, time:now, found:found, cancelled:false};
       stScanEvents.push(ev);
-      stRecountFromEvents();
-      stSaveSession();
+      stApplyEvent(ev);              // 전체 재집계 없이 이번 스캔만 반영
+      stSaveSession();               // 0.6초 모아서 저장
       var name = found ? stBaseItems[barcode].name : '(미등록 품목)';
       function p(n){ return (n<10?'0':'')+n; }
       var timeStr = p(now.getHours())+':'+p(now.getMinutes())+':'+p(now.getSeconds());
       stAddFeedRow({id: ev.id, barcode:barcode, name:name, qty:qty, found:found, time:timeStr});
       stBarcodeInput.value = '';
-      renderStStats(); renderStLiveTable();
+      renderStStats();
+      stUpdateLiveAfterScan(barcode);
+      stShowLastScan(barcode, found, qty);
       stBarcodeInput.focus();
     });
 
