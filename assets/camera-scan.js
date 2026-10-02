@@ -10,6 +10,8 @@
         - 4글자 미만, 제어문자 포함 값은 무시
      4) 확정 후에는 같은 값 3초, 어떤 값이든 0.7초 동안 다시 안 받음(중복 입력 방지)
      5) 화면 아래에 "인식 중 (n/필요수)" 상태를 보여줘서 지금 뭘 읽고 있는지 알 수 있게 함
+     6) 카메라 화면은 가운데 띠(기본 높이 170px)만 보이게 잘라서 작게 표시 — 폰 세로 화면에서 영상 박스가 화면 한가득
+        커져서 조회 결과를 보려면 스크롤을 내려야 하던 문제 대응 (조준 박스는 항상 가운데라 잘라도 읽는 영역은 그대로)
    사용법:
      var cam = RobustCameraScan.create({
        elementId: 'camReader',              // html5-qrcode가 영상을 그릴 div id
@@ -28,6 +30,8 @@
     var needUnknown = o.needUnknown || 4, dwellUnknown = o.dwellUnknown || 900;
     var windowMs = o.windowMs || 1800, sameCooldownMs = o.sameCooldownMs || 3000, anyCooldownMs = o.anyCooldownMs || 700;
     var minLen = o.minLen || 4;
+    var viewportH = o.viewportHeight || 170;    // 화면에 보이는 카메라 띠의 높이(px)
+    var viewportEl = null;
     var qr = null, running = false, starting = false;
     var hist = [], acceptedAt = {}, lastAcceptTs = 0, lastStatusTs = 0;
 
@@ -79,17 +83,19 @@
         hist = []; acceptedAt = {}; lastAcceptTs = 0;
         var cfg = { verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } };
         var fm = formatList(); if (fm && fm.length) cfg.formatsToSupport = fm;
+        mountViewport();
         qr = new global.Html5Qrcode(o.elementId, cfg);
         await qr.start(
-          // videoConstraints를 쓰면 위 facingMode 대신 이 값이 쓰이므로 facingMode를 여기에도 넣는다
+          // (해상도 videoConstraints는 일부러 안 넣는다 — 1280x720을 요청하면 폰 세로 화면에서 영상 박스가 아주 길게
+          //  잡히고 조준 박스가 영상 밖으로 밀리는 레이아웃 문제가 있었음. 라이브러리 기본 설정이 검증된 동작.)
           { facingMode: 'environment' },
           {
             fps: o.fps || 10,
-            // 가운데 가로로 긴 박스만 읽음 — 1차원 바코드에 맞는 모양이고, 배경 오인식을 줄인다
+            // 가운데 가로로 긴 박스만 읽음 — 1차원 바코드에 맞는 모양이고, 배경 오인식을 줄인다.
+            // 높이는 화면에 보이는 띠(viewportH) 안에 들어오게 제한
             qrbox: function (vw, vh) {
-              return { width: Math.floor(Math.min(vw * 0.9, 420)), height: Math.floor(Math.min(vh * 0.38, 150)) };
-            },
-            videoConstraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+              return { width: Math.floor(Math.min(vw * 0.9, 420)), height: Math.floor(Math.min(vh * 0.38, 150, viewportH - 24)) };
+            }
           },
           function (text) { feed(text); },
           function () { /* 프레임에서 못 읽음 — 정상, 무시 */ }
@@ -107,6 +113,30 @@
         try { qr.clear(); } catch (e) {}
       }
       qr = null; running = false; hist = [];
+      unmountViewport();
+    }
+
+    // 카메라 영상이 들어갈 element를 "고정 높이 + 가운데 정렬 + 넘치는 부분 숨김" 박스(viewport)로 감싼다.
+    // flex 가운데 정렬이라 영상이 박스보다 커도 위아래가 똑같이 잘려서 가운데 띠가 보인다(조준 박스 위치와 일치).
+    function mountViewport() {
+      var el = document.getElementById(o.elementId);
+      if (!el) return;
+      var vp = el.parentNode;
+      if (!vp.classList || !vp.classList.contains('rcs-viewport')) {
+        vp = document.createElement('div');
+        vp.className = 'rcs-viewport';
+        el.parentNode.insertBefore(vp, el);
+        vp.appendChild(el);
+      }
+      vp.style.cssText = 'display:flex;align-items:center;justify-content:center;overflow:hidden;width:100%;max-width:480px;margin:0 auto;' +
+        'height:' + viewportH + 'px;background:#000;border-radius:10px;';
+      el.style.display = 'block'; el.style.width = '100%'; el.style.flex = 'none'; el.style.minHeight = '0';
+      viewportEl = vp;
+    }
+    function unmountViewport() {
+      var el = document.getElementById(o.elementId);
+      if (el) { el.style.display = ''; el.style.minHeight = ''; }
+      if (viewportEl) viewportEl.style.display = 'none';
     }
 
     return { start: start, stop: stop, isRunning: function () { return running; }, _feed: feed };
