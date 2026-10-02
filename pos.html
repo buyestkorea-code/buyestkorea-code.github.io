@@ -466,7 +466,7 @@ function renderScanScreen(){
     <div class="bar" style="margin-top:-6px;"><div class="spacer"></div><button class="btn btn-outline" style="padding:5px 12px;font-size:12px;" onclick="renderUploadScreen()">재고파일 다시 올리기</button></div>
     <div class="stat-row" style="margin-top:10px;">
       <div class="stat">품목수<b>${st.itemCount}</b></div>
-      <div class="stat">현재 총 재고<b>${st.totalQty}</b></div>
+      <div class="stat">현재 총 재고(행사 남은 수량)<b>${st.totalQty}</b></div>
       <div class="stat">누적 판매<b>${st.soldQty}</b></div>
       <div class="stat">주문택배<b>${st.courierQty}</b></div>
       <div class="stat">회수<b>${st.recallQty}</b></div>
@@ -1042,8 +1042,10 @@ function stStatus(it){
 }
 const ST_LABEL = {ok:'일치', short:'부족', unchecked:'미확인', over:'초과', none:'해당없음'};
 function stSummary(items){
-  const s = {ok:0, short:0, unchecked:0, over:0, none:0, expectedSum:0, confirmedSum:0, extraSum:0};
+  const s = {ok:0, short:0, unchecked:0, over:0, none:0, expectedSum:0, confirmedSum:0, extraSum:0, curSum:0, recallSum:0};
   items.forEach(it => {
+    s.curSum += it.cur_qty;                                        // 스캔 화면 '현재 총 재고'와 같은 값
+    s.recallSum += stState.includeRecall ? (it.recall_qty || 0) : 0;
     const e = Math.max(stExpected(it), 0), c = it.counted_qty;
     s[stStatus(it)]++;
     s.expectedSum += e; s.confirmedSum += Math.min(c, e); s.extraSum += Math.max(c - e, 0);
@@ -1144,14 +1146,18 @@ function updateStocktakePanels(){
       <span><b>${s.confirmedSum.toLocaleString('ko-KR')}</b> / ${s.expectedSum.toLocaleString('ko-KR')}개 확인 (${pct}%)</span>
       <span style="color:var(--sub);">대상 ${s.target}품목${s.extraSum ? ` · 초과 확인 +${s.extraSum}개` : ''}</span>
     </div>
-    <div style="height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;"><div style="height:100%;width:${Math.min(pct,100)}%;background:var(--green);"></div></div>`;
+    <div style="height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;"><div style="height:100%;width:${Math.min(pct,100)}%;background:var(--green);"></div></div>
+    <div class="hint" style="margin-top:8px;line-height:1.7;">
+      <b>예상수량 ${s.expectedSum.toLocaleString('ko-KR')}개</b> = 행사 남은 재고 ${s.curSum.toLocaleString('ko-KR')}개${stState.includeRecall ? ` + 회수분 ${s.recallSum.toLocaleString('ko-KR')}개(중간에 본사로 보낸 것)` : ''}${s.expectedSum !== s.curSum + s.recallSum ? ` + 음수재고 보정 ${(s.expectedSum - s.curSum - s.recallSum).toLocaleString('ko-KR')}개` : ''}<br>
+      위쪽 숫자(개)는 <b>수량</b>, 아래 필터 칩의 숫자는 <b>품목 수</b>예요. 같은 상품이 2개 이상인 품목이 있어서 서로 달라요.
+    </div>`;
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   set('stOk', s.ok); set('stShort', s.short); set('stUnchecked', s.unchecked); set('stOver', s.over); set('stUnreg', stState.unreg);
 
   const chips = [['todo','확인필요', s.short + s.unchecked + s.over], ['all','전체', state.items.length], ['unchecked','미확인', s.unchecked],
                  ['short','부족', s.short], ['over','초과', s.over], ['ok','일치', s.ok], ['none','해당없음', s.none]];
   const fw = document.getElementById('stFilters');
-  if (fw) fw.innerHTML = chips.map(([k, label, n]) => `<div class="tab ${stState.filter===k?'active':''}" onclick="setStFilter('${k}')">${label} ${n}</div>`).join('');
+  if (fw) fw.innerHTML = chips.map(([k, label, n]) => `<div class="tab ${stState.filter===k?'active':''}" onclick="setStFilter('${k}')">${label} ${n}품목</div>`).join('');
   renderStocktakeTable();
 }
 
