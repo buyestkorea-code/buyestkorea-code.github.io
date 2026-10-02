@@ -602,6 +602,10 @@
     border-radius:16px; padding:18px 20px; box-shadow:var(--me-shadow); }
   #meToolsMobileSlot .me-hero-tools-h{ justify-content:space-between; margin-bottom:14px; }
   #meToolsMobileSlot .me-hero-tools-label{ display:block; }
+  #meToolsMobileSlot:not(:empty){ margin-bottom:18px; }
+  #meToolsMobileSlot .me-sync{ margin-left:auto; font-size:11px; color:var(--ink-muted); white-space:nowrap; }
+  #meToolsMobileSlot .me-sync:empty{ display:none; }
+  @media (max-width:640px){ .me-herorow{ display:none; } }
   #meToolsMobileSlot .me-hero-pick{ background:none; border:none; padding:0; color:var(--accent); font-weight:600; }
   #meToolsMobileSlot .me-hero-pick:hover{ background:none; text-decoration:underline; }
   #meToolsMobileSlot .me-toolgrid-hero button{ background:var(--surface); border-color:var(--border); }
@@ -1105,6 +1109,9 @@
         <!-- 로그인하면 이 위젯이 대시보드 메인이 되고, 아래 도구목록은 숨겨진다 (도구는 사이드바에) -->
         <div class="me-wrap">
           <div id="meApp" hidden>
+            <!-- 폰에서는 인사말 배너 대신 '자주 쓰는 도구'가 맨 위에 오도록, 도구 블록을 이 자리로
+                 옮겨 붙인다(아래 JS). 데스크톱에서는 비어있고 도구는 히어로 배너 안에 있다. -->
+            <div id="meToolsMobileSlot"></div>
             <div class="me-herorow">
               <div class="me-hero">
                 <div class="me-hero-top">
@@ -1200,10 +1207,6 @@
                     </div>
                   </div>
                 </div>
-
-                <!-- 좁은 화면(폰)에서는 자주 쓰는 도구의 우선순위가 낮아서, 오늘의 할일·캘린더보다
-                     아래로 오도록 이 자리로 옮겨 붙인다 (JS: placeHeroTools). 데스크톱에서는 비어있음. -->
-                <div id="meToolsMobileSlot"></div>
 
                 <div class="me-panel me-metrics">
                   <div class="me-panel-h">
@@ -2423,12 +2426,17 @@
     }
     $('meToolsEdit').addEventListener('click', function(){ optsBox.hidden = !optsBox.hidden; });
 
-    // 폰 화면에서는 "오늘의 할일 → 캘린더 → 자주 쓰는 도구" 순서가 되도록, 이 도구 블록을
-    // 히어로 안(데스크톱 자리)과 캘린더 아래(폰 자리) 사이에서 그때그때 옮겨 붙인다.
+    // 폰 화면에서는 인사말 배너를 없애고 "자주 쓰는 도구"를 맨 위로 올린다. 이 도구 블록을
+    // 히어로 안(데스크톱 자리)과 맨 위 슬롯(폰 자리) 사이에서 그때그때 옮겨 붙이고,
+    // 저장/동기화 상태 배지도 폰에서는 도구 카드 머리줄로 같이 옮긴다.
     (function(){
       var heroTools = $('meHeroTools'), heroSlot = heroTools.parentNode, mobileSlot = $('meToolsMobileSlot');
+      var sync = $('meSync'), syncHome = sync.parentNode, toolsHead = heroTools.querySelector('.me-hero-tools-h'), pickBtn = $('meToolsEdit');
       var mq = window.matchMedia('(max-width:640px)');
-      function place(){ (mq.matches ? mobileSlot : heroSlot).appendChild(heroTools); }
+      function place(){
+        (mq.matches ? mobileSlot : heroSlot).appendChild(heroTools);
+        if(mq.matches) toolsHead.insertBefore(sync, pickBtn); else syncHome.appendChild(sync);
+      }
       place();
       (mq.addEventListener ? mq.addEventListener.bind(mq) : mq.addListener.bind(mq))('change', place);
     })();
