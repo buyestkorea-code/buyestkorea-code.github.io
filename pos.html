@@ -45,6 +45,8 @@
   .c-sale{background:#f0fdf4;color:#15803d;}
   .c-return{background:#eff6ff;color:#1d4ed8;}
   .c-manual{background:#fef3c7;color:#92400e;}
+  .c-courier{background:#ede9fe;color:#5b21b6;}
+  .c-recall{background:#ffedd5;color:#9a3412;}
   .c-void{background:#f3f4f6;color:#9ca3af;text-decoration:line-through;}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;}
   .modal{background:#fff;border-radius:12px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow:auto;}
@@ -123,8 +125,10 @@ function fmtTime(ts){ return new Date(ts*1000).toLocaleTimeString('ko-KR',{hour:
    날짜가 깨짐 — 반드시 이 함수처럼 연/월/일을 직접 조립할 것. */
 function fmtYMD(ts){ const d = new Date(ts*1000); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function money(n){ return N(n).toLocaleString('ko-KR'); }
-const TYPE_LABEL_KO = {sale:'판매', return:'반품', manual_sale:'수기판매'};
-const TYPE_LABEL_CHIP = {sale:['판매','c-sale'], return:['반품','c-return'], manual_sale:['수기판매','c-manual']};
+const TYPE_LABEL_KO = {sale:'판매', return:'반품', manual_sale:'수기판매', courier:'주문택배', recall:'회수'};
+const TYPE_LABEL_CHIP = {sale:['판매','c-sale'], return:['반품','c-return'], manual_sale:['수기판매','c-manual'], courier:['주문택배','c-courier'], recall:['회수','c-recall']};
+/* 주문택배/회수는 재고만 줄이고 매출(판매금액)로는 안 잡는 이동 거래 — 금액 표시는 생략 */
+const isMoveType = type => type === 'courier' || type === 'recall';
 /* 거래 한 건의 표시용 품명/사이즈 — 등록품목이면 재고파일에서 온 브랜드+품명/사이즈,
    수기판매(미등록바코드)면 그때 입력한 manual_name/manual_size */
 function txnDisplayName(t){
@@ -354,13 +358,30 @@ async function handleInventoryFile(e){
     <div class="hint">${rows.length}건 인식됨 (미리보기 상위 8건)</div>
     <div class="tbl-wrap" style="max-height:260px;margin-top:8px;">
       <table><thead><tr><th>브랜드</th><th>품목명</th><th>사이즈</th><th>바코드</th><th>재고량</th><th>단가</th></tr></thead>
-      <tbody>${rows.slice(0,8).map(r=>`<tr><td>${esc(r.brand)}</td><td>${esc(r.item_name)}</td><td>${esc(r.size)}</td><td>${esc(r.barcode)}</td><td>${r.init_qty}</td><td>${money(r.price)}</td></tr>`).join('')}</tbody></table>
+      <tbody>${rows.slice(0,8).map(r=>`<tr><td>${esc(r.brand)}</td><td>${esc(r.item_name)}</td><td>${esc(sizeText(r.size))}</td><td>${esc(r.barcode)}</td><td>${r.init_qty}</td><td>${money(r.price)}</td></tr>`).join('')}</tbody></table>
     </div>
     <div class="bar" style="margin-top:14px;"><button class="btn btn-primary" onclick="submitUpload()">이 내용으로 업로드</button></div>
   `;
 }
 
-/* 분류명/품목명/바코드/재고량/단가 헤더를 찾아 매핑, 분류명은 병합셀이라 fill-down */
+/* 품목명에서 (품번, 사이즈) 분리. 사이즈는 "품번_사이즈" 처럼 밑줄이 2개 이상일 때 마지막 조각이거나,
+   밑줄이 1개여도 마지막 조각이 TU/S/M/48 같은 사이즈 모양일 때만 인정한다.
+   예전엔 무조건 "마지막 밑줄 뒤 = 사이즈"로 잘라서, "행_1A000 96 68950 999"처럼 사이즈가 아예 없는
+   품목명(앞의 "행_"이 유일한 밑줄)은 품번 전체가 사이즈로 저장되는 버그가 있었다(2026-10-02 수정). */
+const SIZE_TOKEN_RE = /^(XXS|XS|S|M|L|XL|XXL|XXXL|TU|FREE|F|ONE|OS|UNI|\d{1,3}(\.5)?|\d{1,2}[YMA])$/i;
+function splitNameAndSize(itemName){
+  const parts = itemName.split('_');
+  if (parts.length >= 3){
+    return { styleCode: parts.slice(0,-1).join('_'), size: parts[parts.length-1].trim() };
+  }
+  if (parts.length === 2 && SIZE_TOKEN_RE.test(parts[1].trim())){
+    return { styleCode: parts[0], size: parts[1].trim() };
+  }
+  return { styleCode: itemName, size: '' };
+}
+
+/* 분류명/품목명/바코드/재고량/단가 헤더를 찾아 매핑, 분류명은 병합셀이라 fill-down.
+   파일에 '사이즈'(또는 '규격') 컬럼이 따로 있으면 그 값을 우선 사이즈로 쓴다. */
 function parseInventoryExcel(aoa){
   let headerIdx = -1, colMap = {};
   for (let i=0;i<aoa.length;i++){
@@ -373,6 +394,7 @@ function parseInventoryExcel(aoa){
       if (t==='바코드') idx.barcode = ci;
       if (t==='재고량') idx.init_qty = ci;
       if (t==='단가') idx.price = ci;
+      if (t==='사이즈' || t==='규격') idx.size = ci;
     });
     if (idx.item_name!==undefined && idx.barcode!==undefined){ headerIdx = i; colMap = idx; break; }
   }
@@ -389,9 +411,9 @@ function parseInventoryExcel(aoa){
     const barcode = S(row[colMap.barcode]);
     if (!barcode) continue;
     const itemName = S(row[colMap.item_name]);
-    const li = itemName.lastIndexOf('_');
-    const size = li>=0 ? itemName.slice(li+1) : '';
-    const styleCode = li>=0 ? itemName.slice(0,li) : itemName;
+    const parsed = splitNameAndSize(itemName);
+    const styleCode = parsed.styleCode;
+    const size = (colMap.size!==undefined && S(row[colMap.size])!=='') ? S(row[colMap.size]) : parsed.size;
     out.push({
       brand: curBrand,
       item_name: itemName,
@@ -421,8 +443,12 @@ async function submitUpload(){
 function cornerStats(){
   const totalQty = state.items.reduce((a,i)=>a+i.cur_qty,0);
   const soldQty = state.items.reduce((a,i)=>a+i.sold_qty,0);
-  return {itemCount: state.items.length, totalQty, soldQty};
+  const courierQty = state.items.reduce((a,i)=>a+(i.courier_qty||0),0);
+  const recallQty = state.items.reduce((a,i)=>a+(i.recall_qty||0),0);
+  return {itemCount: state.items.length, totalQty, soldQty, courierQty, recallQty};
 }
+/* 사이즈가 없는 품목(이번 행사 재고파일처럼 품목명에 사이즈가 없는 경우)은 빈 칸 대신 '-'로 보여준다 */
+const sizeText = s => S(s) || '-';
 
 function renderScanScreen(){
   state.screen = 'scan';
@@ -435,6 +461,8 @@ function renderScanScreen(){
       <div class="stat">품목수<b>${st.itemCount}</b></div>
       <div class="stat">현재 총 재고<b>${st.totalQty}</b></div>
       <div class="stat">누적 판매<b>${st.soldQty}</b></div>
+      <div class="stat">주문택배<b>${st.courierQty}</b></div>
+      <div class="stat">회수<b>${st.recallQty}</b></div>
     </div>
 
     <div class="scan-box">
@@ -442,6 +470,8 @@ function renderScanScreen(){
         <button class="btn ${state.mode==='sale'?'btn-primary':'btn-outline'}" onclick="setMode('sale')">판매</button>
         <button class="btn ${state.mode==='return'?'btn-primary':'btn-outline'}" onclick="setMode('return')">반품</button>
         <button class="btn ${state.mode==='exchange'?'btn-primary':'btn-outline'}" onclick="setMode('exchange')">교환</button>
+        <button class="btn ${state.mode==='courier'?'btn-primary':'btn-outline'}" onclick="setMode('courier')">주문택배</button>
+        <button class="btn ${state.mode==='recall'?'btn-primary':'btn-outline'}" onclick="setMode('recall')">회수</button>
       </div>
       <div id="modeHint" class="hint"></div>
       <input id="barcodeInput" placeholder="바코드 스캔 또는 입력 후 Enter" autocomplete="off">
@@ -481,6 +511,8 @@ function updateModeHint(){
   if (!hint) return;
   if (state.mode==='sale') hint.textContent = '판매할 상품의 바코드를 스캔하세요.';
   if (state.mode==='return') hint.textContent = '반품할 상품의 바코드를 스캔하세요.';
+  if (state.mode==='courier') hint.textContent = '온라인 주문으로 택배 발송할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액으로는 안 잡혀요)';
+  if (state.mode==='recall') hint.textContent = '본사 등으로 회수할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액으로는 안 잡혀요)';
   if (state.mode==='exchange') hint.textContent = state.exchangeStep==='sale'
     ? '이제 새로 가져갈(교환) 상품의 바코드를 스캔하세요.'
     : '먼저 반품(돌려받을) 상품의 바코드를 스캔하세요.';
@@ -518,9 +550,12 @@ function renderItemCard(item, intent){
   return `
     <div class="item-card hit">
       <div class="name">${esc(item.brand)} ${esc(item.item_name)}</div>
-      <div class="meta">사이즈 ${esc(item.size)} · 바코드 ${esc(item.barcode)}</div>
+      <div class="meta">${item.size ? '사이즈 ' + esc(item.size) + ' · ' : ''}바코드 ${esc(item.barcode)}</div>
       <div class="qty ${low?'low':''}">현재고 ${item.cur_qty}개 ${low?'(0 이하 — 확인 후 진행)':''}</div>
-      ${intent==='sale' ? `
+      ${isMoveType(intent) ? `
+        <div class="field"><label>비고</label><input id="scanNote" placeholder="${intent==='courier' ? '주문번호 / 받는 분 / 송장번호 등 (선택)' : '회수 장소 / 사유 등 (예: 이시아 > 본사)'}"></div>
+        <button class="btn btn-big" style="width:100%;margin-top:8px;background:${intent==='courier'?'#5b21b6':'#9a3412'};color:#fff;" onclick="submitMove('${escJsAttr(item.barcode)}', '${intent}')">${intent==='courier' ? '주문택배 발송 확정' : '회수 확정'}</button>
+      ` : intent==='sale' ? `
         <div class="row" style="margin-top:12px;">
           <div class="field"><label>판매가</label><input id="scanPrice" type="number" value="${item.price}"></div>
           <div class="field"><label>할인</label>
@@ -544,6 +579,18 @@ function renderUnregisteredCard(barcode, prevManual, intent){
   const prefName = prevManual ? prevManual.manual_name : '';
   const prefSize = prevManual ? prevManual.manual_size : '';
   const prefPrice = prevManual ? prevManual.price : 0;
+  if (isMoveType(intent)){
+    const label = intent==='courier' ? '주문택배' : '회수';
+    return `
+      <div class="item-card miss">
+        <div class="name">미등록상품</div>
+        <div class="meta">바코드 ${esc(barcode)} — 재고파일에 없어요. 품명을 직접 입력해서 ${label}로 기록할 수 있어요 (재고 수량에는 영향 없음).</div>
+        <div class="field"><label>품명</label><input id="manName" value="${esc(prefName)}" placeholder="상품명"></div>
+        <div class="field"><label>사이즈</label><input id="manSize" value="${esc(prefSize)}"></div>
+        <div class="field"><label>비고</label><input id="manNote" placeholder="${intent==='courier' ? '주문번호 / 받는 분 등 (선택)' : '회수 장소 / 사유 등 (선택)'}"></div>
+        <button class="btn btn-outline btn-big" style="width:100%;margin-top:8px;" onclick="submitManualMove('${escJsAttr(barcode)}', '${intent}')">미등록 상품 ${label} 기록</button>
+      </div>`;
+  }
   if (intent === 'return'){
     return `
       <div class="item-card miss">
@@ -592,6 +639,24 @@ async function submitReturn(barcode){
   toast('반품 처리됐어요', 'ok');
   await afterTxn();
 }
+/* 주문택배 / 회수 — 재고만 줄이고 매출은 0으로 기록 */
+async function submitMove(barcode, moveType){
+  const note = S(document.getElementById('scanNote').value);
+  const res = await apiPost('scan_move', {corner_id: state.corner.id, actor: state.actor, barcode, move_type: moveType, note});
+  if (!res.ok){ toast(res.error||'처리 실패','err'); return; }
+  toast(moveType==='courier' ? '주문택배로 기록됐어요' : '회수로 기록됐어요', 'ok');
+  await afterTxn();
+}
+async function submitManualMove(barcode, moveType){
+  const manual_name = S(document.getElementById('manName').value);
+  if (!manual_name){ toast('품명을 입력해주세요','err'); return; }
+  const manual_size = S(document.getElementById('manSize').value);
+  const note = S(document.getElementById('manNote').value);
+  const res = await apiPost('manual_move', {corner_id: state.corner.id, actor: state.actor, barcode, move_type: moveType, manual_name, manual_size, note});
+  if (!res.ok){ toast(res.error||'처리 실패','err'); return; }
+  toast(moveType==='courier' ? '주문택배로 기록됐어요' : '회수로 기록됐어요', 'ok');
+  await afterTxn();
+}
 async function submitUnregisteredReturn(barcode){
   // 재고파일에 없는 바코드의 반품 — manual_sale과 동일 원장에 type return, item_id 없이 기록되도록
   // 서버는 scan_return에서 item 못찾으면 unregistered를 리턴하므로, 수기 반품 전용 처리로 manual_sale API를 qty +1 용도로 재사용하지 않고
@@ -623,7 +688,7 @@ async function handleExchangeScan(barcode){
     updateModeHint();
     box.innerHTML = `
       <div class="item-card hit">
-        <div class="name">반품: ${esc(res.item.brand)} ${esc(res.item.item_name)} (${esc(res.item.size)})</div>
+        <div class="name">반품: ${esc(res.item.brand)} ${esc(res.item.item_name)}${res.item.size ? ' (' + esc(res.item.size) + ')' : ''}</div>
         <div class="meta">이제 새로 가져갈 상품의 바코드를 스캔하세요.</div>
       </div>`;
     focusBarcode();
@@ -635,8 +700,8 @@ async function handleExchangeScan(barcode){
   const item = res.item;
   box.innerHTML = `
     <div class="item-card hit">
-      <div class="name">반품: ${esc(state.exchangeReturn.item_name)} (${esc(state.exchangeReturn.size)})</div>
-      <div class="name" style="margin-top:6px;">→ 교환: ${esc(item.brand)} ${esc(item.item_name)} (${esc(item.size)})</div>
+      <div class="name">반품: ${esc(state.exchangeReturn.item_name)}${state.exchangeReturn.size ? ' (' + esc(state.exchangeReturn.size) + ')' : ''}</div>
+      <div class="name" style="margin-top:6px;">→ 교환: ${esc(item.brand)} ${esc(item.item_name)}${item.size ? ' (' + esc(item.size) + ')' : ''}</div>
       <div class="row" style="margin-top:12px;">
         <div class="field"><label>교환 판매가</label><input id="exPrice" type="number" value="${item.price}"></div>
         <div class="field"><label>할인</label>
@@ -672,12 +737,17 @@ async function afterTxn(){
   document.getElementById('scanResult').innerHTML = '';
   const itemsRes = await apiGet('items', {corner_id: state.corner.id});
   state.items = itemsRes.items || [];
-  const st = cornerStats();
-  document.querySelectorAll('.stat b')[0].textContent = st.itemCount;
-  document.querySelectorAll('.stat b')[1].textContent = st.totalQty;
-  document.querySelectorAll('.stat b')[2].textContent = st.soldQty;
+  updateScanStats();
   await loadRecent();
   focusBarcode();
+}
+function updateScanStats(){
+  const st = cornerStats();
+  const statEls = document.querySelectorAll('.stat-row .stat b');
+  if (statEls.length === 5){
+    statEls[0].textContent = st.itemCount; statEls[1].textContent = st.totalQty; statEls[2].textContent = st.soldQty;
+    statEls[3].textContent = st.courierQty; statEls[4].textContent = st.recallQty;
+  }
 }
 
 async function loadRecent(){
@@ -691,7 +761,7 @@ async function loadRecent(){
     return `
       <div class="recent-item">
         <span class="chip ${t.voided? 'c-void':cls}">${label}${t.voided?'(취소됨)':''}</span>
-        <span class="grow">${esc(txnDisplayName(t))}${size?' ('+esc(size)+')':''} ${money(t.final_amount)}원 ${t.note?('· '+esc(t.note)):''}</span>
+        <span class="grow">${esc(txnDisplayName(t))}${size?' ('+esc(size)+')':''} ${isMoveType(t.type)?'':money(t.final_amount)+'원'} ${t.note?('· '+esc(t.note)):''}</span>
         <span>${fmtDate(t.created_at)}</span>
         ${!t.voided ? `<button class="void-btn" onclick="voidTxn(${t.id})">취소</button>` : ''}
       </div>`;
@@ -755,14 +825,15 @@ async function renderDailyScreen(){
   if (res.days.length===0){ body.innerHTML = '<div class="hint">아직 거래 내역이 없어요.</div>'; return; }
   body.innerHTML = `
     <div class="tbl-wrap"><table>
-      <thead><tr><th>날짜</th><th>판매</th><th>수기판매</th><th>반품</th><th>판매금액</th><th>반품금액</th><th></th></tr></thead>
+      <thead><tr><th>날짜</th><th>판매</th><th>수기판매</th><th>반품</th><th>주문택배</th><th>회수</th><th>판매금액</th><th>반품금액</th><th></th></tr></thead>
       <tbody>${res.days.map(d => `
         <tr>
           <td>${esc(d.d)}</td><td>${d.sale_cnt}</td><td>${d.manual_cnt}</td><td>${d.return_cnt}</td>
+          <td>${d.courier_cnt||0}</td><td>${d.recall_cnt||0}</td>
           <td>${money(d.sale_amount)}</td><td>${money(d.return_amount)}</td>
           <td><button class="btn btn-outline" id="ddbtn-${d.d}" style="padding:3px 10px;font-size:12px;" onclick="toggleDayDetail('${d.d}')">더보기</button></td>
         </tr>
-        <tr id="dd-${d.d}" style="display:none;"><td colspan="7" style="background:#fafafa;"></td></tr>
+        <tr id="dd-${d.d}" style="display:none;"><td colspan="9" style="background:#fafafa;"></td></tr>
       `).join('')}</tbody>
     </table></div>`;
 }
@@ -786,17 +857,17 @@ async function toggleDayDetail(dateStr){
   const rows = res.txns.slice().sort((a,b)=>a.created_at-b.created_at);
   td.innerHTML = `
     <table style="width:100%;font-size:12.5px;">
-      <thead><tr><th>시간</th><th>구분</th><th>품명</th><th>사이즈</th><th>바코드</th><th>수량</th><th>금액</th><th>비고</th></tr></thead>
+      <thead><tr><th style="white-space:nowrap;">시간</th><th style="white-space:nowrap;">구분</th><th>품명</th><th style="white-space:nowrap;">사이즈</th><th style="white-space:nowrap;">바코드</th><th style="white-space:nowrap;">수량</th><th style="white-space:nowrap;">금액</th><th>비고</th></tr></thead>
       <tbody>${rows.map(t => {
         const [label, cls] = TYPE_LABEL_CHIP[t.type] || [t.type, ''];
         return `<tr${t.voided ? ' style="opacity:.5;text-decoration:line-through;"' : ''}>
-          <td>${fmtTime(t.created_at)}</td>
-          <td><span class="chip ${t.voided?'c-void':cls}">${label}${t.voided?'(취소)':''}</span></td>
+          <td style="white-space:nowrap;">${fmtTime(t.created_at)}</td>
+          <td style="white-space:nowrap;"><span class="chip ${t.voided?'c-void':cls}">${label}${t.voided?'(취소)':''}</span></td>
           <td>${esc(txnDisplayName(t))}</td>
-          <td>${esc(txnDisplaySize(t))}</td>
-          <td>${esc(t.barcode)}</td>
-          <td>${t.qty_delta}</td>
-          <td>${money(t.final_amount)}</td>
+          <td style="white-space:nowrap;">${esc(sizeText(txnDisplaySize(t)))}</td>
+          <td style="white-space:nowrap;">${esc(t.barcode)}</td>
+          <td style="white-space:nowrap;">${t.qty_delta}</td>
+          <td style="white-space:nowrap;">${isMoveType(t.type) ? '-' : money(t.final_amount)}</td>
           <td>${esc(t.note||'')}</td>
         </tr>`;
       }).join('')}</tbody>
@@ -823,6 +894,7 @@ async function downloadDailyDetail(){
       '날짜': d.d, '구분': '일계',
       '시간': '', '품명': '', '사이즈': '', '바코드': '', '수량': '', '금액': '', '비고': '',
       '판매건수': d.sale_cnt, '수기판매건수': d.manual_cnt, '반품건수': d.return_cnt,
+      '주문택배건수': d.courier_cnt||0, '회수건수': d.recall_cnt||0,
       '판매금액합계': d.sale_amount, '반품금액합계': d.return_amount,
     });
     const dayTxns = (byDate[d.d] || []).slice().sort((a,b)=>a.created_at-b.created_at);
@@ -830,8 +902,8 @@ async function downloadDailyDetail(){
       rows.push({
         '날짜': '', '구분': TYPE_LABEL_KO[t.type] + (t.exchange_group?'(교환)':'') + (t.voided?' [취소됨]':''),
         '시간': fmtTime(t.created_at), '품명': txnDisplayName(t), '사이즈': txnDisplaySize(t),
-        '바코드': t.barcode, '수량': t.qty_delta, '금액': t.final_amount, '비고': t.note || '',
-        '판매건수': '', '수기판매건수': '', '반품건수': '', '판매금액합계': '', '반품금액합계': '',
+        '바코드': t.barcode, '수량': t.qty_delta, '금액': isMoveType(t.type) ? '' : t.final_amount, '비고': t.note || '',
+        '판매건수': '', '수기판매건수': '', '반품건수': '', '주문택배건수': '', '회수건수': '', '판매금액합계': '', '반품금액합계': '',
       });
     });
   });
@@ -919,7 +991,7 @@ function renderStocktakeTable(){
         const diff = it.counted_qty - it.cur_qty;
         const rowStyle = diff === 0 ? '' : `style="background:${diff>0?'#fef3c7':'#fef2f2'};"`;
         return `<tr ${rowStyle}>
-          <td>${esc(it.brand)}</td><td>${esc(it.item_name)}</td><td>${esc(it.size)}</td><td>${esc(it.barcode)}</td>
+          <td>${esc(it.brand)}</td><td>${esc(it.item_name)}</td><td>${esc(sizeText(it.size))}</td><td>${esc(it.barcode)}</td>
           <td>${it.cur_qty}</td><td>${it.counted_qty}</td>
           <td>${diff>0?'+':''}${diff}</td>
         </tr>`;
@@ -953,7 +1025,7 @@ async function onCountSubmit(){
   box.innerHTML = `
     <div class="item-card ${diff===0?'hit':'miss'}">
       <div class="name">${esc(it.brand)} ${esc(it.item_name)}</div>
-      <div class="meta">사이즈 ${esc(it.size)} · 바코드 ${esc(it.barcode)}</div>
+      <div class="meta">${it.size ? "사이즈 " + esc(it.size) + " · " : ""}바코드 ${esc(it.barcode)}</div>
       <div class="qty">전산 예상재고 ${it.cur_qty}개 · 지금까지 확인 ${it.counted_qty}개</div>
       <div class="field"><label>비고</label><input id="countNote" placeholder="선택사항"></div>
       <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitCount('${escJsAttr(barcode)}')">실물 확인 (+1)</button>
@@ -1044,11 +1116,12 @@ async function downloadExport(){
   const reconcileRows = res.items.map(it => {
     const list = (txnByItem[it.id] || []).slice().sort((a,b)=>a.created_at-b.created_at);
     const history = list.map(t => {
-      const lbl = t.type==='sale' ? '판매' : (t.type==='return' ? '반품' : '수기판매');
+      const lbl = TYPE_LABEL_KO[t.type] || t.type;
       const qty = Math.abs(t.qty_delta);
       const flag = t.voided ? '[취소]' : '';
       return `${lbl}${qty}(${fmtMD(t.created_at)})${flag}`;
     }).join(', ');
+    const returned = list.filter(t => t.type==='return' && !t.voided).reduce((a,t)=>a+Math.abs(t.qty_delta),0);
     const counted = it.counted_qty || 0;
     return {
       '브랜드': it.brand,
@@ -1056,6 +1129,10 @@ async function downloadExport(){
       '사이즈': it.size,
       '바코드': it.barcode,
       '기존재고(초기)': it.init_qty,
+      '판매수량': it.sold_qty || 0,
+      '반품수량': returned,
+      '주문택배수량': it.courier_qty || 0,
+      '회수수량': it.recall_qty || 0,
       '거래내역': history,
       '현재전산재고': it.cur_qty,
       '실사확인수량': counted,
@@ -1064,17 +1141,17 @@ async function downloadExport(){
     };
   });
 
-  // 시트3: 미등록 수기판매만 모아서
-  const manualRows = res.txns.filter(t => t.type==='manual_sale').map(t => ({
-    '날짜': fmtDate(t.created_at), '바코드': t.barcode,
-    '품명': t.manual_name, '사이즈': t.manual_size, '최종금액': t.final_amount,
+  // 시트3: 재고파일에 없는 바코드(미등록)로 수기 입력한 거래 — 수기판매 + 미등록 주문택배/회수
+  const manualRows = res.txns.filter(t => !t.item_id).map(t => ({
+    '날짜': fmtDate(t.created_at), '구분': TYPE_LABEL_KO[t.type] || t.type, '바코드': t.barcode,
+    '품명': t.manual_name, '사이즈': t.manual_size, '최종금액': isMoveType(t.type) ? '' : t.final_amount,
     '비고': t.note || '', '취소여부': t.voided?'취소됨':'',
   }));
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(reconcileRows), '재고대사');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ledgerRows), '거래원장');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(manualRows), '미등록수기판매');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(manualRows), '미등록수기내역');
   XLSX.writeFile(wb, `${res.event.name}_마감정산_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
@@ -1126,9 +1203,7 @@ setInterval(async () => {
       const itemsRes = await apiGet('items', {corner_id: state.corner.id});
       if (itemsRes.ok) {
         state.items = itemsRes.items;
-        const st = cornerStats();
-        const statEls = document.querySelectorAll('.stat-row .stat b');
-        if (statEls.length === 3){ statEls[0].textContent=st.itemCount; statEls[1].textContent=st.totalQty; statEls[2].textContent=st.soldQty; }
+        updateScanStats();
       }
       await loadRecent();
     } else if (state.screen === 'stocktake') {
