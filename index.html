@@ -1575,6 +1575,11 @@
                     </div>
                     <div id="stLastScan" style="margin-top:8px;min-height:22px;"></div>
                     <label style="font-size:12.5px;display:inline-flex;align-items:center;gap:6px;margin-top:6px;"><input type="checkbox" id="stSound" checked /> 스캔 소리</label>
+                    <div class="btn-row" style="margin-top:8px;"><button class="btn" id="stCamToggle" type="button">📷 폰 카메라로 스캔</button></div>
+                    <div id="stCamWrap" style="display:none;margin-top:8px;">
+                      <div id="stCamReader" style="width:100%;max-width:420px;border-radius:10px;overflow:hidden;background:#000;min-height:220px;"></div>
+                      <div id="stCamStatus" style="font-size:12.5px;color:var(--ink-muted);margin-top:6px;min-height:18px;"></div>
+                    </div>
                     <div class="dz-grid" style="margin-top:10px;">
                       <div class="field"><label>수량</label><input type="number" class="textinput" id="stQtyInput" value="1" min="0.01" step="1" /></div>
                       <div class="field"><label>담당자</label><input type="text" class="textinput" id="stCounterInput" placeholder="이름" /></div>
@@ -1920,6 +1925,7 @@
   // pushHash=false는 뒤로/앞으로가기(hashchange)로 인한 호출임을 뜻한다 - 이때는 주소 해시를
   // 다시 쓰지 않는다(그렇게 하면 새 기록이 또 쌓여 뒤로가기가 제자리에서 맴돈다).
   function showView(name, roadmapTarget, pushHash){
+    try { document.dispatchEvent(new CustomEvent('toolkit:viewchange', {detail: {view: name}})); } catch(e) {}
     document.querySelectorAll('[data-view]').forEach(function(el){
       el.classList.toggle('active', el.getAttribute('data-view') === name);
     });
@@ -6777,6 +6783,7 @@
     stRenderResumeBanner();
 
     document.getElementById('stNewBase').addEventListener('click', function(){
+      if(typeof stStopCamera === 'function' && stCam) stStopCamera();
       stSetBase(null, null); stCounts = {}; stUnregisteredOrder = {}; stScanEvents = []; stScanEventIdCounter = 0;
       stClearSession();
       document.getElementById('stBaseFile').value = '';
@@ -7000,11 +7007,11 @@
     }
 
     var stBarcodeInput = document.getElementById('stBarcodeInput');
-    stBarcodeInput.addEventListener('keydown', function(e){
-      if(e.key !== 'Enter') return;
-      e.preventDefault();
+    // 스캔 한 건 처리 — USB/블루투스 스캐너(Enter)와 폰 카메라가 같이 쓴다. fromCamera면 입력칸에 포커스를 안 줘서
+    // 폰에서 소프트 키보드가 튀어나오지 않게 한다.
+    function stProcessScan(rawValue, fromCamera){
       if(!stBaseItems) return;
-      var raw = stBarcodeInput.value.trim();
+      var raw = String(rawValue || '').trim();
       if(!raw) return;
       var barcode = stBarcodeStr(raw);
       var qty = parseFloat(document.getElementById('stQtyInput').value) || 1;
@@ -7022,7 +7029,73 @@
       renderStStats();
       stUpdateLiveAfterScan(barcode);
       stShowLastScan(barcode, found, qty);
-      stBarcodeInput.focus();
+      if(!fromCamera) stBarcodeInput.focus();
+    }
+    stBarcodeInput.addEventListener('keydown', function(e){
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      stProcessScan(stBarcodeInput.value, false);
+    });
+
+    /* ---- 폰 카메라 스캔 (2026-10-03) — assets/camera-scan.js 의 오인식 방지 래퍼 사용.
+       이 페이지는 카메라 라이브러리를 미리 안 불러오므로, 버튼을 처음 누를 때 한 번만 불러온다. ---- */
+    var stCam = null;
+    function stLoadScript(src){
+      return new Promise(function(resolve, reject){
+        if(document.querySelector('script[data-st-src="' + src + '"]')) return resolve();
+        var sc = document.createElement('script');
+        sc.src = src; sc.setAttribute('data-st-src', src);
+        sc.onload = function(){ resolve(); };
+        sc.onerror = function(){ reject(new Error('카메라 스캔 모듈을 불러오지 못했어요 (인터넷 연결 확인)')); };
+        document.head.appendChild(sc);
+      });
+    }
+    async function stEnsureCameraLibs(){
+      if(typeof Html5Qrcode === 'undefined') await stLoadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js');
+      if(typeof RobustCameraScan === 'undefined') await stLoadScript('assets/camera-scan.js');
+    }
+    function stSetCamUi(on, msg){
+      document.getElementById('stCamWrap').style.display = on ? 'block' : 'none';
+      document.getElementById('stCamToggle').textContent = on ? '📷 카메라 끄기' : '📷 폰 카메라로 스캔';
+      if(msg !== undefined) document.getElementById('stCamStatus').textContent = msg;
+    }
+    async function stStopCamera(){
+      // 화면이 바뀌거나 꺼질 때도 카메라 불이 바로 꺼지도록 영상 트랙부터 즉시 정지
+      document.querySelectorAll('#stCamReader video').forEach(function(v){
+        var st = v.srcObject; if(st && st.getTracks) st.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} });
+      });
+      var c = stCam; stCam = null;
+      if(c){ try{ await c.stop(); }catch(e){} }
+      stSetCamUi(false, '');
+    }
+    async function stStartCamera(){
+      if(!stBaseItems) return;
+      var statusEl = document.getElementById('stCamStatus');
+      stSetCamUi(true, '카메라를 여는 중…');
+      try{
+        await stEnsureCameraLibs();
+        stCam = RobustCameraScan.create({
+          elementId: 'stCamReader',
+          sameCooldownMs: 2500,   // 같은 바코드 상품을 이어서 찍는 실사 작업이라 기본(3초)보다 조금 짧게
+          isKnown: function(code){ return !!(stBaseItems && stBaseItems[stBarcodeStr(code)]); },
+          onStatus: function(msg, kind){
+            statusEl.textContent = msg;
+            statusEl.style.color = kind === 'ok' ? '#15803d' : (kind === 'warn' ? '#92400e' : 'var(--ink-muted)');
+          },
+          onAccept: function(text){ stProcessScan(text, true); }
+        });
+        await stCam.start();
+      }catch(err){
+        stCam = null;
+        stSetCamUi(false, '');
+        alert('카메라를 열 수 없습니다. 브라우저 카메라 권한과 인터넷 연결을 확인해주세요.\n(' + (err && err.message ? err.message : err) + ')');
+      }
+    }
+    document.getElementById('stCamToggle').addEventListener('click', function(){
+      if(stCam) stStopCamera(); else stStartCamera();
+    });
+    document.addEventListener('toolkit:viewchange', function(e){
+      if(e.detail && e.detail.view !== 'stocktake' && stCam) stStopCamera();
     });
 
     document.getElementById('stDownloadScan').addEventListener('click', function(){
