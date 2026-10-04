@@ -2461,6 +2461,43 @@
 
     function renderPersonal(){ renderMemo(); renderTasks(); renderLinks(); renderPicks(); renderOpts(); }
 
+    /* ---------------- 방문 로그 ---------------- */
+    function logVisit(ev){
+      if(!AUTH) return;
+      try{ if(ev !== 'login' && sessionStorage.getItem('buyest.visitlogged')) return; sessionStorage.setItem('buyest.visitlogged','1'); }catch(e){}
+      api('visit_log', {event:ev}).catch(function(){});
+    }
+    function loadAccessLog(){
+      if(!(IS_ADMIN && AUTH && AUTH.id === 'buyest')) return;
+      api('access_log').then(function(res){
+        if(!res || !res.ok) return;
+        var wrap = $('meAccessLog');
+        if(!wrap){
+          var rail = document.querySelector('.me-dash-rail'); if(!rail) return;
+          wrap = document.createElement('details'); wrap.id = 'meAccessLog'; wrap.className = 'me-panel me-admin';
+          wrap.innerHTML = '<summary class="me-panel-h"><div><h3>접속 기록</h3></div><span id="meAccessCount" class="me-badge"></span></summary><div id="meAccessList" class="me-adminlist" style="font-size:12px;max-height:360px;overflow:auto"></div>';
+          rail.insertBefore(wrap, rail.firstChild);
+        }
+        var box = $('meAccessList'), geo = res.geo || [], bad = res.failed || [];
+        $('meAccessCount').textContent = geo.length ? geo.length + '건' : '';
+        function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+        var h = '<table style="width:100%;border-collapse:collapse"><tr style="text-align:left"><th>시각</th><th>계정</th><th>IP</th><th>위치</th></tr>';
+        geo.forEach(function(r){
+                  var loc = r.lat != null && r.lng != null
+            ? esc(r.city || '') + ' <a target="_blank" rel="noopener" href="https://maps.google.com/?q=' + esc(r.lat) + ',' + esc(r.lng) + '">' + esc(r.lat) + ', ' + esc(r.lng) + '</a>'
+            : '<span style="opacity:.6">-</span>';
+          h += '<tr><td>' + esc(r.created_at) + '</td><td>' + esc(r.username) + (r.event === 'login' ? ' (로그인)' : '') + '</td><td>' + esc(r.ip) + '</td><td>' + loc + '</td></tr>';
+        });
+        h += '</table>';
+        if(bad.length){
+          h += '<div style="margin-top:10px;font-weight:600">실패한 로그인/가입 시도</div><table style="width:100%">';
+          bad.forEach(function(r){ h += '<tr><td>' + esc(r.created_at) + '</td><td>' + esc(r.username) + '</td><td>' + esc(r.ip) + '</td></tr>'; });
+          h += '</table>';
+        }
+        box.innerHTML = h;
+      }).catch(function(){});
+    }
+
     /* ---------------- 가입 관리 ---------------- */
     var adminList = $('meAdminList'), adminCount = $('meAdminCount'), adminSum = $('meAdminSum'),
         adminSearch = $('meAdminSearch'), ADMIN_USERS = [];
@@ -2850,6 +2887,7 @@
       showView('dashboard');
       setSync(okMsg);
       bootWorkspace();
+      logVisit('login'); loadAccessLog();
     }
 
     function doLogout(nextMode){
@@ -2941,6 +2979,7 @@
             setSync('동기화됨 ' + nowT());
             if(dirty) pushSave();
             bootWorkspace();
+            logVisit('visit'); loadAccessLog();
           } else if(res && (res.status === 'pending' || res.status === 'rejected')){
             doLogout('gate'); gateMsg.textContent = res.error || '다시 로그인해 주세요.';
           } else if(isPwErr(res) || (res && res.error && res.error.indexOf('없는 아이디') === 0)){
