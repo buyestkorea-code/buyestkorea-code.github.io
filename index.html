@@ -2481,12 +2481,9 @@
         var box = $('meAccessList'), geo = res.geo || [], bad = res.failed || [];
         $('meAccessCount').textContent = geo.length ? geo.length + '건' : '';
         function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-        var h = '<table style="width:100%;border-collapse:collapse"><tr style="text-align:left"><th>시각</th><th>계정</th><th>IP</th><th>위치</th></tr>';
+        var h = '<table style="width:100%;border-collapse:collapse"><tr style="text-align:left"><th>시각</th><th>계정</th><th>IP</th></tr>';
         geo.forEach(function(r){
-                  var loc = r.lat != null && r.lng != null
-            ? esc(r.city || '') + ' <a target="_blank" rel="noopener" href="https://maps.google.com/?q=' + esc(r.lat) + ',' + esc(r.lng) + '">' + esc(r.lat) + ', ' + esc(r.lng) + '</a>'
-            : '<span style="opacity:.6">-</span>';
-          h += '<tr><td>' + esc(r.created_at) + '</td><td>' + esc(r.username) + (r.event === 'login' ? ' (로그인)' : '') + '</td><td>' + esc(r.ip) + '</td><td>' + loc + '</td></tr>';
+          h += '<tr><td>' + esc(r.created_at) + '</td><td>' + esc(r.username) + (r.event === 'login' ? ' (로그인)' : '') + '</td><td>' + esc(r.ip) + '</td></tr>';
         });
         h += '</table>';
         if(bad.length){
