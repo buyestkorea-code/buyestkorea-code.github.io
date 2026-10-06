@@ -491,6 +491,7 @@ function renderScanScreen(){
         <button class="btn btn-outline" onclick="toggleCamera()">📷 폰 카메라로 스캔</button>
       </div>
       <div id="camWrap"><div id="camReader"></div><div id="camStatus" class="hint" style="text-align:center;min-height:18px;margin-top:6px;"></div></div>
+      <div id="cartBox"></div>
       <div id="scanResult"></div>
     </div>
 
@@ -504,6 +505,8 @@ function renderScanScreen(){
     if (e.key==='Enter'){ e.preventDefault(); onScanSubmit(); }
   });
   updateModeHint();
+  if (state.cartEventId !== state.event.id){ state.cart = []; state.cartEventId = state.event.id; }
+  renderCart();
   loadRecent();
 }
 
@@ -558,8 +561,102 @@ async function lookupAndShow(barcode, intent){
     return;
   }
   const item = res.item;
+  state.scannedItem = item;
   box.innerHTML = renderItemCard(item, intent);
   focusBarcode();
+}
+
+/* ---- 추가 판매(장바구니): 한 고객이 여러 개 살 때 바코드를 계속 찍어서 한번에 확정 (판매/주문택배 모드) ----
+   담긴 건 확정 전까지 이 화면(브라우저) 안에만 있고, 확정하면 상품마다 기존 scan_sale/scan_move로 1건씩 기록된다. */
+state.cart = []; state.cartEventId = null; state.cartBusy = false; state.scannedItem = null;
+function cartFinal(c){
+  let f = c.price;
+  if (c.discount_type === 'percent') f = c.price * (1 - c.discount_value/100);
+  else if (c.discount_type === 'amount') f = c.price - c.discount_value;
+  return Math.max(0, Math.round(f));
+}
+function readCardFields(){
+  const type = document.getElementById('scanDiscType').value;
+  return {
+    price: N(document.getElementById('scanPrice').value),
+    discount_type: type,
+    discount_value: type === 'none' ? 0 : N(document.getElementById('scanDiscVal').value),
+    note: S(document.getElementById('scanNote').value),
+  };
+}
+/* 판매 장바구니와 주문택배 장바구니는 섞지 않는다 */
+function cartModeOk(){
+  if (state.cart.length && state.cart[0].mode !== state.mode){
+    toast('담은 상품이 "' + (state.cart[0].mode==='courier'?'주문택배':'판매') + '"예요. 먼저 확정하거나 비운 뒤에 다른 구분으로 담아주세요', 'err');
+    return false;
+  }
+  return true;
+}
+function cartPush(){
+  const item = state.scannedItem;
+  if (!item || !document.getElementById('scanPrice') || !cartModeOk()) return;
+  state.cart.push(Object.assign({item, mode: state.mode}, readCardFields()));
+  state.scannedItem = null;
+  document.getElementById('scanResult').innerHTML = '';
+  renderCart();
+  toast('담았어요 — 다음 상품 바코드를 스캔하세요', 'ok');
+  focusBarcode();
+}
+function cartRemove(i){ state.cart.splice(i, 1); renderCart(); }
+function cartClear(){
+  if (!state.cart.length) return;
+  if (!confirm('담은 ' + state.cart.length + '개를 모두 비울까요?')) return;
+  state.cart = []; renderCart(); focusBarcode();
+}
+function renderCart(){
+  const box = document.getElementById('cartBox');
+  if (!box) return;
+  const cart = state.cart;
+  if (!cart.length){ box.innerHTML = ''; return; }
+  const label = cart[0].mode === 'courier' ? '주문택배' : '판매';
+  const total = cart.reduce((a, c) => a + cartFinal(c), 0);
+  // 같은 바코드를 담은 개수가 현재고를 넘으면 안내
+  const cnt = {}; cart.forEach(c => { cnt[c.item.barcode] = (cnt[c.item.barcode] || 0) + 1; });
+  box.innerHTML = `
+    <div class="item-card" style="border-color:#6366f1;background:#eef2ff;">
+      <div class="name">담은 상품 ${cart.length}개 · 합계 ${money(total)}원 <span style="font-weight:400;font-size:12px;">(${label})</span></div>
+      ${cart.map((c, i) => `
+        <div class="recent-item">
+          <span class="grow">${esc(c.item.brand)} ${esc(c.item.item_name)}${c.item.size ? ' ('+esc(c.item.size)+')' : ''} · ${money(cartFinal(c))}원
+            ${cnt[c.item.barcode] > c.item.cur_qty ? '<span style="color:var(--red);">· 현재고('+c.item.cur_qty+'개)보다 많이 담김</span>' : ''}</span>
+          <button class="void-btn" onclick="cartRemove(${i})">빼기</button>
+        </div>`).join('')}
+      <div class="hint" style="margin:6px 0;">다음 상품 바코드를 이어서 스캔하세요. 다 담았으면 아래 버튼으로 한번에 확정합니다.</div>
+      <button class="btn btn-big ${cart[0].mode==='courier' ? '' : 'btn-primary'}" style="width:100%;${cart[0].mode==='courier' ? 'background:#5b21b6;color:#fff;' : ''}" onclick="submitCart(false)">${cart.length}개 한번에 ${label} 확정</button>
+      <button class="btn btn-outline" style="width:100%;margin-top:6px;" onclick="cartClear()">담은 것 모두 비우기</button>
+    </div>`;
+}
+async function submitCart(withCurrent){
+  if (state.cartBusy) return;
+  if (withCurrent){
+    if (!state.scannedItem || !document.getElementById('scanPrice') || !cartModeOk()) return;
+    state.cart.push(Object.assign({item: state.scannedItem, mode: state.mode}, readCardFields()));
+    state.scannedItem = null;
+  }
+  if (!state.cart.length) return;
+  state.cartBusy = true;
+  const list = state.cart.slice();
+  let done = 0, failMsg = '';
+  for (const c of list){
+    const base = {corner_id: state.corner.id, actor: state.actor, barcode: c.item.barcode, price: c.price,
+                  discount_type: c.discount_type, discount_value: c.discount_value, note: c.note};
+    const res = c.mode === 'courier'
+      ? await apiPost('scan_move', Object.assign(base, {move_type: 'courier'}))
+      : await apiPost('scan_sale', base);
+    if (!res.ok){ failMsg = res.error || '처리 실패'; break; }
+    done++;
+    state.cart.shift();   // 성공한 건은 바로 비워서, 중간에 실패해도 중복 기록 없이 나머지만 남게 한다
+  }
+  state.cartBusy = false;
+  renderCart();
+  if (failMsg) toast(`${done}건 처리 후 중단됐어요: ${failMsg} (나머지 ${state.cart.length}개는 아직 담겨 있어요)`, 'err');
+  else toast(`${done}개 ${list[0].mode==='courier'?'주문택배':'판매'} 처리됐어요`, 'ok');
+  await afterTxn();
 }
 
 function renderItemCard(item, intent){
@@ -583,9 +680,16 @@ function renderItemCard(item, intent){
           <div class="field"><label>할인값</label><input id="scanDiscVal" type="number" value="0" disabled></div>
         </div>
         <div class="field"><label>비고</label><input id="scanNote" placeholder="${intent==='courier' ? '주문번호 / 받는 분 / 송장번호 등 (선택)' : '특이사항 (선택)'}"></div>
-        ${intent==='courier'
-          ? `<button class="btn btn-big" style="width:100%;margin-top:8px;background:#5b21b6;color:#fff;" onclick="submitMove('${escJsAttr(item.barcode)}', 'courier')">주문택배 발송 확정 (매출 기록)</button>`
-          : `<button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" onclick="submitSale(${item.id}, '${escJsAttr(item.barcode)}')">판매 확정</button>`}
+        ${(() => {
+          const n = (state.cart.length && state.cart[0].mode === intent) ? state.cart.length : 0;
+          const label = intent==='courier' ? '주문택배 발송 확정 (매출 기록)' : '판매 확정';
+          const color = intent==='courier' ? 'background:#5b21b6;color:#fff;' : '';
+          const cls = intent==='courier' ? 'btn btn-big' : 'btn btn-primary btn-big';
+          const main = n
+            ? `<button class="${cls}" style="width:100%;margin-top:8px;${color}" onclick="submitCart(true)">담은 ${n}개 + 이 상품 = ${n+1}개 한번에 ${intent==='courier'?'주문택배 확정':'판매 확정'}</button>`
+            : `<button class="${cls}" style="width:100%;margin-top:8px;${color}" onclick="${intent==='courier' ? `submitMove('${escJsAttr(item.barcode)}', 'courier')` : `submitSale(${item.id}, '${escJsAttr(item.barcode)}')`}">${label}</button>`;
+          return main + `<button class="btn btn-outline btn-big" style="width:100%;margin-top:6px;" onclick="cartPush()">＋ 추가 ${intent==='courier'?'주문택배':'판매'} (이 상품 담고 바코드 더 찍기)</button>`;
+        })()}
       ` : `
         <div class="field"><label>비고</label><input id="scanNote" placeholder="반품 사유 등 (선택)"></div>
         <button class="btn btn-green btn-big" style="width:100%;margin-top:8px;" onclick="submitReturn('${escJsAttr(item.barcode)}')">반품 확정</button>
