@@ -88,6 +88,7 @@
   #camWrap{display:none;margin-top:10px;}
   #camReader{width:100%;max-width:420px;margin:0 auto;}
   .hint{font-size:12px;color:var(--sub);margin-top:6px;}
+  @media print{ .tabs,.bar,.crumb,#toast{display:none !important;} body{background:#fff;padding:0;} .card{break-inside:avoid;} }
 </style>
 </head>
 <body>
@@ -321,6 +322,7 @@ function topNav(active){
     <div class="tabs">
       <div class="tab ${active==='scan'?'active':''}" onclick="goScan()">스캔</div>
       <div class="tab ${active==='daily'?'active':''}" onclick="renderDailyScreen()">일별 현황</div>
+      <div class="tab ${active==='report'?'active':''}" onclick="renderReportScreen()">리포트</div>
       <div class="tab ${active==='stocktake'?'active':''}" onclick="renderStocktakeScreen()">실재고 확인</div>
       <div class="tab ${active==='export'?'active':''}" onclick="renderExportScreen()">마감 다운로드</div>
     </div>
@@ -1161,6 +1163,223 @@ async function downloadDailyDetail(){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '일별현황');
   XLSX.writeFile(wb, `${state.event.name}_일별현황_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+/* ============================================================
+   리포트 — 하루(또는 전체 기간)의 판매 총계를 한 장으로 요약.
+   매출 = 판매 + 수기판매 + 주문택배(취소 제외). 반품은 금액이 0으로 기록돼 있어 매출에서 빼지 않고 수량만 보여준다.
+   브랜드 비중 · 인기품목 · 시간대(전체 기간은 날짜별) 흐름 · 엑셀/텍스트 복사/인쇄.
+   ============================================================ */
+const REPORT_COLORS = ['#0f766e','#1d4ed8','#b45309','#7c3aed','#be123c','#0369a1','#4d7c0f'];
+const REPORT_OTHER = '#9ca3af';
+const reportState = {eventId: null, date: null, data: null};
+const pct1 = (a, b) => b > 0 ? (Math.round(a / b * 1000) / 10).toFixed(1) + '%' : '-';
+
+async function renderReportScreen(){
+  stopCamera();
+  state.screen = 'report';
+  const app = document.getElementById('app');
+  app.innerHTML = topNav('report') + `<div id="reportBody"><div class="hint">불러오는 중...</div></div>`;
+  const res = await apiGet('daily_summary', {event_id: state.event.id});
+  const body = document.getElementById('reportBody');
+  if (!res.ok){ body.innerHTML = `<div class="hint">${esc(res.error||'불러오기 실패')}</div>`; return; }
+  const dates = res.days.map(d => d.d);
+  if (!dates.length){ body.innerHTML = '<div class="hint">아직 거래 내역이 없어요.</div>'; return; }
+  if (reportState.eventId !== state.event.id){ reportState.eventId = state.event.id; reportState.date = null; }
+  if (!reportState.date || (reportState.date !== 'ALL' && !dates.includes(reportState.date))) reportState.date = dates[dates.length-1];
+  reportState.dates = dates;
+  await loadReport();
+}
+async function onReportDateChange(v){ reportState.date = v; await loadReport(); }
+
+async function loadReport(){
+  const body = document.getElementById('reportBody');
+  if (!body) return;
+  const isAll = reportState.date === 'ALL';
+  let txns;
+  if (isAll){
+    const r = await apiGet('export', {event_id: state.event.id});   // export는 건수 제한 없이 전부 내려준다
+    if (!r.ok){ toast(r.error||'불러오기 실패','err'); return; }
+    txns = r.txns;
+  } else {
+    const r = await apiGet('txns', {event_id: state.event.id, date: reportState.date});
+    if (!r.ok){ toast(r.error||'불러오기 실패','err'); return; }
+    txns = r.txns;
+  }
+  reportState.data = reportCompute(txns, isAll);
+  reportRender();
+}
+
+function reportCompute(txns, isAll){
+  const valid = txns.filter(t => !t.voided);
+  const sales = valid.filter(t => t.type === 'sale' || t.type === 'manual_sale' || t.type === 'courier');
+  const grp = {sale:{qty:0,list:0,final:0}, manual_sale:{qty:0,list:0,final:0}, courier:{qty:0,list:0,final:0}};
+  const tot = {qty:0, list:0, final:0, discCnt:0};
+  const brands = {}, products = {}, buckets = {};
+  sales.forEach(t => {
+    const q = Math.abs(t.qty_delta) || 1;
+    const list = t.price * q, fin = t.final_amount;
+    const g = grp[t.type]; g.qty += q; g.list += list; g.final += fin;
+    tot.qty += q; tot.list += list; tot.final += fin;
+    if (t.discount_type && t.discount_type !== 'none' && list > fin) tot.discCnt += 1;
+    const brand = t.item_id ? (t.item_brand || '(브랜드 없음)') : '(미등록 상품)';
+    const b = brands[brand] = brands[brand] || {name: brand, qty: 0, final: 0}; b.qty += q; b.final += fin;
+    const pname = t.item_id ? [t.item_brand, t.item_item_name].filter(Boolean).join(' ') : ('(미등록) ' + (t.manual_name || t.barcode));
+    const p = products[pname] = products[pname] || {name: pname, qty: 0, final: 0, sizes: {}}; p.qty += q; p.final += fin;
+    const sz = txnDisplaySize(t) || '-'; p.sizes[sz] = (p.sizes[sz] || 0) + q;
+    const key = isAll ? fmtYMD(t.created_at) : String(new Date(t.created_at*1000).getHours()).padStart(2,'0') + '시';
+    const k = buckets[key] = buckets[key] || {label: key, qty: 0, final: 0}; k.qty += q; k.final += fin;
+  });
+  const exGroups = new Set(valid.filter(t => t.exchange_group).map(t => t.exchange_group));
+  const brandList = Object.values(brands).sort((a,b) => b.final - a.final || b.qty - a.qty);
+  const productList = Object.values(products).sort((a,b) => b.qty - a.qty || b.final - a.final);
+  return {
+    isAll, tot, grp,
+    discAmt: tot.list - tot.final,
+    returnCnt: valid.filter(t => t.type === 'return' && !t.exchange_group).length,
+    exchangeCnt: exGroups.size,
+    recallCnt: valid.filter(t => t.type === 'recall').length,
+    voidCnt: txns.filter(t => t.voided).length,
+    brands: brandList, products: productList,
+    buckets: Object.values(buckets).sort((a,b) => a.label < b.label ? -1 : 1),
+  };
+}
+
+function reportBrandRows(d, maxN){
+  // 상위 maxN개 + 나머지는 '기타'로 묶는다
+  const rows = d.brands.slice(0, maxN).map((b, i) => ({...b, color: REPORT_COLORS[i % REPORT_COLORS.length]}));
+  const rest = d.brands.slice(maxN);
+  if (rest.length) rows.push({name: `기타 (${rest.length}개 브랜드)`, qty: rest.reduce((a,b)=>a+b.qty,0), final: rest.reduce((a,b)=>a+b.final,0), color: REPORT_OTHER});
+  return rows;
+}
+function reportSizesText(p){
+  return Object.entries(p.sizes).sort((a,b) => b[1]-a[1]).map(([s,q]) => `${s}×${q}`).join(', ');
+}
+function reportLabel(){
+  return reportState.date === 'ALL' ? '전체 기간' : reportState.date;
+}
+
+function reportRender(){
+  const body = document.getElementById('reportBody');
+  const d = reportState.data;
+  if (!body || !d) return;
+  const t = d.tot;
+  const brandRows = reportBrandRows(d, 7);
+  const maxBucket = Math.max(1, ...d.buckets.map(b => b.final));
+  const top = d.products.slice(0, 10);
+  const grpRow = (label, g, cls) => `<tr><td><span class="chip ${cls}">${label}</span></td><td>${g.qty}</td><td>${money(g.list)}</td><td>${money(g.list - g.final)}</td><td><b>${money(g.final)}</b></td></tr>`;
+  const dateOpts = [`<option value="ALL" ${reportState.date==='ALL'?'selected':''}>전체 기간</option>`]
+    .concat(reportState.dates.slice().reverse().map(x => `<option value="${x}" ${reportState.date===x?'selected':''}>${x}</option>`)).join('');
+
+  body.innerHTML = `
+    <div class="bar" style="margin-top:-6px;">
+      <select id="reportDate" onchange="onReportDateChange(this.value)" style="font-size:14px;padding:7px 10px;">${dateOpts}</select>
+      <div class="spacer"></div>
+      <button class="btn btn-outline" style="padding:6px 12px;font-size:12px;" onclick="reportCopyText()">요약 복사 (카톡용)</button>
+      <button class="btn btn-outline" style="padding:6px 12px;font-size:12px;" onclick="reportDownload()">엑셀</button>
+      <button class="btn btn-outline" style="padding:6px 12px;font-size:12px;" onclick="window.print()">인쇄</button>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat">총매출(원)<b>${money(t.final)}</b></div>
+      <div class="stat">판매 수량<b>${t.qty}</b></div>
+      <div class="stat">평균 판매단가(원)<b>${t.qty ? money(Math.round(t.final / t.qty)) : '-'}</b></div>
+      <div class="stat">할인 합계(원)<b>${money(d.discAmt)}</b><span style="font-size:11px;">정가 대비 ${pct1(d.discAmt, t.list)} · ${t.discCnt}건</span></div>
+    </div>
+    <div class="hint" style="margin:-4px 0 12px;">반품 ${d.returnCnt}건 · 교환 ${d.exchangeCnt}건 · 회수 ${d.recallCnt}건${d.voidCnt ? ` · 취소 ${d.voidCnt}건(집계 제외)` : ''}. 반품은 금액이 0으로 기록돼 총매출에서 빼지 않았어요.</div>
+
+    <div class="card">
+      <h2>구분별</h2>
+      <div class="tbl-wrap" style="max-height:none;"><table>
+        <thead><tr><th>구분</th><th>수량</th><th>정가 합계</th><th>할인</th><th>매출</th></tr></thead>
+        <tbody>
+          ${grpRow('판매', d.grp.sale, 'c-sale')}${grpRow('수기판매', d.grp.manual_sale, 'c-manual')}${grpRow('주문택배', d.grp.courier, 'c-courier')}
+          <tr style="font-weight:700;background:#f9fafb;"><td>합계</td><td>${t.qty}</td><td>${money(t.list)}</td><td>${money(d.discAmt)}</td><td>${money(t.final)}</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <h2>브랜드별 매출 비중</h2>
+      ${t.final > 0 ? `
+      <div style="display:flex;height:22px;border-radius:6px;overflow:hidden;margin-bottom:10px;background:#f3f4f6;">
+        ${brandRows.map(b => `<div title="${esc(b.name)} ${pct1(b.final, t.final)}" style="width:${b.final / t.final * 100}%;background:${b.color};"></div>`).join('')}
+      </div>` : ''}
+      <div class="tbl-wrap" style="max-height:none;"><table>
+        <thead><tr><th>브랜드</th><th>수량</th><th>매출</th><th>매출 비중</th><th>수량 비중</th></tr></thead>
+        <tbody>${brandRows.map(b => `<tr>
+          <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${b.color};margin-right:6px;"></span>${esc(b.name)}</td>
+          <td>${b.qty}</td><td>${money(b.final)}</td><td><b>${pct1(b.final, t.final)}</b></td><td>${pct1(b.qty, t.qty)}</td>
+        </tr>`).join('') || '<tr><td colspan="5" class="hint">판매 내역이 없어요.</td></tr>'}</tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <h2>인기 품목 TOP ${top.length || 10} <span style="font-size:12px;font-weight:400;color:var(--sub);">(품목명 기준, 사이즈는 합산)</span></h2>
+      <div class="tbl-wrap" style="max-height:none;"><table>
+        <thead><tr><th style="width:52px;white-space:nowrap;">순위</th><th>품목</th><th>수량</th><th>매출</th><th>사이즈별</th></tr></thead>
+        <tbody>${top.map((p, i) => `<tr><td>${i+1}</td><td>${esc(p.name)}</td><td><b>${p.qty}</b></td><td>${money(p.final)}</td><td style="color:var(--sub);">${esc(reportSizesText(p))}</td></tr>`).join('') || '<tr><td colspan="5" class="hint">판매 내역이 없어요.</td></tr>'}</tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <h2>${d.isAll ? '날짜별 매출' : '시간대별 매출'}</h2>
+      ${d.buckets.map(b => `
+        <div style="display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px;">
+          <span style="width:${d.isAll ? 84 : 36}px;color:var(--sub);">${esc(b.label)}</span>
+          <div style="flex:1;background:#f3f4f6;border-radius:4px;height:16px;"><div style="width:${b.final / maxBucket * 100}%;height:100%;background:var(--pri);border-radius:4px;"></div></div>
+          <span style="width:150px;text-align:right;">${money(b.final)}원 · ${b.qty}개</span>
+        </div>`).join('') || '<div class="hint">판매 내역이 없어요.</div>'}
+    </div>`;
+}
+
+function reportSummaryText(){
+  const d = reportState.data, t = d.tot;
+  const lines = [
+    `[${state.event.name}] ${reportLabel()} 판매 리포트`,
+    `총매출 ${money(t.final)}원 · ${t.qty}개 (판매 ${d.grp.sale.qty} · 수기 ${d.grp.manual_sale.qty} · 주문택배 ${d.grp.courier.qty})`,
+    `평균단가 ${t.qty ? money(Math.round(t.final / t.qty)) : '-'}원 · 할인 ${money(d.discAmt)}원`,
+    `반품 ${d.returnCnt} · 교환 ${d.exchangeCnt} · 회수 ${d.recallCnt}`,
+    '',
+    '브랜드별',
+    ...reportBrandRows(d, 7).map(b => `- ${b.name} ${pct1(b.final, t.final)} (${money(b.final)}원 / ${b.qty}개)`),
+    '',
+    '인기 품목 TOP 5',
+    ...d.products.slice(0, 5).map((p, i) => `${i+1}. ${p.name} ${p.qty}개 (${money(p.final)}원)`),
+  ];
+  return lines.join('\n');
+}
+async function reportCopyText(){
+  const text = reportSummaryText();
+  try { await navigator.clipboard.writeText(text); toast('요약을 복사했어요','ok'); }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('요약을 복사했어요','ok'); } catch(_){ toast('복사하지 못했어요','err'); }
+    ta.remove();
+  }
+}
+function reportDownload(){
+  const d = reportState.data, t = d.tot;
+  const summary = [
+    ['행사', state.event.name], ['기간', reportLabel()], [],
+    ['총매출(원)', t.final], ['판매 수량', t.qty], ['평균 판매단가(원)', t.qty ? Math.round(t.final / t.qty) : 0],
+    ['정가 합계(원)', t.list], ['할인 합계(원)', d.discAmt], ['할인 적용 건수', t.discCnt], [],
+    ['구분', '수량', '정가 합계', '할인', '매출'],
+    ['판매', d.grp.sale.qty, d.grp.sale.list, d.grp.sale.list - d.grp.sale.final, d.grp.sale.final],
+    ['수기판매', d.grp.manual_sale.qty, d.grp.manual_sale.list, d.grp.manual_sale.list - d.grp.manual_sale.final, d.grp.manual_sale.final],
+    ['주문택배', d.grp.courier.qty, d.grp.courier.list, d.grp.courier.list - d.grp.courier.final, d.grp.courier.final], [],
+    ['반품 건수(교환 제외)', d.returnCnt], ['교환 건수', d.exchangeCnt], ['회수 건수', d.recallCnt], ['취소 건수(집계 제외)', d.voidCnt],
+    [], ['※ 반품은 금액 0으로 기록돼 총매출에서 차감하지 않음'],
+  ];
+  const brandRows = d.brands.map(b => ({'브랜드': b.name, '수량': b.qty, '매출': b.final, '매출 비중': pct1(b.final, t.final), '수량 비중': pct1(b.qty, t.qty)}));
+  const prodRows = d.products.map((p, i) => ({'순위': i+1, '품목': p.name, '수량': p.qty, '매출': p.final, '사이즈별': reportSizesText(p)}));
+  const bucketRows = d.buckets.map(b => ({[d.isAll ? '날짜' : '시간대']: b.label, '수량': b.qty, '매출': b.final}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), '요약');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(brandRows), '브랜드별');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(prodRows), '품목별(인기순)');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bucketRows), d.isAll ? '날짜별' : '시간대별');
+  XLSX.writeFile(wb, `${state.event.name}_리포트_${reportState.date === 'ALL' ? '전체' : reportState.date}.xlsx`);
 }
 
 /* ============================================================
