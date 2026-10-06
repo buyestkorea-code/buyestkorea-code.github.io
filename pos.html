@@ -142,7 +142,13 @@ const isMoveType = type => type === 'courier' || type === 'recall';
    수기판매(미등록바코드)면 그때 입력한 manual_name/manual_size */
 function txnDisplayName(t){
   if (t.item_id) return [t.item_brand, t.item_item_name].filter(Boolean).join(' ') || ('#' + t.barcode);
-  return t.manual_name || ('#' + t.barcode);
+  return [t.manual_brand, t.manual_name].filter(Boolean).join(' ') || ('#' + t.barcode);
+}
+/* 수기 입력(재고파일에 없는 상품)의 브랜드 입력칸 — 재고파일에 있는 브랜드 목록에서 고르거나 직접 입력 */
+function brandInputHtml(id, value){
+  const brands = [...new Set((state.items || []).map(i => i.brand).filter(Boolean))].sort();
+  return `<div class="field"><label>브랜드 (필수)</label><input id="${id}" list="${id}List" value="${esc(value||'')}" placeholder="브랜드 선택 또는 입력" autocomplete="off">
+    <datalist id="${id}List">${brands.map(b => `<option value="${esc(b)}">`).join('')}</datalist></div>`;
 }
 function txnDisplaySize(t){
   return t.item_id ? (t.item_size || '') : (t.manual_size || '');
@@ -572,7 +578,7 @@ async function lookupAndShow(barcode, intent){
     return;
   }
   if (!res.found){
-    box.innerHTML = renderUnregisteredCard(barcode, res.prev_manual, intent);
+    box.innerHTML = renderUnregisteredCard(barcode, res.prev_manual, intent, res.brand_guess);
     focusBarcode();
     return;
   }
@@ -716,7 +722,8 @@ function renderItemCard(item, intent){
   `;
 }
 
-function renderUnregisteredCard(barcode, prevManual, intent){
+function renderUnregisteredCard(barcode, prevManual, intent, brandGuess){
+  const prefBrand = brandGuess || '';
   const prefName = prevManual ? prevManual.manual_name : '';
   const prefSize = prevManual ? prevManual.manual_size : '';
   const prefPrice = prevManual ? prevManual.price : 0;
@@ -726,6 +733,7 @@ function renderUnregisteredCard(barcode, prevManual, intent){
       <div class="item-card miss">
         <div class="name">미등록상품</div>
         <div class="meta">바코드 ${esc(barcode)} — 재고파일에 없어요. 품명을 직접 입력해서 ${label}로 기록할 수 있어요 (재고 수량에는 영향 없음).</div>
+        ${brandInputHtml('manBrand', prefBrand)}
         <div class="field"><label>품명</label><input id="manName" value="${esc(prefName)}" placeholder="상품명"></div>
         <div class="field"><label>사이즈</label><input id="manSize" value="${esc(prefSize)}"></div>
         ${intent==='courier' ? `
@@ -755,6 +763,7 @@ function renderUnregisteredCard(barcode, prevManual, intent){
     <div class="item-card miss">
       <div class="name">미등록상품</div>
       <div class="meta">바코드 ${esc(barcode)} — 재고파일에 없어요. 수기로 입력해서 판매로 저장할 수 있어요.</div>
+      ${brandInputHtml('manBrand', prefBrand)}
       <div class="field"><label>품명</label><input id="manName" value="${esc(prefName)}" placeholder="상품명"></div>
       <div class="row">
         <div class="field"><label>사이즈</label><input id="manSize" value="${esc(prefSize)}"></div>
@@ -805,11 +814,13 @@ async function submitMove(barcode, moveType){
   await afterTxn();
 }
 async function submitManualMove(barcode, moveType){
+  const manual_brand = S(document.getElementById('manBrand').value);
+  if (!manual_brand){ toast('브랜드를 입력해주세요','err'); return; }
   const manual_name = S(document.getElementById('manName').value);
   if (!manual_name){ toast('품명을 입력해주세요','err'); return; }
   const manual_size = S(document.getElementById('manSize').value);
   const note = S(document.getElementById('manNote').value);
-  const body = {corner_id: state.corner.id, actor: state.actor, barcode, move_type: moveType, manual_name, manual_size, note};
+  const body = {corner_id: state.corner.id, actor: state.actor, barcode, move_type: moveType, manual_brand, manual_name, manual_size, note};
   if (moveType === 'courier'){
     body.price = N(document.getElementById('manPrice').value);
     body.discount_type = document.getElementById('manDiscType').value;
@@ -827,6 +838,8 @@ async function submitUnregisteredReturn(barcode){
   toast('재고파일에 없는 바코드는 먼저 실물 확인이 필요해요. 비고와 함께 화면을 캡처해두세요.', 'err');
 }
 async function submitManualSale(barcode){
+  const manual_brand = S(document.getElementById('manBrand').value);
+  if (!manual_brand){ toast('브랜드를 입력해주세요','err'); return; }
   const manual_name = S(document.getElementById('manName').value);
   if (!manual_name){ toast('품명을 입력해주세요','err'); return; }
   const manual_size = S(document.getElementById('manSize').value);
@@ -834,7 +847,7 @@ async function submitManualSale(barcode){
   const discount_type = document.getElementById('manDiscType').value;
   const discount_value = N(document.getElementById('manDiscVal').value);
   const note = S(document.getElementById('manNote').value);
-  const res = await apiPost('manual_sale', {corner_id: state.corner.id, actor: state.actor, barcode, manual_name, manual_size, price, discount_type, discount_value, note});
+  const res = await apiPost('manual_sale', {corner_id: state.corner.id, actor: state.actor, barcode, manual_brand, manual_name, manual_size, price, discount_type, discount_value, note});
   if (!res.ok){ toast(res.error||'처리 실패','err'); return; }
   toast('수기 판매로 저장됐어요', 'ok');
   await afterTxn();
@@ -948,6 +961,7 @@ function openEditTxn(txnId){
     <h2>거래 수정</h2>
     <div class="hint" style="margin:0 0 10px;">${esc(txnDisplayName(t))}${txnDisplaySize(t) ? ' ('+esc(txnDisplaySize(t))+')' : ''} · 바코드 ${esc(t.barcode)} · ${label}<br>수량(재고)은 바뀌지 않아요.</div>
     ${isManual && t.type !== 'return' ? `
+      ${brandInputHtml('etBrand', t.manual_brand || '')}
       <div class="row">
         <div class="field"><label>품명</label><input id="etName" value="${esc(t.manual_name||'')}"></div>
         <div class="field"><label>사이즈</label><input id="etSize" value="${esc(t.manual_size||'')}"></div>
@@ -993,6 +1007,8 @@ async function submitEditTxn(txnId){
   if (document.getElementById('etName')){
     body.manual_name = S(document.getElementById('etName').value);
     body.manual_size = S(document.getElementById('etSize').value);
+    body.manual_brand = S(document.getElementById('etBrand').value);
+    if (!body.manual_brand){ toast('브랜드를 입력해주세요','err'); return; }
     if (!body.manual_name){ toast('품명을 입력해주세요','err'); return; }
   }
   if (document.getElementById('etPrice') && (newType === 'sale' || newType === 'manual_sale' || newType === 'courier')){
@@ -1244,10 +1260,11 @@ function reportCompute(txns, isAll){
     tot.qty += q; tot.list += list; tot.final += fin;
     if (t.discount_type && t.discount_type !== 'none' && list > fin) tot.discCnt += 1;
     const hit = t.item_id ? null : (styleInfo[styleKey(t.barcode)] || styleInfo[styleKey(t.manual_name)] || null);
-    const brand = t.item_id ? (t.item_brand || '(브랜드 없음)') : (hit ? (hit.brand || '(브랜드 없음)') : '(미등록 상품)');
+    const brand = t.item_id ? (t.item_brand || '(브랜드 없음)') : (t.manual_brand || (hit && hit.brand) || '(브랜드 미지정)');
     const b = brands[brand] = brands[brand] || {name: brand, qty: 0, final: 0}; b.qty += q; b.final += fin;
     const pname = t.item_id ? [t.item_brand, t.item_item_name].filter(Boolean).join(' ')
-      : (hit ? [hit.brand, hit.item_name].filter(Boolean).join(' ') : ('(미등록) ' + (t.manual_name || t.barcode)));
+      : (hit && !t.manual_brand ? [hit.brand, hit.item_name].filter(Boolean).join(' ')
+         : [t.manual_brand, (hit ? hit.item_name : t.manual_name) || t.barcode].filter(Boolean).join(' '));
     const p = products[pname] = products[pname] || {name: pname, qty: 0, final: 0, sizes: {}}; p.qty += q; p.final += fin;
     const sz = txnDisplaySize(t) || '-'; p.sizes[sz] = (p.sizes[sz] || 0) + q;
     const key = isAll ? fmtYMD(t.created_at) : String(new Date(t.created_at*1000).getHours()).padStart(2,'0') + '시';
@@ -1844,7 +1861,7 @@ async function downloadExport(){
   // 시트3: 재고파일에 없는 바코드(미등록)로 수기 입력한 거래 — 수기판매 + 미등록 주문택배/회수
   const manualRows = res.txns.filter(t => !t.item_id).map(t => ({
     '날짜': fmtDate(t.created_at), '구분': TYPE_LABEL_KO[t.type] || t.type, '바코드': t.barcode,
-    '품명': t.manual_name, '사이즈': t.manual_size, '최종금액': t.type==='recall' ? '' : t.final_amount,
+    '브랜드': t.manual_brand || '', '품명': t.manual_name, '사이즈': t.manual_size, '최종금액': t.type==='recall' ? '' : t.final_amount,
     '비고': t.note || '', '취소여부': t.voided?'취소됨':'',
   }));
 
