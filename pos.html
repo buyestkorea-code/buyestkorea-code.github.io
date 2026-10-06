@@ -1232,15 +1232,22 @@ function reportCompute(txns, isAll){
   const grp = {sale:{qty:0,list:0,final:0}, manual_sale:{qty:0,list:0,final:0}, courier:{qty:0,list:0,final:0}};
   const tot = {qty:0, list:0, final:0, discCnt:0};
   const brands = {}, products = {}, buckets = {};
+  // 수기 입력(재고 연결 없음)이라도 택의 품번이 재고파일 품번과 같으면 브랜드/품목명은 재고파일 것으로 집계한다
+  // (사이즈가 재고파일에 없거나 달라서 품목 연결은 못 한 건들 — 브랜드 비중이 '(미등록)'으로 몰리는 걸 막는다)
+  const styleKey = s => S(s).replace(/^행_/, '').replace(/\s+/g, '').toUpperCase();
+  const styleInfo = {};
+  (state.items || []).forEach(it => { const k = styleKey(it.style_code || it.item_name); if (k && !styleInfo[k]) styleInfo[k] = it; });
   sales.forEach(t => {
     const q = Math.abs(t.qty_delta) || 1;
     const list = t.price * q, fin = t.final_amount;
     const g = grp[t.type]; g.qty += q; g.list += list; g.final += fin;
     tot.qty += q; tot.list += list; tot.final += fin;
     if (t.discount_type && t.discount_type !== 'none' && list > fin) tot.discCnt += 1;
-    const brand = t.item_id ? (t.item_brand || '(브랜드 없음)') : '(미등록 상품)';
+    const hit = t.item_id ? null : (styleInfo[styleKey(t.barcode)] || styleInfo[styleKey(t.manual_name)] || null);
+    const brand = t.item_id ? (t.item_brand || '(브랜드 없음)') : (hit ? (hit.brand || '(브랜드 없음)') : '(미등록 상품)');
     const b = brands[brand] = brands[brand] || {name: brand, qty: 0, final: 0}; b.qty += q; b.final += fin;
-    const pname = t.item_id ? [t.item_brand, t.item_item_name].filter(Boolean).join(' ') : ('(미등록) ' + (t.manual_name || t.barcode));
+    const pname = t.item_id ? [t.item_brand, t.item_item_name].filter(Boolean).join(' ')
+      : (hit ? [hit.brand, hit.item_name].filter(Boolean).join(' ') : ('(미등록) ' + (t.manual_name || t.barcode)));
     const p = products[pname] = products[pname] || {name: pname, qty: 0, final: 0, sizes: {}}; p.qty += q; p.final += fin;
     const sz = txnDisplaySize(t) || '-'; p.sizes[sz] = (p.sizes[sz] || 0) + q;
     const key = isAll ? fmtYMD(t.created_at) : String(new Date(t.created_at*1000).getHours()).padStart(2,'0') + '시';
