@@ -557,6 +557,20 @@ async function lookupAndShow(barcode, intent){
   const box = document.getElementById('scanResult');
   if (!res.ok){ toast(res.error||'조회 실패','err'); focusBarcode(); return; }
 
+  if (!res.found && res.style_matches && res.style_matches.length){
+    // 택의 품번 바코드로 찍은 경우 — 사이즈별 품목이 여러 개라 사이즈를 고르게 한다
+    state.scannedItem = null;
+    box.innerHTML = `
+      <div class="item-card hit">
+        <div class="name">${esc(res.style_matches[0].brand)} ${esc(res.style_matches[0].item_name)}</div>
+        <div class="meta">품번 바코드 ${esc(barcode)} — 사이즈를 선택하세요</div>
+        <div class="scan-actions">
+          ${res.style_matches.map(m => `<button class="btn btn-outline" ${m.cur_qty<=0?'style="opacity:.55;"':''} onclick="pickStyleMatch('${escJsAttr(m.barcode)}', '${intent}')">${esc(m.size || '-')}<br><span style="font-weight:400;font-size:12px;">재고 ${m.cur_qty}</span></button>`).join('')}
+        </div>
+      </div>`;
+    focusBarcode();
+    return;
+  }
   if (!res.found){
     box.innerHTML = renderUnregisteredCard(barcode, res.prev_manual, intent);
     focusBarcode();
@@ -565,8 +579,10 @@ async function lookupAndShow(barcode, intent){
   const item = res.item;
   state.scannedItem = item;
   box.innerHTML = renderItemCard(item, intent);
+  if (res.matched_by === 'style') box.insertAdjacentHTML('afterbegin', `<div class="hint" style="margin-top:12px;">품번 바코드(${esc(barcode)})로 찾았어요</div>`);
   focusBarcode();
 }
+function pickStyleMatch(barcode, intent){ lookupAndShow(barcode, intent); }
 
 /* ---- 추가 판매(장바구니): 한 고객이 여러 개 살 때 바코드를 계속 찍어서 한번에 확정 (판매/주문택배 모드) ----
    담긴 건 확정 전까지 이 화면(브라우저) 안에만 있고, 확정하면 상품마다 기존 scan_sale/scan_move로 1건씩 기록된다. */
