@@ -4,7 +4,7 @@
             느릴 때도 앱은 뜨도록.
    절대 하지 않는 것: toolkit_dashboard_api.php 응답 캐싱 — 로그인/캘린더/할일처럼
    실시간으로 바뀌어야 하는 데이터라 여기서 캐시하면 오래된 값을 보여주게 된다. */
-var CACHE_NAME = 'buyest-toolkit-shell-v3';
+var CACHE_NAME = 'buyest-toolkit-shell-v4';
 var SHELL_FILES = [
   './index.html',
   './assets/manifest.json',
@@ -57,7 +57,10 @@ self.addEventListener('fetch', function(e){
       var timer = setTimeout(function(){
         caches.match(e.request).then(function(cached){ if(cached && !settled){ settled = true; resolve(cached); } });
       }, 2500);
-      fetch(e.request).then(function(res){
+      // cache:'no-cache' = 브라우저 HTTP 캐시를 그냥 쓰지 않고 서버에 "바뀌었나?"(ETag)를 먼저 물어본다.
+      // GitHub Pages가 모든 파일에 max-age=600(10분)을 붙여서, 이게 없으면 배포 후 최대 10분간 옛 화면(pos.html 등)이 뜬다.
+      // 안 바뀌었으면 304라 가볍다.
+      fetch(e.request, {cache: 'no-cache'}).then(function(res){
         clearTimeout(timer);
         if(!settled){ settled = true; resolve(cacheIt(res)); } else { cacheIt(res); }
       }).catch(function(){
