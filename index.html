@@ -980,6 +980,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
         바이스트사이트 품절<span class="chip chip-ready">사용가능</span>
       </button>
+      <button class="nav-item" data-nav="buyestSoldOutTest">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
+        TEST 바이스트사이트 품절<span class="chip chip-ready">시험판</span>
+      </button>
       <button class="nav-item" data-nav="seasonSoldOut">
         <span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8 3v4M16 3v4"/></svg></span>
         바이스트사이트 시즌품절<span class="chip chip-ready">사용가능</span>
@@ -1815,6 +1819,10 @@
         <iframe data-src="ecount-sync-delta.html" title="바이스트사이트 품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <section data-view="buyestSoldOutTest">
+        <iframe data-src="ecount-sync-delta-test.html" title="TEST 바이스트사이트 품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
 
       <section data-view="seasonSoldOut">
         <iframe data-src="season-soldout.html" title="바이스트사이트 시즌품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
@@ -1892,7 +1900,7 @@
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', videoStudio:'영상 스튜디오', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
-    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'TEST 이카운트 재고 매칭', stocktake:'재고조사 (바코드 실사)',
+    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'TEST 이카운트 재고 매칭', stocktake:'재고조사 (바코드 실사)',
     barcodeStock:'바코드 재고조회', kreamSoldOut:'크림 품절 정리',
     orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
   };

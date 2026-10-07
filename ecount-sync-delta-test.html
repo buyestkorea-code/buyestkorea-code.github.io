@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>TEST 이카운트 변동 → BUYEST 품절 반영</title>
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1100px; margin: 40px auto; padding: 0 20px; background: #fafafa; color: #222; }
+  h1 { font-size: 20px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+  .badge.warn { background: #fef3c7; color: #92400e; }
+  .btn { font-size: 15px; padding: 10px 22px; border: none; border-radius: 6px; cursor: pointer; margin-right: 8px; }
+  .btn-primary { background: #111827; color: #fff; }
+  .btn-refresh { background: #2563eb; color: #fff; }
+  .btn-secondary { background: #0f766e; color: #fff; }
+  .btn-danger { background: #b91c1c; color: #fff; }
+  .btn:disabled { background: #d1d5db; color: #6b7280; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; background: #fff; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+  th { background: #f3f4f6; }
+  tr.failed { background: #fef2f2; }
+  .status-ok { color: #15803d; font-weight: 600; }
+  .status-fail { color: #b91c1c; font-weight: 600; }
+  input.fixinput { width: 140px; padding: 4px 6px; border: 1px solid #fca5a5; border-radius: 4px; }
+  input.fixinput.filled { border-color: #86efac; }
+  #status { color: #6b7280; margin: 10px 0; }
+  #result { margin-top: 16px; padding: 12px; border-radius: 6px; }
+  #result.ok { background: #f0fdf4; color: #15803d; }
+  #result.err { background: #fef2f2; color: #b91c1c; }
+  .tag-sale { color: #15803d; }
+  .tag-soldout { color: #b91c1c; }
+  .tag-nochange { color: #9ca3af; }
+  .chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+  .chip-soldout { background: #fef2f2; color: #b91c1c; }
+  .chip-sale { background: #f0fdf4; color: #15803d; }
+  .chip-mismatch { background: #fef3c7; color: #92400e; }
+  .dropzone { border: 1.5px dashed #d1d5db; border-radius: 8px; padding: 20px 16px; text-align: center; color: #6b7280; cursor: pointer; transition: border-color .12s, background .12s; max-width: 420px; }
+  .dropzone:hover, .dropzone.drag { border-color: #111827; background: #f3f4f6; color: #222; }
+  .dropzone.has-file { border-style: solid; border-color: #0f766e; }
+  .dropzone input[type=file] { display: none; }
+  .fbar { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 4px; }
+  .fchip { border:1px solid #d1d5db; background:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:12.5px; font-family:inherit; color:#222; }
+  .fchip b { margin-left:6px; }
+  .fchip:hover { border-color:#6b7280; }
+  .fchip.on { border-color:#111827; background:#111827; color:#fff; }
+  tr.picked { background:#f0fdf4; }
+  .cand { display:block; width:100%; text-align:left; margin-top:4px; padding:5px 8px; font:inherit; font-size:12px; cursor:pointer; border:1px solid #d1d5db; border-radius:6px; background:#fff; color:#222; }
+  .cand:hover { background:#f3f4f6; }
+  .cand.sel { border-color:#16a34a; background:#f0fdf4; }
+  .cand small { color:#6b7280; }
+  .chip-warn { background:#fef3c7; color:#92400e; }
+  .chip-grey { background:#e5e7eb; color:#374151; }
+</style>
+</head>
+<body>
+  <h1>TEST 이카운트 변동분 → BUYEST 품절 반영 <span class="badge warn">시험판</span> <a href="soldout-manual.html" target="_blank" style="font-size:13px; font-weight:normal; color:#2563eb;">📖 사용법 보기</a></h1>
+  <p>이카운트에서 다운받은 재고변동표 엑셀을 올리면, 그 품목들만 이카운트 API로 최신 재고를 다시 확인해요. 매핑 실패·재확인 건은 아래 후보 버튼을 눌러 고르거나 BUYEST 상품코드를 직접 입력하세요. 위쪽 칸을 누르면 그 항목만 볼 수 있어요.</p>
+
+  <div class="dropzone" id="fileDrop" tabindex="0" role="button" aria-label="재고변동표 엑셀 선택">
+    <div id="fileDropText">클릭 또는 끌어다 놓기 (Ctrl+V 붙여넣기도 가능)</div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadFromExcel(this.files[0])">
+  </div>
+  <button class="btn btn-refresh" id="refreshMapBtn" onclick="refreshMapping()" style="display:none">바이스트상품최신화</button>
+  <button class="btn btn-secondary" id="saveMapBtn" onclick="saveMappings()" disabled style="display:none">매핑 저장 (직접 입력한 것만)</button>
+  <button class="btn btn-danger" id="execBtn" onclick="execute()" disabled style="display:none">최종 실행 (실제 품절처리)</button>
+  <label id="skipLabel" style="display:none; margin-left:4px; font-size:13px; cursor:pointer; vertical-align:middle;">
+    <input type="checkbox" id="skipToggle" onchange="setSkipUnresolved(this.checked)"> 코드 못 정한 행은 건너뛰고 나머지만 실행
+  </label>
+  <div id="filterBar" class="fbar"></div>
+
+  <div id="status"></div>
+  <div id="result"></div>
+  <div id="tableWrap"></div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script>
+const REPORT_URL = 'https://buyest.co.kr/ecount_sync_report_test_api.php';   // TEST: 후보 목록(candidates) 포함
+const EXEC_URL = 'https://buyest.co.kr/ecount_sync_execute_api.php';
+const SAVE_MAP_URL = 'https://buyest.co.kr/ecount_sync_save_mapping_api.php';
+const REFRESH_MAP_URL = 'https://buyest.co.kr/ecount_sync_refresh_mapping_api.php';
+let currentItems = [];
+
+function wireDropzone(zoneId, inputId){
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  input.addEventListener('change', () => {
+    if (input.files[0]) { zone.classList.add('has-file'); document.getElementById(zoneId + 'Text').textContent = '✓ ' + input.files[0].name; }
+  });
+  ['dragenter','dragover'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(evt => zone.addEventListener(evt, e => { e.preventDefault(); zone.classList.remove('drag'); }));
+  zone.addEventListener('drop', e => {
+    if (e.dataTransfer.files[0]) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  zone.addEventListener('paste', e => {
+    const f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (f) { const dt = new DataTransfer(); dt.items.add(f); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+}
+wireDropzone('fileDrop', 'fileInput');
+let activeFilter = 'all';
+let skipUnresolved = false;
+
+const STATE_LABEL = { sale: '판매중', soldout: '품절' };
+
+// 미리보기 값: 행 자체에 있으면 그걸, 없으면(재확인 행) 현재 지정된 코드와 같은 후보의 미리보기를 쓴다.
+function eff(it) {
+  if (it.before && it.after) return it;
+  const c = (it.candidates || []).find(c => c.product_code === it.buyest_product_code);
+  return c || it;
+}
+function hasCode(it) { return !!it.buyest_product_code; }
+
+// 필터 분류. 'unresolved' = 코드를 아직 못 정한 행.
+const FILTERS = [
+  ['all', '전체', it => true],
+  ['matched', '매핑성공', it => it.status === 'matched'],
+  ['unresolved', '코드 미정(처리 필요)', it => !hasCode(it)],
+  ['ambiguous', '재확인(후보 2개+)', it => it.status !== 'matched' && !!it.ambiguous],
+  ['dead', '매핑상품 삭제됨', it => !!it.mapping_dead],
+  ['to_soldout', '품절로 변경', it => { const e = eff(it); return e.changed === true && e.after === 'soldout'; }],
+  ['to_sale', '판매중으로 변경', it => { const e = eff(it); return e.changed === true && e.after === 'sale'; }],
+  ['nochange', '변경 없음', it => { const e = eff(it); return e.changed === false; }],
+  ['mismatch', '직접확인필요', it => !!eff(it).display_mismatch],
+];
+
+function setFilter(key) {
+  activeFilter = (activeFilter === key) ? 'all' : key;
+  renderTable();
+}
+function setSkipUnresolved(v) { skipUnresolved = v; updateExecButton(); }
+
+function statusHtml(items, extra) {
+  const unresolved = items.filter(i => !hasCode(i)).length;
+  let html = `총 ${items.length}건 (<a href="javascript:void(0)" onclick="setFilter('unresolved')" style="color:#b91c1c;text-decoration:underline;">코드 미정 ${unresolved}건</a>)`;
+  if (extra) html += ' — ' + extra;
+  return html;
+}
+
+async function loadFromExcel(file) {
+  if (!file) return;
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const execBtn = document.getElementById('execBtn');
+  const tableWrap = document.getElementById('tableWrap');
+  result.textContent = ''; result.className = '';
+  tableWrap.innerHTML = '';
+  execBtn.style.display = 'none';
+  status.textContent = '엑셀 읽는 중...';
+
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+
+    // rows 0-2 are the title + two-level header; data starts at row 3
+    const rows = [];
+    let noCodeCount = 0;
+    for (let i = 3; i < grid.length; i++) {
+      const r = grid[i];
+      if (!r) continue;
+      const hasContent = r.some(v => v !== null && v !== undefined && String(v).trim() !== '');
+      if (!hasContent) continue;
+      if (!r[0]) { noCodeCount++; continue; } // 품목코드(A열)가 비어있으면 이 시스템은 못 읽음
+      rows.push({ ec_code: String(r[0]).trim(), ec_name: (r[1] || '').toString().trim(), size: (r[2] || '').toString().trim() });
+    }
+    if (!rows.length) {
+      if (noCodeCount > 0) throw new Error(`품목코드(A열)가 비어있는 행 ${noCodeCount}개뿐이라 읽을 게 없어요. 이카운트에서 재고변동표를 다시 받을 때 품목코드가 채워져서 나오는지 확인해주세요.`);
+      throw new Error('엑셀에서 품목을 못 찾았어요 (형식이 다른 파일인가요?)');
+    }
+
+    status.textContent = `엑셀에서 ${rows.length}건 읽음, 이카운트에서 최신 재고 확인 중...`;
+
+    const res = await fetch(REPORT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+
+    currentItems = data.items;
+    activeFilter = 'all'; skipUnresolved = false;
+    let extra = '';
+    if (noCodeCount > 0) {
+      extra += `⚠ 품목코드 없는 행 ${noCodeCount}개는 못 읽어서 제외됨`;
+    }
+    if (data.not_found_in_ecount && data.not_found_in_ecount.length) {
+      if (extra) extra += ' / ';
+      extra += `이카운트에서 조회 안 된 ${data.not_found_in_ecount.length}건은 제외됨`;
+    }
+    const mismatchCount = data.items.filter(i => i.display_mismatch).length;
+    if (mismatchCount > 0) {
+      if (extra) extra += ' / ';
+      extra += `⚠ ${mismatchCount}건은 품절/노출 상태가 이미 어긋나 있어요(표에 표시됨) — 실행해도 자동으로 안 고쳐지니 직접 확인 필요`;
+    }
+    status.innerHTML = statusHtml(data.items, extra);
+    result.className = 'ok';
+    result.textContent = '✅ 파일 선택만으로 이카운트 최신 재고까지 자동 조회 완료';
+    renderTable();
+    execBtn.style.display = 'inline-block';
+    document.getElementById('refreshMapBtn').style.display = 'inline-block';
+    document.getElementById('saveMapBtn').style.display = 'inline-block';
+    document.getElementById('skipLabel').style.display = 'inline-block';
+    document.getElementById('skipToggle').checked = false;
+    updateExecButton();
+  } catch (e) {
+    status.textContent = '';
+    result.textContent = '오류: ' + e.message;
+    result.className = 'err';
+  }
+}
+
+function changeCellHtml(it) {
+  if (!it.before || !it.after) return '<span class="tag-nochange">-</span>';
+  if (!it.changed) return `<span class="tag-nochange">${STATE_LABEL[it.after]} (변경없음)</span>`;
+  return `<span class="tag-${it.before}">${STATE_LABEL[it.before]}</span> → <span class="tag-${it.after}">${STATE_LABEL[it.after]}</span>`;
+}
+
+function wholeCellHtml(it) {
+  if (!it.whole_after) return '-';
+  return `<span class="chip chip-${it.whole_after}">${STATE_LABEL[it.whole_after]}</span>`;
+}
+
+// 품절여부(option_empty)와 노출여부(option_display)가 이미 어긋나 있는 상태로 발견된 행.
+// 이 도구가 자동으로 고치지 않으므로(재고를 실제로 확인해야 할 수도 있어서) 눈에 띄게 표시만 함.
+function mismatchChip(it) {
+  if (!it.display_mismatch) return '';
+  return ` <span class="chip chip-mismatch" title="품절/노출 상태가 이미 어긋나 있어요. 재고 실물 확인 후 관리자 화면에서 직접 맞춰주세요.">⚠ 직접확인필요</span>`;
+}
+
+function candHtml(idx, it) {
+  const cands = it.candidates || [];
+  if (!cands.length) return '';
+  return cands.map((c, ci) => {
+    const sel = it.buyest_product_code === c.product_code;
+    const st = !c.size_found ? '<span class="chip chip-warn">⚠ 이 사이즈 옵션 없음</span>' : changeCellHtml(c);
+    const hidden = (c.display === 'N') ? ' <span class="chip chip-grey">미노출 상품</span>' : '';
+    return `<button type="button" class="cand${sel ? ' sel' : ''}" onclick="pickCandidate(${idx}, ${ci})" title="누르면 이 상품으로 확정">
+      ${sel ? '✓ ' : ''}${escapeHtml(c.product_name)} <small>(${escapeHtml(c.product_code)})</small><br>이 사이즈: ${st}${hidden}</button>`;
+  }).join('');
+}
+
+function renderTable() {
+  // 코드 미정 → 코드 지정됐지만 아직 저장 전(실패·재확인) → 매핑성공 순으로 위에서부터.
+  const flt = (FILTERS.find(f => f[0] === activeFilter) || FILTERS[0])[2];
+  const rank = it => !hasCode(it) ? 0 : (it.status !== 'matched' ? 1 : 2);
+  const indexes = currentItems
+    .map((it, idx) => idx)
+    .filter(idx => flt(currentItems[idx]))
+    .sort((a, b) => rank(currentItems[a]) - rank(currentItems[b]));
+
+  document.getElementById('filterBar').innerHTML = FILTERS.map(f => {
+    const n = currentItems.filter(f[2]).length;
+    return `<button type="button" class="fchip${activeFilter === f[0] ? ' on' : ''}" onclick="setFilter('${f[0]}')" title="누르면 이 항목만 표시 (다시 누르면 전체)">${f[1]}<b>${n}</b></button>`;
+  }).join('');
+
+  const rows = indexes.map((idx, pos) => {
+    const it = currentItems[idx];
+    if (it.status === 'matched') {
+      return `<tr>
+        <td>${pos+1}</td><td>${escapeHtml(it.ec_name)}</td>
+        <td class="status-ok">매핑성공</td>
+        <td>${it.ec_code}</td><td>${it.size||'-'}</td><td>${it.qty}</td>
+        <td>${escapeHtml(it.buyest_product_code)}</td>
+        <td>${changeCellHtml(it)}${mismatchChip(it)}</td>
+        <td>${wholeCellHtml(it)}</td>
+      </tr>`;
+    }
+    const label = it.mapping_dead ? '매핑상품 삭제됨' : (it.ambiguous ? '재확인 (후보 2개+)' : '실패');
+    const prefill = it.buyest_product_code || '';
+    const e = eff(it);
+    const picked = hasCode(it);
+    return `<tr class="failed${picked ? ' picked' : ''}">
+      <td>${pos+1}</td><td>${escapeHtml(it.ec_name)}</td>
+      <td class="${picked ? 'status-ok' : 'status-fail'}">${label}${picked ? '<br><span style="font-weight:400;font-size:11.5px;">코드 지정됨</span>' : ''}</td>
+      <td>${it.ec_code}</td><td>${it.size||'-'}</td><td>${it.qty}</td>
+      <td><input class="fixinput${prefill ? ' filled' : ''}" data-idx="${idx}" value="${escapeHtml(prefill)}" placeholder="상품코드 입력 (콜라보면 쉼표로 여러개)" oninput="onFixInput(${idx}, this.value)">
+        ${candHtml(idx, it)}</td>
+      <td>${changeCellHtml(e)}${mismatchChip(e)}</td><td>${wholeCellHtml(e)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableWrap').innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>이카운트 상품명</th><th>상태</th><th>이카운트코드</th><th>사이즈</th><th>재고</th><th>BUYEST 상품코드</th><th>변경</th><th>전체상품</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="9" style="color:#6b7280;">이 조건에 해당하는 항목이 없어요. 위 칸을 다시 누르면 전체가 보여요.</td></tr>'}</tbody>
+    </table>
+  `;
+}
+
+// 후보 버튼으로 상품 확정: 코드 + 이 사이즈의 반영 미리보기를 행에 복사
+function pickCandidate(idx, ci) {
+  const it = currentItems[idx];
+  const c = (it.candidates || [])[ci];
+  if (!c) return;
+  it.buyest_product_code = c.product_code;
+  it.before = c.before; it.after = c.after; it.changed = c.changed; it.whole_after = c.whole_after; it.display_mismatch = c.display_mismatch;
+  renderTable();
+  updateExecButton();
+}
+
+function onFixInput(idx, value) {
+  const it = currentItems[idx];
+  it.buyest_product_code = value.trim() || null;
+  // 직접 타이핑한 코드가 후보와 다르면 이전에 복사해 둔 미리보기는 무효
+  if (!(it.candidates || []).some(c => c.product_code === it.buyest_product_code)) {
+    it.before = null; it.after = null; it.changed = null; it.whole_after = null; it.display_mismatch = false;
+  }
+  const input = document.querySelector(`input[data-idx="${idx}"]`);
+  input.classList.toggle('filled', !!it.buyest_product_code);
+  updateExecButton();
+}
+
+function updateExecButton() {
+  const execBtn = document.getElementById('execBtn');
+  const ready = currentItems.filter(hasCode).length;
+  const pending = currentItems.length - ready;
+  execBtn.disabled = skipUnresolved ? ready === 0 : (pending > 0 || ready === 0);
+  execBtn.textContent = (skipUnresolved && pending > 0)
+    ? `최종 실행 (코드 정한 ${ready}건만, ${pending}건 건너뜀)`
+    : '최종 실행 (실제 품절처리)';
+  // save button: enabled whenever at least one still-"failed" row has something typed in
+  const hasFixToSave = currentItems.some(it => it.status === 'failed' && !!it.buyest_product_code);
+  document.getElementById('saveMapBtn').disabled = !hasFixToSave;
+}
+
+async function refreshMapping() {
+  const btn = document.getElementById('refreshMapBtn');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const failedRows = currentItems.filter(it => it.status === 'failed');
+  if (!failedRows.length) {
+    status.textContent = '매핑실패 항목이 없어요. 이미 다 매칭돼있어요.';
+    return;
+  }
+  btn.disabled = true;
+  status.textContent = `바이스트 상품 목록과 대조해서 매핑실패 ${failedRows.length}건 재매칭 중...`;
+  try {
+    const res = await fetch(REFRESH_MAP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: failedRows })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+
+    const byCode = {};
+    for (const r of data.items) byCode[r.ec_code] = r.buyest_product_code;
+    for (const it of currentItems) {
+      if (it.status === 'failed' && byCode[it.ec_code]) {
+        it.buyest_product_code = byCode[it.ec_code];
+        it.status = 'matched';
+      }
+    }
+    renderTable();
+    status.textContent = `새로 매칭됨 ${data.matched}건 (여전히 매핑실패 ${currentItems.filter(i=>i.status==='failed').length}건)`;
+    updateExecButton();
+  } catch (e) {
+    result.className = 'err';
+    result.textContent = '오류: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function saveMappings() {
+  const saveBtn = document.getElementById('saveMapBtn');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  saveBtn.disabled = true;
+  status.textContent = '매핑 저장 중...';
+  try {
+    const res = await fetch(SAVE_MAP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: currentItems })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+
+    // mark saved rows as matched so the table/exec-button reflect it
+    for (const it of currentItems) {
+      if (it.status === 'failed' && it.buyest_product_code) it.status = 'matched';
+    }
+    renderTable();
+    status.textContent = `매핑 ${data.saved}건 저장됨` + (data.errors.length ? ` (오류 ${data.errors.length}건: ${data.errors.join(', ')})` : '');
+    updateExecButton();
+  } catch (e) {
+    result.className = 'err';
+    result.textContent = '오류: ' + e.message;
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+async function execute() {
+  const execBtn = document.getElementById('execBtn');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const tableWrap = document.getElementById('tableWrap');
+  const runItems = currentItems.filter(hasCode);
+  const skipped = currentItems.length - runItems.length;
+  if (!runItems.length) return;
+  const E = runItems.map(eff);
+  const cnt = fn => E.filter(fn).length;
+  const lines = [
+    `총 ${runItems.length}건을 실제로 반영합니다.`,
+    ` · 품절로 변경: ${cnt(e => e.changed === true && e.after === 'soldout')}건`,
+    ` · 판매중으로 변경: ${cnt(e => e.changed === true && e.after === 'sale')}건`,
+    ` · 변경 없음: ${cnt(e => e.changed === false)}건`,
+    ` · 미리보기 없음(직접 입력한 코드): ${cnt(e => !e.before || !e.after)}건`,
+  ];
+  const wholeSold = cnt(e => e.changed === true && e.whole_after === 'soldout');
+  if (wholeSold) lines.push(` · 상품 전체가 품절 처리되는 행: ${wholeSold}건`);
+  const mm = cnt(e => !!e.display_mismatch);
+  if (mm) lines.push(` · ⚠ 품절/노출 상태가 이미 어긋난 행: ${mm}건 (자동으로 안 고쳐져요)`);
+  const reconf = runItems.filter(it => it.status !== 'matched' && it.ambiguous).length;
+  if (reconf) lines.push(` · ⚠ 후보 2개+ 재확인 행 ${reconf}건 포함 — 지정한 상품이 맞는지 한 번 더 봐주세요`);
+  if (skipped) lines.push(` · 건너뜀(코드 미정): ${skipped}건`);
+  lines.push('', '진행할까요?');
+  if (!confirm(lines.join('\n'))) return;
+
+  execBtn.disabled = true;
+  status.textContent = '실행 중...';
+  try {
+    const res = await fetch(EXEC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: runItems })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+
+    status.textContent = '';
+    result.className = 'ok';
+    let msg = `완료: ${data.processed}건 처리, ${data.products_touched}개 상품 변경, 새 매핑 ${data.new_mappings_saved}건 저장됨`;
+    if (data.errors.length) msg += `<br>오류 ${data.errors.length}건: ` + data.errors.join(', ');
+    const mismatchCount = (data.results || []).filter(r => r.display_mismatch).length;
+    if (mismatchCount > 0) {
+      msg += `<br>⚠ ${mismatchCount}건은 품절/노출 상태가 이미 어긋나 있어서 자동으로 안 고치고 표시만 했어요 — 재고 확인 후 관리자 화면에서 직접 처리해주세요.`;
+    }
+    result.innerHTML = msg;
+
+    // show the confirmed before/after result per row instead of the input table
+    const rows = (data.results || []).map((r, i) => `<tr>
+        <td>${i+1}</td><td>${r.ec_code}</td><td>${r.size||'-'}</td>
+        <td>${changeCellHtml(r)}${mismatchChip(r)}</td>
+        <td>${wholeCellHtml(r)}</td>
+      </tr>`).join('');
+    tableWrap.innerHTML = rows ? `
+      <table>
+        <thead><tr><th>#</th><th>이카운트코드</th><th>사이즈</th><th>변경 결과</th><th>전체상품</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>` : '';
+
+    execBtn.style.display = 'none';
+    document.getElementById('saveMapBtn').style.display = 'none';
+    document.getElementById('skipLabel').style.display = 'none';
+    document.getElementById('filterBar').innerHTML = '';
+  } catch (e) {
+    result.className = 'err';
+    result.textContent = '오류: ' + e.message;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+</script>
+</body>
+</html>
