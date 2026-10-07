@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BUYEST 영상 스튜디오</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d0d0d'/%3E%3Crect x='10' y='5' width='12' height='22' rx='2' fill='none' stroke='%23c8a96a' stroke-width='2'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink:#0d0d0d; --ivory:#f5f1ea; --paper:#fbf9f5; --gold:#c8a96a; --gold-deep:#8f7438;
+    --muted:#6f6a61; --line:#ddd6c8; --warn:#fff4d6; --warn-line:#e6cf8a;
+    --serif:"Noto Serif KR","Batang",serif; --sans:"Noto Sans KR","Malgun Gothic",sans-serif; --mono:ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.7 var(--sans)}
+  a{color:inherit}
+  .wrap{width:min(1040px,100% - 40px);margin-inline:auto}
+  :focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+
+  /* ── 상단: 검은 면 + 릴 프레임 ── */
+  .hero{background:var(--ink);color:var(--ivory);padding:56px 0 64px;overflow:hidden}
+  .hero .wrap{display:grid;grid-template-columns:1.25fr .75fr;gap:48px;align-items:center}
+  .back{font-size:13px;color:#a9a396;text-decoration:none;letter-spacing:.04em}
+  .back:hover{color:var(--gold)}
+  h1{font:700 clamp(34px,5.4vw,60px)/1.12 var(--serif);margin:20px 0 18px;letter-spacing:-.01em}
+  h1 em{font-style:normal;color:var(--gold)}
+  .lead{font-size:18px;color:#d9d3c6;max-width:30em;margin:0 0 30px}
+  .cta{display:flex;gap:12px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:10px;padding:16px 26px;border-radius:12px;font:700 17px var(--sans);text-decoration:none;border:2px solid var(--gold);transition:transform .15s,background .15s}
+  .btn.solid{background:var(--gold);color:var(--ink)}
+  .btn.line{color:var(--gold)}
+  .btn:hover{transform:translateY(-2px)}
+  .btn.solid:hover{background:#d8bc82}
+  .btn.line:hover{background:rgba(200,169,106,.12)}
+  .ver{margin-top:22px;font:13px var(--mono);color:#a9a396}
+  .ver b{color:var(--gold);font-weight:500}
+
+  .reel{justify-self:center;width:min(240px,60vw);aspect-ratio:9/16;border:2px solid var(--gold);border-radius:22px;position:relative;
+        background:linear-gradient(180deg,#1b1812 0%,#0d0d0d 100%);padding:26px 14px}
+  .reel::before,.reel::after{content:"";position:absolute;top:18px;bottom:18px;width:6px;
+        background:repeating-linear-gradient(180deg,var(--gold) 0 10px,transparent 10px 24px);opacity:.55;border-radius:3px}
+  .reel::before{left:9px} .reel::after{right:9px}
+  .reel .frame{height:100%;border-radius:8px;background:var(--ivory);color:var(--ink);display:grid;grid-template-rows:1fr auto;overflow:hidden}
+  .reel .shot{background:linear-gradient(135deg,#d8c9a8,#b9976a);position:relative}
+  .reel .shot i{position:absolute;inset:auto 14% 14% 14%;height:34%;background:rgba(13,13,13,.78);border-radius:4px}
+  .reel .meta{padding:10px 12px;font:700 12px var(--serif);letter-spacing:.08em;text-align:center}
+  .reel .bar{height:4px;background:#e4dccb}
+  .reel .bar span{display:block;height:100%;width:0;background:var(--gold-deep);animation:fill 3.6s ease-out .4s forwards}
+  @keyframes fill{to{width:100%}}
+  @media (prefers-reduced-motion:reduce){.reel .bar span{animation:none;width:100%}.btn{transition:none}}
+
+  /* ── 본문 ── */
+  section{padding:56px 0 8px}
+  h2{font:700 28px/1.3 var(--serif);margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 26px}
+  ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:14px;counter-reset:s}
+  ol.steps li{counter-increment:s;background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px 18px 74px;position:relative}
+  ol.steps li::before{content:counter(s);position:absolute;left:20px;top:16px;width:38px;height:38px;border-radius:50%;background:var(--ink);color:var(--gold);
+        display:grid;place-items:center;font:700 18px var(--serif)}
+  ol.steps b{display:block;font-size:17px;margin-bottom:2px}
+  ol.steps span{color:var(--muted);font-size:15px}
+  .note{background:var(--warn);border:1px solid var(--warn-line);border-radius:12px;padding:14px 18px;margin-top:16px;font-size:15px}
+  .note b{font-weight:700}
+  kbd{font:13px var(--mono);background:var(--ivory);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+  details{background:#fff;border:1px solid var(--line);border-radius:12px;padding:0 20px;margin-bottom:10px}
+  summary{cursor:pointer;padding:16px 0;font-weight:700;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";float:right;color:var(--gold-deep);font-size:22px;line-height:1}
+  details[open] summary::after{content:"–"}
+  details p{margin:0 0 16px;color:#3b3832}
+  footer{margin-top:64px;padding:28px 0 40px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+
+  @media (max-width:760px){
+    .hero .wrap{grid-template-columns:1fr;gap:36px}
+    .reel{order:-1;width:150px}
+    ol.steps li{padding-left:66px}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <a class="back" href="../">← 툴키트로 돌아가기</a>
+      <h1>사진을 올리면<br><em>릴스</em>가 만들어집니다</h1>
+      <p class="lead">영상은 내 PC가 직접 만들고, 완성된 파일은 바로 내려받습니다. 설치는 처음 한 번이면 끝나고, 새 버전은 버튼 한 번으로 바뀝니다.</p>
+      <div class="cta">
+        <a class="btn solid" href="http://localhost:3939" target="_blank" rel="noopener">스튜디오 열기</a>
+        <a class="btn line" id="dl" href="BUYEST-Studio-Install.bat" download>설치 파일 받기</a>
+      </div>
+      <p class="ver" id="ver">최신 버전 확인 중…</p>
+    </div>
+    <div class="reel" aria-hidden="true">
+      <div class="frame">
+        <div class="shot"><i></i></div>
+        <div class="meta">BUYEST</div>
+      </div>
+      <div class="bar" style="position:absolute;left:30px;right:30px;bottom:14px;border-radius:2px"><span></span></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="install">
+    <h2>처음 한 번만 설치하세요</h2>
+    <p class="sub">이미 설치했다면 위의 <b>스튜디오 열기</b>만 누르면 됩니다.</p>
+    <ol class="steps">
+      <li><b>설치 파일을 받습니다</b><span>위의 <b>설치 파일 받기</b> 버튼을 누르면 <kbd>BUYEST-Studio-Install.bat</kbd> 이 내려받아집니다.</span></li>
+      <li><b>받은 파일을 더블클릭합니다</b><span>파란 “Windows의 PC 보호” 화면이 뜨면 <b>추가 정보</b> → <b>실행</b>을 누르세요. 회사에서 만든 파일이라 안전합니다.</span></li>
+      <li><b>검은 창이 끝날 때까지 기다립니다</b><span>5~10분 걸립니다. 중간에 “이 앱이 변경하도록 허용하시겠습니까?”가 뜨면 <b>예</b>를 누르세요. 창은 닫지 마세요.</span></li>
+      <li><b>“설치 완료”가 보이면 끝입니다</b><span>브라우저에 스튜디오가 열리고, 바탕화면에 <b>BUYEST 영상 스튜디오</b> 아이콘이 생깁니다. 이후 PC를 켜면 자동으로 준비됩니다.</span></li>
+    </ol>
+  </section>
+
+  <section id="use">
+    <h2>쓰는 방법</h2>
+    <p class="sub">스튜디오는 이 PC 안에서만 열립니다. 다른 사람은 접속할 수 없습니다.</p>
+    <ol class="steps">
+      <li><b>로그인합니다</b><span>툴키트에서 쓰는 아이디와 비밀번호를 그대로 입력하세요.</span></li>
+      <li><b>브랜드를 고르고 사진을 올립니다</b><span>위쪽에서 BUYEST 또는 BUYEST Kids를 고른 뒤, 상품 사진을 최대 12장까지 올리고 브랜드명·상품명·가격·마지막 문구를 적습니다.</span></li>
+      <li><b>“릴스 만들기”를 누릅니다</b><span>1~2분 걸립니다. 진행 막대가 100%가 될 때까지 기다리세요.</span></li>
+      <li><b>“MP4 다운로드”를 누릅니다</b><span>파일 이름은 <kbd>브랜드_상품명_날짜.mp4</kbd> 로 저장됩니다. 만든 영상은 <b>7일 뒤 자동으로 지워지니</b> 바로 받아 두세요.</span></li>
+    </ol>
+  </section>
+
+  <section id="update">
+    <h2>새 버전이 나오면</h2>
+    <p class="sub">스튜디오 맨 위에 노란 안내가 뜹니다.</p>
+    <ol class="steps">
+      <li><b>“새 버전이 있습니다” 안내를 확인합니다</b><span>영상을 만드는 중이라면 끝난 뒤에 누르세요.</span></li>
+      <li><b><kbd>지금 업데이트</kbd> 를 누릅니다</b><span>1~2분 뒤 화면이 저절로 새로고침되고 끝납니다. 로그인과 지난 영상은 그대로 남습니다.</span></li>
+    </ol>
+  </section>
+
+  <section id="help">
+    <h2>문제가 생기면</h2>
+    <p class="sub">대부분 아래 네 가지입니다.</p>
+    <details>
+      <summary>“스튜디오 열기”를 눌렀는데 페이지가 열리지 않아요</summary>
+      <p>스튜디오가 아직 꺼져 있는 상태입니다. 바탕화면의 <b>BUYEST 영상 스튜디오</b> 아이콘을 먼저 더블클릭하세요. 작업 표시줄에 검은 창이 생기고, 잠시 뒤 브라우저가 열립니다.</p>
+    </details>
+    <details>
+      <summary>검은 창이 떠 있는데 닫아도 되나요?</summary>
+      <p>닫으면 스튜디오가 꺼집니다. 영상을 만드는 동안과 쓰는 동안에는 <b>최소화만</b> 해 두세요. 끄고 싶을 때만 닫으면 됩니다.</p>
+    </details>
+    <details>
+      <summary>로그인이 안 돼요</summary>
+      <p>툴키트와 같은 아이디·비밀번호입니다. “관리자 승인 후 사용할 수 있습니다”라고 나오면 가입 승인이 아직 안 된 것이니 관리자에게 문의하세요. 5번 틀리면 15분 동안 잠깁니다.</p>
+    </details>
+    <details>
+      <summary>설치 중에 빨간 글씨가 나왔어요</summary>
+      <p>그 화면을 캡처해서 담당자에게 보내주세요. 인터넷이 끊겼다면 연결을 확인하고 설치 파일을 다시 더블클릭하면 이어서 설치됩니다.</p>
+    </details>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">BUYEST 영상 스튜디오 · 영상은 이 PC에서만 만들어지고, 업로드한 사진은 밖으로 나가지 않습니다.</div>
+</footer>
+
+<script>
+// 툴키트 화면 안(iframe)에서 열렸으면 "툴키트로 돌아가기" 링크는 필요 없다
+if (window.self !== window.top) document.querySelector(".back").style.display = "none";
+
+// 최신 버전 표시 (같은 사이트의 latest.json)
+fetch("latest.json?t=" + Date.now()).then(r => r.json()).then(l => {
+  const el = document.getElementById("ver");
+  el.innerHTML = "최신 버전 <b>v" + l.version + "</b>" + (l.notes ? " · " + l.notes.replace(/[<>&]/g, "") : "");
+}).catch(() => { document.getElementById("ver").textContent = ""; });
+</script>
+</body>
+</html>
