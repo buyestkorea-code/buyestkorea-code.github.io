@@ -409,28 +409,87 @@ function renderAddStockScreen(){
         <div>클릭하거나 파일을 끌어다 놓으세요 (Ctrl+V 붙여넣기도 가능)</div>
         <input type="file" id="addFile" accept=".xlsx,.xls">
       </div>
-      <div id="addPreviewWrap" style="margin-top:14px;"></div>
-    </div>`;
+</div>
+    <div class="card">
+      <h2>단품 직접 등록</h2>
+      <div class="hint" style="margin:0 0 10px;">파일 없이 상품 하나씩 추가할 때 쓰세요. <b>이미 있는 바코드</b>를 넣으면 그 상품에 수량만 더해지고, <b>바코드를 비워두면</b> 자동 번호가 붙어요(수기판매 검색으로 판매 가능). 여러 개를 "목록에 추가"로 쌓은 뒤 한 번에 확정합니다.</div>
+      <div class="row">
+        <div class="field"><label>바코드 (선택)</label><input id="asBarcode" placeholder="스캔하거나 입력 — 비우면 자동 번호" autocomplete="off" oninput="addStockLookup()"></div>
+        <div class="field"><label>추가 수량 (필수)</label><input id="asQty" type="number" min="1" value="1"></div>
+      </div>
+      <div id="asNote" class="hint" style="margin:-4px 0 8px;"></div>
+      <div class="row">
+        ${brandInputHtml('asBrand', '')}
+        <div class="field"><label>품목명 / 품번 (필수)</label><input id="asName" placeholder="예: 행_9B000 23 M7774 999" autocomplete="off"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>사이즈</label><input id="asSize" autocomplete="off"></div>
+        <div class="field"><label>단가</label><input id="asPrice" type="number" value="0"></div>
+      </div>
+      <button class="btn btn-outline" onclick="addStockManualAdd()">목록에 추가</button>
+    </div>
+    <div class="card" id="addPreviewCard" style="display:none;"><div id="addPreviewWrap"></div></div>`;
   document.getElementById('addFile').addEventListener('change', e => {
     if (e.target.files[0]) document.getElementById('addDrop').classList.add('has-file');
     handleAddStockFile(e);
   });
   wireDropzone('addDrop', 'addFile');
+  document.getElementById('asBarcode').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); addStockLookup(); document.getElementById('asQty').focus(); } });
+  document.getElementById('asQty').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); addStockManualAdd(); } });
 }
+/* 단품 직접 등록 — 입력한 상품을 추가 입고 목록(addStockState.rows)에 쌓는다. 파일에서 읽은 줄과 같은 목록이라 한 번에 확정된다. */
+function addStockLookup(){
+  const bc = S(document.getElementById('asBarcode').value);
+  const note = document.getElementById('asNote');
+  const ids = ['asBrand', 'asName', 'asSize', 'asPrice'];
+  const ex = bc ? state.items.find(i => S(i.barcode) === bc) : null;
+  ids.forEach(id => { document.getElementById(id).disabled = !!ex; });
+  if (ex){
+    document.getElementById('asBrand').value = ex.brand || '';
+    document.getElementById('asName').value = ex.item_name || '';
+    document.getElementById('asSize').value = ex.size || '';
+    document.getElementById('asPrice').value = ex.price || 0;
+    note.innerHTML = `이미 있는 상품이에요 — <b>${esc(ex.brand)} ${esc(ex.item_name)} (${esc(sizeText(ex.size))})</b> · 지금 기초수량 ${ex.init_qty}. 수량만 더해져요.`;
+  } else {
+    note.textContent = bc ? '목록에 없는 새 바코드예요 — 새 품목으로 등록됩니다.' : '';
+  }
+}
+function addStockResetBatch(){ addStockState.batchId = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); addStockState.busy = false; }
+function addStockManualAdd(){
+  let bc = S(document.getElementById('asBarcode').value);
+  const brand = S(document.getElementById('asBrand').value), name = S(document.getElementById('asName').value);
+  const qty = Math.floor(N(document.getElementById('asQty').value));
+  if (!brand){ toast('브랜드를 입력해주세요','err'); return; }
+  if (!name){ toast('품목명(품번)을 입력해주세요','err'); return; }
+  if (!(qty >= 1)){ toast('추가 수량은 1 이상이어야 해요','err'); return; }
+  const autoBarcode = !bc;
+  if (autoBarcode) bc = 'M' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase();   // 바코드 없는 상품용 자동 번호
+  addStockState.rows = (addStockState.rows || []).concat([{
+    brand, item_name: name, style_code: name, size: S(document.getElementById('asSize').value),
+    barcode: bc, init_qty: qty, price: Math.max(0, Math.floor(N(document.getElementById('asPrice').value))),
+  }]);
+  addStockResetBatch();
+  renderAddStockPreview();
+  toast(autoBarcode ? `목록에 추가했어요 (자동 번호 ${bc})` : '목록에 추가했어요', 'ok');
+  ['asBarcode', 'asName', 'asSize'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('asQty').value = 1; document.getElementById('asPrice').value = 0;
+  addStockLookup();
+  document.getElementById('asBarcode').focus();
+}
+function addStockClearList(){ addStockState.rows = null; renderAddStockPreview(); }
 async function handleAddStockFile(e){
   const f = e.target.files[0];
   if (!f) return;
   const wb = XLSX.read(await f.arrayBuffer(), {type:'array'});
   const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:true});
   const rows = parseInventoryExcel(aoa);
-  const wrap = document.getElementById('addPreviewWrap');
-  addStockState.rows = rows;
-  addStockState.batchId = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);   // 같은 파일 중복 반영 방지용
-  addStockState.busy = false;
   if (rows.length === 0){
-    wrap.innerHTML = '<div class="hint" style="color:var(--red);">바코드 컬럼을 찾지 못했어요. 양식을 확인해주세요.</div>';
+    toast('바코드 컬럼을 찾지 못했어요. 양식을 확인해주세요.', 'err');
     return;
   }
+  // 이미 "단품 직접 등록"으로 쌓아둔 줄이 있으면 지우지 않고 뒤에 이어 붙인다
+  addStockState.rows = (addStockState.rows || []).concat(rows);
+  addStockResetBatch();   // 목록이 바뀌면 새 번호 — 같은 목록을 두 번 반영하는 것만 서버가 막는다
   // 미리보기는 서버의 최신 재고를 기준으로 (다른 사람이 방금 올렸을 수도 있어서)
   const cur = await apiGet('items', {corner_id: state.corner.id});
   if (cur.ok) state.items = cur.items || [];
@@ -455,15 +514,18 @@ function addStockPlan(){
 }
 function renderAddStockPreview(){
   const wrap = document.getElementById('addPreviewWrap');
-  if (!wrap || !addStockState.rows) return;
+  const card = document.getElementById('addPreviewCard');
+  if (!wrap) return;
+  if (!addStockState.rows || !addStockState.rows.length){ if (card) card.style.display = 'none'; wrap.innerHTML = ''; return; }
+  if (card) card.style.display = '';
   const p = addStockPlan();
   const baseTotal = state.items.reduce((a, i) => a + i.init_qty, 0);
   if (!p.lines.length){
-    wrap.innerHTML = '<div class="hint" style="color:var(--red);">추가할 수량이 있는 품목이 없어요. (재고량이 0 이하인 줄은 제외돼요)</div>';
+    wrap.innerHTML = '<div class="hint" style="color:var(--red);">추가할 수량이 있는 품목이 없어요. (재고량이 0 이하인 줄은 제외돼요)</div><button class="btn btn-outline" style="margin-top:8px;" onclick="addStockClearList()">목록 비우기</button>';
     return;
   }
   wrap.innerHTML = `
-    <div class="hint">${addStockState.rows.length}줄 인식됨</div>
+    <div class="hint">${addStockState.rows.length}줄 담김 <button class="edit-btn" onclick="addStockClearList()">목록 비우기</button></div>
     <div class="stat-row" style="margin-top:8px;">
       <div class="stat">새로 등록할 품목<b>${p.newCnt}</b></div>
       <div class="stat">수량이 늘어날 기존 품목<b>${p.oldCnt}</b></div>
