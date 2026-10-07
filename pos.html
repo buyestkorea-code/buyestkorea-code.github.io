@@ -743,6 +743,8 @@ async function lookupAndShow(barcode, intent){
   const box = document.getElementById('scanResult');
   if (!res.ok){ toast(res.error||'조회 실패','err'); focusBarcode(); return; }
 
+  autoCartPrevious(intent);   // 지금 보이는 상품이 있는 채로 다음 바코드를 찍으면 그 상품을 자동으로 장바구니에 담는다
+
   if (!res.found && res.style_matches && res.style_matches.length){
     // 택의 품번 바코드로 찍은 경우 — 사이즈별 품목이 여러 개라 사이즈를 고르게 한다
     state.scannedItem = null;
@@ -758,6 +760,7 @@ async function lookupAndShow(barcode, intent){
     return;
   }
   if (!res.found){
+    state.scannedItem = null;
     box.innerHTML = renderUnregisteredCard(barcode, res.prev_manual, intent, res.brand_guess);
     focusBarcode();
     return;
@@ -769,6 +772,15 @@ async function lookupAndShow(barcode, intent){
   focusBarcode();
 }
 function pickStyleMatch(barcode, intent){ lookupAndShow(barcode, intent); }
+/* 판매/주문택배 카드가 떠 있는 상태에서 다음 바코드가 스캔되면, "추가 판매" 버튼을 안 눌러도 그 상품이 자동으로 담긴다.
+   (카드가 DOM에 실제로 있을 때만 — 이미 확정·취소돼서 카드가 사라졌으면 담지 않는다. 판매 장바구니와 주문택배 장바구니는 안 섞는다.) */
+function autoCartPrevious(intent){
+  if ((intent !== 'sale' && intent !== 'courier') || !state.scannedItem || !document.getElementById('scanPrice')) return;
+  if (state.cart.length && state.cart[0].mode !== curCartMode()) return;
+  state.cart.push(Object.assign({item: state.scannedItem, mode: curCartMode()}, readCardFields()));
+  state.scannedItem = null;
+  renderCart();
+}
 
 /* ---- 수기판매 모드: 바코드가 없거나 안 찍히는 상품 (간혹 있음) ----
    1) 재고파일에서 브랜드/품명/품번으로 검색해 고르면 → 바코드를 스캔한 것과 똑같이 진행(재고도 정상 차감)
@@ -1202,7 +1214,7 @@ function renderItemCard(item, intent){
           const main = n
             ? `<button class="${cls}" style="width:100%;margin-top:8px;${color}" onclick="submitCart(true)">담은 ${n}개 + 이 상품 = ${n+1}개 한번에 ${intent==='courier'?'주문택배 확정':'판매 확정'}</button>`
             : `<button class="${cls}" style="width:100%;margin-top:8px;${color}" onclick="${intent==='courier' ? `submitMove('${escJsAttr(item.barcode)}', 'courier')` : `submitSale(${item.id}, '${escJsAttr(item.barcode)}')`}">${label}</button>`;
-          return main + `<button class="btn btn-outline btn-big" style="width:100%;margin-top:6px;" onclick="cartPush()">＋ 추가 ${intent==='courier'?'주문택배':'판매'} (이 상품 담고 바코드 더 찍기)</button>`;
+          return main + `<button class="btn btn-outline btn-big" style="width:100%;margin-top:6px;" onclick="cartPush()">＋ 담아두기 (다음 바코드를 그냥 찍어도 자동으로 담겨요)</button>`;
         })()}
       ` : `
         <div class="field"><label>비고</label><input id="scanNote" placeholder="반품 사유 등 (선택)"></div>
