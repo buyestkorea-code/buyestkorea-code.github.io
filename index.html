@@ -6625,14 +6625,30 @@
       }
       return {exactLookup:exactLookup, fuzzyIndex:fuzzyIndex, priceByCode:priceByCode, byCode:byCode};
     }
+    // 송장은 "US 6W", "EU 41"처럼 나라 표기가 붙는데 이카운트 규격은 "6", "41"인 경우가 많다.
+    // 나라 표기(US/EU/UK...)를 떼고 신발 W/M 표기도 뗀다. 키즈 개월 사이즈("6M")는 나라 표기가 없을 때 건드리지 않는다.
+    function icmSizeCore(v){
+      var t = icmNormalizeSize(v).toUpperCase();
+      var m = /^(US|EU|UK|IT|FR|KR|JP)\s*(\d+(?:\.\d+)?)\s*[WM]?$/.exec(t);
+      if(m) return m[2];
+      m = /^(\d+(?:\.\d+)?)\s*W$/.exec(t);
+      if(m) return m[1];
+      return t;
+    }
     function icmFindCode(name, size, exactLookup, fuzzyIndex){
-      var key = icmCleanProductName(name) + ' [' + icmNormalizeSize(size) + ']';
-      if(key in exactLookup) return {code:exactLookup[key], status:'정확매칭', candidates:[]};
-      var tokens = icmCodeTokens(name);
+      var cleaned = icmCleanProductName(name);
       var sizeNorm = icmNormalizeSize(size);
+      var sizeCore = icmSizeCore(size);
+      var key = cleaned + ' [' + sizeNorm + ']';
+      if(key in exactLookup) return {code:exactLookup[key], status:'정확매칭', candidates:[]};
+      if(sizeCore !== sizeNorm.toUpperCase()){
+        var key2 = cleaned + ' [' + sizeCore + ']';
+        if(key2 in exactLookup) return {code:exactLookup[key2], status:'유사매칭', candidates:[]};
+      }
+      var tokens = icmCodeTokens(name);
       var candidates = [];
       fuzzyIndex.forEach(function(entry){
-        if(entry.size !== sizeNorm) return;
+        if(entry.size !== sizeNorm && icmSizeCore(entry.size) !== sizeCore) return;
         var baseWords = entry.base.split(' ');
         if(tokens.length > 0 && tokens.every(function(t){ return icmTokenMatches(t, entry.base, baseWords); })){
           candidates.push(entry);
