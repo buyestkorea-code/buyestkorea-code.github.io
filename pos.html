@@ -668,6 +668,7 @@ function renderScanScreen(){
         <button class="btn ${state.mode==='courier'?'btn-primary':'btn-outline'}" data-mode="courier" onclick="setMode('courier')">주문택배</button>
         <button class="btn ${state.mode==='recall'?'btn-primary':'btn-outline'}" data-mode="recall" onclick="setMode('recall')">회수</button>
         <button class="btn ${state.mode==='manual'?'btn-primary':'btn-outline'}" data-mode="manual" onclick="setMode('manual')">수기판매</button>
+        <button class="btn ${state.mode==='bulk'?'btn-primary':'btn-outline'}" data-mode="bulk" onclick="setMode('bulk')">대량판매(스캔)</button>
       </div>
       <div id="modeHint" class="hint"></div>
       <input id="barcodeInput" placeholder="바코드 스캔 또는 입력 후 Enter" autocomplete="off">
@@ -708,7 +709,7 @@ function setMode(m){
     btn.classList.toggle('btn-primary', on); btn.classList.toggle('btn-outline', !on);
   });
   updateModeHint();
-  if (m === 'manual') nbOpen(); else focusBarcode();
+  if (m === 'manual') nbOpen(); else if (m === 'bulk') bulkOpen(); else focusBarcode();
 }
 function updateModeHint(){
   const hint = document.getElementById('modeHint');
@@ -717,6 +718,7 @@ function updateModeHint(){
   if (state.mode==='return') hint.textContent = '반품할 상품의 바코드를 스캔하세요.';
   if (state.mode==='courier') hint.textContent = '온라인 주문으로 택배 발송할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액(매출)으로 잡혀요)';
   if (state.mode==='recall') hint.textContent = '본사 등으로 회수할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액으로는 안 잡혀요)';
+  if (state.mode==='bulk') hint.textContent = '택을 붙인 종이를 사진으로 찍어 올리면 사진 속 바코드가 모두 판매 목록으로 나와요. (바코드를 직접 스캔하면 목록에 더해져요)';
   if (state.mode==='manual') hint.textContent = '바코드가 없거나 안 찍히는 상품을 직접 입력해서 기록해요. (바코드를 스캔하면 일반 판매처럼 처리돼요)';
   if (state.mode==='exchange') hint.textContent = state.exchangeStep==='sale'
     ? '이제 새로 가져갈(교환) 상품의 바코드를 스캔하세요.'
@@ -729,6 +731,7 @@ async function onScanSubmit(){
   if (!barcode) return;
   input.value = '';
 
+  if (state.mode === 'bulk'){ bulkAddBarcode(barcode, 1); bulkRender(); return; }   // 대량판매: 스캔하면 목록에 1개 더함
   if (state.mode === 'exchange'){
     return handleExchangeScan(barcode);
   }
@@ -821,6 +824,260 @@ function nbSearchRun(){
 function nbPick(barcode){
   // 고른 상품은 바코드를 스캔한 것과 똑같이 처리 (선택한 구분으로)
   lookupAndShow(barcode, state.nbIntent);
+}
+
+/* ---- 대량판매(스캔) 모드 (2026-10-07) ----
+   택(바코드 스티커)을 종이에 여러 장 붙이고 사진으로 찍어 올리면, 사진을 보정해서 구역별로 읽고 → 바코드를 찍은 것처럼 판매 목록으로
+   만들어 준다. 확정하면 서버 `bulk_sale`이 모든 거래를 같은 시각으로 한 번에 기록한다(재고파일에 있는 바코드만).
+   사진 판독: zxing-wasm(여러 바코드 동시 판독). 실사진(폰 그림자·반사·기울기)에서 그냥 읽으면 놓치는 게 많아서
+     1) 흑백 + 큰 블러로 만든 "배경 밝기"로 나눠 그림자를 평평하게 펴고  2) 사진을 구역(3x4, 4x5)으로 나눠 확대해서 읽고
+     3) 결과를 합친다(겹친 구역에서 중복으로 읽힌 건 위치로 합침, 서로 떨어진 같은 바코드는 별개의 택으로 셈).
+   시험: 공책에 택 14개/10개 붙인 사진 → 13~14/10 읽힘(그냥 읽으면 4/7), 영수증 사진 오인식 0. */
+const bulkState = {lines: [], unreg: {}, reading: false, busy: false, batchId: '', discType: 'none', discVal: 0, note: '', status: '', lastRead: null};
+const ZX_URL = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/iife/reader/index.js';
+const ZX_WASM_BASE = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/reader/';
+function loadScriptOnce(src){
+  return new Promise((resolve, reject) => {
+    if (document.querySelector('script[data-once="' + src + '"]')) return resolve();
+    const sc = document.createElement('script');
+    sc.src = src; sc.setAttribute('data-once', src);
+    sc.onload = () => resolve();
+    sc.onerror = () => reject(new Error('바코드 판독 모듈을 불러오지 못했어요 (인터넷 연결 확인)'));
+    document.head.appendChild(sc);
+  });
+}
+async function ensureZXing(){
+  if (typeof ZXingWASM === 'undefined') await loadScriptOnce(ZX_URL);
+  if (!ZXingWASM.__locSet){
+    ZXingWASM.setZXingModuleOverrides({locateFile: (p, prefix) => p.endsWith('.wasm') ? ZX_WASM_BASE + p : prefix + p});
+    ZXingWASM.__locSet = true;
+  }
+}
+/* 상자 흐림(두 번) — ctx.filter는 사파리(아이폰)에서 안 돼서 직접 계산. 배경 밝기 지도(저해상도)라 아주 작아서 빠르다. */
+function boxBlur2(src, w, h, r){
+  let a = Float32Array.from(src), b = new Float32Array(w * h);
+  for (let pass = 0; pass < 2; pass++){
+    for (let y = 0; y < h; y++){            // 가로
+      let acc = 0, cnt = 0;
+      for (let x = -r; x <= r; x++){ const xx = Math.min(w - 1, Math.max(0, x)); acc += a[y*w + xx]; cnt++; }
+      for (let x = 0; x < w; x++){
+        b[y*w + x] = acc / cnt;
+        const addX = Math.min(w - 1, x + r + 1), subX = Math.max(0, x - r);
+        acc += a[y*w + addX] - a[y*w + subX];
+      }
+    }
+    for (let x = 0; x < w; x++){            // 세로
+      let acc = 0, cnt = 0;
+      for (let y = -r; y <= r; y++){ const yy = Math.min(h - 1, Math.max(0, y)); acc += b[yy*w + x]; cnt++; }
+      for (let y = 0; y < h; y++){
+        a[y*w + x] = acc / cnt;
+        const addY = Math.min(h - 1, y + r + 1), subY = Math.max(0, y - r);
+        acc += b[addY*w + x] - b[subY*w + x];
+      }
+    }
+  }
+  return a;
+}
+/* 사진 한 장 → 읽힌 택 목록 [{text, x, y}] (각 항목 = 물리적 택 하나). onProgress(done,total) */
+async function photoReadBarcodes(file, onProgress){
+  await ensureZXing();
+  const bmp = await createImageBitmap(file);
+  const W = bmp.width, H = bmp.height, long = Math.max(W, H);
+  // 1) 배경 밝기 지도: 1/16로 줄인 흑백을 흐리게
+  const k = 16, sw = Math.max(8, Math.round(W / k)), sh = Math.max(8, Math.round(H / k));
+  const sc = document.createElement('canvas'); sc.width = sw; sc.height = sh;
+  const sg = sc.getContext('2d'); sg.drawImage(bmp, 0, 0, sw, sh);
+  const sd = sg.getImageData(0, 0, sw, sh), gray = new Float32Array(sw * sh);
+  for (let i = 0; i < gray.length; i++) gray[i] = 0.299 * sd.data[i*4] + 0.587 * sd.data[i*4+1] + 0.114 * sd.data[i*4+2];
+  const bg = boxBlur2(gray, sw, sh, Math.max(2, Math.round(Math.max(sw, sh) / 54)));
+  const bgCv = document.createElement('canvas'); bgCv.width = sw; bgCv.height = sh;
+  const bgCtx = bgCv.getContext('2d'), bgImg = bgCtx.createImageData(sw, sh);
+  for (let i = 0; i < bg.length; i++){ const v = Math.max(1, Math.min(255, Math.round(bg[i]))); bgImg.data[i*4] = bgImg.data[i*4+1] = bgImg.data[i*4+2] = v; bgImg.data[i*4+3] = 255; }
+  bgCtx.putImageData(bgImg, 0, 0);
+  // 2) 구역별로 확대 + 그림자 보정 후 판독
+  const strategies = [[3900, 3, 4], [4600, 4, 5], [4600, 3, 4]];   // [긴 변 목표 px, 가로 구역 수, 세로 구역 수]
+  const total = strategies.reduce((a, s) => a + s[1] * s[2], 0);
+  const opt = {tryHarder: true, formats: ['Code128', 'Code39', 'EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'ITF', 'Codabar'], maxNumberOfSymbols: 60};
+  const tile = document.createElement('canvas'), tg = tile.getContext('2d', {willReadFrequently: true});
+  const tileBg = document.createElement('canvas'), tbg = tileBg.getContext('2d', {willReadFrequently: true});
+  const inst = [];   // 물리적 택 하나 = 항목 하나
+  const near = 0.04 * long;
+  let done = 0;
+  for (const [T, cols, rows] of strategies){
+    const scale = Math.min(2.5, T / long), tw = W / cols, th = H / rows, ov = 0.3;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++){
+      const sx = Math.max(0, c * tw - tw * ov / 2), sy = Math.max(0, r * th - th * ov / 2);
+      const swd = Math.min(W - sx, tw * (1 + ov)), shd = Math.min(H - sy, th * (1 + ov));
+      const cw = Math.max(1, Math.round(swd * scale)), ch = Math.max(1, Math.round(shd * scale));
+      tile.width = cw; tile.height = ch; tileBg.width = cw; tileBg.height = ch;
+      tg.imageSmoothingQuality = 'high'; tbg.imageSmoothingQuality = 'high';
+      tg.drawImage(bmp, sx, sy, swd, shd, 0, 0, cw, ch);
+      tbg.drawImage(bgCv, sx * sw / W, sy * sh / H, swd * sw / W, shd * sh / H, 0, 0, cw, ch);
+      const id = tg.getImageData(0, 0, cw, ch), bd = tbg.getImageData(0, 0, cw, ch);
+      for (let i = 0; i < id.data.length; i += 4){
+        const g = 0.299 * id.data[i] + 0.587 * id.data[i+1] + 0.114 * id.data[i+2];
+        let v = g / (bd.data[i] + 1) * 210; if (v > 255) v = 255;
+        id.data[i] = id.data[i+1] = id.data[i+2] = v;
+      }
+      let res = [];
+      try { res = await ZXingWASM.readBarcodes(id, opt); } catch (e) { res = []; }
+      res.forEach(x => {
+        const text = S(x.text);
+        if (text.length < 4 || x.isValid === false) return;
+        const p = x.position || {};
+        const pts = [p.topLeft, p.topRight, p.bottomRight, p.bottomLeft].filter(Boolean);
+        if (!pts.length) return;
+        const ox = sx + (pts.reduce((a, q) => a + q.x, 0) / pts.length) / scale;
+        const oy = sy + (pts.reduce((a, q) => a + q.y, 0) / pts.length) / scale;
+        // 같은 값이 가까운 위치에서 또 읽혔으면 같은 택(겹친 구역/다른 보정에서 중복) — 멀리 떨어져 있으면 별개의 택
+        const hit = inst.find(q => q.text === text && Math.hypot(q.x - ox, q.y - oy) < near);
+        if (hit){ hit.x = (hit.x + ox) / 2; hit.y = (hit.y + oy) / 2; hit.hits++; } else inst.push({text, x: ox, y: oy, hits: 1});
+      });
+      done++; if (onProgress) onProgress(done, total);
+      await new Promise(r => setTimeout(r, 0));   // 화면이 멈춰 보이지 않게 숨 돌리기
+    }
+  }
+  if (bmp.close) bmp.close();
+  // 같은 자리에서 서로 다른 값이 읽혔으면(바코드 일부만 걸려 잘못 읽힌 경우) 여러 번 확인된 쪽만 남긴다. 동점이면 재고파일에 있는 값 우선.
+  // (서로 다른 택은 최소 택 하나 크기만큼 떨어져 있어서, 이렇게 가까운 위치에 진짜 서로 다른 바코드가 둘 있을 수는 없다)
+  const same = 0.025 * long;
+  const known = t => state.items.some(i => S(i.barcode) === t) ? 1 : 0;
+  inst.sort((a, b) => b.hits - a.hits || known(b.text) - known(a.text));
+  const kept = [];
+  inst.forEach(q => { if (!kept.some(k => k.text !== q.text && Math.hypot(k.x - q.x, k.y - q.y) < same)) kept.push(q); });
+  return kept;
+}
+
+function bulkLineFor(barcode){ return bulkState.lines.find(l => l.barcode === barcode); }
+/* 읽힌 바코드 하나(개수 n)를 목록에 반영 — 재고파일에 있으면 판매 줄, 없으면 '없음' 목록 */
+function bulkAddBarcode(barcode, n){
+  n = n || 1;
+  const bc = S(barcode);
+  const item = state.items.find(i => S(i.barcode) === bc);
+  if (item){
+    const ex = bulkLineFor(bc);
+    if (ex) ex.qty += n; else bulkState.lines.push({barcode: bc, item, qty: n, price: item.price});
+  } else {
+    bulkState.unreg[bc] = (bulkState.unreg[bc] || 0) + n;
+  }
+  bulkState.batchId = '';   // 목록이 바뀌었으니 새 번호
+}
+function bulkUnitFinal(l){
+  let f = l.price;
+  if (bulkState.discType === 'percent') f = l.price * (1 - bulkState.discVal / 100);
+  else if (bulkState.discType === 'amount') f = l.price - bulkState.discVal;
+  return Math.max(0, Math.round(f));
+}
+async function bulkHandleFiles(files){
+  if (!files || !files.length || bulkState.reading) return;
+  bulkState.reading = true;
+  let totalRead = 0;
+  const perPhoto = [];
+  try {
+    for (let i = 0; i < files.length; i++){
+      const f = files[i];
+      const label = files.length > 1 ? `사진 ${i + 1}/${files.length} ` : '';
+      bulkState.status = label + '바코드를 읽는 중… (그림자 보정 + 구역별 판독)';
+      bulkRenderStatus();
+      const found = await photoReadBarcodes(f, (d, t) => { bulkState.status = `${label}바코드를 읽는 중… ${Math.round(d / t * 100)}%`; bulkRenderStatus(); });
+      const cnt = {}; found.forEach(x => { cnt[x.text] = (cnt[x.text] || 0) + 1; });
+      Object.entries(cnt).forEach(([bc, n]) => bulkAddBarcode(bc, n));
+      totalRead += found.length; perPhoto.push(found.length);
+    }
+    bulkState.lastRead = {photos: files.length, total: totalRead, perPhoto};
+    bulkState.status = totalRead ? '' : '이 사진에서는 바코드를 하나도 못 읽었어요. 더 밝게, 가까이서, 택이 평평하게 보이게 다시 찍어보세요.';
+  } catch (e) {
+    bulkState.status = '사진을 읽는 중 문제가 생겼어요: ' + (e && e.message ? e.message : e);
+  }
+  bulkState.reading = false;
+  bulkRender();
+}
+function bulkRenderStatus(){ const el = document.getElementById('bulkStatus'); if (el) el.textContent = bulkState.status; }
+function bulkOpen(){
+  state.scannedItem = null;
+  if (state.screen !== 'scan') return;
+  bulkRender();
+}
+function bulkRender(){
+  const box = document.getElementById('scanResult');
+  if (!box || state.mode !== 'bulk') return;
+  const lines = bulkState.lines;
+  const unregList = Object.entries(bulkState.unreg);
+  const cnt = lines.reduce((a, l) => a + l.qty, 0);
+  const total = lines.reduce((a, l) => a + bulkUnitFinal(l) * l.qty, 0);
+  const lr = bulkState.lastRead;
+  box.innerHTML = `
+    <div class="item-card hit">
+      <div class="name">대량판매 — 사진으로 한꺼번에 스캔</div>
+      <div class="meta">택(바코드 스티커)을 종이에 붙여 사진을 찍어 올리면, 사진 속 바코드가 모두 판매 목록으로 나와요. 확정하면 같은 시각으로 한번에 기록됩니다.</div>
+      <div class="scan-actions" style="margin-top:10px;">
+        <button class="btn btn-primary" ${bulkState.reading ? 'disabled' : ''} onclick="document.getElementById('bulkCam').click()">📷 사진 찍기</button>
+        <button class="btn btn-outline" ${bulkState.reading ? 'disabled' : ''} onclick="document.getElementById('bulkPick').click()">🖼 사진 선택 (여러 장 가능)</button>
+      </div>
+      <input type="file" id="bulkCam" accept="image/*" capture="environment" style="display:none;" onchange="bulkHandleFiles(this.files); this.value='';">
+      <input type="file" id="bulkPick" accept="image/*" multiple style="display:none;" onchange="bulkHandleFiles(this.files); this.value='';">
+      <div id="bulkStatus" class="hint" style="min-height:18px;color:${bulkState.reading ? 'var(--blue)' : 'var(--amber)'};">${esc(bulkState.status)}</div>
+      <div class="hint">촬영 팁: 밝은 곳에서 택이 평평하게 보이도록, 한 장에 10~15개 정도, 바코드가 선명하게. 폰 원본 크기 그대로 올리면 가장 잘 읽혀요. 놓친 택은 위 바코드 입력칸에 스캔하거나 입력하면 목록에 더해져요.</div>
+    </div>
+    ${lines.length || unregList.length ? `
+    <div class="item-card" style="border-color:#6366f1;background:#eef2ff;">
+      <div class="name">${lr ? `사진 ${lr.photos}장에서 읽힌 바코드 ${lr.total}개` : '판매 목록'} <span style="font-weight:400;font-size:12px;">→ 판매 ${cnt}개 · 합계 ${money(total)}원</span></div>
+      <div class="hint" style="margin:2px 0 8px;">실제 택 개수와 맞는지 확인하세요. 빠졌으면 바코드를 스캔해서 더하고, 잘못 읽힌 건 "빼기"로 지우세요.</div>
+      <div class="tbl-wrap" style="max-height:340px;background:#fff;">
+        <table><thead><tr><th>상품</th><th>수량</th><th>판매가</th><th>재고</th><th></th></tr></thead>
+        <tbody>${lines.map((l, i) => `<tr>
+          <td><b>${esc(l.item.brand)}</b> ${esc(l.item.item_name)}${l.item.size ? ' (' + esc(l.item.size) + ')' : ''}<br><span style="color:var(--sub);font-size:11px;">${esc(l.barcode)}</span></td>
+          <td style="white-space:nowrap;"><button class="edit-btn" onclick="bulkQty(${i},-1)">−</button> <b>${l.qty}</b> <button class="edit-btn" onclick="bulkQty(${i},1)">＋</button></td>
+          <td><input type="number" value="${l.price}" style="width:96px;padding:5px 6px;font-size:13px;" onchange="bulkPrice(${i}, this.value)"></td>
+          <td style="white-space:nowrap;${l.qty > l.item.cur_qty ? 'color:var(--red);font-weight:700;' : ''}">${l.item.cur_qty}${l.qty > l.item.cur_qty ? ' ⚠' : ''}</td>
+          <td><button class="void-btn" onclick="bulkRemove(${i})">빼기</button></td></tr>`).join('') || '<tr><td colspan="5" class="hint">재고파일에 있는 바코드가 없어요.</td></tr>'}</tbody></table>
+      </div>
+      ${unregList.length ? `<div class="hint" style="color:var(--red);margin-top:8px;"><b>재고파일에 없는 바코드 ${unregList.reduce((a, [, n]) => a + n, 0)}개</b> — 판매 목록에서 제외돼요. 수기판매 모드에서 따로 등록하세요: ${unregList.map(([bc, n]) => esc(bc) + (n > 1 ? '×' + n : '')).join(', ')}
+        <button class="edit-btn" onclick="bulkClearUnreg()">알림 지우기</button></div>` : ''}
+      ${lines.length ? `
+      <div class="row" style="margin-top:10px;">
+        <div class="field"><label>일괄 할인 (모든 상품에 적용)</label>
+          <select onchange="bulkSetDisc(this.value, null)">
+            <option value="none" ${bulkState.discType==='none'?'selected':''}>없음</option>
+            <option value="percent" ${bulkState.discType==='percent'?'selected':''}>% 할인</option>
+            <option value="amount" ${bulkState.discType==='amount'?'selected':''}>금액 차감(상품당)</option></select></div>
+        <div class="field"><label>할인값</label><input type="number" value="${bulkState.discVal}" ${bulkState.discType==='none'?'disabled':''} onchange="bulkSetDisc(null, this.value)"></div>
+        <div class="field"><label>비고 (선택)</label><input value="${esc(bulkState.note)}" placeholder="예: 박OO 고객 일괄" onchange="bulkState.note = S(this.value)"></div>
+      </div>
+      <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" ${bulkState.busy ? 'disabled' : ''} onclick="bulkSubmit()">${cnt}개 한번에 판매 확정 (${money(total)}원)</button>
+      <button class="btn btn-outline" style="width:100%;margin-top:6px;" onclick="bulkClearAll()">목록 모두 비우기</button>` : ''}
+    </div>` : ''}`;
+}
+function bulkQty(i, d){ const l = bulkState.lines[i]; if (!l) return; l.qty += d; if (l.qty < 1) bulkState.lines.splice(i, 1); bulkState.batchId = ''; bulkRender(); }
+function bulkPrice(i, v){ const l = bulkState.lines[i]; if (!l) return; l.price = Math.max(0, Math.floor(N(v))); bulkRender(); }
+function bulkRemove(i){ bulkState.lines.splice(i, 1); bulkState.batchId = ''; bulkRender(); }
+function bulkSetDisc(type, val){
+  if (type !== null) bulkState.discType = type;
+  if (val !== null) bulkState.discVal = Math.max(0, Math.floor(N(val)));
+  if (bulkState.discType === 'percent' && bulkState.discVal > 100) bulkState.discVal = 100;
+  if (bulkState.discType === 'none') bulkState.discVal = 0;
+  bulkRender();
+}
+function bulkClearUnreg(){ bulkState.unreg = {}; bulkRender(); }
+function bulkClearAll(){
+  if (bulkState.lines.length && !confirm('읽은 목록을 모두 비울까요?')) return;
+  bulkState.lines = []; bulkState.unreg = {}; bulkState.lastRead = null; bulkState.status = ''; bulkState.batchId = ''; bulkRender();
+}
+async function bulkSubmit(){
+  if (bulkState.busy || !bulkState.lines.length) return;
+  const cnt = bulkState.lines.reduce((a, l) => a + l.qty, 0);
+  const total = bulkState.lines.reduce((a, l) => a + bulkUnitFinal(l) * l.qty, 0);
+  const over = bulkState.lines.filter(l => l.qty > l.item.cur_qty).length;
+  if (!confirm(`${cnt}개 (${money(total)}원)를 지금 시각으로 한번에 판매 처리할까요?` + (over ? `\n\n⚠ 현재고보다 많이 판매되는 상품이 ${over}개 있어요.` : '') + '\n\n실제 택 개수와 맞는지 확인하셨나요?')) return;
+  if (!bulkState.batchId) bulkState.batchId = 'bs' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  bulkState.busy = true; bulkRender();
+  const items = bulkState.lines.map(l => ({barcode: l.barcode, qty: l.qty, price: l.price, discount_type: bulkState.discType, discount_value: bulkState.discVal}));
+  const res = await apiPost('bulk_sale', {corner_id: state.corner.id, actor: state.actor, items, note: bulkState.note, batch_id: bulkState.batchId});
+  bulkState.busy = false;
+  if (!res.ok){ toast(res.error || '대량판매 실패', 'err'); bulkRender(); return; }
+  toast(`${res.count}개 판매 확정 (${money(res.amount)}원) — 같은 시각으로 기록됐어요`, 'ok');
+  bulkState.lines = []; bulkState.unreg = {}; bulkState.lastRead = null; bulkState.status = ''; bulkState.batchId = ''; bulkState.note = '';
+  await afterTxn();
 }
 
 /* ---- 추가 판매(장바구니): 한 고객이 여러 개 살 때 바코드를 계속 찍어서 한번에 확정 (판매/주문택배 모드) ----
@@ -1144,6 +1401,7 @@ async function submitExchange(saleBarcode){
 
 async function afterTxn(){
   document.getElementById('scanResult').innerHTML = '';
+  if (state.mode === 'bulk') bulkRender();
   if (state.mode === 'manual') nbOpen();   // 수기판매 모드는 입력 패널을 다시 열어 바로 다음 건을 받는다
   const itemsRes = await apiGet('items', {corner_id: state.corner.id});
   state.items = itemsRes.items || [];
