@@ -327,6 +327,7 @@ function topNav(active){
     <h1 style="margin-top:8px;">${esc(state.event.name)}</h1>
     <div class="tabs">
       <div class="tab ${active==='scan'?'active':''}" onclick="goScan()">스캔</div>
+      <div class="tab ${active==='addstock'?'active':''}" onclick="renderAddStockScreen()">추가 재고 올리기</div>
       <div class="tab ${active==='daily'?'active':''}" onclick="renderDailyScreen()">일별 현황</div>
       <div class="tab ${active==='report'?'active':''}" onclick="renderReportScreen()">리포트</div>
       <div class="tab ${active==='stocktake'?'active':''}" onclick="renderStocktakeScreen()">실재고 확인</div>
@@ -336,15 +337,15 @@ function topNav(active){
 }
 
 /* ============================================================
-   재고파일 업로드 화면
+   재고파일 업로드 화면 — "재고파일 다시 올리기": 바코드 기준으로 덮어쓰기(upsert), 새 바코드는 등록.
+   (행사 중 상품을 "더 가져간" 경우는 여기가 아니라 별도 메뉴 '추가 재고 올리기'를 쓴다 — 거기서만 수량이 더해진다)
    ============================================================ */
 function renderUploadScreen(){
   stopCamera();
   state.screen = 'upload';
   const app = document.getElementById('app');
   app.innerHTML = topNav('scan') + `
-    <p class="lead">분류명(브랜드)/품목명/바코드/재고량/단가 컬럼이 있는 엑셀을 올리세요. 헤더 위치와 컬럼 순서는 자동으로 찾습니다.<br>
-      ${state.items.length ? '<b>행사 중 상품을 더 가져간 경우</b>: 추가로 가져간 물건만 담은 파일을 올리면 재고량이 기존 수량에 <b>더해져요</b>. 올린 뒤 어떻게 바뀌는지 미리 보여드리고, 확인 후에만 반영됩니다.' : ''}</p>
+    <p class="lead">분류명(브랜드)/품목명/바코드/재고량/단가 컬럼이 있는 엑셀을 올리세요. 헤더 위치와 컬럼 순서는 자동으로 찾습니다.</p>
     <div class="card">
       <div class="dropzone" id="invDrop" tabindex="0" role="button" aria-label="재고파일 선택">
         <div id="invDropText">클릭하거나 파일을 끌어다 놓으세요 (Ctrl+V 붙여넣기도 가능)</div>
@@ -360,10 +361,7 @@ function renderUploadScreen(){
   wireDropzone('invDrop', 'invFile');
 }
 
-/* 재고파일 올리기 — 파일을 고르면 바로 반영하지 않고 "무엇이 얼마나 바뀌는지" 미리보기를 먼저 보여준다.
-   모드: add(추가 입고, 기본) = 파일 수량을 기존 기초수량에 더함 / replace(전체 수정) = 파일 값으로 덮어씀(처음 잘못 올린 걸 고칠 때). */
 let pendingUploadRows = null;
-const uploadState = {mode: 'add', batchId: '', busy: false};
 async function handleInventoryFile(e){
   const f = e.target.files[0];
   if (!f) return;
@@ -371,25 +369,78 @@ async function handleInventoryFile(e){
   const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:true});
   const rows = parseInventoryExcel(aoa);
   pendingUploadRows = rows;
-  uploadState.batchId = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);   // 같은 파일 중복 반영 방지용
-  uploadState.busy = false;
-  uploadState.mode = 'add';
   const wrap = document.getElementById('invPreviewWrap');
   if (rows.length===0){
+    wrap.innerHTML = '<div class="hint" style="color:var(--red);">바코드 컬럼을 찾지 못했어요. 양식을 확인해주세요.</div>';
+    return;
+  }
+  wrap.innerHTML = `
+    <div class="hint">${rows.length}건 인식됨 (미리보기 상위 8건)</div>
+    <div class="tbl-wrap" style="max-height:260px;margin-top:8px;">
+      <table><thead><tr><th>브랜드</th><th>품목명</th><th>사이즈</th><th>바코드</th><th>재고량</th><th>단가</th></tr></thead>
+      <tbody>${rows.slice(0,8).map(r=>`<tr><td>${esc(r.brand)}</td><td>${esc(r.item_name)}</td><td>${esc(sizeText(r.size))}</td><td>${esc(r.barcode)}</td><td>${r.init_qty}</td><td>${money(r.price)}</td></tr>`).join('')}</tbody></table>
+    </div>
+    <div class="bar" style="margin-top:14px;"><button class="btn btn-primary" onclick="submitUpload()">이 내용으로 업로드</button></div>
+  `;
+}
+
+/* ============================================================
+   추가 재고 올리기 — 행사 중 상품을 더 가져간 경우. 파일 수량 = "추가분"이라 기존 기초수량에 더한다.
+   파일을 고르면 바로 반영하지 않고 "무엇이 얼마나 늘어나는지" 미리보기를 보여주고, 확정해야 반영된다.
+   기존 품목은 브랜드·품목명·단가를 그대로 두고 수량만 더하며, 새 바코드는 새로 등록. 같은 파일 중복 반영은 서버가 막는다.
+   ============================================================ */
+const addStockState = {rows: null, batchId: '', busy: false};
+function renderAddStockScreen(){
+  stopCamera();
+  state.screen = 'addstock';
+  addStockState.rows = null; addStockState.busy = false;
+  const app = document.getElementById('app');
+  if (!state.items.length){
+    app.innerHTML = topNav('addstock') + `
+      <div class="card"><p class="lead" style="margin:0 0 12px;">아직 올라간 재고가 없어요. 먼저 "스캔" 탭에서 재고파일을 올려주세요. 추가 재고는 그 다음부터 올릴 수 있어요.</p>
+      <button class="btn btn-primary" onclick="renderUploadScreen()">재고파일 올리러 가기</button></div>`;
+    return;
+  }
+  app.innerHTML = topNav('addstock') + `
+    <p class="lead">행사 중에 <b>상품을 더 가져간 경우</b> — 추가로 가져간 물건만 담은 엑셀을 올리세요. 양식은 처음 재고파일과 같고, 재고량은 <b>추가분 수량</b>을 적습니다.<br>
+      올리면 기존 수량에 <b>더해지고</b>, 새 바코드는 새 품목으로 등록돼요. 올린 뒤 어떻게 바뀌는지 미리 보여드리고, 확인한 다음에만 반영됩니다.</p>
+    <div class="card">
+      <div class="dropzone" id="addDrop" tabindex="0" role="button" aria-label="추가 재고파일 선택">
+        <div>클릭하거나 파일을 끌어다 놓으세요 (Ctrl+V 붙여넣기도 가능)</div>
+        <input type="file" id="addFile" accept=".xlsx,.xls">
+      </div>
+      <div id="addPreviewWrap" style="margin-top:14px;"></div>
+    </div>`;
+  document.getElementById('addFile').addEventListener('change', e => {
+    if (e.target.files[0]) document.getElementById('addDrop').classList.add('has-file');
+    handleAddStockFile(e);
+  });
+  wireDropzone('addDrop', 'addFile');
+}
+async function handleAddStockFile(e){
+  const f = e.target.files[0];
+  if (!f) return;
+  const wb = XLSX.read(await f.arrayBuffer(), {type:'array'});
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:true});
+  const rows = parseInventoryExcel(aoa);
+  const wrap = document.getElementById('addPreviewWrap');
+  addStockState.rows = rows;
+  addStockState.batchId = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);   // 같은 파일 중복 반영 방지용
+  addStockState.busy = false;
+  if (rows.length === 0){
     wrap.innerHTML = '<div class="hint" style="color:var(--red);">바코드 컬럼을 찾지 못했어요. 양식을 확인해주세요.</div>';
     return;
   }
   // 미리보기는 서버의 최신 재고를 기준으로 (다른 사람이 방금 올렸을 수도 있어서)
   const cur = await apiGet('items', {corner_id: state.corner.id});
   if (cur.ok) state.items = cur.items || [];
-  renderUploadPreview();
+  renderAddStockPreview();
 }
-function setUploadMode(m){ uploadState.mode = m; renderUploadPreview(); }
-/* 같은 바코드가 파일에 여러 줄이면 수량을 합산 (추가 입고 모드), 수량 0 이하는 제외 */
-function uploadPlan(){
+/* 같은 바코드가 파일에 여러 줄이면 수량을 합산, 수량 0 이하는 제외 */
+function addStockPlan(){
   const exist = {}; state.items.forEach(i => { exist[S(i.barcode)] = i; });
   const add = {}; let zero = 0;
-  pendingUploadRows.forEach(r => {
+  addStockState.rows.forEach(r => {
     const bc = S(r.barcode);
     if (r.init_qty <= 0){ zero++; return; }
     if (!add[bc]) add[bc] = Object.assign({}, r, {init_qty: 0});
@@ -402,64 +453,46 @@ function uploadPlan(){
   return {lines, zero, newCnt: lines.filter(l => !l.exist).length, oldCnt: lines.filter(l => l.exist).length,
           addQty: lines.reduce((a, l) => a + l.row.init_qty, 0)};
 }
-function renderUploadPreview(){
-  const wrap = document.getElementById('invPreviewWrap');
-  if (!wrap || !pendingUploadRows) return;
-  const hasItems = state.items.length > 0;
-  if (!hasItems){
-    // 처음 올리는 재고파일 — 겹칠 기존 품목이 없으니 예전처럼 간단한 미리보기 (수량 0인 품목도 그대로 등록)
-    const rows = pendingUploadRows;
-    wrap.innerHTML = `
-      <div class="hint">${rows.length}건 인식됨 (미리보기 상위 8건)</div>
-      <div class="tbl-wrap" style="max-height:260px;margin-top:8px;">
-        <table><thead><tr><th>브랜드</th><th>품목명</th><th>사이즈</th><th>바코드</th><th>재고량</th><th>단가</th></tr></thead>
-        <tbody>${rows.slice(0,8).map(r=>`<tr><td>${esc(r.brand)}</td><td>${esc(r.item_name)}</td><td>${esc(sizeText(r.size))}</td><td>${esc(r.barcode)}</td><td>${r.init_qty}</td><td>${money(r.price)}</td></tr>`).join('')}</tbody></table>
-      </div>
-      <div class="bar" style="margin-top:14px;"><button class="btn btn-primary" id="uploadGo" onclick="submitUpload()">이 내용으로 업로드</button></div>`;
+function renderAddStockPreview(){
+  const wrap = document.getElementById('addPreviewWrap');
+  if (!wrap || !addStockState.rows) return;
+  const p = addStockPlan();
+  const baseTotal = state.items.reduce((a, i) => a + i.init_qty, 0);
+  if (!p.lines.length){
+    wrap.innerHTML = '<div class="hint" style="color:var(--red);">추가할 수량이 있는 품목이 없어요. (재고량이 0 이하인 줄은 제외돼요)</div>';
     return;
   }
-  const isAdd = uploadState.mode === 'add';
-  const baseTotal = state.items.reduce((a, i) => a + i.init_qty, 0);
-  let body;
-  if (isAdd){
-    const p = uploadPlan();
-    body = `
-      <div class="stat-row" style="margin-top:12px;">
-        <div class="stat">새로 등록할 품목<b>${p.newCnt}</b></div>
-        <div class="stat">수량이 늘어날 기존 품목<b>${p.oldCnt}</b></div>
-        <div class="stat">추가되는 수량 합계<b>+${p.addQty}</b></div>
-        <div class="stat">행사 전체 기초수량<b>${baseTotal} → ${baseTotal + p.addQty}</b></div>
-      </div>
-      ${p.zero ? `<div class="hint">수량이 0 이하인 ${p.zero}줄은 제외돼요.</div>` : ''}
-      <div class="tbl-wrap" style="max-height:300px;margin-top:8px;">
-        <table><thead><tr><th>구분</th><th>브랜드</th><th>품목명</th><th>사이즈</th><th>바코드</th><th>수량 변화</th></tr></thead>
-        <tbody>${p.lines.slice(0, 60).map(l => `<tr>
-          <td>${l.exist ? '<span class="chip c-return">기존</span>' : '<span class="chip c-sale">신규</span>'}</td>
-          <td>${esc(l.exist ? l.exist.brand : l.row.brand)}</td><td>${esc(l.exist ? l.exist.item_name : l.row.item_name)}</td>
-          <td>${esc(sizeText(l.exist ? l.exist.size : l.row.size))}</td><td>${esc(l.row.barcode)}</td>
-          <td><b>${l.before} → ${l.after}</b> (+${l.row.init_qty})</td></tr>`).join('')}</tbody></table>
-      </div>
-      ${p.lines.length > 60 ? `<div class="hint">${p.lines.length}개 중 60개만 보여요. (전체가 반영됩니다)</div>` : ''}
-      <div class="hint">기존 품목은 브랜드·품목명·단가를 그대로 두고 <b>수량만 더해요</b>. 판매·반품 기록은 그대로입니다.</div>`;
-  } else {
-    const exist = {}; state.items.forEach(i => { exist[S(i.barcode)] = i; });
-    const changed = pendingUploadRows.filter(r => exist[S(r.barcode)] && exist[S(r.barcode)].init_qty !== r.init_qty).length;
-    const overlap = pendingUploadRows.filter(r => exist[S(r.barcode)]).length;
-    body = `
-      <div class="item-card miss" style="margin-top:12px;">
-        <div class="name" style="font-size:16px;">전체 수정(덮어쓰기)</div>
-        <div class="meta">파일 ${pendingUploadRows.length}줄 중 기존 품목과 겹치는 ${overlap}줄은 <b>브랜드·품목명·단가·기초수량이 파일 값으로 바뀌고</b>, 그중 수량이 달라지는 건 ${changed}줄이에요.
-        새 바코드는 새로 등록됩니다. <b>추가로 가져간 물건 파일이라면 이 방식을 쓰면 안 돼요</b> (수량이 더해지지 않고 파일 수량으로 바뀝니다).</div>
-      </div>`;
-  }
   wrap.innerHTML = `
-    ${hasItems ? `<div class="scan-actions" style="margin-bottom:4px;">
-      <button class="btn ${isAdd ? 'btn-primary' : 'btn-outline'}" onclick="setUploadMode('add')">추가 입고 (수량 더하기)</button>
-      <button class="btn ${!isAdd ? 'btn-primary' : 'btn-outline'}" onclick="setUploadMode('replace')">전체 수정 (덮어쓰기)</button>
-    </div>` : ''}
-    <div class="hint">${pendingUploadRows.length}줄 인식됨</div>
-    ${body}
-    <div class="bar" style="margin-top:14px;"><button class="btn ${isAdd ? 'btn-primary' : 'btn-red'}" id="uploadGo" onclick="submitUpload()">${isAdd ? (hasItems ? '추가 입고 확정' : '이 내용으로 업로드') : '덮어쓰기로 반영'}</button></div>`;
+    <div class="hint">${addStockState.rows.length}줄 인식됨</div>
+    <div class="stat-row" style="margin-top:8px;">
+      <div class="stat">새로 등록할 품목<b>${p.newCnt}</b></div>
+      <div class="stat">수량이 늘어날 기존 품목<b>${p.oldCnt}</b></div>
+      <div class="stat">추가되는 수량 합계<b>+${p.addQty}</b></div>
+      <div class="stat">행사 전체 기초수량<b>${baseTotal} → ${baseTotal + p.addQty}</b></div>
+    </div>
+    ${p.zero ? `<div class="hint">수량이 0 이하인 ${p.zero}줄은 제외돼요.</div>` : ''}
+    <div class="tbl-wrap" style="max-height:300px;margin-top:8px;">
+      <table><thead><tr><th>구분</th><th>브랜드</th><th>품목명</th><th>사이즈</th><th>바코드</th><th>수량 변화</th></tr></thead>
+      <tbody>${p.lines.slice(0, 60).map(l => `<tr>
+        <td>${l.exist ? '<span class="chip c-return">기존</span>' : '<span class="chip c-sale">신규</span>'}</td>
+        <td>${esc(l.exist ? l.exist.brand : l.row.brand)}</td><td>${esc(l.exist ? l.exist.item_name : l.row.item_name)}</td>
+        <td>${esc(sizeText(l.exist ? l.exist.size : l.row.size))}</td><td>${esc(l.row.barcode)}</td>
+        <td><b>${l.before} → ${l.after}</b> (+${l.row.init_qty})</td></tr>`).join('')}</tbody></table>
+    </div>
+    ${p.lines.length > 60 ? `<div class="hint">${p.lines.length}개 중 60개만 보여요. (전체가 반영됩니다)</div>` : ''}
+    <div class="hint">기존 품목은 브랜드·품목명·단가를 그대로 두고 <b>수량만 더해요</b>. 판매·반품 기록은 그대로입니다.</div>
+    <div class="bar" style="margin-top:14px;"><button class="btn btn-primary" id="addStockGo" onclick="submitAddStock()">추가 입고 확정</button></div>`;
+}
+async function submitAddStock(){
+  if (!addStockState.rows || addStockState.busy) return;
+  addStockState.busy = true;
+  const btn = document.getElementById('addStockGo'); if (btn) btn.disabled = true;
+  const res = await apiPost('upload_items', {corner_id: state.corner.id, actor: state.actor, items: addStockState.rows, mode: 'add', batch_id: addStockState.batchId});
+  if (!res.ok){ addStockState.busy = false; if (btn) btn.disabled = false; toast(res.error||'추가 입고 실패','err'); return; }
+  toast(`신규 ${res.inserted}개 품목 등록, 기존 ${res.added}개 품목 수량 추가 (합계 +${res.total_qty}개)`, 'ok');
+  const itemsRes = await apiGet('items', {corner_id: state.corner.id});
+  state.items = itemsRes.items || [];
+  goScan();
 }
 
 /* 품목명에서 (품번, 사이즈) 분리. 사이즈는 "품번_사이즈" 처럼 밑줄이 2개 이상일 때 마지막 조각이거나,
@@ -526,17 +559,10 @@ function parseInventoryExcel(aoa){
 }
 
 async function submitUpload(){
-  if (!pendingUploadRows || pendingUploadRows.length===0 || uploadState.busy) return;
-  const isAdd = uploadState.mode === 'add' && state.items.length > 0;   // 처음 올리는 파일은 기존 방식(그대로 등록)
-  if (!isAdd && state.items.length > 0 && !confirm('전체 수정(덮어쓰기)로 반영할까요?\n겹치는 품목의 브랜드·품목명·단가·기초수량이 파일 값으로 바뀝니다.\n(추가로 가져간 물건 파일이라면 취소하고 "추가 입고"를 선택하세요)')) return;
-  uploadState.busy = true;
-  const btn = document.getElementById('uploadGo'); if (btn) btn.disabled = true;
-  const body = {corner_id: state.corner.id, actor: state.actor, items: pendingUploadRows};
-  if (isAdd){ body.mode = 'add'; body.batch_id = uploadState.batchId; }
-  const res = await apiPost('upload_items', body);
-  if (!res.ok){ uploadState.busy = false; if (btn) btn.disabled = false; toast(res.error||'업로드 실패','err'); return; }
-  toast(isAdd ? `신규 ${res.inserted}개 품목 등록, 기존 ${res.added}개 품목 수량 추가 (합계 +${res.total_qty}개)`
-              : `신규 ${res.inserted}건, 갱신 ${res.updated}건 반영됐어요`, 'ok');
+  if (!pendingUploadRows || pendingUploadRows.length===0) return;
+  const res = await apiPost('upload_items', {corner_id: state.corner.id, actor: state.actor, items: pendingUploadRows});
+  if (!res.ok){ toast(res.error||'업로드 실패','err'); return; }
+  toast(`신규 ${res.inserted}건, 갱신 ${res.updated}건 업로드됐어요`, 'ok');
   const itemsRes = await apiGet('items', {corner_id: state.corner.id});
   state.items = itemsRes.items || [];
   goScan();
@@ -579,6 +605,7 @@ function renderScanScreen(){
         <button class="btn ${state.mode==='exchange'?'btn-primary':'btn-outline'}" data-mode="exchange" onclick="setMode('exchange')">교환</button>
         <button class="btn ${state.mode==='courier'?'btn-primary':'btn-outline'}" data-mode="courier" onclick="setMode('courier')">주문택배</button>
         <button class="btn ${state.mode==='recall'?'btn-primary':'btn-outline'}" data-mode="recall" onclick="setMode('recall')">회수</button>
+        <button class="btn ${state.mode==='manual'?'btn-primary':'btn-outline'}" data-mode="manual" onclick="setMode('manual')">수기판매</button>
       </div>
       <div id="modeHint" class="hint"></div>
       <input id="barcodeInput" placeholder="바코드 스캔 또는 입력 후 Enter" autocomplete="off">
@@ -619,7 +646,7 @@ function setMode(m){
     btn.classList.toggle('btn-primary', on); btn.classList.toggle('btn-outline', !on);
   });
   updateModeHint();
-  focusBarcode();
+  if (m === 'manual') nbOpen(); else focusBarcode();
 }
 function updateModeHint(){
   const hint = document.getElementById('modeHint');
@@ -628,6 +655,7 @@ function updateModeHint(){
   if (state.mode==='return') hint.textContent = '반품할 상품의 바코드를 스캔하세요.';
   if (state.mode==='courier') hint.textContent = '온라인 주문으로 택배 발송할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액(매출)으로 잡혀요)';
   if (state.mode==='recall') hint.textContent = '본사 등으로 회수할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액으로는 안 잡혀요)';
+  if (state.mode==='manual') hint.textContent = '바코드가 없거나 안 찍히는 상품을 직접 입력해서 기록해요. (바코드를 스캔하면 일반 판매처럼 처리돼요)';
   if (state.mode==='exchange') hint.textContent = state.exchangeStep==='sale'
     ? '이제 새로 가져갈(교환) 상품의 바코드를 스캔하세요.'
     : '먼저 반품(돌려받을) 상품의 바코드를 스캔하세요.';
@@ -642,7 +670,7 @@ async function onScanSubmit(){
   if (state.mode === 'exchange'){
     return handleExchangeScan(barcode);
   }
-  await lookupAndShow(barcode, state.mode);
+  await lookupAndShow(barcode, state.mode === 'manual' ? state.nbIntent : state.mode);
 }
 
 async function lookupAndShow(barcode, intent){
@@ -677,6 +705,62 @@ async function lookupAndShow(barcode, intent){
 }
 function pickStyleMatch(barcode, intent){ lookupAndShow(barcode, intent); }
 
+/* ---- 수기판매 모드: 바코드가 없거나 안 찍히는 상품 (간혹 있음) ----
+   1) 재고파일에서 브랜드/품명/품번으로 검색해 고르면 → 바코드를 스캔한 것과 똑같이 진행(재고도 정상 차감)
+   2) 목록에 없는 상품이면 브랜드·품명·사이즈·가격을 직접 입력 → 재고 연결 없는 수기 거래로 기록(바코드 빈 값)
+   구분은 판매(기본) / 주문택배 / 회수 중에서 고른다. */
+const NB_INTENT_LABEL = {sale:'판매', courier:'주문택배', recall:'회수'};
+state.nbIntent = 'sale';
+const curCartMode = () => state.mode === 'manual' ? state.nbIntent : state.mode;
+function nbOpen(){
+  state.scannedItem = null;
+  const it = state.nbIntent;
+  document.getElementById('scanResult').innerHTML = `
+    <div class="item-card hit">
+      <div class="name">수기판매 — 바코드 없는 상품</div>
+      <div class="meta">재고파일에 있는 상품이면 검색해서 고르세요(재고도 정상적으로 줄어요). 없는 상품이면 아래에 직접 입력하세요.</div>
+      <div class="scan-actions" id="nbIntentRow" style="margin-top:10px;">
+        ${Object.keys(NB_INTENT_LABEL).map(k => `<button class="btn ${it===k?'btn-primary':'btn-outline'}" data-nb="${k}" onclick="nbSetIntent('${k}')">${NB_INTENT_LABEL[k]}</button>`).join('')}
+      </div>
+      <div class="field" style="margin-top:10px;"><label>재고파일에서 상품 찾기 (브랜드 / 품명 / 품번)</label>
+        <input id="nbSearch" placeholder="예: 몽클레어 M7774" autocomplete="off" oninput="nbSearchRun()"></div>
+      <div id="nbResults" class="hint">검색어를 입력하세요. 띄어쓰기로 여러 단어를 넣으면 모두 들어간 상품만 나와요.</div>
+    </div>
+    <div id="nbForm">${renderUnregisteredCard('', null, it, '')}</div>`;
+}
+function nbSetIntent(k){
+  state.nbIntent = k;
+  document.querySelectorAll('#nbIntentRow [data-nb]').forEach(btn => {
+    const on = btn.dataset.nb === k;
+    btn.classList.toggle('btn-primary', on); btn.classList.toggle('btn-outline', !on);
+  });
+  const f = document.getElementById('nbForm');
+  if (f) f.innerHTML = renderUnregisteredCard('', null, k, '');
+}
+function nbSearchRun(){
+  const box = document.getElementById('nbResults');
+  const q = S(document.getElementById('nbSearch').value).toLowerCase();
+  if (!q){ box.className = 'hint'; box.textContent = '검색어를 입력하세요. 띄어쓰기로 여러 단어를 넣으면 모두 들어간 상품만 나와요.'; return; }
+  const words = q.split(/\s+/).filter(Boolean);
+  const hit = state.items.filter(it => {
+    const hay = (S(it.brand) + ' ' + S(it.item_name) + ' ' + S(it.style_code) + ' ' + S(it.barcode)).toLowerCase();
+    return words.every(w => hay.includes(w));
+  });
+  box.className = '';
+  if (!hit.length){ box.className = 'hint'; box.textContent = '검색 결과가 없어요. 목록에 없는 상품이면 아래 칸에 직접 입력하세요.'; return; }
+  hit.sort((a, b) => (S(a.brand) + S(a.item_name)).localeCompare(S(b.brand) + S(b.item_name)) || S(a.size).localeCompare(S(b.size), 'ko', {numeric: true}));
+  box.innerHTML = hit.slice(0, 30).map(it => `
+    <div class="recent-item">
+      <span class="grow"><b>${esc(it.brand)}</b> ${esc(it.item_name)} · 사이즈 ${esc(sizeText(it.size))}
+        <span style="color:var(--sub);">· ${money(it.price)}원 · 재고 ${it.cur_qty}</span></span>
+      <button class="btn btn-outline" style="padding:4px 12px;font-size:12px;" onclick="nbPick('${escJsAttr(it.barcode)}')">선택</button>
+    </div>`).join('') + (hit.length > 30 ? `<div class="hint">${hit.length}개 중 30개만 보여요. 검색어를 더 넣어 좁혀주세요.</div>` : '');
+}
+function nbPick(barcode){
+  // 고른 상품은 바코드를 스캔한 것과 똑같이 처리 (선택한 구분으로)
+  lookupAndShow(barcode, state.nbIntent);
+}
+
 /* ---- 추가 판매(장바구니): 한 고객이 여러 개 살 때 바코드를 계속 찍어서 한번에 확정 (판매/주문택배 모드) ----
    담긴 건 확정 전까지 이 화면(브라우저) 안에만 있고, 확정하면 상품마다 기존 scan_sale/scan_move로 1건씩 기록된다. */
 state.cart = []; state.cartEventId = null; state.cartBusy = false; state.scannedItem = null;
@@ -697,7 +781,7 @@ function readCardFields(){
 }
 /* 판매 장바구니와 주문택배 장바구니는 섞지 않는다 */
 function cartModeOk(){
-  if (state.cart.length && state.cart[0].mode !== state.mode){
+  if (state.cart.length && state.cart[0].mode !== curCartMode()){
     toast('담은 상품이 "' + (state.cart[0].mode==='courier'?'주문택배':'판매') + '"예요. 먼저 확정하거나 비운 뒤에 다른 구분으로 담아주세요', 'err');
     return false;
   }
@@ -706,7 +790,7 @@ function cartModeOk(){
 function cartPush(){
   const item = state.scannedItem;
   if (!item || !document.getElementById('scanPrice') || !cartModeOk()) return;
-  state.cart.push(Object.assign({item, mode: state.mode}, readCardFields()));
+  state.cart.push(Object.assign({item, mode: curCartMode()}, readCardFields()));
   state.scannedItem = null;
   document.getElementById('scanResult').innerHTML = '';
   renderCart();
@@ -746,7 +830,7 @@ async function submitCart(withCurrent){
   if (state.cartBusy) return;
   if (withCurrent){
     if (!state.scannedItem || !document.getElementById('scanPrice') || !cartModeOk()) return;
-    state.cart.push(Object.assign({item: state.scannedItem, mode: state.mode}, readCardFields()));
+    state.cart.push(Object.assign({item: state.scannedItem, mode: curCartMode()}, readCardFields()));
     state.scannedItem = null;
   }
   if (!state.cart.length) return;
@@ -819,7 +903,7 @@ function renderUnregisteredCard(barcode, prevManual, intent, brandGuess){
     return `
       <div class="item-card miss">
         <div class="name">미등록상품</div>
-        <div class="meta">바코드 ${esc(barcode)} — 재고파일에 없어요. 품명을 직접 입력해서 ${label}로 기록할 수 있어요 (재고 수량에는 영향 없음).</div>
+        <div class="meta">${barcode ? `바코드 ${esc(barcode)} — 재고파일에 없어요. ` : '바코드 없는 상품 — '}품명을 직접 입력해서 ${label}로 기록할 수 있어요 (재고 수량에는 영향 없음).</div>
         ${brandInputHtml('manBrand', prefBrand)}
         <div class="field"><label>품명</label><input id="manName" value="${esc(prefName)}" placeholder="상품명"></div>
         <div class="field"><label>사이즈</label><input id="manSize" value="${esc(prefSize)}"></div>
@@ -849,7 +933,7 @@ function renderUnregisteredCard(barcode, prevManual, intent, brandGuess){
   return `
     <div class="item-card miss">
       <div class="name">미등록상품</div>
-      <div class="meta">바코드 ${esc(barcode)} — 재고파일에 없어요. 수기로 입력해서 판매로 저장할 수 있어요.</div>
+      <div class="meta">${barcode ? `바코드 ${esc(barcode)} — 재고파일에 없어요. 수기로 입력해서 판매로 저장할 수 있어요.` : '바코드 없는 상품 — 수기로 입력해서 판매로 저장해요. (재고 수량에는 영향 없음)'}</div>
       ${brandInputHtml('manBrand', prefBrand)}
       <div class="field"><label>품명</label><input id="manName" value="${esc(prefName)}" placeholder="상품명"></div>
       <div class="row">
@@ -998,6 +1082,7 @@ async function submitExchange(saleBarcode){
 
 async function afterTxn(){
   document.getElementById('scanResult').innerHTML = '';
+  if (state.mode === 'manual') nbOpen();   // 수기판매 모드는 입력 패널을 다시 열어 바로 다음 건을 받는다
   const itemsRes = await apiGet('items', {corner_id: state.corner.id});
   state.items = itemsRes.items || [];
   updateScanStats();
@@ -1046,7 +1131,7 @@ function openEditTxn(txnId){
   const [label] = TYPE_LABEL_CHIP[t.type] || [t.type];
   showModal(`
     <h2>거래 수정</h2>
-    <div class="hint" style="margin:0 0 10px;">${esc(txnDisplayName(t))}${txnDisplaySize(t) ? ' ('+esc(txnDisplaySize(t))+')' : ''} · 바코드 ${esc(t.barcode)} · ${label}<br>수량(재고)은 바뀌지 않아요.</div>
+    <div class="hint" style="margin:0 0 10px;">${esc(txnDisplayName(t))}${txnDisplaySize(t) ? ' ('+esc(txnDisplaySize(t))+')' : ''} · ${t.barcode ? '바코드 ' + esc(t.barcode) : '바코드 없음(수기 등록)'} · ${label}<br>수량(재고)은 바뀌지 않아요.</div>
     ${isManual && t.type !== 'return' ? `
       ${brandInputHtml('etBrand', t.manual_brand || '')}
       <div class="row">
@@ -1235,7 +1320,7 @@ async function toggleDayDetail(dateStr){
           <td style="white-space:nowrap;"><span class="chip ${t.voided?'c-void':cls}">${label}${t.voided?'(취소)':''}</span></td>
           <td>${esc(txnDisplayName(t))}</td>
           <td style="white-space:nowrap;">${esc(sizeText(txnDisplaySize(t)))}</td>
-          <td style="white-space:nowrap;">${esc(t.barcode)}</td>
+          <td style="white-space:nowrap;">${esc(t.barcode || '(바코드 없음)')}</td>
           <td style="white-space:nowrap;">${t.qty_delta}</td>
           <td style="white-space:nowrap;">${t.type==='recall' ? '-' : money(t.final_amount)}</td>
           <td>${esc(t.note||'')}</td>
@@ -1273,7 +1358,7 @@ async function downloadDailyDetail(){
       rows.push({
         '날짜': '', '구분': TYPE_LABEL_KO[t.type] + (t.exchange_group?'(교환)':'') + (t.voided?' [취소됨]':''),
         '시간': fmtTime(t.created_at), '품명': txnDisplayName(t), '사이즈': txnDisplaySize(t),
-        '바코드': t.barcode, '수량': t.qty_delta, '금액': t.type==='recall' ? '' : t.final_amount, '비고': t.note || '',
+        '바코드': t.barcode || '(바코드 없음)', '수량': t.qty_delta, '금액': t.type==='recall' ? '' : t.final_amount, '비고': t.note || '',
         '판매건수': '', '수기판매건수': '', '반품건수': '', '주문택배건수': '', '회수건수': '', '판매금액합계(주문택배 포함)': '', '그중 주문택배금액': '', '반품금액합계': '',
       });
     });
@@ -1902,7 +1987,7 @@ async function downloadExport(){
     '구분': TYPE_LABEL_KO[t.type] + (t.exchange_group?'(교환)':'') + (t.voided?' [취소됨]':''),
     '품명': txnDisplayName(t),
     '사이즈': txnDisplaySize(t),
-    '바코드': t.barcode,
+    '바코드': t.barcode || '(바코드 없음)',
     '수량': t.qty_delta,
     '정가': t.price,
     '할인구분': t.discount_type,
@@ -1947,7 +2032,7 @@ async function downloadExport(){
 
   // 시트3: 재고파일에 없는 바코드(미등록)로 수기 입력한 거래 — 수기판매 + 미등록 주문택배/회수
   const manualRows = res.txns.filter(t => !t.item_id).map(t => ({
-    '날짜': fmtDate(t.created_at), '구분': TYPE_LABEL_KO[t.type] || t.type, '바코드': t.barcode,
+    '날짜': fmtDate(t.created_at), '구분': TYPE_LABEL_KO[t.type] || t.type, '바코드': t.barcode || '(바코드 없음)',
     '브랜드': t.manual_brand || '', '품명': t.manual_name, '사이즈': t.manual_size, '최종금액': t.type==='recall' ? '' : t.final_amount,
     '비고': t.note || '', '취소여부': t.voided?'취소됨':'',
   }));
