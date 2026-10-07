@@ -6664,7 +6664,9 @@
           candidates.push(entry);
         }
       });
-      if(candidates.length === 1) return {code:candidates[0].code, status:'유사매칭', candidates:[]};
+      // 품번과 사이즈가 같으면 이름이 달라도(사이트별 글자수 제한·"여성" 유무 등) 같은 상품 → 정확매칭.
+      // 사이즈 표기를 변환(US 6W→6 등)해서 맞춘 경우만 유사매칭으로 남긴다.
+      if(candidates.length === 1) return {code:candidates[0].code, status:(candidates[0].size === sizeNorm ? '정확매칭' : '유사매칭'), candidates:[]};
       if(candidates.length > 1) return {code:null, status:'복수후보(수동확인)', candidates:candidates};
       return {code:null, status:'매칭실패(재고없음/미등록)', candidates:[]};
     }
