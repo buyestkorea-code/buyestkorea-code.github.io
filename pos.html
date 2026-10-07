@@ -668,6 +668,7 @@ function renderScanScreen(){
         <button class="btn ${state.mode==='courier'?'btn-primary':'btn-outline'}" data-mode="courier" onclick="setMode('courier')">주문택배</button>
         <button class="btn ${state.mode==='recall'?'btn-primary':'btn-outline'}" data-mode="recall" onclick="setMode('recall')">회수</button>
         <button class="btn ${state.mode==='manual'?'btn-primary':'btn-outline'}" data-mode="manual" onclick="setMode('manual')">수기판매</button>
+        <button class="btn ${state.mode==='manual_return'?'btn-primary':'btn-outline'}" data-mode="manual_return" onclick="setMode('manual_return')">수기반품</button>
         <button class="btn ${state.mode==='bulk'?'btn-primary':'btn-outline'}" data-mode="bulk" onclick="setMode('bulk')">대량판매(스캔)</button>
       </div>
       <div id="modeHint" class="hint"></div>
@@ -709,7 +710,7 @@ function setMode(m){
     btn.classList.toggle('btn-primary', on); btn.classList.toggle('btn-outline', !on);
   });
   updateModeHint();
-  if (m === 'manual') nbOpen(); else if (m === 'bulk') bulkOpen(); else focusBarcode();
+  if (m === 'manual') nbOpen(); else if (m === 'manual_return') mrOpen(); else if (m === 'bulk') bulkOpen(); else focusBarcode();
 }
 function updateModeHint(){
   const hint = document.getElementById('modeHint');
@@ -718,6 +719,7 @@ function updateModeHint(){
   if (state.mode==='return') hint.textContent = '반품할 상품의 바코드를 스캔하세요.';
   if (state.mode==='courier') hint.textContent = '온라인 주문으로 택배 발송할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액(매출)으로 잡혀요)';
   if (state.mode==='recall') hint.textContent = '본사 등으로 회수할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액으로는 안 잡혀요)';
+  if (state.mode==='manual_return') hint.textContent = '바코드가 없거나 재고파일에 없는 상품의 반품을 직접 입력해서 기록해요. (바코드를 스캔하면 일반 반품처럼 처리돼요)';
   if (state.mode==='bulk') hint.textContent = '택을 붙인 종이를 사진으로 찍어 올리면 사진 속 바코드가 모두 판매 목록으로 나와요. (바코드를 직접 스캔하면 목록에 더해져요)';
   if (state.mode==='manual') hint.textContent = '바코드가 없거나 안 찍히는 상품을 직접 입력해서 기록해요. (바코드를 스캔하면 일반 판매처럼 처리돼요)';
   if (state.mode==='exchange') hint.textContent = state.exchangeStep==='sale'
@@ -735,7 +737,7 @@ async function onScanSubmit(){
   if (state.mode === 'exchange'){
     return handleExchangeScan(barcode);
   }
-  await lookupAndShow(barcode, state.mode === 'manual' ? state.nbIntent : state.mode);
+  await lookupAndShow(barcode, state.mode === 'manual' ? state.nbIntent : (state.mode === 'manual_return' ? 'return' : state.mode));
 }
 
 async function lookupAndShow(barcode, intent){
@@ -835,7 +837,23 @@ function nbSearchRun(){
 }
 function nbPick(barcode){
   // 고른 상품은 바코드를 스캔한 것과 똑같이 처리 (선택한 구분으로)
-  lookupAndShow(barcode, state.nbIntent);
+  lookupAndShow(barcode, state.mode === 'manual_return' ? 'return' : state.nbIntent);
+}
+
+/* ---- 수기반품 모드: 바코드가 없거나 재고파일에 없는 상품의 반품 ----
+   1) 재고파일에서 검색해 고르면 → 일반 반품과 똑같이 처리(재고 +1)
+   2) 없는 상품이면 브랜드·품명·사이즈를 직접 입력 → 재고 연결 없이 반품 기록만 남김(바코드는 있으면 입력, 없으면 빈 값) */
+function mrOpen(){
+  state.scannedItem = null;
+  document.getElementById('scanResult').innerHTML = `
+    <div class="item-card hit">
+      <div class="name">수기반품 — 바코드 없는 상품 반품</div>
+      <div class="meta">재고파일에 있는 상품이면 검색해서 고르세요(재고가 정상적으로 +1 돼요). 없는 상품이면 아래에 직접 입력하세요.</div>
+      <div class="field" style="margin-top:10px;"><label>재고파일에서 상품 찾기 (브랜드 / 품명 / 품번)</label>
+        <input id="nbSearch" placeholder="예: 몽클레어 M7774" autocomplete="off" oninput="nbSearchRun()"></div>
+      <div id="nbResults" class="hint">검색어를 입력하세요. 띄어쓰기로 여러 단어를 넣으면 모두 들어간 상품만 나와요.</div>
+    </div>
+    <div id="nbForm">${renderUnregisteredCard('', null, 'return', '')}</div>`;
 }
 
 /* ---- 대량판매(스캔) 모드 (2026-10-07) ----
@@ -1255,10 +1273,16 @@ function renderUnregisteredCard(barcode, prevManual, intent, brandGuess){
   if (intent === 'return'){
     return `
       <div class="item-card miss">
-        <div class="name">미등록상품</div>
-        <div class="meta">바코드 ${esc(barcode)} — 재고파일에 없어요. 그래도 반품 처리하려면 아래에서 진행하세요.</div>
-        <div class="field"><label>비고</label><input id="scanNote" placeholder="사유"></div>
-        <button class="btn btn-outline btn-big" style="width:100%;margin-top:8px;" onclick="submitUnregisteredReturn('${escJsAttr(barcode)}')">미등록 바코드로 반품 기록</button>
+        <div class="name">미등록상품 반품</div>
+        <div class="meta">${barcode ? `바코드 ${esc(barcode)} — 재고파일에 없어요. ` : '바코드 없는 상품 — '}직접 입력해서 반품으로 기록해요 (재고 수량에는 영향 없음).</div>
+        ${brandInputHtml('manBrand', prefBrand)}
+        <div class="field"><label>품명</label><input id="manName" value="${esc(prefName)}" placeholder="상품명"></div>
+        <div class="row">
+          <div class="field"><label>사이즈</label><input id="manSize" value="${esc(prefSize)}"></div>
+          <div class="field"><label>정가 (참고, 선택)</label><input id="manPrice" type="number" value="${prefPrice||0}"></div>
+        </div>
+        <div class="field"><label>비고 / 반품 사유</label><input id="manNote" placeholder="사유 (선택)"></div>
+        <button class="btn btn-green btn-big" style="width:100%;margin-top:8px;" onclick="submitManualReturn('${escJsAttr(barcode)}')">수기 반품으로 저장</button>
       </div>`;
   }
   return `
@@ -1333,11 +1357,16 @@ async function submitManualMove(barcode, moveType){
   toast(moveType==='courier' ? '주문택배로 기록됐어요' : '회수로 기록됐어요', 'ok');
   await afterTxn();
 }
-async function submitUnregisteredReturn(barcode){
-  // 재고파일에 없는 바코드의 반품 — manual_sale과 동일 원장에 type return, item_id 없이 기록되도록
-  // 서버는 scan_return에서 item 못찾으면 unregistered를 리턴하므로, 수기 반품 전용 처리로 manual_sale API를 qty +1 용도로 재사용하지 않고
-  // 별도 안내: 이런 경우는 드물게 발생 — item 없이 직접 반품 기록을 남기고 싶으면 관리자에게 문의하도록 안내.
-  toast('재고파일에 없는 바코드는 먼저 실물 확인이 필요해요. 비고와 함께 화면을 캡처해두세요.', 'err');
+async function submitManualReturn(barcode){
+  const manual_brand = S(document.getElementById('manBrand').value);
+  if (!manual_brand){ toast('브랜드를 입력해주세요','err'); return; }
+  const manual_name = S(document.getElementById('manName').value);
+  if (!manual_name){ toast('품명을 입력해주세요','err'); return; }
+  const res = await apiPost('manual_return', {corner_id: state.corner.id, actor: state.actor, barcode, manual_brand, manual_name,
+    manual_size: S(document.getElementById('manSize').value), price: N(document.getElementById('manPrice').value), note: S(document.getElementById('manNote').value)});
+  if (!res.ok){ toast(res.error||'처리 실패','err'); return; }
+  toast('수기 반품으로 저장됐어요', 'ok');
+  await afterTxn();
 }
 async function submitManualSale(barcode){
   const manual_brand = S(document.getElementById('manBrand').value);
@@ -1414,6 +1443,7 @@ async function submitExchange(saleBarcode){
 async function afterTxn(){
   document.getElementById('scanResult').innerHTML = '';
   if (state.mode === 'bulk') bulkRender();
+  if (state.mode === 'manual_return') mrOpen();
   if (state.mode === 'manual') nbOpen();   // 수기판매 모드는 입력 패널을 다시 열어 바로 다음 건을 받는다
   const itemsRes = await apiGet('items', {corner_id: state.corner.id});
   state.items = itemsRes.items || [];
@@ -1464,7 +1494,7 @@ function openEditTxn(txnId){
   showModal(`
     <h2>거래 수정</h2>
     <div class="hint" style="margin:0 0 10px;">${esc(txnDisplayName(t))}${txnDisplaySize(t) ? ' ('+esc(txnDisplaySize(t))+')' : ''} · ${t.barcode ? '바코드 ' + esc(t.barcode) : '바코드 없음(수기 등록)'} · ${label}<br>수량(재고)은 바뀌지 않아요.</div>
-    ${isManual && t.type !== 'return' ? `
+    ${isManual ? `
       ${brandInputHtml('etBrand', t.manual_brand || '')}
       <div class="row">
         <div class="field"><label>품명</label><input id="etName" value="${esc(t.manual_name||'')}"></div>
