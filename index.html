@@ -177,6 +177,16 @@
   .chip-ambiguous{ background:var(--warning-soft); color:var(--warning); }
   .chip-soldout{ background:var(--surface-2); color:var(--ink-muted); }
   .chip-shortage{ background:var(--danger-soft); color:var(--danger); }
+  .chip-similar{ background:rgba(59,130,246,.16); color:#3B82F6; }
+  .chip-manual{ background:rgba(139,92,246,.16); color:#8B5CF6; }
+  .stat.stat-btn{ cursor:pointer; border:2px solid transparent; user-select:none; }
+  .stat.stat-btn:hover{ border-color:var(--line, rgba(128,128,128,.35)); }
+  .stat.stat-on{ border-color:var(--accent, #2F5D50); background:var(--accent-soft, rgba(47,93,80,.12)); }
+  tr.icmt-sim td{ background:rgba(59,130,246,.07); }
+  .icmt-cand{ display:block; width:100%; text-align:left; margin-top:3px; padding:3px 6px; font:inherit; font-size:11.5px; cursor:pointer;
+    border:1px solid rgba(128,128,128,.35); border-radius:6px; background:transparent; color:inherit; }
+  .icmt-cand:hover{ background:var(--accent-soft, rgba(47,93,80,.12)); }
+  .icmt-matched-name{ font-size:11px; color:var(--ink-muted); margin-top:2px; max-width:260px; }
   .chip-excess{ background:var(--warning-soft); color:var(--warning); }
   .chip-locked{ background:var(--surface-2) !important; color:var(--ink-muted) !important; }
   .nav-locked{ opacity:.6; }
@@ -6675,10 +6685,15 @@
           var isTarget = icmNormalizeText(headerVal) === '상품명';
           parsedSheets[name] = {path:path, doc:parsed.doc, rows:parsed.rows, isTarget:isTarget};
         });
+        // 송장에 "최종 / 미출고 / 키즈" 시트가 같이 있어도 실제 확인 대상은 "최종"뿐 — 최종 시트가 있으면 나머지는 처리하지 않는다
+        var hasFinal = sheetNames.some(function(n){ return parsedSheets[n].isTarget && n.replace(/\s/g, '') === '최종'; });
+        if(hasFinal){
+          sheetNames.forEach(function(n){ if(parsedSheets[n].isTarget && n.replace(/\s/g, '') !== '최종') parsedSheets[n].isTarget = false; });
+        }
         var targetCount = sheetNames.filter(function(n){ return parsedSheets[n].isTarget; }).length;
         if(targetCount === 0) throw new Error('J열 헤더가 "상품명"인 시트를 찾을 수 없습니다.');
         state.invoice = {fileName:file.name, zip:wb.zip, sheetMap:wb.sheetMap, sheetNames:sheetNames, parsedSheets:parsedSheets};
-        icmMarkDropzone('invoice', file.name, '시트 ' + sheetNames.length + '개 중 대상 시트 ' + targetCount + '개 인식', true);
+        icmMarkDropzone('invoice', file.name, '시트 ' + sheetNames.length + '개 중 대상 시트 ' + targetCount + '개 인식' + (hasFinal ? ' ("최종" 시트만 처리, 나머지 시트는 건너뜀)' : ''), true);
       }catch(e){
         state.invoice = null;
         icmMarkDropzone('invoice', file.name, '읽기 실패: ' + (e.message||e), false);
@@ -6866,9 +6881,10 @@
     }
 
     var ICM_STATUS_CHIP = {
-      '정확매칭':'chip-matched', '유사매칭':'chip-matched',
+      '정확매칭':'chip-matched', '유사매칭':'chip-similar', '수기입력':'chip-manual',
       '복수후보(수동확인)':'chip-ambiguous', '매칭실패(재고없음/미등록)':'chip-shortage'
     };
+    var icmFilter = 'all';   // 통계 칸을 누르면 해당 항목만 표시
 
     // 수기로 코드를 넣으면 송장 파일의 해당 행(K열=품목코드, L열=입고단가)도 같이 채운다
     function icmApplyManual(entry, rawCode){
@@ -6912,20 +6928,31 @@
 
       var statsEl = document.getElementById('icmTStats');
       statsEl.innerHTML = '';
-      function statCard(n, l, colorVar){
-        var s = el('div', {class:'stat'});
+      function judgeShort(e){ var j = judge(e); return !!(j && j.short); }
+      function passFilter(e){
+        if(icmFilter === 'all') return true;
+        if(icmFilter === 'short') return judgeShort(e);
+        return e.status === icmFilter;
+      }
+      function statCard(key, n, l, colorVar){
+        var on = (icmFilter === key);
+        var s = el('div', {class:'stat stat-btn' + (on ? ' stat-on' : ''), title:on ? '다시 누르면 전체 보기' : '누르면 이 항목만 표시'});
         var nEl = el('div', {class:'n tabular'}, [document.createTextNode(n)]);
         if(colorVar) nEl.style.color = colorVar;
         s.appendChild(nEl);
         s.appendChild(el('div', {class:'l'}, [document.createTextNode(l)]));
+        s.addEventListener('click', function(){ icmFilter = (on || key === 'all') ? 'all' : key; renderIcmResults(state.stats, state.issues); });
         return s;
       }
+      function nf(n){ return n.toLocaleString('ko-KR'); }
+      statsEl.appendChild(statCard('all', nf(entries.length), '전체'));
+      statsEl.appendChild(statCard('정확매칭', nf(cnt['정확매칭']||0), '정확매칭', 'var(--success)'));
+      statsEl.appendChild(statCard('유사매칭', nf(cnt['유사매칭']||0), '유사매칭', '#3B82F6'));
+      statsEl.appendChild(statCard('복수후보(수동확인)', nf(cnt['복수후보(수동확인)']||0), '복수후보', 'var(--warning)'));
+      statsEl.appendChild(statCard('매칭실패(재고없음/미등록)', nf(cnt['매칭실패(재고없음/미등록)']||0), '매칭실패', (cnt['매칭실패(재고없음/미등록)']||0) ? 'var(--danger)' : 'var(--success)'));
+      statsEl.appendChild(statCard('수기입력', nf(cnt['수기입력']||0), '수기 입력', '#8B5CF6'));
+      statsEl.appendChild(statCard('short', nf(shortCount), '재고 부족/0', shortCount ? 'var(--warning)' : 'var(--success)'));
       var unresolved = entries.filter(function(e){ return !e.code; }).length;
-      statsEl.appendChild(statCard(entries.length.toLocaleString('ko-KR'), '전체 건수'));
-      statsEl.appendChild(statCard(((cnt['정확매칭']||0) + (cnt['유사매칭']||0)).toLocaleString('ko-KR'), '자동 매칭', 'var(--success)'));
-      statsEl.appendChild(statCard((cnt['수기입력']||0).toLocaleString('ko-KR'), '수기 입력', 'var(--success)'));
-      statsEl.appendChild(statCard(unresolved.toLocaleString('ko-KR'), '코드 없음(입력 필요)', unresolved ? 'var(--danger)' : 'var(--success)'));
-      statsEl.appendChild(statCard(shortCount.toLocaleString('ko-KR'), '재고 부족/0', shortCount ? 'var(--warning)' : 'var(--success)'));
 
       var st = state.stock;
       var srcLine = st.source === 'server'
@@ -6936,7 +6963,7 @@
         srcEl = el('div', {class:'status-line', id:'icmTSrcLine', style:'margin:6px 0 10px;'});
         statsEl.parentNode.insertBefore(srcEl, statsEl.nextSibling);
       }
-      srcEl.textContent = srcLine + ' · 같은 코드가 여러 줄이면 수량을 합쳐서 비교합니다';
+      srcEl.textContent = srcLine + ' · 같은 코드가 여러 줄이면 수량을 합쳐서 비교합니다 · 위 칸을 누르면 그 항목만 보여요';
 
       var table = document.getElementById('icmTTable');
       table.innerHTML = '';
@@ -6948,7 +6975,7 @@
       });
       thead.appendChild(htr); table.appendChild(thead);
 
-      var order = entries.slice().sort(function(a, b){
+      var order = entries.filter(passFilter).sort(function(a, b){
         function rank(e){ var j = judge(e); return !e.code ? 0 : (j && j.short ? 1 : 2); }
         return rank(a) - rank(b) || (a.sheet < b.sheet ? -1 : a.sheet > b.sheet ? 1 : 0) || (a.row - b.row);
       });
@@ -6956,11 +6983,15 @@
       function td(v, num){ return el('td', num ? {class:'num tabular'} : null, [document.createTextNode(v === null || v === undefined ? '' : String(v))]); }
       var showLimit = 1000;
       order.slice(0, showLimit).forEach(function(e, idx){
-        var tr = el('tr');
+        var tr = el('tr', e.status === '유사매칭' ? {class:'icmt-sim'} : null);
         tr.appendChild(td(e.sheet)); tr.appendChild(td(e.row, true)); tr.appendChild(td(e.name)); tr.appendChild(td(e.size)); tr.appendChild(td(e.qty, true));
         var codeTd = el('td');
         if(e.code && e.status !== '수기입력'){
           codeTd.appendChild(document.createTextNode(e.code));
+          if(e.status === '유사매칭'){
+            var mi = st.byCode[e.code];
+            if(mi){ var mn = el('div', {class:'icmt-matched-name'}); mn.textContent = '→ ' + mi.name; codeTd.appendChild(mn); }
+          }
         } else {
           var listId = 'icmTCand' + idx;
           var inp = el('input', {type:'text', placeholder:'코드 직접 입력', value:e.code || '', style:'width:120px;font:inherit;padding:2px 6px;'});
@@ -6976,6 +7007,13 @@
           }
           inp.addEventListener('change', function(){ icmApplyManual(e, inp.value); renderIcmResults(state.stats, state.issues); });
           codeTd.appendChild(inp);
+          (e.candidates || []).forEach(function(c){
+            var ci = st.byCode[c.code];
+            var btn = el('button', {type:'button', class:'icmt-cand', title:'누르면 이 코드로 확정'});
+            btn.textContent = c.code + ' · ' + (ci ? ci.name : c.base + ' [' + c.size + ']') + (ci ? ' · 재고 ' + ci.qty : '');
+            btn.addEventListener('click', function(){ icmApplyManual(e, c.code); renderIcmResults(state.stats, state.issues); });
+            codeTd.appendChild(btn);
+          });
           if(e.err){ var er = el('div', {style:'color:var(--danger);font-size:11px;'}); er.textContent = e.err; codeTd.appendChild(er); }
         }
         tr.appendChild(codeTd);
@@ -6991,6 +7029,11 @@
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
+      if(order.length === 0){
+        var emptyNote = el('div', {class:'icm-note', style:'padding:8px 12px;color:var(--ink-muted);font-size:12px;'});
+        emptyNote.textContent = '이 조건에 해당하는 항목이 없습니다. 위 칸을 다시 누르면 전체가 보입니다.';
+        table.parentNode.appendChild(emptyNote);
+      }
       if(order.length > showLimit){
         var note = el('div', {class:'icm-note', style:'padding:8px 12px;color:var(--ink-muted);font-size:12px;'});
         note.textContent = '표시는 ' + showLimit.toLocaleString('ko-KR') + '건까지만 됩니다. 전체 ' + order.length.toLocaleString('ko-KR') + '건은 다운로드 파일에서 확인해주세요.';
@@ -7044,7 +7087,7 @@
     }
 
     function icmReset(){
-      state.invoice = null; state.stock = null; state.stats = null; state.issues = null; state.entries = null;
+      state.invoice = null; state.stock = null; state.stats = null; state.issues = null; state.entries = null; icmFilter = 'all';
       icmMarkDropzone('invoice', '1. 송장 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요 (여러 시트 가능, J열 헤더가 "상품명"인 시트만 처리)', false);
       document.getElementById('icmTInvoiceDrop').classList.remove('has-file');
       icmMarkDropzone('stock', '2. 이카운트 재고 — 서버에서 자동으로 가져옵니다', '송장을 올리면 자동으로 불러와요 (툴킷 로그인 필요). 서버를 못 쓸 때만 이 칸을 눌러 이카운트 재고현황 엑셀을 직접 올리세요', false);
