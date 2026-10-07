@@ -6643,8 +6643,11 @@
       if(m) return m[2];
       m = /^(\d+(?:\.\d+)?)\s*W$/.exec(t);
       if(m) return m[1];
+      m = /^(\d+)[AY]$/.exec(t);   // 키즈: 4Y = 4A = 4
+      if(m) return m[1];
       return t;
     }
+    function icmDefectLabel(s){ var m = /^\[(스크래치|하자)\]/.exec(String(s || '').trim()); return m ? m[1] : ''; }
     function icmFindCode(name, size, exactLookup, fuzzyIndex){
       var cleaned = icmCleanProductName(name);
       var sizeNorm = icmNormalizeSize(size);
@@ -6657,8 +6660,10 @@
       }
       var tokens = icmCodeTokens(name);
       var candidates = [];
+      var invLabel = icmDefectLabel(cleaned);
       fuzzyIndex.forEach(function(entry){
         if(entry.size !== sizeNorm && icmSizeCore(entry.size) !== sizeCore) return;
+        if(icmDefectLabel(entry.base) !== invLabel) return;
         var baseWords = entry.base.split(' ');
         if(tokens.length > 0 && tokens.every(function(t){ return icmTokenMatches(t, entry.base, baseWords); })){
           candidates.push(entry);
