@@ -6638,7 +6638,7 @@
     // 송장은 "US 6W", "EU 41"처럼 나라 표기가 붙는데 이카운트 규격은 "6", "41"인 경우가 많다.
     // 나라 표기(US/EU/UK...)를 떼고 신발 W/M 표기도 뗀다. 키즈 개월 사이즈("6M")는 나라 표기가 없을 때 건드리지 않는다.
     function icmSizeCore(v){
-      var t = icmNormalizeSize(v).toUpperCase();
+      var t = icmNormalizeSize(v).toUpperCase().replace(/\s*\/\s*/g, '-');   // 구간 사이즈 XS/S = XS-S
       var m = /^(US|EU|UK|IT|FR|KR|JP)\s*(\d+(?:\.\d+)?)\s*[WM]?$/.exec(t);
       if(m) return m[2];
       m = /^(\d+(?:\.\d+)?)\s*W$/.exec(t);
