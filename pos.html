@@ -600,6 +600,8 @@ function parseInventoryExcel(aoa){
     if (!row) continue;
     const allEmpty = row.every(c => S(c)==='');
     if (allEmpty) continue;
+    // 파일 중간에 제목 줄(분류명/품목명/바코드…)이 반복되는 경우(브랜드 블록마다 복사된 엑셀) — 상품으로 읽지 않고, 브랜드도 '분류명'으로 바뀌지 않게 건너뜀
+    if (S(row[colMap.barcode]) === '바코드' || S(row[colMap.item_name]) === '품목명') continue;
     if (colMap.brand!==undefined && S(row[colMap.brand])!=='') curBrand = S(row[colMap.brand]);
     const barcode = S(row[colMap.barcode]);
     if (!barcode) continue;
