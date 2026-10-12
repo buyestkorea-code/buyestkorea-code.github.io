@@ -68,22 +68,24 @@
     <h3>2. 결과</h3>
     <div id="asOf" style="font-size:13px;color:var(--mute);"></div>
     <div class="stats" id="stats"></div>
-    <div style="margin:8px 0;">
+    <div style="margin:8px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <button class="btn btn-sub" id="dlBtn">결과 엑셀로 다운로드</button>
+      <select id="fileSel" style="display:none;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;"></select>
     </div>
     <div class="tablewrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
-    <div class="note">"판매중"은 바이스트 사이트에 노출 중이고 판매 가능한 옵션이 하나라도 있는 상품이에요. 재고는 이카운트 전체 창고 합계입니다.</div>
+    <div class="note">분류 안에서는 사이트 조회수가 높은 순으로 정렬돼요. 조회수는 판매량이 아니라 관심도 참고용입니다. "판매중"은 사이트에 노출 중이고 판매 가능한 옵션이 하나라도 있는 상품이고, 재고는 이카운트 전체 창고 합계예요.</div>
   </div>
 </div>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script>
 const API = 'https://buyest.co.kr/list_check_api.php';
 const CHUNK = 2000;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-const S = { files: [], rows: [], cellMap: new Map(), cells: [], hits: {}, items: {}, groups: [], filter: 'all', asOf: 0, ageMin: null };
+const S = { files: [], rows: [], cellMap: new Map(), cells: [], hits: {}, items: {}, entries: [], newItems: [], filter: 'all', fileSel: '', asOf: 0, ageMin: null };
 
 function getAuth(){
   try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth')); return (a && a.id) ? a : null; } catch(e){ return null; }
@@ -152,7 +154,8 @@ $('runBtn').addEventListener('click', async () => {
       asOf = d.as_of; ageMin = d.age_min;
     }
     Object.assign(S, { rows, cells, cellMap, hits, items, asOf, ageMin });
-    buildGroups();
+    S.filter = 'all'; S.fileSel = '';
+    buildEntries();
     renderResult();
     setMsg('');
   } catch (e) {
@@ -161,7 +164,17 @@ $('runBtn').addEventListener('click', async () => {
   $('runBtn').disabled = false;
 });
 
-/* ---------- 품번별로 모으기 ---------- */
+/* ---------- 분류 ---------- */
+// 사용 목적: 많은 업체 리스트에서 "지금 품절인 것"과 "관심 높은 것"을 빨리 골라내기.
+const CATS = {
+  soldout: { label: '품절 · 재주문 후보', rank: 0, cls: 't-bad',  fill: 'FFFEE2E2', font: 'FFB91C1C' },
+  check:   { label: '확인 필요',          rank: 1, cls: 't-warn', fill: 'FFFEF3C7', font: 'FF92400E' },
+  selling: { label: '판매중',             rank: 2, cls: 't-ok',   fill: 'FFDCFCE7', font: 'FF15803D' },
+  unreg:   { label: '사이트 미등록',      rank: 3, cls: 't-gray', fill: 'FFF3F4F6', font: 'FF4B5563' },
+  similar: { label: '같은 모델 · 다른 컬러', rank: 4, cls: 't-blue', fill: 'FFE0E7FF', font: 'FF1D4ED8' },
+};
+const shortName = n => String(n).replace(/\.(xlsx|xlsm|xls|csv|txt)$/i, '');
+
 function rowKeys(row){
   // 한 줄에서 정확 일치가 있으면 앞부분 일치 후보는 버린다.
   const m = new Map();
@@ -170,108 +183,178 @@ function rowKeys(row){
   return [...m.entries()].filter(([k, t]) => !hasExact || t === 'exact');
 }
 function siteStatus(it){
-  if (!it.site.length) return { text: '사이트 미등록', cls: 't-gray', rank: 3 };
+  if (!it.site.length) return { text: '사이트 미등록', cls: 't-gray' };
   const live = it.site.filter(p => p.display === 'Y');
-  if (!live.length) return { text: '미노출', cls: 't-warn', rank: 2 };
-  const avail = live.some(p => p.opt_avail > 0);
-  return avail ? { text: '판매중', cls: 't-ok', rank: 0 } : { text: '품절', cls: 't-bad', rank: 1 };
+  if (!live.length) return { text: '미노출', cls: 't-warn' };
+  return live.some(p => p.opt_avail > 0) ? { text: '판매중', cls: 't-ok' } : { text: '품절', cls: 't-bad' };
 }
-function buildGroups(){
+function classify(it){
+  const st = siteStatus(it).text, q = it.ec ? it.ec.qty : null, has = q != null && q > 0;
+  if (st === '판매중') return has ? { cat: 'selling' } : { cat: 'check', why: '사이트는 판매중인데 이카운트 재고가 0' };
+  if (st === '사이트 미등록') return has ? { cat: 'check', why: '이카운트 재고는 있는데 사이트에 없음' } : { cat: 'unreg' };
+  return has ? { cat: 'check', why: `이카운트 재고 ${q}개인데 사이트는 ${st}` } : { cat: 'soldout' };
+}
+const viewsOf = it => Math.max(0, ...it.site.map(p => p.views || 0));
+
+/* ---------- 업체 파일 × 품번 으로 모으기 ---------- */
+function buildEntries(){
+  // 상품명에 섞인 보이지 않는 방향 문자(LRM 등)는 품번 표시에서 제거
+  Object.values(S.items).forEach(it => { if (it.label) it.label = it.label.replace(/[​-‏‪-‮﻿]/g, '').trim(); });
   const g = new Map();
   S.rows.forEach(row => rowKeys(row).forEach(([k, type]) => {
     if (!S.items[k]) return;
-    if (!g.has(k)) g.set(k, { key: k, it: S.items[k], types: new Set(), where: [] });
-    const o = g.get(k); o.types.add(type);
-    o.where.push((row.file + (row.sheet ? ' / ' + row.sheet : '') + ' ' + row.r + '행'));
+    const id = row.file + '||' + k;
+    if (!g.has(id)) g.set(id, { file: row.file, key: k, it: S.items[k], exact: false, rows: [] });
+    const o = g.get(id); if (type === 'exact') o.exact = true; o.rows.push(row.r);
   }));
-  S.groups = [...g.values()];
-  // 못 찾은 줄: 품번처럼 생긴 토큰(숫자 포함 5자 이상)이 있는데 매칭 없는 줄
-  // 영문+숫자가 섞인 5자 이상 토큰, 또는 숫자만 7자 이상 토큰이 있으면 품번 후보로 본다 (가격·수량·설명 문구는 제외)
+  S.entries = [...g.values()].map(e => {
+    Object.assign(e, classify(e.it), { views: viewsOf(e.it) });
+    // 업체 품번과 정확히 같지 않고 앞부분만 같은 경우 = 같은 모델의 다른 컬러. 재주문 후보와 섞이지 않게 따로 둔다.
+    if (!e.exact) { e.cat = 'similar'; e.why = '업체 품번 그대로는 우리 DB에 없고, 같은 모델의 다른 컬러만 있어요'; }
+    return e;
+  });
+  S.entries.sort((a, b) => CATS[a.cat].rank - CATS[b.cat].rank || b.views - a.views || a.file.localeCompare(b.file));
+
+  // 우리 DB에 없는 줄 → 품번 후보별로 묶기 (사이즈마다 같은 줄이 반복되므로)
   const codeLike = c => c.split(/[\s\-_.\/,;|]+/).some(t => (t.length >= 5 && /[A-Za-z]/.test(t) && /\d/.test(t)) || /^\d{7,}$/.test(t));
-  S.missRows = S.rows.filter(row => !rowKeys(row).length && row.cells.some(codeLike));
-}
-const ecQty = g => g.it.ec ? g.it.ec.qty : null;
-function passFilter(g){
-  const f = S.filter, q = ecQty(g), st = siteStatus(g.it);
-  if (f === 'all') return true;
-  if (f === 'stock') return q > 0;
-  if (f === 'nostock') return !(q > 0);
-  if (f === 'soldout') return st.text === '품절' || st.text === '미노출';
-  if (f === 'unreg') return st.text === '사이트 미등록';
-  if (f === 'prefix') return !g.types.has('exact');
-  return true;
+  const clean = s => s.replace(/&lt;BR\/?&gt;|<BR\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
+  const nm = new Map();
+  S.rows.forEach(row => {
+    const ks = rowKeys(row);
+    const onlyPrefix = ks.length > 0 && ks.every(([, t]) => t === 'prefix');
+    if (ks.length && !onlyPrefix) return;
+    const code = row.cells.find(c => c.length <= 40 && codeLike(c));
+    if (!code) return;
+    const id = row.file + '||' + code.toUpperCase();
+    if (!nm.has(id)) {
+      const desc = row.cells.filter(c => c !== code && c.length >= 6 && /[A-Za-z가-힣]{4}/.test(c) && !/^[\d.,\s]+$/.test(c)).map(clean).find(Boolean) || '';
+      nm.set(id, { file: row.file, code, desc: (onlyPrefix ? '[같은 모델 다른 컬러 보유] ' : '') + desc.slice(0, 90), n: 0 });
+    }
+    nm.get(id).n++;
+  });
+  S.newItems = [...nm.values()];
 }
 
 /* ---------- 화면 ---------- */
-const fmtDate = ts => { if (!ts) return ''; const d = new Date(ts * 1000); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
 const fmtTime = ts => { if (!ts) return ''; const d = new Date(ts * 1000); return (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
-
+function passFilter(e){
+  if (S.fileSel && e.file !== S.fileSel) return false;
+  if (S.filter === 'all') return true;
+  return e.cat === S.filter;
+}
 function renderResult(){
   $('resultBox').style.display = '';
-  const gs = S.groups;
-  const cnt = fn => gs.filter(fn).length;
-  const chips = [
-    ['all', '찾은 품번', gs.length], ['stock', '이카운트 재고 있음', cnt(g => ecQty(g) > 0)],
-    ['nostock', '재고 없음', cnt(g => !(ecQty(g) > 0))], ['soldout', '사이트 품절·미노출', cnt(g => ['품절','미노출'].includes(siteStatus(g.it).text))],
-    ['unreg', '사이트 미등록', cnt(g => siteStatus(g.it).text === '사이트 미등록')], ['prefix', '앞부분만 일치(확인 필요)', cnt(g => !g.types.has('exact'))],
-  ];
-  $('stats').innerHTML = chips.map(([k, t, n]) => `<button class="chip ${S.filter === k ? 'on' : ''}" data-f="${k}">${t} <b>${n.toLocaleString()}</b></button>`).join('')
-    + `<button class="chip ${S.filter === 'miss' ? 'on' : ''}" data-f="miss">우리 DB에 없는 줄(신규 후보) <b>${S.missRows.length.toLocaleString()}</b></button>`;
+  const ents = S.entries.filter(e => !S.fileSel || e.file === S.fileSel);
+  const news = S.newItems.filter(n => !S.fileSel || n.file === S.fileSel);
+  const cnt = c => ents.filter(e => e.cat === c).length;
+  const chips = [['all', '전체', ents.length], ['soldout', CATS.soldout.label, cnt('soldout')], ['check', CATS.check.label, cnt('check')],
+    ['selling', CATS.selling.label, cnt('selling')], ['unreg', CATS.unreg.label, cnt('unreg')], ['similar', CATS.similar.label, cnt('similar')], ['new', '신규 후보 (우리 DB에 없음)', news.length]];
+  $('stats').innerHTML = chips.map(([k, t, n]) => `<button class="chip ${S.filter === k ? 'on' : ''}" data-f="${k}">${t} <b>${n.toLocaleString()}</b></button>`).join('');
   $('stats').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; renderResult(); });
-  const miss = S.filter === 'miss';
-  $('thead').innerHTML = miss ? '<tr><th>리스트 위치</th><th>줄 내용</th></tr>'
-    : '<tr><th>품번</th><th>바이스트 사이트</th><th>이카운트 재고</th><th>리스트 위치</th></tr>';
-  if (miss) {
-    $('tbody').innerHTML = S.missRows.map(r => `<tr><td class="where" style="white-space:nowrap;">${esc(r.file + (r.sheet ? ' / ' + r.sheet : '') + ' ' + r.r + '행')}</td><td>${esc(r.cells.filter(Boolean).join(' | ').slice(0, 300))}</td></tr>`).join('')
-      || '<tr><td colspan="2" style="text-align:center;color:#6b7280;padding:28px;">해당하는 줄이 없어요.</td></tr>';
-    $('asOf').textContent = '품번처럼 보이는 글자가 있지만 바이스트 상품·이카운트 품목 어디에도 없는 줄이에요. 아직 매입하지 않은 신규 상품일 가능성이 높아요.';
-    return;
-  }
+
+  const files = [...new Set(S.entries.map(e => e.file).concat(S.newItems.map(n => n.file)))];
+  $('fileSel').style.display = files.length > 1 ? '' : 'none';
+  $('fileSel').innerHTML = '<option value="">업체 파일 전체</option>' + files.map(f => `<option value="${esc(f)}" ${S.fileSel === f ? 'selected' : ''}>${esc(shortName(f))}</option>`).join('');
+  $('fileSel').onchange = e => { S.fileSel = e.target.value; renderResult(); };
   $('asOf').textContent = S.asOf ? `이카운트 재고 기준 ${fmtTime(S.asOf)}` + (S.ageMin != null ? ` (${S.ageMin >= 60 ? Math.floor(S.ageMin/60) + '시간 ' : ''}${S.ageMin % 60}분 전 동기화)` : '') : '';
 
-  const rows = gs.filter(passFilter).map(g => {
-    const it = g.it, st = siteStatus(it);
+  if (S.filter === 'new') {
+    $('thead').innerHTML = '<tr><th>업체 파일</th><th>업체 품번</th><th>업체 설명</th><th>줄 수</th></tr>';
+    $('tbody').innerHTML = news.map(n => `<tr><td class="where">${esc(shortName(n.file))}</td><td class="code">${esc(n.code)}</td><td>${esc(n.desc)}</td><td class="num">${n.n}</td></tr>`).join('')
+      || '<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:28px;">해당하는 품번이 없어요.</td></tr>';
+    return;
+  }
+  $('thead').innerHTML = '<tr><th>분류</th><th>품번</th><th>바이스트 사이트</th><th>이카운트 재고</th><th>업체 파일 · 줄</th></tr>';
+  const rows = ents.filter(passFilter).map(e => {
+    const it = e.it, st = siteStatus(it), c = CATS[e.cat];
     let ec;
     if (!it.ec) ec = '<span class="tag t-gray">이카운트 품목 없음</span>';
     else if (it.ec.qty > 0) ec = `<b>${it.ec.qty}개</b><div>${it.ec.sizes.map(([s, q]) => `<span class="sz">${esc(s)} ${q}</span>`).join('')}</div>`;
-    else ec = '<span class="tag t-bad">재고 0</span><div class="sub">이카운트 취급 이력 있음</div>';
-    const prods = it.site.map(p => {
-      const sub = p.display === 'Y' ? `옵션 ${p.opt_avail}/${p.opt_total} 판매가능` : '미노출';
-      return `<div class="sub">${p.tag === 'kids' ? '[키즈] ' : ''}${esc(p.name)} · ${sub}</div>`;
-    }).join('');
-    const tipPrefix = g.types.has('exact') ? '' : ' <span class="tag t-blue">앞부분 일치</span>';
-    const wh = g.where.slice(0, 3).join(', ') + (g.where.length > 3 ? ` 외 ${g.where.length - 3}곳` : '');
-    return `<tr><td><div class="code">${esc(it.label || it.key)}${tipPrefix}</div></td>
-      <td><span class="tag ${st.cls}">${st.text}</span>${prods}</td><td>${ec}</td>
-      <td><div class="where">${esc(wh)}</div></td></tr>`;
+    else ec = '<span class="tag t-bad">재고 0</span>';
+    const prods = it.site.map(p => `<div class="sub">${p.tag === 'kids' ? '[키즈] ' : ''}${esc(p.name)}</div>`).join('');
+    const views = e.views ? `<div class="sub">사이트 조회수 ${e.views.toLocaleString()}</div>` : '';
+    const pre = e.exact ? '' : ' <span class="tag t-blue">앞부분 일치</span>';
+    const rl = e.rows.slice(0, 4).join(', ') + (e.rows.length > 4 ? ` 외 ${e.rows.length - 4}` : '');
+    return `<tr><td><span class="tag ${c.cls}">${c.label}</span>${e.why ? `<div class="sub">${esc(e.why)}</div>` : ''}</td>
+      <td><div class="code">${esc(it.label || it.key)}${pre}</div></td>
+      <td><span class="tag ${st.cls}">${st.text}</span>${prods}${views}</td><td>${ec}</td>
+      <td><div class="where">${esc(shortName(e.file))} · ${rl}행</div></td></tr>`;
   });
-  $('tbody').innerHTML = rows.join('') || '<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:28px;">해당하는 품번이 없어요.</td></tr>';
+  $('tbody').innerHTML = rows.join('') || '<tr><td colspan="5" style="text-align:center;color:#6b7280;padding:28px;">해당하는 품번이 없어요.</td></tr>';
 }
 
-/* ---------- 엑셀 다운로드 ---------- */
-$('dlBtn').addEventListener('click', () => {
-  const sum = [['품번', '바이스트 상태', '이카운트 재고', '사이즈별 재고', '바이스트 상품', '매칭방식', '리스트 위치']];
-  S.groups.forEach(g => {
-    const it = g.it, st = siteStatus(it);
-    sum.push([it.label || it.key, st.text, it.ec ? it.ec.qty : '', it.ec ? it.ec.sizes.map(([s, q]) => s + ':' + q).join(', ') : '',
-      it.site.map(p => (p.tag === 'kids' ? '[키즈]' : '') + p.name).join(' | '),
-      g.types.has('exact') ? '정확' : '앞부분(확인필요)', g.where.join(', ')]);
-  });
-  const det = [['파일', '시트', '행', '매칭품번', '바이스트 상태', '이카운트 재고', '매칭방식', '원본 행 내용']];
-  S.rows.forEach(row => {
-    const ks = rowKeys(row).filter(([k]) => S.items[k]);
-    const orig = row.cells.filter(Boolean).join(' | ');
-    if (!ks.length) { if (S.missRows.includes(row)) det.push([row.file, row.sheet, row.r, '(못 찾음)', '', '', '', orig]); return; }
-    const its = ks.map(([k, t]) => [S.items[k], t]);
-    det.push([row.file, row.sheet, row.r, its.map(([i]) => i.label).join(' / '),
-      its.map(([i]) => siteStatus(i).text).join(' / '), its.map(([i]) => i.ec ? i.ec.qty : '-').join(' / '),
-      its.every(([, t]) => t === 'exact') ? '정확' : '앞부분(확인필요)', orig]);
-  });
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), '품번별 요약');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), '리스트 줄별');
-  const d = new Date(); const stamp = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
-  XLSX.writeFile(wb, `품번재고확인_${stamp}.xlsx`);
+/* ---------- 엑셀 다운로드 (보기 좋게: 색·열너비·틀고정·필터) ---------- */
+$('dlBtn').addEventListener('click', async () => {
+  if (typeof ExcelJS === 'undefined') { setMsg('엑셀 라이브러리를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.', true); return; }
+  $('dlBtn').disabled = true;
+  try {
+    const wb = new ExcelJS.Workbook();
+    const thin = { style: 'thin', color: { argb: 'FFE5E7EB' } };
+    const border = { top: thin, left: thin, bottom: thin, right: thin };
+    const head = ws => { const r = ws.getRow(1); r.height = 24; r.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A34' } }; c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }; c.border = border; }); };
+    const now = new Date(), stamp = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+    const files = [...new Set(S.entries.map(e => e.file).concat(S.newItems.map(n => n.file)))];
+
+    /* 시트 1: 요약 */
+    const ws0 = wb.addWorksheet('요약');
+    ws0.getCell('A1').value = '품번 리스트 재고확인'; ws0.getCell('A1').font = { bold: true, size: 15 };
+    ws0.getCell('A2').value = `확인 ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}` + (S.asOf ? ` · 이카운트 재고 기준 ${fmtTime(S.asOf)}` : '');
+    ws0.getCell('A2').font = { color: { argb: 'FF6B7280' } };
+    const hdr = ['업체 파일', '확인한 품번', CATS.soldout.label, CATS.check.label, CATS.selling.label, CATS.unreg.label, CATS.similar.label, '신규 후보', '이카운트 재고 합계'];
+    const hr = ws0.getRow(4); hdr.forEach((t, i) => hr.getCell(i + 1).value = t);
+    hr.height = 28; hr.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A34' } }; c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }; c.border = border; });
+    const tot = [0, 0, 0, 0, 0, 0, 0, 0];
+    files.forEach(f => {
+      const es = S.entries.filter(e => e.file === f), c = k => es.filter(e => e.cat === k).length;
+      const stock = es.reduce((a, e) => a + (e.it.ec ? e.it.ec.qty : 0), 0);
+      const vals = [es.length, c('soldout'), c('check'), c('selling'), c('unreg'), c('similar'), S.newItems.filter(n => n.file === f).length, stock];
+      vals.forEach((v, i) => tot[i] += v);
+      const r = ws0.addRow([shortName(f), ...vals]);
+      r.eachCell((cell, i) => { cell.border = border; if (i > 1) cell.alignment = { horizontal: 'center' }; });
+    });
+    const tr = ws0.addRow(['합계', ...tot]); tr.font = { bold: true };
+    tr.eachCell((cell, i) => { cell.border = border; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }; if (i > 1) cell.alignment = { horizontal: 'center' }; });
+    ws0.columns = [{ width: 34 }, { width: 13 }, { width: 18 }, { width: 14 }, { width: 12 }, { width: 14 }, { width: 18 }, { width: 11 }, { width: 16 }];
+    const notes = ['분류 기준', `· ${CATS.soldout.label}: 사이트에서 판매하지 않고(품절·미노출) 이카운트 재고도 0`, `· ${CATS.check.label}: 사이트 상태와 이카운트 재고가 서로 맞지 않음 (예: 사이트 판매중인데 재고 0)`,
+      `· ${CATS.selling.label}: 사이트에서 판매 중이고 이카운트 재고가 있음`, `· ${CATS.unreg.label}: 이카운트에만 있고 재고 0`, `· ${CATS.similar.label}: 업체 품번 그대로는 없고 같은 모델의 다른 컬러만 우리에게 있음 (업체의 새 컬러는 신규 후보에도 표시)`,
+      '· 신규 후보: 바이스트 상품·이카운트 품목 어디에도 없는 품번',
+      '· 조회수는 바이스트 사이트 누적 조회수로, 판매량이 아니라 관심도 참고용입니다. 같은 분류 안에서는 조회수 높은 순으로 정렬했습니다.'];
+    notes.forEach((t, i) => { const c = ws0.getCell('A' + (ws0.rowCount + (i === 0 ? 2 : 1))); c.value = t; c.font = i === 0 ? { bold: true } : { color: { argb: 'FF4B5563' } }; });
+
+    /* 시트 2: 품번 확인 */
+    const ws = wb.addWorksheet('품번 확인', { views: [{ state: 'frozen', ySplit: 1, xSplit: 3 }] });
+    ws.columns = [{ header: '분류', width: 19 }, { header: '업체 파일', width: 22 }, { header: '품번', width: 26 }, { header: '바이스트 상품명', width: 48 },
+      { header: '사이트', width: 11 }, { header: '이카운트 재고', width: 12 }, { header: '사이즈별 재고', width: 30 }, { header: '사이트 조회수', width: 12 },
+      { header: '확인 메모', width: 34 }, { header: '일치', width: 12 }, { header: '리스트 줄', width: 16 }];
+    head(ws);
+    S.entries.forEach(e => {
+      const it = e.it, c = CATS[e.cat], st = siteStatus(it);
+      const r = ws.addRow([c.label, shortName(e.file), it.label || it.key, it.site.map(p => (p.tag === 'kids' ? '[키즈] ' : '') + p.name).join('\n') || '(사이트 미등록)',
+        st.text, it.ec ? it.ec.qty : '', it.ec && it.ec.sizes.length ? it.ec.sizes.map(([s, q]) => `${s} ${q}`).join(' · ') : '', e.views || '',
+        e.why || '', e.exact ? '정확' : '앞부분(확인필요)', e.rows.join(', ')]);
+      r.eachCell(cell => { cell.border = border; cell.alignment = { vertical: 'top', wrapText: true }; });
+      [1, 5, 6, 8, 10].forEach(i => r.getCell(i).alignment = { vertical: 'top', horizontal: 'center', wrapText: true });
+      const a = r.getCell(1); a.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.fill } }; a.font = { bold: true, color: { argb: c.font } };
+      if (it.ec && it.ec.qty > 0) r.getCell(6).font = { bold: true };
+      if (!e.exact) r.getCell(10).font = { color: { argb: 'FF1D4ED8' }, bold: true };
+      r.getCell(8).numFmt = '#,##0';
+    });
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(ws.rowCount, 2), column: 11 } };
+
+    /* 시트 3: 신규 후보 */
+    const w3 = wb.addWorksheet('신규 후보', { views: [{ state: 'frozen', ySplit: 1 }] });
+    w3.columns = [{ header: '업체 파일', width: 24 }, { header: '업체 품번', width: 28 }, { header: '업체 설명', width: 70 }, { header: '줄 수', width: 8 }];
+    head(w3);
+    S.newItems.forEach(n => { const r = w3.addRow([shortName(n.file), n.code, n.desc, n.n]); r.eachCell(cell => { cell.border = border; cell.alignment = { vertical: 'top', wrapText: true }; }); r.getCell(4).alignment = { horizontal: 'center', vertical: 'top' }; });
+    w3.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(w3.rowCount, 2), column: 4 } };
+
+    const buf = await wb.xlsx.writeBuffer();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = `품번재고확인_${stamp}.xlsx`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) { setMsg('엑셀 만들기 실패: ' + (e && e.message ? e.message : e), true); }
+  $('dlBtn').disabled = false;
 });
 </script>
 </body>
