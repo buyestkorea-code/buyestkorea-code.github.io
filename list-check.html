@@ -52,7 +52,7 @@
   <details class="step" id="salesBox">
     <summary style="cursor:pointer;font-size:15px;font-weight:700;">판매현황 업데이트 <span id="salesBadge" style="font-weight:500;font-size:12.5px;color:var(--mute);margin-left:6px;"></span></summary>
     <div id="salesStatus" style="font-size:13.5px;line-height:1.6;margin:10px 0;"></div>
-    <div style="font-size:13px;color:var(--mute);margin-bottom:8px;">이카운트 → 판매현황 엑셀(품목별 수량이 나오는 것)을 올리면, 아래 확인 결과에 품번별 판매량이 같이 나와요. 기준 일시는 파일 맨 아래 줄의 시각을 그대로 씁니다. 올린 기간의 기존 판매 데이터는 새 파일로 교체돼서, 겹치는 기간을 다시 올려도 이중으로 쌓이지 않아요.</div>
+    <div style="font-size:13px;color:var(--mute);margin-bottom:8px;">이카운트 → 판매현황 엑셀(품목별 수량이 나오는 것)을 올리면, 아래 확인 결과에 품번별 판매량이 같이 나와요. 기준은 올린 날짜가 아니라 <b>파일에 들어 있는 판매 기간</b>이에요. 올린 기간의 기존 판매 데이터는 새 파일로 교체돼서, 겹치는 기간을 다시 올려도 이중으로 쌓이지 않아요.</div>
     <input type="file" id="salesFile" accept=".xlsx,.xls">
     <div id="salesPreview" style="font-size:13px;margin-top:10px;line-height:1.6;"></div>
     <div style="margin-top:10px;"><button class="btn btn-sub" id="salesGo" disabled>서버에 반영하기</button></div>
@@ -205,9 +205,9 @@ async function loadSalesStatus(){
     if (!d.has_data) { box.innerHTML = '<b>아직 올린 판매현황이 없어요.</b> 아래에서 이카운트 판매현황 엑셀을 올려 주세요.'; $('salesBadge').textContent = '(없음)'; return; }
     const l = d.last, to = d.ranges.length ? d.ranges[d.ranges.length - 1][1] : '';
     const lag = to ? Math.floor((Date.now() - new Date(to + 'T00:00:00').getTime()) / 86400000) : 0;
-    $('salesBadge').textContent = `(기준 ${l.as_of_text || '-'})`;
-    box.innerHTML = `<div><b>판매현황 기준:</b> ${esc(l.as_of_text || '-')} <span style="color:var(--mute)">(이카운트 추출 시각)</span></div>
-      <div><b>들어 있는 기간:</b> ${esc(fmtRange(d.ranges))} · 품번 ${d.products.toLocaleString()}개 · 일별 ${d.daily_rows.toLocaleString()}행</div>
+    $('salesBadge').textContent = `(${to} 까지)`;
+    box.innerHTML = `<div><b>판매현황 기준:</b> ${esc(fmtRange(d.ranges))}</div>
+      <div style="color:var(--mute)">품번 ${d.products.toLocaleString()}개 · 일별 ${d.daily_rows.toLocaleString()}행${d.ranges.length > 1 ? ' · <span style="color:#b45309">기간이 끊겨 있어요(빈 구간은 판매가 0으로 보여요)</span>' : ''}</div>
       ${lag > 14 ? `<div class="note" style="margin-top:6px;">마지막 판매 기간이 ${to} 까지라서 최근 ${lag}일 판매가 비어 있어요. 그 이후 기간을 이카운트에서 받아 올려 주세요.</div>` : ''}`;
   } catch (e) { box.textContent = '상태를 불러오지 못했어요: ' + e.message; }
 }
@@ -264,10 +264,9 @@ function renderSalesPreview(){
   const p = SALES.parsed; if (!p) return;
   const warn = [];
   if (p.truncated) warn.push(`이 파일은 이카운트 엑셀 행 제한(10만 줄)에서 <b>잘렸어요</b>. 데이터가 ${p.maxD} 에서 끝나고, 파일 위쪽 기간은 ${p.hdrTo} 까지라고 돼 있어요. <b>${isoAdd(p.maxD, -1)} 까지만</b> 반영하고, 그 이후는 기간을 나눠서(예: ${p.maxD.slice(0, 7)}-01 ~ ${p.hdrTo}) 이카운트에서 다시 받아 올려 주세요.`);
-  if (!p.asOf) warn.push('맨 아래 줄에서 기준 시각을 못 읽었어요. (기준 일시 없이 올라가요)');
   $('salesPreview').innerHTML = `<div><b>${esc(p.file)}</b></div>
     <div>판매 ${p.rows.toLocaleString()}줄 → 일자×품번 ${p.agg.length.toLocaleString()}행 · 품번 ${p.items.length.toLocaleString()}개 (품번을 못 읽은 ${p.noKey.toLocaleString()}줄은 제외)</div>
-    <div>반영 기간: <b>${p.from} ~ ${p.to}</b> · 기준 일시: <b>${esc(p.asOfText || '없음')}</b></div>
+    <div>반영 기간(판매현황 기준): <b>${p.from} ~ ${p.to}</b></div>
     ${warn.map(w => `<div class="note" style="margin-top:6px;">${w}</div>`).join('')}`;
   $('salesGo').disabled = false;
 }
@@ -395,7 +394,7 @@ function renderResult(){
   $('fileSel').onchange = e => { S.fileSel = e.target.value; renderResult(); };
   const sm = S.salesMeta;
   $('asOf').innerHTML = (S.asOf ? `이카운트 재고 기준 ${esc(fmtTime(S.asOf))}` + (S.ageMin != null ? ` (${S.ageMin >= 60 ? Math.floor(S.ageMin/60) + '시간 ' : ''}${S.ageMin % 60}분 전 동기화)` : '') : '')
-    + (sm ? ` · 판매현황 기준 <b>${esc(sm.as_of_text || '-')}</b> (${esc(sm.from)} ~ ${esc(sm.to)})` : ' · <span style="color:#b45309">판매현황이 아직 없어요 (위 "판매현황 업데이트"에서 올려 주세요)</span>');
+    + (sm ? ` · 판매현황 기준 <b>${esc(sm.from)} ~ ${esc(sm.to)}</b>` : ' · <span style="color:#b45309">판매현황이 아직 없어요 (위 "판매현황 업데이트"에서 올려 주세요)</span>');
   if (sm) {
     const lag = Math.floor((Date.now() - new Date(sm.to + 'T00:00:00').getTime()) / 86400000);
     if (lag > 14) $('asOf').innerHTML += `<div style="color:#b45309;margin-top:4px;">⚠ 판매 데이터가 ${esc(sm.to)} 까지라서 최근 ${lag}일 판매는 빠져 있어요. "최근 90일·1년" 숫자는 ${esc(sm.to)} 기준이에요. 위 "판매현황 업데이트"에서 이후 기간을 올려 주세요.</div>`;
@@ -446,7 +445,7 @@ $('dlBtn').addEventListener('click', async () => {
     ws0.getCell('A1').value = '품번 리스트 재고확인'; ws0.getCell('A1').font = { bold: true, size: 15 };
     ws0.getCell('A2').value = `확인 ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}` + (S.asOf ? ` · 이카운트 재고 기준 ${fmtTime(S.asOf)}` : '');
     ws0.getCell('A2').font = { color: { argb: 'FF6B7280' } };
-    ws0.getCell('A3').value = S.salesMeta ? `판매현황 기준 ${S.salesMeta.as_of_text || '-'} · 판매 데이터 기간 ${S.salesMeta.from} ~ ${S.salesMeta.to}` : '판매현황 없음 (판매량 열은 비어 있어요)';
+    ws0.getCell('A3').value = S.salesMeta ? `판매현황 기준 ${S.salesMeta.from} ~ ${S.salesMeta.to}` : '판매현황 없음 (판매량 열은 비어 있어요)';
     ws0.getCell('A3').font = { color: { argb: 'FF6B7280' } };
     const hdr = ['업체 파일', '확인한 품번', CATS.soldout.label, CATS.pastsold.label, CATS.check.label, CATS.selling.label, CATS.unreg.label, CATS.similar.label, '신규 후보', '이카운트 재고 합계'];
     const hr = ws0.getRow(4); hdr.forEach((t, i) => hr.getCell(i + 1).value = t);
