@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>품번 리스트 재고확인</title>
+<style>
+  :root { --ink:#111827; --mute:#6b7280; --line:#e5e7eb; --bg:#fafafa; --ok:#15803d; --warn:#b45309; --bad:#b91c1c; --blue:#1d4ed8; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1280px; margin: 28px auto; padding: 0 20px 60px; background: var(--bg); color: var(--ink); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.desc { color: #4b5563; font-size: 13.5px; margin: 0 0 14px; line-height: 1.55; }
+  .step { background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; margin:14px 0; }
+  .step h3 { margin:0 0 8px; font-size:15px; }
+  .btn { font-size:14.5px; padding:9px 20px; border:none; border-radius:6px; cursor:pointer; background:#111827; color:#fff; }
+  .btn:disabled { background:#d1d5db; color:#6b7280; cursor:not-allowed; }
+  .btn-sub { background:#0f766e; }
+  .btn-ghost { background:#fff; color:var(--ink); border:1px solid #d1d5db; }
+  .dropzone { border:1.5px dashed #d1d5db; border-radius:8px; padding:22px 16px; text-align:center; color:var(--mute); cursor:pointer; transition:border-color .12s, background .12s; }
+  .dropzone:hover, .dropzone.drag { border-color:#111827; background:#f3f4f6; color:var(--ink); }
+  .dropzone input { display:none; }
+  textarea { width:100%; min-height:90px; border:1px solid #d1d5db; border-radius:6px; padding:8px; font-size:13px; font-family:inherit; }
+  .files { font-size:12.5px; color:var(--mute); margin-top:8px; }
+  .files span { display:inline-block; background:#f3f4f6; border-radius:4px; padding:2px 8px; margin:2px 4px 2px 0; }
+  #msg { font-size:13.5px; color:var(--mute); margin:10px 0; white-space:pre-wrap; }
+  #msg.err { color:var(--bad); }
+  .note { font-size:12.5px; color:var(--warn); background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:8px 10px; margin-top:10px; line-height:1.5; }
+  .stats { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 10px; }
+  .chip { border:1px solid #d1d5db; background:#fff; border-radius:999px; padding:5px 13px; font-size:13px; cursor:pointer; }
+  .chip b { font-weight:700; }
+  .chip.on { background:#111827; color:#fff; border-color:#111827; }
+  table { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
+  th, td { border-bottom:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
+  th { background:#f3f4f6; position:sticky; top:0; z-index:1; white-space:nowrap; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .code { font-weight:600; word-break:break-all; }
+  .sub { color:var(--mute); font-size:11.5px; margin-top:2px; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; }
+  .t-ok { background:#f0fdf4; color:var(--ok); } .t-warn { background:#fef3c7; color:#92400e; }
+  .t-bad { background:#fef2f2; color:var(--bad); } .t-gray { background:#f3f4f6; color:#4b5563; } .t-blue { background:#eff6ff; color:var(--blue); }
+  .sz { display:inline-block; border:1px solid var(--line); border-radius:4px; padding:1px 6px; margin:1px 3px 1px 0; font-size:12px; white-space:nowrap; }
+  .tablewrap { max-height:68vh; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+  .where { color:var(--mute); font-size:11.5px; word-break:break-all; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>품번 리스트 재고확인</h1>
+  <p class="desc">업체에서 받은 리스트(엑셀·CSV·붙여넣기)를 올리면, 양식이 달라도 안에서 품번을 찾아 <b>바이스트 사이트에서 판매중인지</b>와 <b>이카운트 현재 재고</b>를 같이 보여줘요. 사이즈는 보지 않고 품번 기준으로만 맞춥니다.</p>
+
+  <div class="step">
+    <h3>1. 리스트 올리기</h3>
+    <div class="dropzone" id="drop" tabindex="0" role="button" aria-label="리스트 파일 선택">
+      <div>엑셀·CSV 파일을 끌어다 놓거나 클릭해서 선택하세요 (여러 개 가능)</div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv,.txt" multiple>
+    </div>
+    <div class="files" id="fileList"></div>
+    <div style="margin-top:10px;font-size:13px;color:var(--mute);">또는 아래에 품번이나 목록을 그대로 붙여넣기 (한 줄에 하나)</div>
+    <textarea id="paste" placeholder="예) 1D246M ULS F0002&#10;CW9STF01 화이트&#10;211970730"></textarea>
+    <div style="margin-top:12px;">
+      <button class="btn" id="runBtn">재고 확인하기</button>
+      <button class="btn btn-ghost" id="clearBtn">비우기</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div class="step" id="resultBox" style="display:none;">
+    <h3>2. 결과</h3>
+    <div id="asOf" style="font-size:13px;color:var(--mute);"></div>
+    <div class="stats" id="stats"></div>
+    <div style="margin:8px 0;">
+      <button class="btn btn-sub" id="dlBtn">결과 엑셀로 다운로드</button>
+    </div>
+    <div class="tablewrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+    <div class="note">"판매중"은 바이스트 사이트에 노출 중이고 판매 가능한 옵션이 하나라도 있는 상품이에요. 재고는 이카운트 전체 창고 합계입니다.</div>
+  </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script>
+const API = 'https://buyest.co.kr/list_check_api.php';
+const CHUNK = 2000;
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const S = { files: [], rows: [], cellMap: new Map(), cells: [], hits: {}, items: {}, groups: [], filter: 'all', asOf: 0, ageMin: null };
+
+function getAuth(){
+  try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth')); return (a && a.id) ? a : null; } catch(e){ return null; }
+}
+function setMsg(t, err){ const m = $('msg'); m.textContent = t || ''; m.className = err ? 'err' : ''; }
+
+/* ---------- 파일 읽기 ---------- */
+$('drop').addEventListener('click', () => $('fileInput').click());
+$('drop').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') $('fileInput').click(); });
+['dragenter','dragover'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.remove('drag'); }));
+$('drop').addEventListener('drop', e => addFiles(e.dataTransfer.files));
+$('fileInput').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+$('clearBtn').addEventListener('click', () => { S.files = []; $('paste').value = ''; renderFiles(); $('resultBox').style.display = 'none'; setMsg(''); });
+
+function addFiles(list){ for (const f of list) S.files.push(f); renderFiles(); }
+function renderFiles(){ $('fileList').innerHTML = S.files.map(f => `<span>${esc(f.name)}</span>`).join(''); }
+
+async function readFileRows(file){
+  const out = [];
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+  for (const sn of wb.SheetNames) {
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: '', blankrows: false });
+    // 시트 이름은 헷갈림 방지용으로 시트가 여러 개일 때만 보여준다.
+    aoa.forEach((row, i) => {
+      const cells = row.map(v => String(v == null ? '' : v).trim());
+      if (cells.some(c => c)) out.push({ file: file.name, sheet: wb.SheetNames.length > 1 ? sn : '', r: i + 1, cells });
+    });
+  }
+  return out;
+}
+
+/* ---------- 실행 ---------- */
+$('runBtn').addEventListener('click', async () => {
+  const auth = getAuth();
+  if (!auth) { setMsg('툴킷에 로그인한 뒤 새로고침해 주세요. (상단 인트라넷 홈에서 로그인)', true); return; }
+  const pasted = $('paste').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (!S.files.length && !pasted.length) { setMsg('파일을 올리거나 목록을 붙여넣어 주세요.', true); return; }
+  $('runBtn').disabled = true; setMsg('리스트 읽는 중…');
+  try {
+    const rows = [];
+    for (const f of S.files) rows.push(...await readFileRows(f));
+    pasted.forEach((line, i) => rows.push({ file: '붙여넣기', sheet: '', r: i + 1, cells: [line] }));
+
+    // 셀 중복 제거 (같은 문자열은 한 번만 서버에 물어본다)
+    const cellMap = new Map(), cells = [];
+    rows.forEach(row => { row.cellIdx = []; row.cells.forEach(c => {
+      if (c.length < 4 || c.length > 600) return;
+      if (!cellMap.has(c)) { cellMap.set(c, cells.length); cells.push(c); }
+      row.cellIdx.push(cellMap.get(c));
+    }); });
+    if (!cells.length) { setMsg('읽을 내용이 없어요.', true); $('runBtn').disabled = false; return; }
+
+    const hits = {}, items = {};
+    let asOf = 0, ageMin = null;
+    for (let off = 0; off < cells.length; off += CHUNK) {
+      setMsg(`서버에서 품번 찾는 중… ${Math.min(off + CHUNK, cells.length).toLocaleString()} / ${cells.length.toLocaleString()} 칸`);
+      const part = cells.slice(off, off + CHUNK);
+      const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: auth.id, pass: auth.pass, cells: part }) });
+      const d = await res.json();
+      if (!d.ok) throw new Error(d.need_login ? '로그인 정보가 맞지 않아요. 툴킷에서 다시 로그인해 주세요.' : (d.error || '서버 오류'));
+      Object.keys(d.hits || {}).forEach(k => { hits[off + Number(k)] = d.hits[k]; });
+      Object.assign(items, d.items || {});
+      asOf = d.as_of; ageMin = d.age_min;
+    }
+    Object.assign(S, { rows, cells, cellMap, hits, items, asOf, ageMin });
+    buildGroups();
+    renderResult();
+    setMsg('');
+  } catch (e) {
+    setMsg('실패: ' + (e && e.message ? e.message : e), true);
+  }
+  $('runBtn').disabled = false;
+});
+
+/* ---------- 품번별로 모으기 ---------- */
+function rowKeys(row){
+  // 한 줄에서 정확 일치가 있으면 앞부분 일치 후보는 버린다.
+  const m = new Map();
+  row.cellIdx.forEach(ci => (S.hits[ci] || []).forEach(h => { if (!m.has(h.key) || h.type === 'exact') m.set(h.key, h.type); }));
+  const hasExact = [...m.values()].includes('exact');
+  return [...m.entries()].filter(([k, t]) => !hasExact || t === 'exact');
+}
+function siteStatus(it){
+  if (!it.site.length) return { text: '사이트 미등록', cls: 't-gray', rank: 3 };
+  const live = it.site.filter(p => p.display === 'Y');
+  if (!live.length) return { text: '미노출', cls: 't-warn', rank: 2 };
+  const avail = live.some(p => p.opt_avail > 0);
+  return avail ? { text: '판매중', cls: 't-ok', rank: 0 } : { text: '품절', cls: 't-bad', rank: 1 };
+}
+function buildGroups(){
+  const g = new Map();
+  S.rows.forEach(row => rowKeys(row).forEach(([k, type]) => {
+    if (!S.items[k]) return;
+    if (!g.has(k)) g.set(k, { key: k, it: S.items[k], types: new Set(), where: [] });
+    const o = g.get(k); o.types.add(type);
+    o.where.push((row.file + (row.sheet ? ' / ' + row.sheet : '') + ' ' + row.r + '행'));
+  }));
+  S.groups = [...g.values()];
+  // 못 찾은 줄: 품번처럼 생긴 토큰(숫자 포함 5자 이상)이 있는데 매칭 없는 줄
+  // 영문+숫자가 섞인 5자 이상 토큰, 또는 숫자만 7자 이상 토큰이 있으면 품번 후보로 본다 (가격·수량·설명 문구는 제외)
+  const codeLike = c => c.split(/[\s\-_.\/,;|]+/).some(t => (t.length >= 5 && /[A-Za-z]/.test(t) && /\d/.test(t)) || /^\d{7,}$/.test(t));
+  S.missRows = S.rows.filter(row => !rowKeys(row).length && row.cells.some(codeLike));
+}
+const ecQty = g => g.it.ec ? g.it.ec.qty : null;
+function passFilter(g){
+  const f = S.filter, q = ecQty(g), st = siteStatus(g.it);
+  if (f === 'all') return true;
+  if (f === 'stock') return q > 0;
+  if (f === 'nostock') return !(q > 0);
+  if (f === 'soldout') return st.text === '품절' || st.text === '미노출';
+  if (f === 'unreg') return st.text === '사이트 미등록';
+  if (f === 'prefix') return !g.types.has('exact');
+  return true;
+}
+
+/* ---------- 화면 ---------- */
+const fmtDate = ts => { if (!ts) return ''; const d = new Date(ts * 1000); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+const fmtTime = ts => { if (!ts) return ''; const d = new Date(ts * 1000); return (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
+
+function renderResult(){
+  $('resultBox').style.display = '';
+  const gs = S.groups;
+  const cnt = fn => gs.filter(fn).length;
+  const chips = [
+    ['all', '찾은 품번', gs.length], ['stock', '이카운트 재고 있음', cnt(g => ecQty(g) > 0)],
+    ['nostock', '재고 없음', cnt(g => !(ecQty(g) > 0))], ['soldout', '사이트 품절·미노출', cnt(g => ['품절','미노출'].includes(siteStatus(g.it).text))],
+    ['unreg', '사이트 미등록', cnt(g => siteStatus(g.it).text === '사이트 미등록')], ['prefix', '앞부분만 일치(확인 필요)', cnt(g => !g.types.has('exact'))],
+  ];
+  $('stats').innerHTML = chips.map(([k, t, n]) => `<button class="chip ${S.filter === k ? 'on' : ''}" data-f="${k}">${t} <b>${n.toLocaleString()}</b></button>`).join('')
+    + `<button class="chip ${S.filter === 'miss' ? 'on' : ''}" data-f="miss">우리 DB에 없는 줄(신규 후보) <b>${S.missRows.length.toLocaleString()}</b></button>`;
+  $('stats').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; renderResult(); });
+  const miss = S.filter === 'miss';
+  $('thead').innerHTML = miss ? '<tr><th>리스트 위치</th><th>줄 내용</th></tr>'
+    : '<tr><th>품번</th><th>바이스트 사이트</th><th>이카운트 재고</th><th>리스트 위치</th></tr>';
+  if (miss) {
+    $('tbody').innerHTML = S.missRows.map(r => `<tr><td class="where" style="white-space:nowrap;">${esc(r.file + (r.sheet ? ' / ' + r.sheet : '') + ' ' + r.r + '행')}</td><td>${esc(r.cells.filter(Boolean).join(' | ').slice(0, 300))}</td></tr>`).join('')
+      || '<tr><td colspan="2" style="text-align:center;color:#6b7280;padding:28px;">해당하는 줄이 없어요.</td></tr>';
+    $('asOf').textContent = '품번처럼 보이는 글자가 있지만 바이스트 상품·이카운트 품목 어디에도 없는 줄이에요. 아직 매입하지 않은 신규 상품일 가능성이 높아요.';
+    return;
+  }
+  $('asOf').textContent = S.asOf ? `이카운트 재고 기준 ${fmtTime(S.asOf)}` + (S.ageMin != null ? ` (${S.ageMin >= 60 ? Math.floor(S.ageMin/60) + '시간 ' : ''}${S.ageMin % 60}분 전 동기화)` : '') : '';
+
+  const rows = gs.filter(passFilter).map(g => {
+    const it = g.it, st = siteStatus(it);
+    let ec;
+    if (!it.ec) ec = '<span class="tag t-gray">이카운트 품목 없음</span>';
+    else if (it.ec.qty > 0) ec = `<b>${it.ec.qty}개</b><div>${it.ec.sizes.map(([s, q]) => `<span class="sz">${esc(s)} ${q}</span>`).join('')}</div>`;
+    else ec = '<span class="tag t-bad">재고 0</span><div class="sub">이카운트 취급 이력 있음</div>';
+    const prods = it.site.map(p => {
+      const sub = p.display === 'Y' ? `옵션 ${p.opt_avail}/${p.opt_total} 판매가능` : '미노출';
+      return `<div class="sub">${p.tag === 'kids' ? '[키즈] ' : ''}${esc(p.name)} · ${sub}</div>`;
+    }).join('');
+    const tipPrefix = g.types.has('exact') ? '' : ' <span class="tag t-blue">앞부분 일치</span>';
+    const wh = g.where.slice(0, 3).join(', ') + (g.where.length > 3 ? ` 외 ${g.where.length - 3}곳` : '');
+    return `<tr><td><div class="code">${esc(it.label || it.key)}${tipPrefix}</div></td>
+      <td><span class="tag ${st.cls}">${st.text}</span>${prods}</td><td>${ec}</td>
+      <td><div class="where">${esc(wh)}</div></td></tr>`;
+  });
+  $('tbody').innerHTML = rows.join('') || '<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:28px;">해당하는 품번이 없어요.</td></tr>';
+}
+
+/* ---------- 엑셀 다운로드 ---------- */
+$('dlBtn').addEventListener('click', () => {
+  const sum = [['품번', '바이스트 상태', '이카운트 재고', '사이즈별 재고', '바이스트 상품', '매칭방식', '리스트 위치']];
+  S.groups.forEach(g => {
+    const it = g.it, st = siteStatus(it);
+    sum.push([it.label || it.key, st.text, it.ec ? it.ec.qty : '', it.ec ? it.ec.sizes.map(([s, q]) => s + ':' + q).join(', ') : '',
+      it.site.map(p => (p.tag === 'kids' ? '[키즈]' : '') + p.name).join(' | '),
+      g.types.has('exact') ? '정확' : '앞부분(확인필요)', g.where.join(', ')]);
+  });
+  const det = [['파일', '시트', '행', '매칭품번', '바이스트 상태', '이카운트 재고', '매칭방식', '원본 행 내용']];
+  S.rows.forEach(row => {
+    const ks = rowKeys(row).filter(([k]) => S.items[k]);
+    const orig = row.cells.filter(Boolean).join(' | ');
+    if (!ks.length) { if (S.missRows.includes(row)) det.push([row.file, row.sheet, row.r, '(못 찾음)', '', '', '', orig]); return; }
+    const its = ks.map(([k, t]) => [S.items[k], t]);
+    det.push([row.file, row.sheet, row.r, its.map(([i]) => i.label).join(' / '),
+      its.map(([i]) => siteStatus(i).text).join(' / '), its.map(([i]) => i.ec ? i.ec.qty : '-').join(' / '),
+      its.every(([, t]) => t === 'exact') ? '정확' : '앞부분(확인필요)', orig]);
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), '품번별 요약');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), '리스트 줄별');
+  const d = new Date(); const stamp = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  XLSX.writeFile(wb, `품번재고확인_${stamp}.xlsx`);
+});
+</script>
+</body>
+</html>
