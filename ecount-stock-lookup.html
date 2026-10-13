@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이카운트재고조회</title>
+<style>
+  :root { --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --bg:#fafafa; --accent:#0f766e; --warn-bg:#fef3c7; --warn-fg:#92400e; --bad:#b91c1c; --ok:#15803d; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,"Malgun Gothic",sans-serif; max-width:720px; margin:0 auto; padding:18px 16px 60px; background:var(--bg); color:var(--ink); }
+  h1 { font-size:19px; margin:4px 0 2px; }
+  p.lead { color:var(--muted); margin:4px 0 14px; font-size:13px; line-height:1.55; }
+  .asof { display:inline-block; font-size:12.5px; font-weight:700; color:var(--accent); background:#f0fdfa; padding:6px 12px; border-radius:999px; margin-bottom:14px; }
+  .asof.stale { color:var(--warn-fg); background:var(--warn-bg); }
+  .asof.none { color:var(--muted); background:#f3f4f6; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
+  .dropzone { display:block; border:1.5px dashed var(--line); border-radius:8px; padding:26px 12px; text-align:center; color:var(--muted); cursor:pointer; font-size:13px; }
+  .dropzone:hover,.dropzone.drag { border-color:var(--accent); background:#f0fdfa; color:var(--ink); }
+  .dropzone.has-file { border-style:solid; border-color:var(--accent); color:var(--ink); }
+  .dropzone input { display:none; }
+  .btn { font-size:15px; padding:12px 20px; border:none; border-radius:8px; cursor:pointer; font-weight:600; width:100%; background:var(--ink); color:#fff; margin-top:12px; }
+  .btn:disabled { opacity:.4; cursor:default; }
+  .msg { font-size:13px; margin-top:10px; line-height:1.6; }
+  .msg.err { color:var(--bad); } .msg.ok { color:var(--ok); }
+  .stats { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .stat { flex:1 1 90px; background:#f9fafb; border:1px solid var(--line); border-radius:8px; padding:8px; text-align:center; font-size:12px; color:var(--muted); }
+  .stat b { display:block; font-size:18px; color:var(--ink); }
+</style>
+</head>
+<body>
+<h1>이카운트재고조회</h1>
+<p class="lead">이카운트 품목코드가 들어 있는 엑셀을 올리면, 현재 이카운트 재고수량을 <b>S열</b>에 채워서 다운로드할 수 있어요. 품목코드는 A열이어야 하고, 이카운트에서 받은 파일이면 그대로 쓰면 됩니다.</p>
+<div id="asof" class="asof none">이카운트 기준 시각 불러오는 중…</div>
+
+<div class="card">
+  <label class="dropzone" id="drop">
+    <input type="file" id="file" accept=".xlsx,.xls">
+    <span id="dropText">엑셀 파일을 끌어다 놓거나 눌러서 선택</span>
+  </label>
+  <button class="btn" id="run" disabled>현재 재고 기재하고 다운로드</button>
+  <div id="msg" class="msg"></div>
+  <div id="stats" class="stats" style="display:none"></div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script>
+const API = 'https://buyest.co.kr/ecount_qty_lookup_api.php';
+const COL = 18;            // S열 (0부터)
+const HEAD = '현재재고(이카운트)';
+let wb = null, fileName = '';
+
+function auth() { try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); return (a && a.id && a.pass) ? a : null; } catch (e) { return null; } }
+const $ = id => document.getElementById(id);
+function say(t, cls) { const m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t; }
+
+function asofHtml(d) {
+  const el = $('asof');
+  if (!d || !d.as_of) { el.className = 'asof none'; el.textContent = '아직 이카운트 동기화 전이에요'; return; }
+  const dt = new Date(d.as_of * 1000);
+  const p = n => String(n).padStart(2, '0');
+  const stamp = `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+  const age = d.age_min < 60 ? `${d.age_min}분 전` : `${Math.floor(d.age_min / 60)}시간 전`;
+  el.className = 'asof' + (d.stale ? ' stale' : '');
+  el.textContent = `이카운트 재고 기준: ${stamp} (${age})` + (d.stale ? ' — 오래된 값일 수 있어요' : '');
+}
+
+async function call(codes) {
+  const a = auth();
+  if (!a) throw new Error('툴킷에 로그인한 뒤 사용할 수 있어요. 로그인 후 새로고침해 주세요.');
+  const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ user:a.id, pass:a.pass, codes }) });
+  const d = await r.json();
+  if (!d.ok) throw new Error(d.error || '조회 실패');
+  return d;
+}
+
+// 열자마자 기준 시각 표시 (코드 0개 조회)
+call([]).then(asofHtml).catch(e => { $('asof').className = 'asof none'; $('asof').textContent = e.message; });
+
+function pick(f) {
+  if (!f) return;
+  fileName = f.name; $('drop').classList.add('has-file'); $('dropText').textContent = f.name;
+  const rd = new FileReader();
+  rd.onload = e => { try { wb = XLSX.read(e.target.result, { type:'array', cellStyles:true }); $('run').disabled = false; say('파일을 읽었어요. 아래 버튼을 눌러주세요.'); } catch (x) { say('엑셀을 읽지 못했어요: ' + x.message, 'err'); } };
+  rd.readAsArrayBuffer(f);
+}
+$('file').onchange = e => pick(e.target.files[0]);
+['dragover','dragenter'].forEach(t => $('drop').addEventListener(t, e => { e.preventDefault(); $('drop').classList.add('drag'); }));
+['dragleave','drop'].forEach(t => $('drop').addEventListener(t, e => { e.preventDefault(); $('drop').classList.remove('drag'); }));
+$('drop').addEventListener('drop', e => pick(e.dataTransfer.files[0]));
+
+$('run').onclick = async () => {
+  if (!wb) return;
+  $('run').disabled = true; say('재고를 조회하는 중…'); $('stats').style.display = 'none';
+  try {
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const rows = [];
+    for (let r = range.s.r; r <= range.e.r; r++) {
+      const c = ws[XLSX.utils.encode_cell({ r, c:0 })];
+      if (!c || c.v == null) continue;
+      const code = String(c.v).trim();
+      if (/^\d{4,}$/.test(code)) rows.push({ r, code });     // 숫자 코드 행만 (제목/머리글/합계 행 제외)
+    }
+    if (!rows.length) throw new Error('A열에서 품목코드를 찾지 못했어요.');
+    const d = await call([...new Set(rows.map(x => x.code))]);
+    asofHtml(d);
+    const miss = new Set(d.missing || []);
+    let hit = 0, zero = 0, unk = 0;
+    rows.forEach(({ r, code }) => {
+      const ref = XLSX.utils.encode_cell({ r, c:COL });
+      if (miss.has(code)) { ws[ref] = { t:'s', v:'조회불가' }; unk++; return; }
+      const q = d.qty[code] != null ? d.qty[code] : 0;
+      ws[ref] = { t:'n', v:q, z:'#,##0' };
+      if (q) hit++; else zero++;
+    });
+    ws[XLSX.utils.encode_cell({ r:1, c:COL })] = { t:'s', v:HEAD };
+    ws['!merges'] = (ws['!merges'] || []).concat([{ s:{ r:1, c:COL }, e:{ r:2, c:COL } }]);
+    const asof = new Date(d.as_of * 1000), p = n => String(n).padStart(2, '0');
+    ws[XLSX.utils.encode_cell({ r:0, c:COL })] = { t:'s', v:`이카운트 재고 기준 ${asof.getFullYear()}-${p(asof.getMonth()+1)}-${p(asof.getDate())} ${p(asof.getHours())}:${p(asof.getMinutes())}` };
+    range.e.c = Math.max(range.e.c, COL);
+    ws['!ref'] = XLSX.utils.encode_range(range);
+    ws['!cols'] = ws['!cols'] || []; ws['!cols'][COL] = { wch:20 };
+    XLSX.writeFile(wb, fileName.replace(/\.(xlsx|xls)$/i, '') + '_이카운트재고.xlsx', { cellStyles:true });
+    $('stats').style.display = 'flex';
+    $('stats').innerHTML = `<div class="stat"><b>${rows.length}</b>조회 행</div><div class="stat"><b>${hit}</b>재고 있음</div><div class="stat"><b>${zero}</b>재고 0</div><div class="stat"><b>${unk}</b>조회불가</div>`;
+    say('S열에 기재해서 다운로드했어요.', 'ok');
+  } catch (e) { say(e.message, 'err'); }
+  $('run').disabled = false;
+};
+</script>
+</body>
+</html>
