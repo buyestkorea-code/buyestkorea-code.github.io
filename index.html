@@ -7695,13 +7695,23 @@
     function stBeep(kind){
       var cb = document.getElementById('stSound');
       if(cb && !cb.checked) return;
+      // 소리 크기: 사인파 0.08 → 사각파 1.0(최대). 사각파가 같은 볼륨에서도 훨씬 크게 들린다.
+      // 종류: ok=짧은 "띠"(1000Hz) / over=낮은 2연음 "두두"(600Hz) / warn(미등록)=높은 "삐삐삐" 3연음(고저 교대)
+      var seq = kind==='ok'   ? [[1000, 0, 0.12]]
+              : (kind==='over' ? [[600, 0, 0.14], [600, 0.2, 0.14]]
+                               : [[2000, 0, 0.14], [1400, 0.2, 0.14], [2000, 0.4, 0.14]]);
       try{
         stAudio = stAudio || new (window.AudioContext || window.webkitAudioContext)();
-        var o = stAudio.createOscillator(), g = stAudio.createGain();
-        o.connect(g); g.connect(stAudio.destination);
-        o.type = 'sine'; o.frequency.value = kind==='ok' ? 880 : (kind==='over' ? 520 : 240);
-        g.gain.value = 0.08;
-        o.start(); o.stop(stAudio.currentTime + (kind==='ok' ? 0.08 : 0.25));
+        if(stAudio.state === 'suspended') stAudio.resume();
+        var t0 = stAudio.currentTime;
+        seq.forEach(function(n){
+          var o = stAudio.createOscillator(), g = stAudio.createGain();
+          o.connect(g); g.connect(stAudio.destination);
+          o.type = 'square'; o.frequency.value = n[0];
+          g.gain.setValueAtTime(1.0, t0 + n[1]);
+          g.gain.setValueAtTime(0, t0 + n[1] + n[2]);
+          o.start(t0 + n[1]); o.stop(t0 + n[1] + n[2] + 0.02);
+        });
       }catch(e){}
     }
     function stShowLastScan(barcode, found, qty){
