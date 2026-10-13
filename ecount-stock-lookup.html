@@ -74,7 +74,10 @@ async function call(codes) {
 }
 
 // 열자마자 기준 시각 표시 (코드 0개 조회)
-call([]).then(asofHtml).catch(e => { $('asof').className = 'asof none'; $('asof').textContent = e.message; });
+fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ status_only:1 }) })
+  .then(r => r.json()).then(asofHtml)
+  .catch(() => { $('asof').className = 'asof none'; $('asof').textContent = '기준 시각을 불러오지 못했어요 (새로고침 해보세요)'; });
+if (!auth()) say('툴킷에 로그인한 뒤 사용할 수 있어요. 로그인 후 새로고침해 주세요.', 'err');
 
 function pick(f) {
   if (!f) return;
