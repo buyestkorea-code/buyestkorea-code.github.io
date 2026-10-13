@@ -136,12 +136,27 @@ function normSpec(v) {
   if (/^\d+\.0$/.test(s)) s = s.slice(0, -2);
   return s;
 }
+// a=이카운트 규격, b=크림 사이즈. 크림은 "6.5 (250)", "US 7 (EU 38)"처럼 괄호 설명/접두어가 붙기도 해서
+// 괄호 앞부분과 US/EU 접두어를 뗀 값도 같이 비교한다.
 function specsMatch(a, b) {
-  const x = normSpec(a), y = normSpec(b);
-  if (x === y) return true;
+  const x = normSpec(a);
   const free = v => v === '' || v === 'TU' || v === 'FREE' || v === 'ONE SIZE' || v === 'OS';
-  if (free(x) && free(y)) return true;
-  return false;
+  const raw = S(b).toUpperCase();
+  const pre = raw.replace(/\(.*$/, '').trim();
+  const forms = [normSpec(b), normSpec(pre), normSpec(pre.replace(/^(US|EU|UK)\s*/, ''))];
+  return forms.some(y => y === x || (free(x) && free(y)));
+}
+
+// 표기 보정용 느슨한 품번 키: 공백/하이픈/슬래시/언더바를 모두 없애 붙이고, 6자리 이상 숫자 덩어리는 앞자리 0을 뗀다.
+// (이카운트 "A06268 0AFAA 9XXA" ↔ 크림 "A062680AFAA-9XXA", 이카운트 "0742168" ↔ 크림 "742168")
+function looseKey(s) {
+  return String(s || '').toUpperCase().split(/[\s\-\/_]+/).filter(Boolean)
+    .map(t => /^\d{6,}$/.test(t) ? t.replace(/^0+/, '') : t).join('');
+}
+// 크림 상품명에 "5MC076-2FPP-F0002/5MC076-AFPP-F0002"처럼 슬래시로 후보가 나열된 경우 각각을 키로 쓴다.
+// 8자 미만 조각("BF", "E22" 같은 접두어)은 너무 흔해서 키로 쓰지 않는다.
+function keyAlts(kreamName) {
+  return String(kreamName || '').split('/').map(looseKey).filter(k => k.length >= 8);
 }
 
 function headerColMap(headerRow) {
@@ -245,15 +260,34 @@ async function run() {
       if (!codeMap[key]) codeMap[key] = [];
       codeMap[key].push(it);
     });
+    const looseMap = {};
+    ecItems.forEach(it => {
+      const k = looseKey(codeSuffix(it.name));
+      if (!k) return;
+      (looseMap[k] = looseMap[k] || []).push(it);
+    });
 
     const { sheetName, ws, headerIdx, col } = findKreamSheet(kreamWB);
     kreamSheetName = sheetName;
     const range = XLSX.utils.decode_range(ws['!ref']);
 
+    // 느슨한 키가 서로 다른 크림 상품명 둘 이상과 겹치면 어느 쪽인지 알 수 없어서 표기보정 매칭을 건너뛴다.
+    const altOwners = {};
+    {
+      let nm = '';
+      for (let r = headerIdx + 1; r <= range.e.r; r++) {
+        const c = ws[XLSX.utils.encode_cell({ r, c: col['크림 상품명'] })];
+        if (c && S(c.v)) {
+          nm = S(c.v);
+          keyAlts(nm).forEach(k => { (altOwners[k] = altOwners[k] || new Set()).add(nm); });
+        }
+      }
+    }
+
     let lastBrand = '', lastKreamName = '', lastName = '';
     deltaRows = [];
     patchList = [];
-    let matchedCount = 0, ambiguousCount = 0;
+    let matchedCount = 0, ambiguousCount = 0, looseCount = 0, looseSkipped = 0;
 
     for (let r = headerIdx + 1; r <= range.e.r; r++) {
       const get = c => {
@@ -273,7 +307,20 @@ async function run() {
       if (!lastKreamName || !S(size)) continue; // 완전히 빈 행
 
       const key = normKey(lastKreamName);
-      const candidates = (codeMap[key] || []).filter(it => specsMatch(it.spec, size));
+      let candidates = (codeMap[key] || []).filter(it => specsMatch(it.spec, size));
+      let isLoose = false;
+      if (!candidates.length) {
+        // 정확히 일치하는 품번이 없으면 표기 차이(붙여쓰기/하이픈 위치/슬래시/앞자리 0)를 보정해서 한 번 더 찾는다.
+        const seen = new Set();
+        for (const alt of keyAlts(lastKreamName)) {
+          const owners = altOwners[alt];
+          if (owners && owners.size > 1) { if ((looseMap[alt] || []).some(it => specsMatch(it.spec, size))) looseSkipped++; continue; }
+          (looseMap[alt] || []).forEach(it => {
+            if (specsMatch(it.spec, size) && !seen.has(it.code + '|' + it.spec)) { seen.add(it.code + '|' + it.spec); candidates.push(it); }
+          });
+        }
+        isLoose = candidates.length > 0;
+      }
       if (!candidates.length) continue; // 오늘 변동표에 없는 상품 - 건드리지 않음
 
       let picked = candidates[0];
@@ -299,9 +346,10 @@ async function run() {
       else if ((oldVal === null || oldVal === 0) && newVal > 0) statusLabel = '재입고';
 
       matchedCount++;
+      if (isLoose) looseCount++;
       deltaRows.push({
         brand: lastBrand, kreamName: lastKreamName, name: lastName, size: S(size),
-        oldVal, newVal, statusLabel, ecCode: picked.code, ecName: picked.name
+        oldVal, newVal, statusLabel, ecCode: picked.code, ecName: picked.name, loose: isLoose
       });
     }
 
@@ -309,7 +357,7 @@ async function run() {
 
     status.textContent = `크림 등록상품 ${range.e.r - headerIdx}행 · 이카운트 변동표 ${ecItems.length}건 중 ${matchedCount}건 변동`;
     result.className = 'ok';
-    result.textContent = `✅ 매칭 완료. 재고 컬럼에 이카운트 잔량을 반영했습니다.${ambiguousCount ? ` (⚠️ 후보 중복 ${ambiguousCount}건 - 첫 후보로 처리됨, 표에서 확인해주세요.)` : ''}`;
+    result.textContent = `✅ 매칭 완료. 재고 컬럼에 이카운트 잔량을 반영했습니다.${ambiguousCount ? ` (⚠️ 후보 중복 ${ambiguousCount}건 - 첫 후보로 처리됨, 표에서 확인해주세요.)` : ''}${looseCount ? ` 표기보정 매칭 ${looseCount}건(띄어쓰기/하이픈/앞자리0 차이)은 표에 '표기보정'으로 표시했어요.` : ''}${looseSkipped ? ` (⚠️ 크림 상품명 중복으로 건너뛴 표기보정 ${looseSkipped}건)` : ''}`;
 
     renderTable(deltaRows);
     renderStats(deltaRows);
@@ -342,7 +390,7 @@ function renderTable(rows) {
     <td class="num">${r.oldVal === null ? '—' : r.oldVal}</td>
     <td class="num">${r.newVal}</td>
     <td><span class="chip ${chip(r.statusLabel)}">${esc(r.statusLabel)}</span></td>
-    <td>${esc(r.ecName)}</td>
+    <td>${esc(r.ecName)}${r.loose ? ' <span class="chip c-qty">표기보정</span>' : ''}</td>
   </tr>`).join('');
   document.getElementById('tbl').innerHTML =
     `<thead><tr><th>#</th><th>특이사항</th><th>크림 상품명</th><th>사이즈</th><th>이전재고</th><th>신규재고</th><th>상태</th><th>이카운트 품목명</th></tr></thead><tbody>${body}</tbody>`;
@@ -354,8 +402,8 @@ function todayStamp() {
 }
 
 function downloadDelta() {
-  const aoa = [['특이사항', '크림 상품명', '상품명', '사이즈', '이전재고', '신규재고', '상태', '이카운트품목코드', '이카운트품목명']];
-  deltaRows.forEach(r => aoa.push([r.brand, r.kreamName, r.name, r.size, r.oldVal, r.newVal, r.statusLabel, r.ecCode, r.ecName]));
+  const aoa = [['특이사항', '크림 상품명', '상품명', '사이즈', '이전재고', '신규재고', '상태', '이카운트품목코드', '이카운트품목명', '매칭']];
+  deltaRows.forEach(r => aoa.push([r.brand, r.kreamName, r.name, r.size, r.oldVal, r.newVal, r.statusLabel, r.ecCode, r.ecName, r.loose ? '표기보정' : '정확']));
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '변동내역');
