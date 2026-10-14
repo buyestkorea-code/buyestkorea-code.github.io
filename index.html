@@ -5765,6 +5765,7 @@
 
       var results = [];
       var stats = {changed:0, dupChanged:0, noChange:0, specMismatch:0, notFound:0};
+      var agg = {};
       state.ecount.items.forEach(function(it){
         var ecCode = rvmCodeSuffix(it.name);
         var candNames = ecCode ? (codeMap[ecCode] || []) : [];
@@ -5786,6 +5787,16 @@
 
         if(matchedRows.length === 0){ stats.specMismatch++; results.push({item:it, status:'specMismatch', sbName:candNames.join(' / ')}); return; }
 
+        // 서버 자동 불러오기 모드: 같은 상품이 이카운트에 코드 여러 개로 등록돼 같은 사방넷 행에 겹치면
+        // 덮어쓰지 않고 재고를 합산한다(안 쓰는 옛 코드의 0 이 실제 재고를 덮는 문제 방지). 아래에서 한 줄로 만든다.
+        if(state.ecAuto){
+          matchedRows.forEach(function(m){
+            var ag = agg[m.rowIdx] || (agg[m.rowIdx] = {rowIdx:m.rowIdx, sbName:m.sbName, sum:0, items:[]});
+            ag.sum += it.remain; ag.items.push(it);
+          });
+          return;
+        }
+
         if(matchedRows.length === 1){
           var ri = matchedRows[0].rowIdx;
           var curStock = aoa[ri][col['현재고']];
@@ -5802,6 +5813,19 @@
           stats.dupChanged++;
           results.push({item:it, status:'dupChanged', sbRowIdx:m.rowIdx, sbName:m.sbName, curStock:curNum2, newStock:it.remain});
         });
+      });
+
+      // 자동 모드: 사방넷 행마다 합산한 재고로 결과 한 줄 (여러 코드면 대표 품목명에 "외 N개 합산" 표시)
+      Object.keys(agg).forEach(function(k){
+        var ag = agg[k];
+        var top = ag.items.reduce(function(b, x){ return (x.remain > b.remain) ? x : b; }, ag.items[0]);
+        var codes = ag.items.map(function(x){ return x.code; });
+        var shown = {code: ag.items.length > 1 ? (top.code + ' 외 ' + (ag.items.length-1) + '개 합산') : top.code,
+                     name: top.name, spec: top.spec, prevStock:0, buy:0, sale:0, remain: ag.sum, merged: ag.items.length, codes: codes};
+        var curS = aoa[ag.rowIdx][col['현재고']];
+        var curN = curS==null ? 0 : (Number(curS) || 0);
+        if(curN === ag.sum){ stats.noChange++; results.push({item:shown, status:'noChange', sbRowIdx:ag.rowIdx, sbName:ag.sbName, curStock:curN}); }
+        else { stats.changed++; results.push({item:shown, status:'changed', sbRowIdx:ag.rowIdx, sbName:ag.sbName, curStock:curN, newStock:ag.sum}); }
       });
 
       state.results = results;
