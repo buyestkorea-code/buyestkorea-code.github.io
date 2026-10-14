@@ -58,6 +58,8 @@
         <div id="ecDropText">클릭 또는 끌어다 놓기 (Ctrl+V 가능)</div>
         <input type="file" id="ecFile" accept=".xlsx,.xls">
       </div>
+      <button class="btn btn-green" id="ecAutoBtn" type="button" onclick="loadEcAuto()" style="margin-top:8px;">엑셀 없이 서버 이카운트 재고 자동 불러오기</button>
+      <div id="ecAutoNote" style="font-size:12px;color:#6b7280;margin-top:4px;">서버가 이카운트에서 받아 둔 전체 품목·재고를 씁니다(툴킷 로그인 필요). 변동표에 없던 품목도 현재 재고로 비교돼요.</div>
     </div>
   </div>
 
@@ -73,7 +75,35 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
-let kreamWB = null, kreamBuf = null, kreamFileName = '', kreamSheetName = '', ecWB = null;
+let kreamWB = null, kreamBuf = null, kreamFileName = '', kreamSheetName = '', ecWB = null, ecAutoItems = null;
+const EC_QTY_URL = 'https://buyest.co.kr/ecount_qty_lookup_api.php';
+/* 서버가 이카운트에서 받아 둔 품목 마스터+재고 → [{code,name,spec,remain}] (툴킷 로그인 필요) */
+async function fetchEcMasterAuto() {
+  let a = null;
+  try { a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); } catch (e) {}
+  if (!a || !a.id || !a.pass) throw new Error('툴킷에 로그인한 뒤 사용할 수 있어요. 로그인 후 새로고침해 주세요. (엑셀 업로드는 로그인 없이 가능)');
+  const res = await fetch(EC_QTY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: a.id, pass: a.pass, master: 1 }) });
+  const d = await res.json();
+  if (!d.ok) throw new Error(d.error || '불러오기 실패');
+  const t = new Date(d.as_of * 1000), p = n => String(n).padStart(2, '0');
+  const stamp = `${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
+  return { items: d.rows.map(r => ({ code: r[0], name: r[1], spec: r[2], remain: r[3] })), stamp, stale: !!d.stale, count: d.count };
+}
+async function loadEcAuto() {
+  const btn = document.getElementById('ecAutoBtn'), note = document.getElementById('ecAutoNote');
+  btn.disabled = true; note.style.color = '#6b7280'; note.textContent = '서버 이카운트 재고 불러오는 중...';
+  try {
+    const r = await fetchEcMasterAuto();
+    ecAutoItems = r.items; ecWB = null;
+    document.getElementById('ecFile').value = '';
+    document.getElementById('ecDrop').classList.add('has-file');
+    document.getElementById('ecDropText').textContent = `✓ 서버 이카운트 재고 ${r.count.toLocaleString()}건 (기준 ${r.stamp})`;
+    note.style.color = r.stale ? '#92400e' : '#15803d';
+    note.textContent = `자동 불러옴 — 이카운트 재고 기준 ${r.stamp}` + (r.stale ? ' (오래된 값일 수 있어요)' : '');
+    refreshRunBtn();
+  } catch (e) { note.style.color = '#b91c1c'; note.textContent = '오류: ' + e.message; }
+  btn.disabled = false;
+}
 let deltaRows = [], patchList = [];
 
 document.getElementById('kreamFile').addEventListener('change', async e => {
@@ -89,7 +119,7 @@ document.getElementById('kreamFile').addEventListener('change', async e => {
 document.getElementById('ecFile').addEventListener('change', async e => {
   const f = e.target.files[0];
   if (!f) return;
-  ecWB = XLSX.read(await f.arrayBuffer(), { type: 'array', raw: true });
+  ecWB = XLSX.read(await f.arrayBuffer(), { type: 'array', raw: true }); ecAutoItems = null;
   document.getElementById('ecDrop').classList.add('has-file');
   document.getElementById('ecDropText').textContent = '✓ ' + f.name;
   refreshRunBtn();
@@ -114,7 +144,7 @@ wireDropzone('kreamDrop', 'kreamFile');
 wireDropzone('ecDrop', 'ecFile');
 
 function refreshRunBtn() {
-  document.getElementById('runBtn').disabled = !kreamWB || !ecWB;
+  document.getElementById('runBtn').disabled = !kreamWB || !(ecWB || ecAutoItems);
 }
 
 const S = v => (v === null || v === undefined) ? '' : String(v).trim();
@@ -252,7 +282,7 @@ async function run() {
   status.textContent = '엑셀 파싱 중...';
 
   try {
-    const ecItems = parseEcountDelta(ecWB);
+    const ecItems = ecAutoItems || parseEcountDelta(ecWB);
     const codeMap = {};
     ecItems.forEach(it => {
       const key = normKey(codeSuffix(it.name));

@@ -55,6 +55,8 @@
         <div id="ecDropText">클릭 또는 끌어다 놓기 (Ctrl+V 가능)</div>
         <input type="file" id="ecFile" accept=".xlsx,.xls">
       </div>
+      <button class="btn btn-green" id="ecAutoBtn" type="button" onclick="loadEcAuto()" style="margin-top:8px;">엑셀 없이 서버 이카운트 품목 자동 불러오기</button>
+      <div id="ecAutoNote" style="font-size:12px;color:#6b7280;margin-top:4px;">서버가 이카운트에서 받아 둔 품목표를 씁니다(툴킷 로그인 필요). 최근에 등록한 품목이 빠져 있을 수 있어요 — 신규가 이상하게 많으면 엑셀을 올려 주세요.</div>
     </div>
   </div>
 
@@ -68,7 +70,35 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script>
 const API_URL = 'https://buyest.co.kr/stock_add_convert_api.php';
-let stockWB = null, ecWB = null, resultItems = [], srcBase = 'result';
+let stockWB = null, ecWB = null, ecAutoItems = null, resultItems = [], srcBase = 'result';
+const EC_QTY_URL = 'https://buyest.co.kr/ecount_qty_lookup_api.php';
+/* 서버가 이카운트에서 받아 둔 품목 마스터+재고 → [{code,name,spec,remain}] (툴킷 로그인 필요) */
+async function fetchEcMasterAuto() {
+  let a = null;
+  try { a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); } catch (e) {}
+  if (!a || !a.id || !a.pass) throw new Error('툴킷에 로그인한 뒤 사용할 수 있어요. 로그인 후 새로고침해 주세요. (엑셀 업로드는 로그인 없이 가능)');
+  const res = await fetch(EC_QTY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: a.id, pass: a.pass, master: 1 }) });
+  const d = await res.json();
+  if (!d.ok) throw new Error(d.error || '불러오기 실패');
+  const t = new Date(d.as_of * 1000), p = n => String(n).padStart(2, '0');
+  const stamp = `${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
+  return { items: d.rows.map(r => ({ code: r[0], name: r[1], spec: r[2], remain: r[3] })), stamp, stale: !!d.stale, count: d.count };
+}
+async function loadEcAuto() {
+  const btn = document.getElementById('ecAutoBtn'), note = document.getElementById('ecAutoNote');
+  btn.disabled = true; note.style.color = '#6b7280'; note.textContent = '서버 이카운트 품목 불러오는 중...';
+  try {
+    const r = await fetchEcMasterAuto();
+    ecAutoItems = r.items.map(x => ({ code: x.code, name: x.name, size: x.spec })); ecWB = null;
+    document.getElementById('ecFile').value = '';
+    document.getElementById('ecDrop').classList.add('has-file');
+    document.getElementById('ecDropText').textContent = `✓ 서버 이카운트 품목 ${r.count.toLocaleString()}건 (기준 ${r.stamp})`;
+    note.style.color = r.stale ? '#92400e' : '#15803d';
+    note.textContent = `자동 불러옴 — 이카운트 기준 ${r.stamp}` + (r.stale ? ' (오래된 값일 수 있어요)' : '');
+    refreshRunBtn();
+  } catch (e) { note.style.color = '#b91c1c'; note.textContent = '오류: ' + e.message; }
+  btn.disabled = false;
+}
 
 document.getElementById('stockFile').addEventListener('change', async e => {
   const f = e.target.files[0];
@@ -82,14 +112,14 @@ document.getElementById('stockFile').addEventListener('change', async e => {
 document.getElementById('ecFile').addEventListener('change', async e => {
   const f = e.target.files[0];
   if (!f) return;
-  ecWB = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+  ecWB = XLSX.read(await f.arrayBuffer(), { type: 'array' }); ecAutoItems = null;
   document.getElementById('ecDrop').classList.add('has-file');
   document.getElementById('ecDropText').textContent = '✓ ' + f.name;
   refreshRunBtn();
 });
 
 function refreshRunBtn() {
-  document.getElementById('runBtn').disabled = !stockWB || !ecWB;
+  document.getElementById('runBtn').disabled = !stockWB || !(ecWB || ecAutoItems);
 }
 
 function wireDropzone(zoneId, inputId){
@@ -204,13 +234,13 @@ async function run() {
   try {
     const rows = parseStock(stockWB);
     if (!rows.length) throw new Error('재고추가 품목을 못 찾았어요. BRAND / MODEL 헤더가 있는 가로형 파일인지 확인해주세요.');
-    const ec = parseEcount(ecWB);
+    const ec = ecAutoItems || parseEcount(ecWB);
     if (!ec.length) throw new Error('이카운트 품목 엑셀에서 품목코드/품목명을 못 읽었어요. (품목코드·품목명 열이 있는 시트인지 확인)');
 
     status.textContent = `재고추가 ${rows.length}행 · 이카운트 조회표 ${ec.length}건 — 서버에서 사이트 상태 확인 중...`;
     const res = await fetch(API_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows, ecount_source: 'manual', ecount_rows: ec })
+      body: JSON.stringify({ rows, ecount_source: ecAutoItems ? 'server' : 'manual', ecount_rows: ec })
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || '서버 오류');

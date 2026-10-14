@@ -1528,6 +1528,10 @@
                 <input type="file" id="rvmEcountFile" accept=".xlsx" />
               </div>
             </div>
+            <div style="margin-top:8px;">
+              <button class="btn" type="button" id="rvmEcAutoBtn">엑셀 없이 서버 이카운트 재고 자동 불러오기</button>
+              <span class="status-line" id="rvmEcAutoNote" style="margin-left:8px;">서버가 이카운트에서 받아 둔 전체 품목·재고를 씁니다(로그인 필요). 변동표 업로드 대신 쓸 수 있어요.</span>
+            </div>
 
             <div id="rvmStatusWrap" style="margin-top:12px;"><span class="status-line" id="rvmStatus"></span></div>
 
@@ -5552,7 +5556,7 @@
      그 후보 안에서 이카운트 규격 = 사방넷 옵션상세명칭(공백=TU)으로 정확한 옵션(사이즈) 행을 고른다.
      ========================================================= */
   (function(){
-    var state = { sabangAoa:null, sabangFileName:'', sabangHeaderIdx:-1, sabangDataStart:-1, sabangCol:{}, ecount:null, results:null, stats:null };
+    var state = { sabangAoa:null, sabangFileName:'', sabangHeaderIdx:-1, sabangDataStart:-1, sabangCol:{}, ecount:null, ecAuto:false, results:null, stats:null };
 
     function rvmSetStatus(msg, isErr){
       var s = document.getElementById('rvmStatus');
@@ -5648,7 +5652,7 @@
           });
         }
         if(items.length === 0) throw new Error('인식된 품목이 없습니다.');
-        state.ecount = { items: items };
+        state.ecount = { items: items }; state.ecAuto = false;
         rvmMarkDropzone('ecount', file.name, '품목 ' + items.length + '행 인식', true);
       }catch(e){
         state.ecount = null;
@@ -5764,7 +5768,7 @@
       state.ecount.items.forEach(function(it){
         var ecCode = rvmCodeSuffix(it.name);
         var candNames = ecCode ? (codeMap[ecCode] || []) : [];
-        if(candNames.length === 0){ stats.notFound++; results.push({item:it, status:'notFound'}); return; }
+        if(candNames.length === 0){ if(!state.ecAuto){ stats.notFound++; results.push({item:it, status:'notFound'}); } return; }  // 서버 전체 재고는 사방넷에 없는 품목이 대부분이라 결과에서 제외
 
         // 품번이 같은 사방넷 상품명이 여러 개일 수 있다(같은 품번을 시즌/성별 등으로 중복
         // 등록한 경우, 또는 "하자"/"스크래치"처럼 상태 라벨로 별도 등록한 경우). 그런 후보
@@ -6077,7 +6081,7 @@
     }
 
     function rvmReset(){
-      state.sabangAoa = null; state.ecount = null; state.results = null; state.stats = null; state.sabangNameGroups = null;
+      state.sabangAoa = null; state.ecount = null; state.ecAuto = false; state.results = null; state.stats = null; state.sabangNameGroups = null;
       rvmMarkDropzone('sabang', '1. 사방넷단품대량수정 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요', false);
       document.getElementById('rvmSabangDrop').classList.remove('has-file');
       rvmMarkDropzone('ecount', '2. 이카운트 재고변동표 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요', false);
@@ -6108,6 +6112,26 @@
         if (f) onFile(f);
       });
     }
+
+    document.getElementById('rvmEcAutoBtn').addEventListener('click', async function(){
+      var btn = document.getElementById('rvmEcAutoBtn'), note = document.getElementById('rvmEcAutoNote');
+      var a = null; try{ a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); }catch(e){}
+      if(!a || !a.id || !a.pass){ note.textContent = '툴킷에 로그인한 뒤 사용할 수 있어요. (엑셀 업로드는 로그인 없이 가능)'; note.classList.add('err'); return; }
+      btn.disabled = true; note.classList.remove('err'); note.textContent = '서버 이카운트 재고 불러오는 중…';
+      try{
+        var res = await fetch('https://buyest.co.kr/ecount_qty_lookup_api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user:a.id, pass:a.pass, master:1})});
+        var d = await res.json();
+        if(!d.ok) throw new Error(d.error || '불러오기 실패');
+        state.ecount = { items: d.rows.map(function(r){ return {code:r[0], name:r[1], spec:r[2], prevStock:0, buy:0, sale:0, remain:r[3]}; }) };
+        state.ecAuto = true;
+        var t = new Date(d.as_of*1000), p2 = function(n){ return String(n).padStart(2,'0'); };
+        var stamp = t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(t.getDate())+' '+p2(t.getHours())+':'+p2(t.getMinutes());
+        rvmMarkDropzone('ecount', '서버 이카운트 재고 (기준 ' + stamp + ')', '품목 ' + d.count.toLocaleString('ko-KR') + '건 불러옴' + (d.stale ? ' · 오래된 값일 수 있어요' : ''), true);
+        note.textContent = '';
+        rvmUpdateRunButton();
+      }catch(e){ note.textContent = '오류: ' + (e.message||e); note.classList.add('err'); }
+      btn.disabled = false;
+    });
 
     wireDropzoneRVM('rvmSabangDrop', 'input[type="file"]', handleRvmSabangFile);
     wireDropzoneRVM('rvmEcountDrop', 'input[type="file"]', handleRvmEcountFile);
