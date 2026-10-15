@@ -842,7 +842,7 @@ function flyDoc(from, to){
 
 /* ----- 시계: 데이터만 갱신, 그림은 데이터를 따라간다 ----- */
 setInterval(function(){
-  if(LIVE.on || ui.paused || document.hidden) return;
+  if(LIVE.on || ui.paused || document.hidden || hiddenFrame()) return;
   var bs = cur(); bs.elapsed += 250;
   var changed = false;
   bs.scripts.forEach(function(sc){
@@ -890,9 +890,11 @@ function stopLive(msg){
   ui.team = null; ui.project = null; updateChrome(); render();
 }
 
-var polling = false, lastSig = '';
+var polling = false, lastSig = '', pollIdle = 0;
+// 툴킷 안에서 다른 메뉴를 보고 있어 이 화면(iframe)이 가려져 있으면 서버 조회·애니메이션을 멈춘다
+function hiddenFrame(){ try{ return !!(window.frameElement && window.frameElement.getClientRects().length === 0); }catch(e){ return false; } }
 function poll(){
-  if(!LIVE.on || polling || document.hidden) return;
+  if(!LIVE.on || polling || document.hidden || hiddenFrame()) return;
   polling = true;
   call('state', {after:LIVE.after}).then(function(r){
     polling = false;
@@ -905,7 +907,8 @@ function poll(){
     fresh.forEach(function(e){ LIVE.events.push(e); if(e.id > LIVE.after) LIVE.after = e.id; });
     var sig = JSON.stringify([LIVE.cmds.map(function(c){ return c.id + c.status + c.cancel_flag; }), LIVE.runners.map(function(x){ return x.name + x.online; }), LIVE.after]);
     updateChrome();
-    if(sig === lastSig) return;
+    if(sig === lastSig){ pollIdle++; return; }   // 변화가 없으면 조회 간격을 늘린다
+    pollIdle = 0;
     lastSig = sig;
     liveRebuild();
     if(ui.view === 'office'){
@@ -921,7 +924,8 @@ function poll(){
     else if(ui.view === 'artifacts') renderArtifacts();
   });
 }
-setInterval(poll, 3000);
+(function pollTick(){ poll(); setTimeout(pollTick, pollIdle > 5 ? 10000 : 3000); })();
+document.addEventListener('visibilitychange', function(){ if(!document.hidden){ pollIdle = 0; poll(); } });
 
 function liveRebuild(){ ['buyest', 'buyest_kids'].forEach(function(b){ LIVE.store[b] = liveBuild(b); }); }
 
