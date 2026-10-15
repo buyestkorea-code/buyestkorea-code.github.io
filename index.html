@@ -5834,6 +5834,18 @@
         var best = scored.reduce(function(m, y){ return y.sc > m ? y.sc : m; }, 0);
         var kept = scored.filter(function(y){ return y.sc >= best - 0.0001; }).map(function(y){ return y.x; });
         var dropped = ag.items.length - kept.length;
+        var allCands = scored.map(function(y){ return {code:y.x.code, name:y.x.name, spec:y.x.spec, qty:y.x.remain, sc:y.sc, used:(kept.indexOf(y.x) >= 0)}; });
+        var dupInfo = null;
+        if(scored.length > 1){
+          var keptStocked = kept.filter(function(x){ return x.remain > 0; }).length;
+          var droppedStocked = allCands.filter(function(c){ return !c.used && c.qty > 0; }).length;
+          var reasons = [];
+          if(keptStocked >= 2) reasons.push('재고 있는 코드 ' + keptStocked + '개 합산');
+          if(best < 0.6) reasons.push('이름 유사도 낮음(' + best.toFixed(2) + ')');
+          var warn = reasons.length > 0;
+          if(droppedStocked > 0) reasons.push('재고 있는 다른 이름 코드 ' + droppedStocked + '개 제외');
+          dupInfo = {cands: allCands, warn: warn, reasons: reasons.join(' · ')};
+        }
         ag.items = kept;
         ag.sum = kept.reduce(function(t, x){ return t + x.remain; }, 0);
         var top = ag.items.reduce(function(b, x){ return (x.remain > b.remain) ? x : b; }, ag.items[0]);
@@ -5843,13 +5855,14 @@
                      name: top.name, spec: top.spec, prevStock:0, buy:0, sale:0, remain: ag.sum, merged: ag.items.length, codes: codes};
         var curS = aoa[ag.rowIdx][col['현재고']];
         var curN = curS==null ? 0 : (Number(curS) || 0);
-        if(curN === ag.sum){ stats.noChange++; results.push({item:shown, status:'noChange', sbRowIdx:ag.rowIdx, sbName:ag.sbName, curStock:curN}); }
-        else { stats.changed++; results.push({item:shown, status:'changed', sbRowIdx:ag.rowIdx, sbName:ag.sbName, curStock:curN, newStock:ag.sum}); }
+        if(curN === ag.sum){ stats.noChange++; results.push({item:shown, status:'noChange', sbRowIdx:ag.rowIdx, sbName:ag.sbName, curStock:curN, dup:dupInfo}); }
+        else { stats.changed++; results.push({item:shown, status:'changed', sbRowIdx:ag.rowIdx, sbName:ag.sbName, curStock:curN, newStock:ag.sum, dup:dupInfo}); }
       });
 
       state.results = results;
       state.stats = stats;
       state.sabangNameGroups = nameGroups;
+      state.dupOnly = false;
       renderRvmResults(results, stats);
     }
 
@@ -5959,6 +5972,38 @@
       var restockedCount = new Set(restockedProducts.map(function(l){ return l.name; })).size;
       statsEl.appendChild(statCard(restockedCount.toLocaleString('ko-KR'), '품절 해제 필요 (반품·재입고)', 'var(--success)'));
 
+      // 중복 매칭 확인 (서버 자동 불러오기 모드): 한 사방넷 행에 이카운트 코드가 여럿 겹친 줄
+      var dupRows = (results||[]).filter(function(r){ return r.dup; });
+      var dupWarn = dupRows.filter(function(r){ return r.dup.warn; }).length;
+      var dupBar = document.getElementById('rvmDupBar');
+      if(!dupBar){
+        dupBar = el('div', {id:'rvmDupBar', style:'margin:10px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;'});
+        statsEl.parentNode.insertBefore(dupBar, statsEl.nextSibling);
+      }
+      dupBar.innerHTML = '';
+      if(state.ecAuto && dupRows.length){
+        var dupCard = statCard(dupRows.length.toLocaleString('ko-KR'), '중복 매칭 (확인 필요 ' + dupWarn.toLocaleString('ko-KR') + ') — 눌러서 ' + (state.dupOnly ? '전체 보기' : '이 줄만 보기'), 'var(--warning)');
+        dupCard.style.cursor = 'pointer';
+        if(state.dupOnly) dupCard.style.outline = '2px solid var(--warning)';
+        dupCard.addEventListener('click', function(){ state.dupOnly = !state.dupOnly; renderRvmResults(state.results, state.stats); });
+        statsEl.appendChild(dupCard);
+        var dupBtn = el('button', {class:'btn', type:'button'}, [document.createTextNode('중복 확인 목록 엑셀 다운로드')]);
+        dupBtn.addEventListener('click', function(){
+          var aoaD = [['사방넷상품코드','사방넷 상품명','기존 현재고','반영값','후보 이카운트코드','후보 품목명','규격','후보 재고','이름 유사도','채택/제외','주의']];
+          dupRows.forEach(function(r){
+            var cur = r.curStock === undefined ? '' : r.curStock, nv = rvmNewValueDisplay(r);
+            r.dup.cands.forEach(function(c){
+              aoaD.push([rvmSbCode(r), r.sbName, cur, nv, c.code, c.name, c.spec, c.qty, Math.round(c.sc*100)/100, c.used ? '채택' : '제외', r.dup.reasons]);
+            });
+          });
+          var wsD = XLSX.utils.aoa_to_sheet(aoaD), wbD = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wbD, wsD, '중복확인');
+          XLSX.writeFile(wbD, '중복확인_' + timestamp() + '.xlsx');
+        });
+        dupBar.appendChild(dupBtn);
+        dupBar.appendChild(el('span', {class:'status-line'}, [document.createTextNode('노란 줄 = 확인 필요(재고 있는 코드가 여럿 합쳐졌거나 이름이 많이 다름). 줄을 누르면 후보 코드가 펼쳐집니다.')]));
+      }
+
       var table = document.getElementById('rvmTable');
       table.innerHTML = '';
       var cols = ['품목명','규격','상태','사방넷 상품명','사방넷상품코드','기존 현재고','신규 값(잔량)'];
@@ -5974,8 +6019,13 @@
       function td(v, num){ return el('td', num?{class:'num tabular'}:null, [document.createTextNode(v===null||v===undefined?'':String(v))]); }
       var sorted = rvmSortedResults(results);
       sorted.forEach(function(r){
+        if(state.dupOnly && !r.dup) return;
         var tr = el('tr');
-        tr.appendChild(td(r.item.name));
+        if(r.dup){
+          tr.style.cursor = 'pointer';
+          if(r.dup.warn) tr.style.background = '#fffbeb';
+        }
+        tr.appendChild(td(r.item.name + (r.dup ? '  ▾' : '')));
         tr.appendChild(td(r.item.spec, true));
         var statusTd = el('td');
         statusTd.appendChild(el('span', {class:'chip ' + RVM_STATUS_CHIP[r.status]}, [document.createTextNode(RVM_STATUS_LABEL[r.status])]));
@@ -5985,6 +6035,19 @@
         tr.appendChild(td(r.curStock === undefined ? '' : r.curStock, true));
         tr.appendChild(td(rvmNewValueDisplay(r), true));
         tbody.appendChild(tr);
+        if(r.dup){
+          var dtr = el('tr'); dtr.style.display = 'none';
+          var dtd = el('td', {colspan:'7'});
+          var html = '<div style="padding:6px 10px;font-size:12.5px;line-height:1.7;">' +
+            (r.dup.reasons ? '<div style="color:#92400e;font-weight:600;">' + r.dup.reasons.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>' : '');
+          r.dup.cands.forEach(function(c){
+            html += '<div>' + (c.used ? '<b style="color:#15803d;">채택</b>' : '<span style="color:#b91c1c;">제외</span>') + ' · ' +
+              String(c.code).replace(/&/g,'&amp;') + ' · ' + String(c.name).replace(/&/g,'&amp;').replace(/</g,'&lt;') + ' [' + String(c.spec||'').replace(/&/g,'&amp;').replace(/</g,'&lt;') + '] · 재고 <b>' + c.qty + '</b> · 이름 유사도 ' + c.sc.toFixed(2) + '</div>';
+          });
+          dtd.innerHTML = html + '</div>';
+          dtr.appendChild(dtd); tbody.appendChild(dtr);
+          tr.addEventListener('click', function(){ dtr.style.display = dtr.style.display === 'none' ? '' : 'none'; });
+        }
       });
       table.appendChild(tbody);
     }
@@ -6124,7 +6187,7 @@
     }
 
     function rvmReset(){
-      state.sabangAoa = null; state.ecount = null; state.ecAuto = false; state.results = null; state.stats = null; state.sabangNameGroups = null;
+      state.sabangAoa = null; state.ecount = null; state.ecAuto = false; state.dupOnly = false; state.results = null; state.stats = null; state.sabangNameGroups = null;
       rvmMarkDropzone('sabang', '1. 사방넷단품대량수정 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요', false);
       document.getElementById('rvmSabangDrop').classList.remove('has-file');
       rvmMarkDropzone('ecount', '2. 이카운트 재고변동표 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요', false);
