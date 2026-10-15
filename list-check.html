@@ -407,7 +407,7 @@ function renderResult(){
       || '<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:28px;">해당하는 품번이 없어요.</td></tr>';
     return;
   }
-  $('thead').innerHTML = '<tr><th>분류</th><th>품번</th><th>바이스트 사이트</th><th>이카운트 재고</th>' + (sm ? '<th>판매 (순판매)</th>' : '') + '<th>업체 파일 · 줄</th></tr>';
+  $('thead').innerHTML = '<tr><th>분류</th><th>품번</th><th>바이스트 사이트</th><th>이카운트 재고</th>' + (sm ? '<th>판매 수량 (반품 뺀 개수)</th>' : '') + '<th>업체 파일 · 줄</th></tr>';
   const rows = ents.filter(passFilter).map(e => {
     const it = e.it, st = siteStatus(it), c = CATS[e.cat];
     let ec;
@@ -417,7 +417,7 @@ function renderResult(){
     const prods = it.site.map(p => `<div class="sub">${p.tag === 'kids' ? '[키즈] ' : ''}${esc(p.name)}</div>`).join('')
       || (it.sales_name ? `<div class="sub">${it.brand ? '[' + esc(it.brand) + '] ' : ''}${esc(it.sales_name)}</div>` : '');
     const sl = it.sales;
-    const salesTd = !sm ? '' : '<td>' + (sl && (sl.tot || sl.d365) ? `<div><b>${sl.d90}</b> <span class="sub">90일</span> · <b>${sl.d365}</b> <span class="sub">1년</span> · <b>${sl.tot}</b> <span class="sub">전체</span></div>${sl.last ? `<div class="sub">마지막 판매 ${esc(sl.last)}</div>` : ''}` : '<span class="sub">판매 이력 없음</span>') + '</td>';
+    const salesTd = !sm ? '' : '<td>' + (sl && (sl.tot || sl.d365) ? `<div class="sub">최근 3개월 <b style="color:${sl.d90 > 0 ? '#111827' : '#9ca3af'}">${sl.d90}개</b></div><div class="sub">최근 1년 <b style="color:${sl.d365 > 0 ? '#111827' : '#9ca3af'}">${sl.d365}개</b></div><div class="sub">전체 기간 <b style="color:#111827">${sl.tot}개</b></div>${sl.last ? `<div class="sub" style="margin-top:3px;">마지막 판매일 ${esc(sl.last)}</div>` : ''}` : '<span class="sub">판매 이력 없음</span>') + '</td>';
     const views = e.views ? `<div class="sub">사이트 조회수 ${e.views.toLocaleString()}</div>` : '';
     const pre = e.exact ? '' : ' <span class="tag t-blue">앞부분 일치</span>';
     const rl = e.rows.slice(0, 4).join(', ') + (e.rows.length > 4 ? ` 외 ${e.rows.length - 4}` : '');
