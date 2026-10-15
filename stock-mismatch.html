@@ -69,6 +69,7 @@
   </div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/ec-cache.js"></script>
 <script>
 const SNAPSHOT_URL = 'https://buyest.co.kr/buyest_stock_snapshot_api.php';
 const TOOLKIT_API_URL = 'https://buyest.co.kr/toolkit_dashboard_api.php';
@@ -199,8 +200,7 @@ async function loadEcountAuto() {
   if (!a || !a.id || !a.pass) { st.innerHTML = '<span style="color:#b91c1c">툴킷에 로그인한 뒤 사용할 수 있어요. 로그인 후 새로고침해 주세요.</span>'; return; }
   btn.disabled = true; st.textContent = '서버 이카운트 재고 불러오는 중...';
   try {
-    const res = await fetch(EC_QTY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: a.id, pass: a.pass, all: 1 }) });
-    const d = await res.json();
+    const d = await ECCache.load('all');   // 브라우저에 저장해 둔 값이 최신이면 다시 받지 않는다
     if (!d.ok) throw new Error(d.error || '불러오기 실패');
     ecMap = {}; d.rows.forEach(r => { ecMap[r[0]] = r[1]; }); ecAuto = true;
     const t = new Date(d.as_of * 1000), p = n => String(n).padStart(2, '0');

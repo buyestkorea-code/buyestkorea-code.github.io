@@ -1905,6 +1905,7 @@
 
 <script>window.__bootStep && window.__bootStep(40);</script>
 <script src="assets/libs/xlsx.min.js" defer></script>
+<script src="assets/ec-cache.js" defer></script>
 <script src="assets/libs/pdf.min.js" defer></script>
 <script src="assets/libs/tesseract.min.js" defer></script>
 <!-- pdf.worker.min.js / tesseract-worker.min.js / tesseract-core.wasm.js / eng.traineddata.b64.txt
@@ -6266,8 +6267,7 @@
       if(!a || !a.id || !a.pass){ note.textContent = '툴킷에 로그인한 뒤 사용할 수 있어요. (엑셀 업로드는 로그인 없이 가능)'; note.classList.add('err'); return; }
       btn.disabled = true; note.classList.remove('err'); note.textContent = '서버 이카운트 재고 불러오는 중…';
       try{
-        var res = await fetch('https://buyest.co.kr/ecount_qty_lookup_api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user:a.id, pass:a.pass, master:1})});
-        var d = await res.json();
+        var d = await ECCache.load('master');   // 브라우저에 저장해 둔 값이 최신이면 다시 받지 않는다
         if(!d.ok) throw new Error(d.error || '불러오기 실패');
         state.ecount = { items: d.rows.map(function(r){ return {code:r[0], name:r[1], spec:r[2], prevStock:0, buy:0, sale:0, remain:r[3]}; }) };
         state.ecAuto = true;

@@ -73,6 +73,7 @@
   <div class="tbl-wrap" id="tblWrap" style="display:none;"><table id="tbl"></table></div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/ec-cache.js"></script>
 <script src="assets/libs/jszip-3.10.1.min.js"></script>
 <script>
 let kreamWB = null, kreamBuf = null, kreamFileName = '', kreamSheetName = '', ecWB = null, ecAutoItems = null;
@@ -82,12 +83,10 @@ async function fetchEcMasterAuto() {
   let a = null;
   try { a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); } catch (e) {}
   if (!a || !a.id || !a.pass) throw new Error('툴킷에 로그인한 뒤 사용할 수 있어요. 로그인 후 새로고침해 주세요. (엑셀 업로드는 로그인 없이 가능)');
-  const res = await fetch(EC_QTY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: a.id, pass: a.pass, master: 1 }) });
-  const d = await res.json();
-  if (!d.ok) throw new Error(d.error || '불러오기 실패');
+  const d = await ECCache.load('master');   // 브라우저에 저장해 둔 값이 최신이면 다시 받지 않는다
   const t = new Date(d.as_of * 1000), p = n => String(n).padStart(2, '0');
   const stamp = `${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
-  return { items: d.rows.map(r => ({ code: r[0], name: r[1], spec: r[2], remain: r[3] })), stamp, stale: !!d.stale, count: d.count };
+  return { items: d.rows.map(r => ({ code: r[0], name: r[1], spec: r[2], remain: r[3] })), stamp, stale: !!d.stale, count: d.count, fromCache: !!d.fromCache };
 }
 async function loadEcAuto() {
   const btn = document.getElementById('ecAutoBtn'), note = document.getElementById('ecAutoNote');
