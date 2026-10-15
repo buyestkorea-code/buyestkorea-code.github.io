@@ -29,7 +29,7 @@
   .stat b{display:block;font-size:18px;color:var(--ink);}
   .stat.warn b{color:var(--red);}
   table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;}
-  th,td{border-bottom:1px solid var(--line);padding:6px 7px;text-align:left;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
+  th,td{border-bottom:1px solid var(--line);padding:6px 7px;text-align:left;white-space:nowrap;}
   th{background:#f3f4f6;position:sticky;top:0;z-index:1;}
   .tbl-wrap{max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:10px;}
   tr.row-issue{background:#fef2f2;}
@@ -641,5 +641,6 @@ function downloadResult() {
   XLSX.writeFile(wb, `${srcBase}_사방넷양식_${stamp}.xlsx`);
 }
 </script>
+<script src="colresize.js"></script>
 </body>
 </html>
