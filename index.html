@@ -5816,11 +5816,30 @@
       });
 
       // 자동 모드: 사방넷 행마다 합산한 재고로 결과 한 줄 (여러 코드면 대표 품목명에 "외 N개 합산" 표시)
+      // 이름 유사도: 같은 품번이라도 시즌(26SS/26FW)·성별·키즈 표기가 다른 별개 품목일 수 있어서,
+      // 사방넷 상품명과 가장 비슷한 이카운트 품목만 쓰고(이름이 같은 코드끼리만 합산) 나머지는 제외한다.
+      function rvmNameTokenSet(nm){
+        var t = String(nm||'').toUpperCase().replace(/[\/&,()\[\]]/g, ' ').split(/\s+/).filter(Boolean);
+        var o = {}; t.forEach(function(x){ o[x] = 1; }); return o;
+      }
+      function rvmNameScore(a, b){
+        var A = rvmNameTokenSet(a), B = rvmNameTokenSet(b), inter = 0, uni = 0, k;
+        for(k in A){ uni++; if(B[k]) inter++; }
+        for(k in B){ if(!A[k]) uni++; }
+        return uni ? inter / uni : 0;
+      }
       Object.keys(agg).forEach(function(k){
-        var ag = agg[k];
+        var ag = agg[k], sbn = ag.sbName;
+        var scored = ag.items.map(function(x){ return {x:x, sc:rvmNameScore(sbn, x.name)}; });
+        var best = scored.reduce(function(m, y){ return y.sc > m ? y.sc : m; }, 0);
+        var kept = scored.filter(function(y){ return y.sc >= best - 0.0001; }).map(function(y){ return y.x; });
+        var dropped = ag.items.length - kept.length;
+        ag.items = kept;
+        ag.sum = kept.reduce(function(t, x){ return t + x.remain; }, 0);
         var top = ag.items.reduce(function(b, x){ return (x.remain > b.remain) ? x : b; }, ag.items[0]);
         var codes = ag.items.map(function(x){ return x.code; });
-        var shown = {code: ag.items.length > 1 ? (top.code + ' 외 ' + (ag.items.length-1) + '개 합산') : top.code,
+        var note = (ag.items.length > 1 ? ' 외 ' + (ag.items.length-1) + '개 합산' : '') + (dropped ? ' (이름 다른 ' + dropped + '개 제외)' : '');
+        var shown = {code: top.code + note,
                      name: top.name, spec: top.spec, prevStock:0, buy:0, sale:0, remain: ag.sum, merged: ag.items.length, codes: codes};
         var curS = aoa[ag.rowIdx][col['현재고']];
         var curN = curS==null ? 0 : (Number(curS) || 0);
