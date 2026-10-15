@@ -1906,8 +1906,25 @@
 <script>window.__bootStep && window.__bootStep(40);</script>
 <script src="assets/libs/xlsx.min.js" defer></script>
 <script src="assets/ec-cache.js" defer></script>
-<script src="assets/libs/pdf.min.js" defer></script>
-<script src="assets/libs/tesseract.min.js" defer></script>
+<script>
+/* pdf.js / tesseract 는 인보이스 PDF·OCR 도구에서만 쓰므로 첫 화면에서 받지 않고, 그 도구가 처음 필요할 때 한 번만 불러온다 */
+window.__loadLib = (function(){
+  var SRC = {pdf:'assets/libs/pdf.min.js', tesseract:'assets/libs/tesseract.min.js'}, P = {};
+  return function(name){
+    if(P[name]) return P[name];
+    P[name] = new Promise(function(res, rej){
+      var s = document.createElement('script'); s.src = SRC[name];
+      s.onload = function(){
+        if(name === 'pdf'){ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/libs/pdf.worker.min.js'; }catch(e){} }
+        res();
+      };
+      s.onerror = function(){ delete P[name]; rej(new Error(name + ' 라이브러리를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.')); };
+      document.head.appendChild(s);
+    });
+    return P[name];
+  };
+})();
+</script>
 <!-- pdf.worker.min.js / tesseract-worker.min.js / tesseract-core.wasm.js / eng.traineddata.b64.txt
      는 더 이상 이 파일에 통째로 박아넣지 않고 assets/libs/ 에 별도 파일로 두고,
      실제 PDF/OCR 처리를 시작할 때만 fetch로 불러옵니다 (초기 로딩 10MB -> 약 0.5MB). -->
@@ -4397,6 +4414,7 @@
           var combined = buildWorkerShim(coreSrc, langB64) + '\n' + workerSrc;
           var blob = new Blob([combined], {type:'text/javascript'});
           var workerUrl = URL.createObjectURL(blob);
+          await window.__loadLib('tesseract');
           var worker = await Tesseract.createWorker('eng', 1, {
             workerPath: workerUrl,
             corePath: 'local-core',
@@ -4555,6 +4573,7 @@
       // pdfjsLib.getDocument({data:buf})는 buf를 워커로 넘기면서 detach시키므로,
       // buf의 원본 바이트가 필요한 검사는 반드시 그 전에 끝내야 한다.
       var isSlowFormat = ocrNeeded ? looksLikeSlowScanFormat(buf) : false;
+      await window.__loadLib('pdf');
       var pdfDoc = await pdfjsLib.getDocument({data:buf}).promise;
       var pagesLines = [];
       var timedOutPages = []; // {page, reason}
