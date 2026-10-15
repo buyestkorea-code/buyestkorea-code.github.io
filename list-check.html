@@ -38,6 +38,9 @@
   .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; }
   .t-ok { background:#f0fdf4; color:var(--ok); } .t-warn { background:#fef3c7; color:#92400e; }
   .t-purple { background:#f3e8ff; color:#7e22ce; }
+  th.sortable { cursor:pointer; user-select:none; }
+  th.sortable:hover { background:#e5e7eb; }
+  th .ar { color:#1f3a34; font-size:11px; }
   .t-bad { background:#fef2f2; color:var(--bad); } .t-gray { background:#f3f4f6; color:#4b5563; } .t-blue { background:#eff6ff; color:var(--blue); }
   .sz { display:inline-block; border:1px solid var(--line); border-radius:4px; padding:1px 6px; margin:1px 3px 1px 0; font-size:12px; white-space:nowrap; }
   .tablewrap { max-height:68vh; overflow:auto; border:1px solid var(--line); border-radius:8px; }
@@ -167,7 +170,7 @@ $('runBtn').addEventListener('click', async () => {
       asOf = d.as_of; ageMin = d.age_min; salesMeta = d.sales_meta;
     }
     Object.assign(S, { rows, cells, cellMap, hits, items, asOf, ageMin, salesMeta });
-    S.filter = 'all'; S.fileSel = '';
+    S.filter = 'all'; S.fileSel = ''; S.sort = null;
     buildEntries();
     renderResult();
     setMsg('');
@@ -379,6 +382,42 @@ function passFilter(e){
   if (S.filter === 'sold') return !!(e.it.sales && e.it.sales.tot > 0);
   return e.cat === S.filter;
 }
+/* ---------- 헤더 클릭 정렬 ----------
+   글자 칸: 가나다·ABC순 ▲ → 반대 ▼ → 원래 순서 / 숫자 칸: 큰 수 ▼ 먼저 → 작은 수 ▲ → 원래 순서.
+   헤더는 다시 그리지 않고 화살표만 바꾼다(열 폭 조절한 값이 정렬 때문에 초기화되지 않게). */
+const ENT_SORT = {
+  cat:   e => CATS[e.cat].rank,
+  code:  e => String(e.it.label || e.it.key),
+  // 화면에 보이는 글자 그대로 정렬 ([키즈]·[브랜드] 접두어 포함)
+  site:  e => e.it.site[0] ? (e.it.site[0].tag === 'kids' ? '[키즈] ' : '') + e.it.site[0].name
+            : (e.it.sales_name ? (e.it.brand ? '[' + e.it.brand + '] ' : '') + e.it.sales_name : ''),
+  stock: e => e.it.ec ? e.it.ec.qty : -1,
+  sales: e => e.it.sales ? e.it.sales.d365 * 1000000 + e.it.sales.tot : -1,
+  file:  e => shortName(e.file) + String(e.rows[0] || 0).padStart(7, '0'),
+};
+const NEW_SORT = { file: n => shortName(n.file), code: n => n.code, desc: n => n.desc, n: n => n.n };
+const NUM_KEYS = new Set(['stock', 'sales', 'n', 'cat']);
+function sortList(list, defs){
+  if (!S.sort || !defs[S.sort.key]) return list;
+  const f = defs[S.sort.key], d = S.sort.dir;
+  return list.slice().sort((a, b) => { const x = f(a), y = f(b); return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'ko')) * d; });
+}
+function setHead(sig, cols){
+  const th = $('thead');
+  if (th.dataset.sig !== sig) {
+    th.innerHTML = '<tr>' + cols.map(([k, t]) => `<th class="sortable" data-s="${k}" title="클릭하면 정렬돼요">${t}<span class="ar"></span></th>`).join('') + '</tr>';
+    th.dataset.sig = sig;
+    th.querySelectorAll('th[data-s]').forEach(h => h.onclick = () => {
+      const k = h.dataset.s, first = NUM_KEYS.has(k) ? -1 : 1;
+      if (!S.sort || S.sort.key !== k) S.sort = { key: k, dir: first };
+      else if (S.sort.dir === first) S.sort = { key: k, dir: -first };
+      else S.sort = null;
+      renderResult();
+    });
+  }
+  th.querySelectorAll('th[data-s]').forEach(h => { const a = h.querySelector('.ar'); if (a) a.textContent = S.sort && S.sort.key === h.dataset.s ? (S.sort.dir === 1 ? ' ▲' : ' ▼') : ''; });
+}
+
 function renderResult(){
   $('resultBox').style.display = '';
   const ents = S.entries.filter(e => !S.fileSel || e.file === S.fileSel);
@@ -402,13 +441,13 @@ function renderResult(){
   }
 
   if (S.filter === 'new') {
-    $('thead').innerHTML = '<tr><th>업체 파일</th><th>업체 품번</th><th>업체 설명</th><th>줄 수</th></tr>';
-    $('tbody').innerHTML = news.map(n => `<tr><td class="where">${esc(shortName(n.file))}</td><td class="code">${esc(n.code)}</td><td>${esc(n.desc)}</td><td class="num">${n.n}</td></tr>`).join('')
+    setHead('new', [['file', '업체 파일'], ['code', '업체 품번'], ['desc', '업체 설명'], ['n', '줄 수']]);
+    $('tbody').innerHTML = sortList(news, NEW_SORT).map(n => `<tr><td class="where">${esc(shortName(n.file))}</td><td class="code">${esc(n.code)}</td><td>${esc(n.desc)}</td><td class="num">${n.n}</td></tr>`).join('')
       || '<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:28px;">해당하는 품번이 없어요.</td></tr>';
     return;
   }
-  $('thead').innerHTML = '<tr><th>분류</th><th>품번</th><th>바이스트 사이트</th><th>이카운트 재고</th>' + (sm ? '<th>판매 수량 (반품 뺀 개수)</th>' : '') + '<th>업체 파일 · 줄</th></tr>';
-  const rows = ents.filter(passFilter).map(e => {
+  setHead(sm ? 'main-sales' : 'main', [['cat', '분류'], ['code', '품번'], ['site', '바이스트 사이트'], ['stock', '이카운트 재고'], ...(sm ? [['sales', '판매 수량 (반품 뺀 개수)']] : []), ['file', '업체 파일 · 줄']]);
+  const rows = sortList(ents.filter(passFilter), ENT_SORT).map(e => {
     const it = e.it, st = siteStatus(it), c = CATS[e.cat];
     let ec;
     if (!it.ec) ec = '<span class="tag t-gray">이카운트 품목 없음</span>';
