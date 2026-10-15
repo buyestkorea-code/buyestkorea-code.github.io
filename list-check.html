@@ -89,6 +89,7 @@
 </div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/xlsx-async.js"></script>
 <script src="assets/libs/exceljs-4.4.0.min.js"></script>
 <script>
 const API = 'https://buyest.co.kr/list_check_api.php';
@@ -119,7 +120,7 @@ function renderFiles(){ $('fileList').innerHTML = S.files.map(f => `<span>${esc(
 async function readFileRows(file){
   const out = [];
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+  const wb = await XLSXW.read(buf, { type: 'array', cellDates: false });
   for (const sn of wb.SheetNames) {
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: '', blankrows: false });
     // 시트 이름은 헷갈림 방지용으로 시트가 여러 개일 때만 보여준다.
@@ -221,7 +222,7 @@ $('salesFile').addEventListener('change', async e => {
 
 async function parseSalesFile(file){
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array' });
+  const wb = await XLSXW.read(buf, { type: 'array' });
   const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '', blankrows: false });
   const hi = aoa.findIndex(r => r.some(c => String(c).includes('품목명')) && r.some(c => String(c).includes('수량')));
   if (hi < 0) throw new Error('판매현황 양식이 아니에요. "품목명(규격)", "수량" 열이 있는 이카운트 판매현황 엑셀을 올려 주세요.');

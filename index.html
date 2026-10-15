@@ -1906,6 +1906,7 @@
 <script>window.__bootStep && window.__bootStep(40);</script>
 <script src="assets/libs/xlsx.min.js" defer></script>
 <script src="assets/ec-cache.js" defer></script>
+<script src="assets/xlsx-async.js" defer></script>
 <script>
 /* pdf.js / tesseract 는 인보이스 PDF·OCR 도구에서만 쓰므로 첫 화면에서 받지 않고, 그 도구가 처음 필요할 때 한 번만 불러온다 */
 window.__loadLib = (function(){
@@ -4622,7 +4623,7 @@ window.__loadLib = (function(){
       var cfg = VENDOR_PARSERS[vendorKey];
       if(cfg.multi){
         var buf = await file.arrayBuffer();
-        var wb = XLSX.read(buf, {type:'array'});
+        var wb = await XLSXW.read(buf, {type:'array'});
         var ws = wb.Sheets['Sheet1'] || wb.Sheets[wb.SheetNames[0]];
         var aoa = sheetToAoa(ws);
         var stem = file.name.replace(/\.[^.]+$/, '');
@@ -5652,7 +5653,7 @@ window.__loadLib = (function(){
       rvmSetStatus('이카운트 파일 읽는 중…');
       try{
         var buf = await file.arrayBuffer();
-        var wb = XLSX.read(buf, {type:'array'});
+        var wb = await XLSXW.read(buf, {type:'array'});
         var ws = wb.Sheets[wb.SheetNames[0]];
         var aoa = sheetToAoa(ws);
         var hIdx = rvmFindHeaderRowIdx(aoa, function(r){ return r[0] === '품목코드'; });
@@ -6499,7 +6500,7 @@ window.__loadLib = (function(){
       icmSetStatus('이카운트 재고현황 파일 읽는 중…');
       try{
         var buf = await file.arrayBuffer();
-        var wb = XLSX.read(buf, {type:'array'});
+        var wb = await XLSXW.read(buf, {type:'array'});
         var ws = wb.Sheets[wb.SheetNames[0]];
         var aoa = sheetToAoa(ws);
         var built = icmBuildStockIndex(aoa);
@@ -7001,7 +7002,7 @@ window.__loadLib = (function(){
       icmSetStatus('이카운트 재고현황 파일 읽는 중…');
       try{
         var buf = await file.arrayBuffer();
-        var wb = XLSX.read(buf, {type:'array'});
+        var wb = await XLSXW.read(buf, {type:'array'});
         var ws = wb.Sheets[wb.SheetNames[0]];
         var aoa = sheetToAoa(ws);
         var built = icmBuildStockIndex(aoa);
@@ -7411,8 +7412,7 @@ window.__loadLib = (function(){
       return new Promise(function(resolve, reject){
         var reader = new FileReader();
         reader.onload = function(e){
-          try{ resolve(XLSX.read(e.target.result, {type:'array'})); }
-          catch(err){ reject(err); }
+          XLSXW.read(e.target.result, {type:'array'}).then(resolve, reject);
         };
         reader.onerror = function(){ reject(new Error('파일을 읽을 수 없습니다.')); };
         reader.readAsArrayBuffer(file);
@@ -8317,7 +8317,7 @@ window.__loadLib = (function(){
     function osReadWorkbook(file){
       return new Promise(function(resolve, reject){
         var reader = new FileReader();
-        reader.onload = function(e){ try{ resolve(XLSX.read(e.target.result, {type:'array'})); } catch(err){ reject(err); } };
+        reader.onload = function(e){ XLSXW.read(e.target.result, {type:'array'}).then(resolve, reject); };
         reader.onerror = function(){ reject(new Error('파일을 읽을 수 없습니다.')); };
         reader.readAsArrayBuffer(file);
       });

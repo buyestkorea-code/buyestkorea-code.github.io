@@ -81,6 +81,7 @@
   <div id="toast"></div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/xlsx-async.js"></script>
 <script>
 const API_URL = 'https://buyest.co.kr/sb_api.php';
 
@@ -415,7 +416,7 @@ async function run() {
   try {
     const f = document.getElementById('srcFile').files[0];
     srcBase = f.name.replace(/\.[^.]+$/, '');
-    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const wb = await XLSXW.read(await f.arrayBuffer(), { type: 'array' });
     const rows = parseSourceExcel(wb);
     if (!rows.length) throw new Error('변환할 상품이 없어요.');
 

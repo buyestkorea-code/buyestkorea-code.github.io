@@ -73,6 +73,7 @@
   <div class="tbl-wrap" id="tblWrap" style="display:none;"><table id="tbl"></table></div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/xlsx-async.js"></script>
 <script src="assets/ec-cache.js"></script>
 <script src="assets/libs/jszip-3.10.1.min.js"></script>
 <script>
@@ -110,7 +111,7 @@ document.getElementById('kreamFile').addEventListener('change', async e => {
   if (!f) return;
   kreamFileName = f.name.replace(/\.[^.]+$/, '');
   kreamBuf = await f.arrayBuffer();
-  kreamWB = XLSX.read(kreamBuf, { type: 'array', cellText: false });
+  kreamWB = await XLSXW.read(kreamBuf, { type: 'array', cellText: false });
   document.getElementById('kreamDrop').classList.add('has-file');
   document.getElementById('kreamDropText').textContent = '✓ ' + f.name;
   refreshRunBtn();
@@ -118,7 +119,7 @@ document.getElementById('kreamFile').addEventListener('change', async e => {
 document.getElementById('ecFile').addEventListener('change', async e => {
   const f = e.target.files[0];
   if (!f) return;
-  ecWB = XLSX.read(await f.arrayBuffer(), { type: 'array', raw: true }); ecAutoItems = null;
+  ecWB = await XLSXW.read(await f.arrayBuffer(), { type: 'array', raw: true }); ecAutoItems = null;
   document.getElementById('ecDrop').classList.add('has-file');
   document.getElementById('ecDropText').textContent = '✓ ' + f.name;
   refreshRunBtn();

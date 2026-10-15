@@ -69,6 +69,7 @@
   </div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/xlsx-async.js"></script>
 <script src="assets/ec-cache.js"></script>
 <script>
 const SNAPSHOT_URL = 'https://buyest.co.kr/buyest_stock_snapshot_api.php';
@@ -142,7 +143,7 @@ async function loadEcountFile(file) {
   document.getElementById('ecStatus').textContent = '읽는 중...';
   document.getElementById('ecColumnPicker').style.display = 'none';
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array' });
+  const wb = await XLSXW.read(buf, { type: 'array' });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
   ecRawGrid = grid;

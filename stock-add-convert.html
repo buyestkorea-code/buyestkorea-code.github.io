@@ -68,6 +68,7 @@
   <div class="tbl-wrap" id="tblWrap" style="display:none;"><table id="tbl"></table></div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/xlsx-async.js"></script>
 <script src="assets/ec-cache.js"></script>
 <script>
 const API_URL = 'https://buyest.co.kr/stock_add_convert_api.php';
@@ -103,7 +104,7 @@ document.getElementById('stockFile').addEventListener('change', async e => {
   const f = e.target.files[0];
   if (!f) return;
   srcBase = f.name.replace(/\.[^.]+$/, '');
-  stockWB = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+  stockWB = await XLSXW.read(await f.arrayBuffer(), { type: 'array' });
   document.getElementById('stockDrop').classList.add('has-file');
   document.getElementById('stockDropText').textContent = '✓ ' + f.name;
   refreshRunBtn();
@@ -111,7 +112,7 @@ document.getElementById('stockFile').addEventListener('change', async e => {
 document.getElementById('ecFile').addEventListener('change', async e => {
   const f = e.target.files[0];
   if (!f) return;
-  ecWB = XLSX.read(await f.arrayBuffer(), { type: 'array' }); ecAutoItems = null;
+  ecWB = await XLSXW.read(await f.arrayBuffer(), { type: 'array' }); ecAutoItems = null;
   document.getElementById('ecDrop').classList.add('has-file');
   document.getElementById('ecDropText').textContent = '✓ ' + f.name;
   refreshRunBtn();

@@ -59,6 +59,7 @@
   <div id="tableWrap"></div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/xlsx-async.js"></script>
 <script>
 const REPORT_URL = 'https://buyest.co.kr/ecount_sync_report_api.php';
 const EXEC_URL = 'https://buyest.co.kr/ecount_sync_execute_api.php';
@@ -116,7 +117,7 @@ async function loadFromExcel(file) {
 
   try {
     const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array' });
+    const wb = await XLSXW.read(buf, { type: 'array' });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
 
