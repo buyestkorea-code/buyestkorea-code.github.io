@@ -23,7 +23,7 @@
   }
 </script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<!-- Pretendard 폰트 CSS 는 CDN 이 느리면(13초 실측) 브라우저 '로딩 완료'를 붙잡아 시작 화면이 87%에서 멈춘다 → 페이지가 뜬 뒤(load 이후)에 따로 불러온다 -->
+<!-- Pretendard 폰트(assets/fonts/pretendard, 직접 호스팅)는 페이지가 뜬 뒤(load 이후)에 따로 불러온다 -->
 <style>
   #bootSplash{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#F3F1EC;color:#20241F;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;transition:opacity .35s ease;}
   @media (prefers-color-scheme:dark){ #bootSplash{background:#141917;color:#EAEEEA;} }
@@ -3113,7 +3113,7 @@
   window.addEventListener('load', function(){
     try{
       var l = document.createElement('link'); l.rel = 'stylesheet';
-      l.href = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendard-variable-dynamic-subset.min.css';
+      l.href = 'assets/fonts/pretendard/pretendard.css';   // 직접 호스팅(CDN 대신) — 기존 CDN 주소는 404 였음
       document.head.appendChild(l);
     }catch(e){}
   });

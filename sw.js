@@ -4,7 +4,7 @@
             느릴 때도 앱은 뜨도록.
    절대 하지 않는 것: toolkit_dashboard_api.php 응답 캐싱 — 로그인/캘린더/할일처럼
    실시간으로 바뀌어야 하는 데이터라 여기서 캐시하면 오래된 값을 보여주게 된다. */
-var CACHE_NAME = 'buyest-toolkit-shell-v4';
+var CACHE_NAME = 'buyest-toolkit-shell-v5';
 var SHELL_FILES = [
   './index.html',
   './assets/manifest.json',
@@ -33,7 +33,7 @@ self.addEventListener('fetch', function(e){
   if (url.indexOf('toolkit_dashboard_api.php') !== -1) return; // 동적 데이터는 절대 캐시 안 함
   if (url.indexOf(self.location.origin) !== 0) return;    // 다른 사이트(글꼴 등)는 브라우저 기본 캐시에 맡김
 
-  var isLib = url.indexOf('/assets/libs/') !== -1;
+  var isLib = url.indexOf('/assets/libs/') !== -1 || url.indexOf('/assets/fonts/') !== -1;   // 라이브러리·폰트는 거의 안 바뀌므로 캐시 우선
   var cacheIt = function(res){
     var copy = res.clone();
     caches.open(CACHE_NAME).then(function(cache){ cache.put(e.request, copy); });
