@@ -5727,16 +5727,33 @@
     // 반대가 되어버린다. 그래서 코드가 같아도 라벨까지 같은 후보만 매칭 대상으로 좁힌다.
     // 하자1/하자2처럼 뒤에 번호가 붙는 경우도 있어, 끝의 숫자는 떼고 기본 단어로 비교한다.
     var RVM_LABEL_WORDS = ['하자', '스크래치'];
-    function rvmEcountLabel(name){
-      var m = /^\[([^\]]+)\]/.exec(String(name||'').trim());
-      if(!m) return null;
-      var base = m[1].trim().replace(/\d+$/, '');
-      return RVM_LABEL_WORDS.indexOf(base) !== -1 ? base : null;
+    // 라벨 단어로 "시작"하면 라벨로 본다 — "[하자상품]"도 하자, "[스크래치2]"는 스크래치(번호 2).
+    // 번호가 양쪽에 다 있으면 번호까지 같아야 매칭한다(스크래치1/2/3은 서로 다른 별도 상품).
+    function rvmLabelParts(text){
+      var t = String(text||'').trim().replace(/^\[|\]$/g, '');
+      for(var i = 0; i < RVM_LABEL_WORDS.length; i++){
+        var w = RVM_LABEL_WORDS[i];
+        if(t.indexOf(w) === 0){
+          var mm = /(\d+)\s*$/.exec(t.slice(w.length));
+          return {base: w, num: mm ? mm[1] : ''};
+        }
+      }
+      return null;
     }
-    function rvmSabangLabel(name){
+    function rvmEcountLabelParts(name){
+      var m = /^\[([^\]]+)\]/.exec(String(name||'').trim());
+      return m ? rvmLabelParts(m[1]) : null;
+    }
+    function rvmSabangLabelParts(name){
       var first = String(name||'').trim().split(/\s+/)[0] || '';
-      var base = first.replace(/\d+$/, '');
-      return RVM_LABEL_WORDS.indexOf(base) !== -1 ? base : null;
+      return rvmLabelParts(first);
+    }
+    function rvmEcountLabel(name){ var l = rvmEcountLabelParts(name); return l ? l.base : null; }
+    function rvmSabangLabel(name){ var l = rvmSabangLabelParts(name); return l ? l.base : null; }
+    function rvmLabelNumOk(ecName, sbName){
+      var e = rvmEcountLabelParts(ecName), b = rvmSabangLabelParts(sbName);
+      if(!e || !b) return true;
+      return !(e.num && b.num && e.num !== b.num);
     }
 
     function runRvmMatching(){
@@ -5780,6 +5797,7 @@
         var matchedRows = [];
         candNames.forEach(function(name){
           if(rvmSabangLabel(name) !== ecLabel) return;
+          if(!rvmLabelNumOk(it.name, name)) return;
           nameGroups[name].forEach(function(ri){
             if(rvmSpecsMatch(it.spec, aoa[ri][col['옵션상세명칭']])) matchedRows.push({rowIdx:ri, sbName:name});
           });
