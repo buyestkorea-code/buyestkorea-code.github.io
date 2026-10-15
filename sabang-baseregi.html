@@ -112,6 +112,9 @@ async function loadRef() {
 }
 
 /* ---------------- 변환 엔진 (BUYEST_MD.xlsx 수식 로직 포팅) ---------------- */
+function makeSearchWords(main, en) {
+  return [main, '수입명품', '정품', '명품', (en || '').trim(), '바이스트'].filter(Boolean).join(',');
+}
 function escRe(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 function buildConverter(ref) {
@@ -160,7 +163,8 @@ function buildConverter(ref) {
   function siteSearchWord(brand) {
     if (!brand) return '';
     const row = brandAlias.find(r => r.main_brand === brand);
-    return row ? (row.search_words || '') : '';
+    if (!row) return '';
+    return row.search_words || makeSearchWords(brand, row.en_brand);
   }
   function englishName(brand, L) {
     if (!L) return '';
@@ -554,8 +558,8 @@ async function saveFix(idx, kind) {
       const main = document.getElementById('fx_main').value.trim();
       const en = document.getElementById('fx_en').value.trim();
       if (!alias || !main) throw new Error('별칭과 대표 브랜드명을 입력해주세요.');
-      payload = { action: 'save_brand', actor: AUTH.id, alias, main_brand: main, en_brand: en };
-      applied = { kind, alias, main };
+      payload = { action: 'save_brand', actor: AUTH.id, alias, main_brand: main, en_brand: en, search_words: makeSearchWords(main, en) };
+      applied = { kind, alias, main, en };
     } else if (kind === 'category') {
       const gender = document.getElementById('fx_gender').value;
       const keyword = document.getElementById('fx_keyword').value.trim();
@@ -577,7 +581,7 @@ async function saveFix(idx, kind) {
     if (!data.ok) throw new Error(data.error || '저장 실패');
 
     // 로컬 참조표에도 즉시 반영 + 전체 재계산
-    if (kind === 'brand') REF.brand_alias.push({ alias: applied.alias, main_brand: applied.main, en_brand: '', search_words: '' });
+    if (kind === 'brand') REF.brand_alias.push({ alias: applied.alias, main_brand: applied.main, en_brand: applied.en, search_words: makeSearchWords(applied.main, applied.en) });
     if (kind === 'category') REF.category_keyword.push({ label: applied.label, gender: applied.gender, keyword: applied.keyword, code: applied.code });
     if (kind === 'color') REF.color_map.push({ before_color: applied.before, after_color: applied.after });
     const conv = buildConverter(REF);
