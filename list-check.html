@@ -333,19 +333,47 @@ function classify(it){
 }
 const viewsOf = it => Math.max(0, ...it.site.map(p => p.views || 0));
 
+/* ---------- 업체 리스트에 실제로 적힌 품번 뽑기 ----------
+   서버가 돌려주는 label 은 우리 DB 의 품번(다른 컬러·다른 띄어쓰기일 수 있음)이라, 화면·엑셀의 "품번"에는
+   업체 리스트의 글자를 그대로 쓴다. 칸이 짧으면 칸 전체, 설명이 섞인 긴 칸이면 매칭된 품번 부분만. */
+function vendorCodeIn(cell, key, type){
+  const c = String(cell).replace(/\s+/g, ' ').trim();
+  if (c.length <= 40) return c;
+  let best = '';
+  for (const m of c.matchAll(/[A-Za-z0-9][A-Za-z0-9 \-_.\/]*/g)) {
+    const parts = m[0].replace(/[ \-_.\/]+$/, '').split(/([ \-_.\/]+)/);      // [토큰, 구분자, 토큰, …]
+    const n = (parts.length + 1) / 2;
+    for (let len = Math.min(n, 7); len >= 1; len--) for (let i = 0; i + len <= n; i++) {
+      const span = parts.slice(i * 2, (i + len - 1) * 2 + 1).join('');
+      const k = span.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const ok = type === 'exact' ? k === key : (k.length >= 7 && k !== key && key.startsWith(k));
+      if (ok && span.length > best.length) best = span;
+    }
+  }
+  return best;
+}
+
 /* ---------- 업체 파일 × 품번 으로 모으기 ---------- */
 function buildEntries(){
   // 상품명에 섞인 보이지 않는 방향 문자(LRM 등)는 품번 표시에서 제거
   Object.values(S.items).forEach(it => { if (it.label) it.label = it.label.replace(/[​-‏‪-‮﻿]/g, '').trim(); });
+  // 같은 파일에서 이 품번이 "정확히" 잡힌 적이 있으면, 같은 모델의 다른 컬러 줄(앞부분 일치)은 이 품번에 합치지 않는다
+  const exactSet = new Set();
+  S.rows.forEach(row => rowKeys(row).forEach(([k, t]) => { if (t === 'exact' && S.items[k]) exactSet.add(row.file + '||' + k); }));
+  const effKeys = row => rowKeys(row).filter(([k, t]) => t === 'exact' || !exactSet.has(row.file + '||' + k));
   const g = new Map();
-  S.rows.forEach(row => rowKeys(row).forEach(([k, type]) => {
+  S.rows.forEach(row => effKeys(row).forEach(([k, type]) => {
     if (!S.items[k]) return;
     const id = row.file + '||' + k;
-    if (!g.has(id)) g.set(id, { file: row.file, key: k, it: S.items[k], exact: false, rows: [] });
+    if (!g.has(id)) g.set(id, { file: row.file, key: k, it: S.items[k], exact: false, rows: [], vcodes: new Set() });
     const o = g.get(id); if (type === 'exact') o.exact = true; o.rows.push(row.r);
+    // 이 품번이 잡힌 칸의 글자(= 업체가 적은 품번)를 모은다
+    row.cellIdx.forEach(ci => { const h = (S.hits[ci] || []).find(x => x.key === k && x.type === type); if (h) { const v = vendorCodeIn(S.cells[ci], k, h.type); if (v) o.vcodes.add(v); } });
   }));
   S.entries = [...g.values()].map(e => {
     Object.assign(e, classify(e.it), { views: viewsOf(e.it) });
+    e.vcode = [...e.vcodes].slice(0, 3).join(' / ') || String(e.it.label || e.it.key);   // 업체 리스트의 품번 (없으면 우리 품번)
+    e.ourCode = String(e.it.label || e.it.key);                                            // 우리 DB 의 품번
     // 업체 품번과 정확히 같지 않고 앞부분만 같은 경우 = 같은 모델의 다른 컬러. 재주문 후보와 섞이지 않게 따로 둔다.
     if (!e.exact) { e.cat = 'similar'; e.why = '업체 품번 그대로는 우리 DB에 없고, 같은 모델의 다른 컬러만 있어요'; }
     return e;
@@ -359,8 +387,9 @@ function buildEntries(){
   const clean = s => s.replace(/&lt;BR\/?&gt;|<BR\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
   const nm = new Map();
   S.rows.forEach(row => {
-    const ks = rowKeys(row);
-    const onlyPrefix = ks.length > 0 && ks.every(([, t]) => t === 'prefix');
+    const ks = effKeys(row);
+    // 앞부분 일치뿐이거나, 앞부분 일치가 전부 "정확히 잡힌 다른 컬러"로 흡수된 줄 = 같은 모델의 새 컬러
+    const onlyPrefix = (ks.length > 0 && ks.every(([, t]) => t === 'prefix')) || (ks.length === 0 && rowKeys(row).length > 0);
     if (ks.length && !onlyPrefix) return;
     const code = row.cells.find(c => c.length <= 40 && codeLike(c));
     if (!code) return;
@@ -387,7 +416,7 @@ function passFilter(e){
    헤더는 다시 그리지 않고 화살표만 바꾼다(열 폭 조절한 값이 정렬 때문에 초기화되지 않게). */
 const ENT_SORT = {
   cat:   e => CATS[e.cat].rank,
-  code:  e => String(e.it.label || e.it.key),
+  code:  e => e.vcode,
   // 화면에 보이는 글자 그대로 정렬 ([키즈]·[브랜드] 접두어 포함)
   site:  e => e.it.site[0] ? (e.it.site[0].tag === 'kids' ? '[키즈] ' : '') + e.it.site[0].name
             : (e.it.sales_name ? (e.it.brand ? '[' + e.it.brand + '] ' : '') + e.it.sales_name : ''),
@@ -446,7 +475,7 @@ function renderResult(){
       || '<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:28px;">해당하는 품번이 없어요.</td></tr>';
     return;
   }
-  setHead(sm ? 'main-sales' : 'main', [['cat', '분류'], ['code', '품번'], ['site', '바이스트 사이트'], ['stock', '이카운트 재고'], ...(sm ? [['sales', '판매 수량 (반품 뺀 개수)']] : []), ['file', '업체 파일 · 줄']]);
+  setHead(sm ? 'main-sales' : 'main', [['cat', '분류'], ['code', '품번 (업체 리스트)'], ['site', '바이스트 사이트'], ['stock', '이카운트 재고'], ...(sm ? [['sales', '판매 수량 (반품 뺀 개수)']] : []), ['file', '업체 파일 · 줄']]);
   const rows = sortList(ents.filter(passFilter), ENT_SORT).map(e => {
     const it = e.it, st = siteStatus(it), c = CATS[e.cat];
     let ec;
@@ -461,7 +490,7 @@ function renderResult(){
     const pre = e.exact ? '' : ' <span class="tag t-blue">앞부분 일치</span>';
     const rl = e.rows.slice(0, 4).join(', ') + (e.rows.length > 4 ? ` 외 ${e.rows.length - 4}` : '');
     return `<tr><td><span class="tag ${c.cls}">${c.label}</span>${e.why ? `<div class="sub">${esc(e.why)}</div>` : ''}</td>
-      <td><div class="code">${esc(it.label || it.key)}${pre}</div></td>
+      <td><div class="code">${esc(e.vcode)}${pre}</div>${e.exact ? '' : `<div class="sub">우리 DB: ${esc(e.ourCode)}</div>`}</td>
       <td><span class="tag ${st.cls}">${st.text}</span>${prods}${views}</td><td>${ec}</td>${salesTd}
       <td><div class="where">${esc(shortName(e.file))} · ${rl}행</div></td></tr>`;
   });
@@ -511,7 +540,7 @@ $('dlBtn').addEventListener('click', async () => {
 
     /* 시트 2: 품번 확인 */
     const ws = wb.addWorksheet('품번 확인', { views: [{ state: 'frozen', ySplit: 1, xSplit: 3 }] });
-    ws.columns = [{ header: '분류', width: 19 }, { header: '업체 파일', width: 22 }, { header: '품번', width: 26 }, { header: '바이스트 상품명', width: 48 },
+    ws.columns = [{ header: '분류', width: 19 }, { header: '업체 파일', width: 22 }, { header: '업체 품번', width: 26 }, { header: '우리 품번', width: 26 }, { header: '바이스트 상품명', width: 48 },
       { header: '사이트', width: 11 }, { header: '이카운트 재고', width: 12 }, { header: '사이즈별 재고', width: 30 }, { header: '사이트 조회수', width: 12 },
       { header: '최근 90일 판매', width: 12 }, { header: '최근 1년 판매', width: 12 }, { header: '전체 판매', width: 11 }, { header: '마지막 판매일', width: 14 },
       { header: '확인 메모', width: 34 }, { header: '일치', width: 12 }, { header: '리스트 줄', width: 16 }];
@@ -520,19 +549,21 @@ $('dlBtn').addEventListener('click', async () => {
       const it = e.it, c = CATS[e.cat], st = siteStatus(it);
       const sl = it.sales, hasSales = !!S.salesMeta;
       const nameTxt = it.site.map(p => (p.tag === 'kids' ? '[키즈] ' : '') + p.name).join('\n') || (it.sales_name ? `(과거 판매) ${it.brand ? '[' + it.brand + '] ' : ''}${it.sales_name}` : '(사이트 미등록)');
-      const r = ws.addRow([c.label, shortName(e.file), it.label || it.key, nameTxt,
+      const r = ws.addRow([c.label, shortName(e.file), e.vcode, e.ourCode, nameTxt,
         st.text, it.ec ? it.ec.qty : '', it.ec && it.ec.sizes.length ? it.ec.sizes.map(([s, q]) => `${s} ${q}`).join(' · ') : '', e.views || '',
         hasSales ? (sl ? sl.d90 : 0) : '', hasSales ? (sl ? sl.d365 : 0) : '', hasSales ? (sl ? sl.tot : 0) : '', sl && sl.last ? sl.last : '',
         e.why || '', e.exact ? '정확' : '앞부분(확인필요)', e.rows.join(', ')]);
       r.eachCell(cell => { cell.border = border; cell.alignment = { vertical: 'top', wrapText: true }; });
-      [1, 5, 6, 8, 9, 10, 11, 12, 14].forEach(i => r.getCell(i).alignment = { vertical: 'top', horizontal: 'center', wrapText: true });
+      [1, 6, 7, 9, 10, 11, 12, 13, 15].forEach(i => r.getCell(i).alignment = { vertical: 'top', horizontal: 'center', wrapText: true });
       const a = r.getCell(1); a.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.fill } }; a.font = { bold: true, color: { argb: c.font } };
-      if (it.ec && it.ec.qty > 0) r.getCell(6).font = { bold: true };
-      if (sl && sl.d365 > 0) r.getCell(10).font = { bold: true };
-      if (!e.exact) r.getCell(14).font = { color: { argb: 'FF1D4ED8' }, bold: true };
-      [8, 9, 10, 11].forEach(i => r.getCell(i).numFmt = '#,##0');
+      r.getCell(3).font = { bold: true };                                  // 업체 품번
+      if (!e.exact) r.getCell(4).font = { color: { argb: 'FF6B7280' } };   // 우리 품번(다른 컬러)은 회색
+      if (it.ec && it.ec.qty > 0) r.getCell(7).font = { bold: true };
+      if (sl && sl.d365 > 0) r.getCell(11).font = { bold: true };
+      if (!e.exact) r.getCell(15).font = { color: { argb: 'FF1D4ED8' }, bold: true };
+      [9, 10, 11, 12].forEach(i => r.getCell(i).numFmt = '#,##0');
     });
-    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(ws.rowCount, 2), column: 15 } };
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(ws.rowCount, 2), column: 16 } };
 
     /* 시트 3: 신규 후보 */
     const w3 = wb.addWorksheet('신규 후보', { views: [{ state: 'frozen', ySplit: 1 }] });
