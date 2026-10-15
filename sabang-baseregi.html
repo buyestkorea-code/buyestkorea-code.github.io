@@ -29,8 +29,7 @@
   .stat b{display:block;font-size:18px;color:var(--ink);}
   .stat.warn b{color:var(--red);}
   table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;}
-  th,td{border-bottom:1px solid var(--line);padding:6px 7px;text-align:left;white-space:nowrap;}
-  td.long{white-space:normal;min-width:280px;max-width:520px;overflow-wrap:break-word;word-break:keep-all;line-height:1.4;}
+  th,td{border-bottom:1px solid var(--line);padding:6px 7px;text-align:left;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
   th{background:#f3f4f6;position:sticky;top:0;z-index:1;}
   .tbl-wrap{max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:10px;}
   tr.row-issue{background:#fef2f2;}
@@ -465,7 +464,7 @@ function render() {
     const badges = r.unmatched.map(u => `<span class="badge" onclick="openFix(event, ${i}, '${u.kind}')">${u.field} 미매칭</span>`).join(' ');
     return `<tr class="${r.unmatched.length ? 'row-issue' : ''}" data-idx="${i}">
       <td>${i + 1}</td>
-      <td class="long">${esc(r.A)}</td>
+      <td>${esc(r.A)}</td>
       <td>${esc(r.C)}</td>
       <td>${esc(r.O) || '<span style="color:#b91c1c;">—</span>'}</td>
       <td>${esc(r.R) || '<span style="color:#b91c1c;">—</span>'}</td>
