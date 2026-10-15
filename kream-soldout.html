@@ -412,7 +412,9 @@ function renderStats(rows) {
 function renderTable(rows) {
   const esc = s => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
   const chip = s => ({ '품절': 'c-soldout', '재입고': 'c-restock', '수량변경': 'c-qty' }[s] || 'c-qty');
-  const body = rows.map((r, i) => `<tr>
+  const LIMIT = 1000;   // 수천 줄이어도 브라우저가 멈추지 않게 일부만 표시(다운로드는 전체)
+  const shown = rows.slice(0, LIMIT);
+  const body = shown.map((r, i) => `<tr>
     <td>${i + 1}</td>
     <td>${esc(r.brand)}</td>
     <td>${esc(r.kreamName)}</td>
@@ -425,6 +427,8 @@ function renderTable(rows) {
   document.getElementById('tbl').innerHTML =
     `<thead><tr><th>#</th><th>특이사항</th><th>크림 상품명</th><th>사이즈</th><th>이전재고</th><th>신규재고</th><th>상태</th><th>이카운트 품목명</th></tr></thead><tbody>${body}</tbody>`;
   document.getElementById('tblWrap').style.display = 'block';
+  const note = document.getElementById('tblNote') || (() => { const d = document.createElement('div'); d.id = 'tblNote'; d.style.cssText = 'font-size:12.5px;color:#6b7280;margin:6px 0;'; document.getElementById('tblWrap').appendChild(d); return d; })();
+  note.textContent = rows.length > LIMIT ? `전체 ${rows.length.toLocaleString()}줄 중 ${LIMIT.toLocaleString()}줄만 표시합니다. 다운로드 파일에는 전체가 들어갑니다.` : '';
 }
 
 function todayStamp() {
