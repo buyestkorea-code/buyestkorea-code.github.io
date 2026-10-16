@@ -135,7 +135,10 @@ function numEU(s) {
 
 /* 품목 한 줄 패턴 - 예:
    "8107463 BURBERRY 162 GIACCHE - Made in: Thailand - Composition: NR 3 568,20 EUR 1.250,00 8,0% 613,66EUR 1.840,98EUR N8" */
-const ITEM_RE = /^(.*?)\s*-\s*Made in:\s*([^-]*?)\s*-\s*Composition:\s*(.*?)\s+NR\s+(\d+)\s+([\d.,]+)\s*EUR\s+([\d.,]+)\s+([\d.,]+)%\s+([\d.,]+)\s*EUR\s+([\d.,]+)\s*EUR\s+N\S*\s*$/;
+/* 숫자 꼬리(NR 수량 단가 EUR 소비자가 마진% ...)만 기준으로 잡는다.
+   품목명이 길어 설명이 3줄 이상으로 꺾이면 "Composition:"이 숫자 줄이 아니라 아래 줄에 있으므로,
+   앞부분(head)에 "Made in"/"Composition"이 다 있다고 가정하면 안 된다. 나머지는 다음 줄들과 합쳐서 해석. */
+const ITEM_RE = /^(.*?)(?:\s+-)?\s+NR\s+(\d+)\s+([\d.,]+)\s*EUR\s+([\d.,]+)\s+([\d.,]+)%\s+([\d.,]+)\s*EUR\s+([\d.,]+)\s*EUR\s+N\S*\s*$/;
 
 function splitPrefix(prefix) {
   const toks = prefix.trim().split(/\s+/);
@@ -154,28 +157,58 @@ function parseGalianoProforma(pagesLines) {
     for (let i = 0; i < lines.length; i++) {
       const m = ITEM_RE.exec(lines[i].trim());
       if (!m) continue;
-      const { code, brand, type } = splitPrefix(m[1]);
-      if (!code) continue;
-      const country = m[2].trim();
-      let composition = m[3].trim();
-      const qty = parseInt(m[4], 10);
-      const whls = numEU(m[5]);
-      const disc = numEU(m[7]) / 100;
-      // Composition 텍스트가 다음 줄(들)로 이어지는 경우 "Color " 줄이 나올 때까지 이어붙인다.
+      const qty = parseInt(m[2], 10);
+      const whls = numEU(m[3]);
+      const disc = numEU(m[5]) / 100;
+      // 설명이 다음 줄(들)로 이어지는 경우 "Color " 줄이 나올 때까지 이어붙인다.
       let j = i + 1, colorCode = '';
-      const compLines = [];
+      const contLines = [];
       while (j < lines.length) {
         const cm = /^Color\s+(\S+)/.exec(lines[j].trim());
         if (cm) { colorCode = cm[1]; break; }
         if (ITEM_RE.test(lines[j].trim())) break;
-        compLines.push(lines[j].trim());
+        contLines.push(lines[j].trim());
         j++;
       }
-      if (compLines.length) composition = composition ? composition + ' ' + compLines.join(' ') : compLines.join(' ');
+      const full = (m[1].trim() + ' ' + contLines.join(' ')).trim();
+      const mi = /^(.*?)\s*-\s*Made in:\s*(.*)$/.exec(full);
+      if (!mi) continue;
+      const { code, brand, type } = splitPrefix(mi[1]);
+      if (!code) continue;
+      const rest = mi[2];
+      const ci = /^(.*?)\s*(?:-\s*)?Composition:\s*(.*)$/.exec(rest);
+      const country = (ci ? ci[1] : rest).replace(/\s*-\s*$/, '').trim();
+      const composition = ci ? ci[2].trim() : '';
       items.push({ code, brand, type, country, composition, qty, whls, disc, colorCode });
     }
   });
   return items;
+}
+
+/* 1페이지 맨 아래 총계 줄 - 예: "351 EUR 68.737,60 EUR 80.869,93" (수량 / Whls 합계 / Mu 포함 합계) */
+function extractSummary(pagesLines) {
+  for (const lines of pagesLines) {
+    for (const line of lines) {
+      const m = /^\s*(\d+)\s+EUR\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+EUR\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/.exec(line);
+      if (m) return { qty: parseInt(m[1], 10), whls: numEU(m[2]), total: numEU(m[3]) };
+    }
+  }
+  return null;
+}
+
+/* 읽어낸 품목 합계를 PDF 총계와 대조 - 어긋나면 품목이 빠졌거나 잘못 읽힌 것 */
+function verifyAgainstSummary(items, summary) {
+  const qty = items.reduce((s, i) => s + i.qty, 0);
+  const whls = items.reduce((s, i) => s + i.qty * i.whls, 0);
+  const total = items.reduce((s, i) => s + i.qty * i.whls * (1 + i.disc), 0);
+  if (!summary) return { ok: null, qty, whls, total, problems: [] };
+  const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const problems = [];
+  if (qty !== summary.qty) problems.push(`수량: 엑셀 ${qty} / PDF ${summary.qty} (차이 ${summary.qty - qty})`);
+  if (Math.abs(whls - summary.whls) > 0.01) problems.push(`Whls 합계: 엑셀 ${fmt(whls)} / PDF ${fmt(summary.whls)} (차이 ${fmt(summary.whls - whls)})`);
+  // PDF는 줄마다 단가를 센트로 반올림해서 곱하므로 품목 수만큼 센트 단위 오차는 허용
+  if (Math.abs(total - summary.total) > 0.5 + items.length * 0.01) problems.push(`최종 합계: 엑셀 ${fmt(total)} / PDF ${fmt(summary.total)} (차이 ${fmt(summary.total - total)})`);
+  return { ok: problems.length === 0, qty, whls, total, problems };
 }
 
 function findProformaNo(pagesLines) {
@@ -211,8 +244,17 @@ async function run() {
     resultItems = items;
     render(items);
     status.textContent = `PROFORMA ${proformaNo || '(번호 미확인)'} · 총 ${items.length}개 품목·컬러 조합`;
-    result.className = 'ok';
-    result.textContent = '✅ 변환 완료. 아래 표를 확인한 뒤 엑셀로 받으세요.';
+    const chk = verifyAgainstSummary(items, extractSummary(pagesLines));
+    if (chk.ok === false) {
+      result.className = 'err';
+      result.textContent = '⚠️ PDF 총계와 합계가 안 맞아요 — 품목이 빠졌거나 잘못 읽혔을 수 있어요. 이 엑셀을 그대로 쓰지 마세요.\n· ' + chk.problems.join('\n· ') + '\nPDF와 아래 표를 품목별로 대조해주세요.';
+    } else if (chk.ok === null) {
+      result.className = 'warn';
+      result.textContent = '⚠️ 변환은 됐지만 PDF 맨 아래 총계 줄을 못 찾아서 합계 검증을 못 했어요. 수량·금액을 PDF와 직접 대조해주세요.';
+    } else {
+      result.className = 'ok';
+      result.textContent = `✅ 변환 완료 · PDF 총계와 일치 (수량 ${chk.qty}, Whls ${chk.whls.toLocaleString('en-US', { minimumFractionDigits: 2 })}). 아래 표를 확인한 뒤 엑셀로 받으세요.`;
+    }
     dlBtn.style.display = 'inline-block';
   } catch (e) {
     status.textContent = '';
