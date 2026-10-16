@@ -1028,6 +1028,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 5v14M6 5v14M9.5 5v14M12 5v14"/><path d="M15.5 8H21M15.5 12H21M15.5 16H21"/></svg></span>
         TEST 바코드→리스트화<span class="chip chip-ready">시험판</span>
       </button>
+      <button class="nav-item" data-nav="priceCheckTest">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/><circle cx="17.5" cy="15.5" r="3"/><path d="m19.8 17.8 2 2"/></svg></span>
+        TEST 최저가 조회<span class="chip chip-ready">시험판</span>
+      </button>
       <button class="nav-item" data-nav="kreamSoldOut">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M9 14h6"/></svg></span>
         크림 품절 정리<span class="chip chip-ready">사용가능</span>
@@ -1833,6 +1837,10 @@
         <iframe data-src="barcode-list.html" title="TEST 바코드→리스트화" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <section data-view="priceCheckTest">
+        <iframe data-src="price-check.html" title="TEST 최저가 조회" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <section data-view="miniChat">
         <div id="miniChatBox"></div>
       </section>
@@ -1960,7 +1968,7 @@ window.__loadLib = (function(){
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', videoStudio:'영상 스튜디오', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'TEST 이카운트 재고 매칭', stocktake:'재고조사 (바코드 실사)',
     listCheck:'품번 리스트 재고확인', barcodeStock:'바코드 재고조회', ecountQty:'이카운트재고조회', kreamSoldOut:'크림 품절 정리',
-    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', barcodeListTest:'TEST 바코드→리스트화', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', barcodeListTest:'TEST 바코드→리스트화', priceCheckTest:'TEST 최저가 조회', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
   };
 
   /* ---------------- 개발중메뉴 (buyest, buyest1 전용, 내부적으로는 비밀 채팅방) ----------------
@@ -5780,6 +5788,25 @@ window.__loadLib = (function(){
     }
     function rvmEcountLabel(name){ var l = rvmEcountLabelParts(name); return l ? l.base : null; }
     function rvmSabangLabel(name){ var l = rvmSabangLabelParts(name); return l ? l.base : null; }
+    // 이름에 들어 있는 '키즈/여성/남성…' 구분. 양쪽에 다 있는데 서로 다르면 품번만 같은 별개 상품이다(예: 이카운트 '23SS 여성 URZAY' ↔ 사방넷 '23SS 키즈 URZAY').
+    // 한쪽에만 있거나 한쪽이 다른 쪽을 포함하면(글자수 제한 생략·'키즈 여성' 병기) 같은 상품으로 본다.
+    function rvmGenderSet(name){
+      var t = String(name||'').replace(/\[[^\]]*\]/g, ' ').split(/[\s\/&,()]+/), o = {};
+      ['키즈','여성','남성','남아','여아'].forEach(function(w){ if(t.indexOf(w) !== -1) o[w] = 1; });
+      return Object.keys(o).sort().join(',');
+    }
+    function rvmGenderOk(ecName, sbName){
+      var a = rvmGenderSet(ecName), b = rvmGenderSet(sbName);
+      if(!a || !b) return true;
+      var A = a.split(','), B = b.split(',');
+      var aInB = A.every(function(x){ return B.indexOf(x) !== -1; }), bInA = B.every(function(x){ return A.indexOf(x) !== -1; });
+      return aInB || bInA;   // 한쪽이 다른 쪽을 포함하면 같은 상품(키즈 ⊂ 키즈 여성), 서로 겹치지 않으면 별개 상품(여성 ↔ 키즈)
+    }
+    // 이름 맨 앞의 시즌/주년 표기: 24SS · 24FW · 13주년 (없으면 빈 값)
+    function rvmSeasonTag(name){
+      var t = (String(name||'').trim().split(/\s+/)[0] || '').toUpperCase();
+      return /^(\d{2}(SS|FW|S\/S|F\/W)|\d+주년)$/.test(t) ? t.replace('/', '') : '';
+    }
     function rvmLabelNumOk(ecName, sbName){
       var e = rvmEcountLabelParts(ecName), b = rvmSabangLabelParts(sbName);
       if(!e || !b) return true;
@@ -5813,6 +5840,14 @@ window.__loadLib = (function(){
       var results = [];
       var stats = {changed:0, dupChanged:0, noChange:0, specMismatch:0, notFound:0};
       var agg = {};
+      // 같은 품번의 이카운트 상품 이름 목록 — 사방넷 이름과 더 비슷한 '다른 상품'이 있는데 그 사이즈 코드만 없는 경우를 걸러내기 위해 쓴다
+      var ecNamesByCode = {};
+      if(state.ecAuto){
+        state.ecount.items.forEach(function(it){
+          var k0 = rvmCodeSuffix(it.name); if(!k0) return;
+          (ecNamesByCode[k0] = ecNamesByCode[k0] || {})[it.name] = 1;
+        });
+      }
       state.ecount.items.forEach(function(it){
         var ecCode = rvmCodeSuffix(it.name);
         var candNames = ecCode ? (codeMap[ecCode] || []) : [];
@@ -5824,10 +5859,12 @@ window.__loadLib = (function(){
         // 좁힌 뒤, 남은 후보 전부에서 규격이 맞는 행을 다 모은다 - 매칭된 사방넷 행이
         // 1개면 평범하게 처리하고 2개 이상이면 전부 "중복변경"으로 값을 그대로 반영한다.
         var ecLabel = rvmEcountLabel(it.name);
-        var matchedRows = [];
+        var matchedRows = [], anyCompat = false;
         candNames.forEach(function(name){
           if(rvmSabangLabel(name) !== ecLabel) return;
           if(!rvmLabelNumOk(it.name, name)) return;
+          if(state.ecAuto && !rvmGenderOk(it.name, name)) return;   // 키즈/여성 구분이 다른 별개 상품
+          anyCompat = true;
           nameGroups[name].forEach(function(ri){
             if(rvmSpecsMatch(it.spec, aoa[ri][col['옵션상세명칭']])) matchedRows.push({rowIdx:ri, sbName:name});
           });
@@ -5835,6 +5872,7 @@ window.__loadLib = (function(){
 
         // 이카운트 재고가 0 이하인 옵션이 사방넷에 없는 건 정상(재고 없는 옵션은 등록 안 함) - 규격 불일치로 띄우지 않는다.
         if(matchedRows.length === 0 && !(Number(it.remain) > 0)) return;
+        if(matchedRows.length === 0 && state.ecAuto && !anyCompat) return;   // 같은 품번이라도 사방넷에는 이 상품 자체가 없음(키즈/여성 구분 다름) — 서버 전체 재고라 결과에서 제외
         if(matchedRows.length === 0){ stats.specMismatch++; results.push({item:it, status:'specMismatch', sbName:candNames.join(' / ')}); return; }
 
         // 서버 자동 불러오기 모드: 같은 상품이 이카운트에 코드 여러 개로 등록돼 같은 사방넷 행에 겹치면
@@ -5883,6 +5921,24 @@ window.__loadLib = (function(){
         var scored = ag.items.map(function(x){ return {x:x, sc:rvmNameScore(sbn, x.name)}; });
         var best = scored.reduce(function(m, y){ return y.sc > m ? y.sc : m; }, 0);
         var kept = scored.filter(function(y){ return y.sc >= best - 0.0001; }).map(function(y){ return y.x; });
+        // 같은 품번에 사방넷 이름과 더 비슷한 이카운트 상품(시즌·키즈/여성이 다른 별개 상품)이 따로 있다면, 이 사이즈에 맞는 코드가 그쪽에 없다는 이유로
+        // 덜 비슷한 상품의 재고를 가져오면 안 된다 → 매칭하지 않고 '규격 불일치'로 표시한다. (예: 15주년 콜디 XS 는 13주년 XS 재고를 쓰지 않는다)
+        if(state.ecAuto){
+          // 시즌·주년 표기(24SS/24FW, 13주년/15주년)가 사방넷과 다른 상품만 대상 — 사방넷과 같은 표기의 이카운트 상품이 따로 있을 때만 제외한다
+          var altNames = ecNamesByCode[rvmCodeSuffix(sbn)] || {}, bestAny = 0, sbTag = rvmSeasonTag(sbn), sameTagAlt = false;
+          Object.keys(altNames).forEach(function(n2){
+            var s2 = rvmNameScore(sbn, n2); if(s2 > bestAny) bestAny = s2;
+            if(sbTag && rvmSeasonTag(n2) === sbTag) sameTagAlt = true;
+          });
+          var keptSameTag = sbTag && kept.some(function(x){ return rvmSeasonTag(x.name) === sbTag; });
+          if(sbTag && sameTagAlt && !keptSameTag && best < bestAny - 0.0001){
+            var t0 = kept[0], curR = aoa[ag.rowIdx][col['현재고']];
+            stats.specMismatch++;
+            results.push({item:{code:t0.code + ' (같은 품번의 더 비슷한 상품이 있어 제외)', name:t0.name, spec:t0.spec, prevStock:0, buy:0, sale:0, remain:0},
+                          status:'specMismatch', sbRowIdx:ag.rowIdx, sbName:ag.sbName, curStock:(curR==null ? 0 : (Number(curR) || 0))});
+            return;
+          }
+        }
         var dropped = ag.items.length - kept.length;
         var allCands = scored.map(function(y){ return {code:y.x.code, name:y.x.name, spec:y.x.spec, qty:y.x.remain, sc:y.sc, used:(kept.indexOf(y.x) >= 0)}; });
         var dupInfo = null;
