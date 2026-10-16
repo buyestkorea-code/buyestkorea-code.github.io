@@ -166,17 +166,17 @@
     background:var(--surface-2); color:var(--ink-muted); transition:background .15s ease, color .15s ease; }
   .nav-item .ic svg{ width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   .nav-item .chip{ margin-left:auto; }
-  .st{ margin-left:auto; flex:none; width:16px; height:16px; display:inline-flex; }
-  .st svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-  .st-ok{ color:#84C98A; } .st-test{ color:#E0A83A; } .st-lock{ color:var(--side-mut); }
-  .nav-item.active .st{ color:#fff; }
+  .navst{ margin-left:auto; flex:none; width:16px; height:16px; display:inline-flex; }
+  .navst svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .navst-ok{ color:#84C98A; } .navst-test{ color:#E0A83A; } .navst-lock{ color:var(--side-mut); }
+  .nav-item.active .navst{ color:#fff; }
   .sidebar{ gap:12px; padding:16px 12px 20px; }
   .sidebar .nav-group{ gap:0; }
   .sidebar .nav-group-label{ padding:4px 8px 3px; font-size:10.5px; }
   .sidebar .nav-item{ padding:5px 8px; gap:8px; font-size:13px; line-height:1.25; }
   .sidebar .nav-item .ic{ width:20px; height:20px; border-radius:6px; }
   .sidebar .nav-item .ic svg{ width:12px; height:12px; }
-  .sidebar .st, .sidebar .st svg{ width:14px; height:14px; }
+  .sidebar .navst, .sidebar .navst svg{ width:14px; height:14px; }
 
   .chip{
     font-size:10.5px; font-weight:700; letter-spacing:.02em;
@@ -969,27 +969,27 @@
       <span class="nav-group-label">사방넷 · 이카운트 연동</span>
       <button class="nav-item" data-nav="sabangEcount">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 15a4 4 0 0 1 0-6h2"/><path d="M15 9a4 4 0 0 1 0 6h-2"/><path d="M9 12h6"/></svg></span>
-        사방넷-이카운트 매칭<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        사방넷-이카운트 매칭<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="icmTest">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg></span>
-        사방넷-이카운트매칭 TEST<span class="st st-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+        사방넷-이카운트매칭 TEST<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
       <button class="nav-item" data-nav="sabangMatchTest">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 15a4 4 0 0 1 0-6h2"/><path d="M15 9a4 4 0 0 1 0 6h-2"/><path d="M9 12h6"/><path d="M4 4v4M2 6h4"/></svg></span>
-        TEST 사방넷-이카운트 매칭 관리<span class="st st-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+        TEST 사방넷-이카운트 매칭 관리<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
       <button class="nav-item" data-nav="sabangBaseregi">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/><path d="m14.5 15.5 2 2 3.5-3.5"/></svg></span>
-        사방넷 기초등록<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        사방넷 기초등록<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="stockMove">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M12.6 3H20a1 1 0 0 1 1 1v7.4a1 1 0 0 1-.29.7l-8.3 8.3a1 1 0 0 1-1.42 0l-7.4-7.4a1 1 0 0 1 0-1.42l8.3-8.3a1 1 0 0 1 .71-.28Z"/><circle cx="16" cy="8" r="1.3"/></svg></span>
-        MD 품절<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        MD 품절<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="icm">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg></span>
-        이카운트 -송장 재고매칭 (CS)<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        이카운트 -송장 재고매칭 (CS)<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
     </nav>
 
@@ -997,31 +997,31 @@
       <span class="nav-group-label">재고 변환 · 조회</span>
       <button class="nav-item" data-nav="inventory">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M8 4v16"/><path d="M16 4v16"/><path d="m5 9 3-3 3 3"/><path d="m21 15-3 3-3-3"/></svg></span>
-        재고 세로변환<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        재고 세로변환<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="stockAddConvert">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="m12 3-8 4 8 4 8-4-8-4Z"/><path d="m4 12 8 4 8-4"/><path d="M12 17v4M10 19h4"/></svg></span>
-        재고추가변환<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        재고추가변환<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="ecountQty">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4Z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg></span>
-        이카운트재고조회<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        이카운트재고조회<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="stockMismatch">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M8 4 4 8l4 4"/><path d="M4 8h9"/><path d="m16 20 4-4-4-4"/><path d="M20 16h-9"/></svg></span>
-        이카운트-사이트 재고 불일치 확인<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        이카운트-사이트 재고 불일치 확인<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="listCheck">
         <span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.2-4.2"/><path d="M8.5 11h5M11 8.5v5"/></svg></span>
-        품번 리스트 재고확인<span class="st st-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+        품번 리스트 재고확인<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
       <button class="nav-item" data-nav="costCheck">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M16.5 7.5c-.8-1-2.3-1.6-4.5-1.6-2.5 0-4 1.100-4 2.800 0 4 8.500 1.800 8.500 6 0 1.800-1.700 3-4.500 3-2.100 0-3.800-.7-4.700-1.900"/></svg></span>
-        상품가격체크<span class="st st-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+        상품가격체크<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
       <button class="nav-item" data-nav="priceCheckTest">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/><circle cx="17.5" cy="15.5" r="3"/><path d="m19.8 17.8 2 2"/></svg></span>
-        TEST 최저가 조회<span class="st st-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+        TEST 최저가 조회<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
     </nav>
 
@@ -1029,19 +1029,19 @@
       <span class="nav-group-label">사이트 품절</span>
       <button class="nav-item" data-nav="buyestSoldOut">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
-        바이스트사이트 품절<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        바이스트사이트 품절<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="buyestSoldOutTest">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
-        TEST 바이스트사이트 품절<span class="st st-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+        TEST 바이스트사이트 품절<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
       <button class="nav-item" data-nav="seasonSoldOut">
         <span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8 3v4M16 3v4"/></svg></span>
-        바이스트사이트 시즌품절<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        바이스트사이트 시즌품절<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="kreamSoldOut">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M9 14h6"/></svg></span>
-        크림 품절 정리<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        크림 품절 정리<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
     </nav>
 
@@ -1049,23 +1049,23 @@
       <span class="nav-group-label">매장 · 행사</span>
       <button class="nav-item" data-nav="stocktake">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5v14M8 5v14M11.5 5v14M15 5v14M18.5 5v14"/></svg></span>
-        재고조사 (바코드 실사)<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        재고조사 (바코드 실사)<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="barcodeStock">
         <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M6 9v6M9 9v6M12 9v6M15 9v6M18 9v6"/></svg></span>
-        바코드 재고조회<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        바코드 재고조회<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="barcodeListTest">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 5v14M6 5v14M9.5 5v14M12 5v14"/><path d="M15.5 8H21M15.5 12H21M15.5 16H21"/></svg></span>
-        TEST 바코드→리스트화<span class="st st-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+        TEST 바코드→리스트화<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
       <button class="nav-item" data-nav="orderStock">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/></svg></span>
-        주문서 창고위치찾기<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        주문서 창고위치찾기<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="eventPos">
         <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/><path d="M9 16h2M13 16h2"/></svg></span>
-        행사 POS<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        행사 POS<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
     </nav>
 
@@ -1073,11 +1073,11 @@
       <span class="nav-group-label">문서 변환</span>
       <button class="nav-item" data-nav="invoice">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/><path d="M9.5 12.5h5M9.5 16h5"/></svg></span>
-        인보이스 자동인식<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        인보이스 자동인식<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="galianoProforma">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/><path d="m9 13 2 2 4-4"/></svg></span>
-        갈리아노양식 변경<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        갈리아노양식 변경<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
     </nav>
 
@@ -1085,11 +1085,11 @@
       <span class="nav-group-label">상품 이미지</span>
       <button class="nav-item" data-nav="productCard">
         <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg></span>
-        상품 카드 이미지<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        상품 카드 이미지<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="videoStudio">
         <span class="ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="m11 10 3 2-3 2v-4Z"/></svg></span>
-        영상 스튜디오<span class="st st-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+        영상 스튜디오<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
     </nav>
 
@@ -2163,7 +2163,7 @@ window.__loadLib = (function(){
       var name = el.getAttribute('data-nav');
       var restrict = locked && !GUEST_ALLOWED[name];
       el.classList.toggle('nav-locked', restrict);
-      var st = el.querySelector('.st'); if(st){ st.classList.toggle('st-lock', restrict); if(restrict){ if(!st.dataset.t){ st.dataset.t = st.title; } st.title = '로그인 필요'; } else if(st.dataset.t){ st.title = st.dataset.t; } }
+      var st = el.querySelector('.navst'); if(st){ st.classList.toggle('navst-lock', restrict); if(restrict){ if(!st.dataset.t){ st.dataset.t = st.title; } st.title = '로그인 필요'; } else if(st.dataset.t){ st.title = st.dataset.t; } }
       var chip = el.querySelector('.chip-ready');
       if(!chip) return;
       if(restrict && !chip.dataset.origText){ chip.dataset.origText = chip.textContent; chip.textContent = '로그인 필요'; chip.classList.add('chip-locked'); }
