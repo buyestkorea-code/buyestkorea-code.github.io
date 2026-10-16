@@ -5833,6 +5833,8 @@ window.__loadLib = (function(){
           });
         });
 
+        // 이카운트 재고가 0 이하인 옵션이 사방넷에 없는 건 정상(재고 없는 옵션은 등록 안 함) - 규격 불일치로 띄우지 않는다.
+        if(matchedRows.length === 0 && !(Number(it.remain) > 0)) return;
         if(matchedRows.length === 0){ stats.specMismatch++; results.push({item:it, status:'specMismatch', sbName:candNames.join(' / ')}); return; }
 
         // 서버 자동 불러오기 모드: 같은 상품이 이카운트에 코드 여러 개로 등록돼 같은 사방넷 행에 겹치면
