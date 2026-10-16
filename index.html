@@ -2969,6 +2969,13 @@ window.__loadLib = (function(){
     // 제목 어디에 있든 마지막 "N/M"을 읽는다 — "박성우 오후반차 (12/15)", "조경호 연차 (야간 5/5)" 등
     var LEAVE_FRAC_RE = /(\d+)\s*\/\s*(\d+)(?![\s\S]*\d\s*\/\s*\d)/;
 
+    // 일정 등록자(author)가 다른 사람 휴가를 대신 올리는 경우가 있어, 제목 속 이름("허태임 오전반차 ...")을 우선 쓰고 없으면 등록자로 대체
+    var LEAVE_WORDS = {월차:1,연차:1,반차:1,오전반차:1,오후반차:1,오전:1,오후:1,휴가:1,대휴:1,반휴:1,공가:1,병가:1,야간:1,상인:1,종일:1,휴무:1,오프:1};
+    function leaveWho(it){
+      var toks = String(it.title || '').replace(/\([^)]*\)/g, ' ').split(/[\s,\/]+/);
+      for(var i=0;i<toks.length;i++){ if(/^[가-힣]{2,4}$/.test(toks[i]) && !LEAVE_WORDS[toks[i]]) return toks[i]; }
+      return it.author;
+    }
     function loadLeaves(){
       leaveYearLabel.textContent = leaveYear + '년';
       var y = leaveYear;
@@ -2979,8 +2986,8 @@ window.__loadLib = (function(){
             if(it.kind !== 'off') return;
             var m = LEAVE_FRAC_RE.exec((it.title || '').trim());
             if(!m) return;
-            var used = parseInt(m[1],10), total = parseInt(m[2],10), key = it.author + '|' + total, cur = latest[key];
-            if(!cur || it.day > cur.day || (it.day === cur.day && used > cur.used)) latest[key] = {name:it.author, day:it.day, used:used, total:total, title:it.title};
+            var used = parseInt(m[1],10), total = parseInt(m[2],10), who = leaveWho(it), key = who + '|' + total, cur = latest[key];
+            if(!cur || it.day > cur.day || (it.day === cur.day && used > cur.used)) latest[key] = {name:who, day:it.day, used:used, total:total, title:it.title};
           });
         }
         renderLeaves(latest);
