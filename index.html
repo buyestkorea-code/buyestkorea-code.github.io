@@ -166,6 +166,21 @@
     background:var(--surface-2); color:var(--ink-muted); transition:background .15s ease, color .15s ease; }
   .nav-item .ic svg{ width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   .nav-item .chip{ margin-left:auto; }
+  .nav-item[hidden]{ display:none; }
+  /* 대시보드 히어로 오른쪽 "내 정보" 카드 (입사일·근속·추가연차·복지포인트) */
+  .me-hrcard{ flex:0 0 300px; position:relative; overflow:hidden; border-radius:20px; padding:22px 24px; color:#F3EFE3;
+    background:radial-gradient(120% 120% at 100% 0%, rgba(255,203,138,.22), transparent 55%), linear-gradient(150deg,#1C2B24 0%,#25392C 100%);
+    box-shadow:var(--me-shadow-hi); display:flex; flex-direction:column; gap:12px; }
+  .me-hrcard[hidden]{ display:none; }
+  .me-hrcard .hl{ font-size:11.5px; font-weight:700; letter-spacing:.06em; color:rgba(243,239,227,.7); }
+  .me-hrcard .big{ font-size:30px; font-weight:800; letter-spacing:-.02em; line-height:1.1; color:#FFF7E6; font-variant-numeric:tabular-nums; }
+  .me-hrcard .big small{ font-size:14px; font-weight:600; margin-left:3px; color:rgba(243,239,227,.8); }
+  .me-hrcard .sb{ font-size:12px; color:rgba(243,239,227,.78); margin-top:3px; }
+  .me-hrcard .ln{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,.14); font-size:12.5px; }
+  .me-hrcard .ln b{ font-size:13.5px; font-weight:700; color:#FFF7E6; font-variant-numeric:tabular-nums; text-align:right; }
+  .me-hrcard .ln span{ color:rgba(243,239,227,.78); }
+  .me-hrcard .ln em{ display:block; font-style:normal; font-size:11px; font-weight:500; color:#9FE3B8; }
+  @media (max-width:1100px){ .me-herorow{ flex-wrap:wrap; } .me-hrcard{ flex:1 1 100%; } }
   .navst{ margin-left:auto; flex:none; width:16px; height:16px; display:inline-flex; }
   .navst svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   .navst-ok{ color:#84C98A; } .navst-test{ color:#E0A83A; } .navst-lock{ color:var(--side-mut); }
@@ -963,6 +978,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h5v-5h2v5h5v-9"/></svg></span>
         대시보드
       </button>
+      <button class="nav-item" data-nav="hrAdmin" id="navHrAdmin" hidden>
+        <span class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.7.2 5 2.2 5 5.8"/></svg></span>
+        직원관리<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+      </button>
     </nav>
 
     <nav class="nav-group">
@@ -1198,6 +1217,7 @@
                   <div id="meOpts" class="me-opts me-opts-hero" hidden></div>
                 </div>
               </div>
+              <aside class="me-hrcard" id="meHrCard" hidden></aside>
             </div>
 
             <form id="mePwForm" class="me-panel me-pwform" hidden>
@@ -1862,6 +1882,10 @@
         <iframe data-src="sabang-baseregi.html" title="사방넷 기초등록" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <section data-view="hrAdmin">
+        <iframe data-src="hr-admin.html" title="직원관리" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <section data-view="eventPos">
         <iframe data-src="pos.html" title="행사 POS" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
@@ -2005,7 +2029,7 @@ window.__loadLib = (function(){
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', videoStudio:'영상 스튜디오', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'사방넷-이카운트매칭 TEST', sabangMatchTest:'TEST 사방넷-이카운트 매칭 관리', stocktake:'재고조사 (바코드 실사)',
     listCheck:'품번 리스트 재고확인', costCheck:'상품가격체크', barcodeStock:'바코드 재고조회', ecountQty:'이카운트재고조회', kreamSoldOut:'크림 품절 정리',
-    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', barcodeListTest:'TEST 바코드→리스트화', priceCheckTest:'TEST 최저가 조회', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', hrAdmin:'직원관리', barcodeListTest:'TEST 바코드→리스트화', priceCheckTest:'TEST 최저가 조회', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
   };
 
   /* ---------------- 개발중메뉴 (buyest, buyest1 전용, 내부적으로는 비밀 채팅방) ----------------
@@ -2337,6 +2361,7 @@ window.__loadLib = (function(){
       $('meAdmin').hidden = !(inn && IS_ADMIN);
       $('meNoticeAdd').hidden = !(inn && IS_ADMIN);
       $('meSearch').hidden = !inn;
+      refreshHrUi(inn);
       $('meTopDate').hidden = !inn;
       $('meUser').hidden = !inn;
       $('meUserMenu').hidden = true;
@@ -2354,6 +2379,50 @@ window.__loadLib = (function(){
       }
     }
 
+    /* ---------------- 직원관리 (조경호·buyest 관리자 메뉴) + 내 정보 카드 ---------------- */
+    // 화면 숨김은 보조일 뿐 — 실제 권한은 서버(toolkit_hr_api.php)가 아이디로 다시 검사한다.
+    var HR_API = 'https://buyest.co.kr/toolkit_hr_api.php';
+    var HR_ADMINS = ['buyest', '조경호'];
+    function refreshHrUi(inn){
+      var isHr = !!(inn && AUTH && HR_ADMINS.indexOf(AUTH.id) > -1);
+      var nv = $('navHrAdmin'); if(nv) nv.hidden = !isHr;
+      if(inn && AUTH) loadHrMe(); else { var c = $('meHrCard'); if(c) c.hidden = true; }
+    }
+    function hrDay0(s){ var p = String(s).split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
+    function hrNextAnniv(join, odd3){
+      var j = hrDay0(join), t = new Date(); t = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+      for(var n = 1; n <= 60; n++){
+        if(odd3 && (n < 3 || (n - 3) % 2)) continue;
+        var d = new Date(j.getFullYear() + n, j.getMonth(), j.getDate());
+        if(d >= t) return {n:n, date:d, dd:Math.round((d - t) / 86400000)};
+      }
+      return null;
+    }
+    function hrDot(d){ return d.getFullYear() + '.' + pad2(d.getMonth()+1) + '.' + pad2(d.getDate()); }
+    function loadHrMe(){
+      var card = $('meHrCard'); if(!card || !AUTH) return;
+      fetch(HR_API, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'me', user:AUTH.id, pass:AUTH.pass, year:new Date().getFullYear()})})
+        .then(function(r){ return r.json(); }).then(function(r){ if(r && r.ok) renderHrMe(card, r); else card.hidden = true; })
+        .catch(function(){ card.hidden = true; });
+    }
+    function renderHrMe(card, r){
+      var y = new Date().getFullYear(), html = '<div class="hl">내 정보</div>';
+      if(r.join_date){
+        var j = hrDay0(r.join_date), t = new Date(); t = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+        var days = Math.round((t - j) / 86400000) + 1, yy = t.getFullYear() - j.getFullYear(), mm = t.getMonth() - j.getMonth();
+        if(t.getDate() < j.getDate()) mm--; if(mm < 0){ yy--; mm += 12; }
+        html += '<div><div class="big">' + days.toLocaleString('ko-KR') + '<small>일째</small></div><div class="sb">' + (yy ? yy + '년 ' : '') + mm + '개월 · 입사 ' + hrDot(j) + '</div></div>';
+        var ex = hrNextAnniv(r.join_date, true), an = hrNextAnniv(r.join_date, false);
+        if(ex) html += '<div class="ln"><span>다음 추가연차</span><b>' + (ex.dd === 0 ? 'D-DAY' : 'D-' + ex.dd) + '<em>' + ex.n + '주년 · ' + hrDot(ex.date) + ' (+1일)</em></b></div>';
+        if(an) html += '<div class="ln"><span>다음 근속 기념일</span><b>' + (an.dd === 0 ? 'D-DAY' : 'D-' + an.dd) + '<em>' + an.n + '주년 · ' + hrDot(an.date) + '</em></b></div>';
+      } else {
+        html += '<div><div class="big" style="font-size:18px">입사일 미등록</div><div class="sb">관리자가 입사일을 등록하면 근속일과 추가연차 일정이 보여요.</div></div>';
+      }
+      html += '<div class="ln"><span>' + y + ' 복지포인트 잔여</span><b>' + Math.round(r.welfare).toLocaleString('ko-KR') + ' P<em>이월 없음 · 올해 말 소멸</em></b></div>';
+      var lv = r.leave || {};
+      if(lv.month || lv.year || lv.extra) html += '<div class="ln"><span>' + y + ' 휴가 부여</span><b>월차 ' + (lv.month || 0) + ' · 연차 ' + (lv.year || 0) + ' · 휴가 ' + (lv.extra || 0) + '</b></div>';
+      card.innerHTML = html; card.hidden = false;
+    }
     /* ---------------- 개인 메모/할일/링크/도구 ---------------- */
     var saveTimer, dirty = false;
     function persist(){
