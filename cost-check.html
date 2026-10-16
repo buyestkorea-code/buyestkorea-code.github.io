@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>상품가격체크</title>
+<style>
+  :root { --ink:#111827; --mute:#6b7280; --line:#e5e7eb; --bg:#fafafa; --ok:#15803d; --warn:#b45309; --bad:#b91c1c; --blue:#1d4ed8; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1180px; margin: 28px auto; padding: 0 20px 60px; background: var(--bg); color: var(--ink); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.desc { color: #4b5563; font-size: 13.5px; margin: 0 0 14px; line-height: 1.55; }
+  .step { background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; margin:14px 0; }
+  .step h3 { margin:0 0 8px; font-size:15px; }
+  .btn { font-size:14.5px; padding:9px 20px; border:none; border-radius:6px; cursor:pointer; background:#111827; color:#fff; }
+  .btn:disabled { background:#d1d5db; color:#6b7280; cursor:not-allowed; }
+  .btn-sub { background:#0f766e; }
+  .dropzone { border:1.5px dashed #d1d5db; border-radius:8px; padding:22px 16px; text-align:center; color:var(--mute); cursor:pointer; transition:border-color .12s, background .12s; }
+  .dropzone:hover, .dropzone.drag { border-color:#111827; background:#f3f4f6; color:var(--ink); }
+  .dropzone input { display:none; }
+  .dropzone.has { border-style:solid; color:var(--ink); background:#f9fafb; }
+  .inputs { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; }
+  .inputs label { display:block; font-size:13px; color:#374151; font-weight:600; }
+  .inputs input { display:block; margin-top:5px; width:150px; padding:8px 10px; font-size:15px; border:1px solid #d1d5db; border-radius:6px; font-variant-numeric:tabular-nums; }
+  .inputs input:focus-visible, .btn:focus-visible, .dropzone:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+  .formula { font-size:13px; color:var(--mute); margin-top:10px; }
+  .formula b { color:var(--ink); }
+  #msg { font-size:13.5px; color:var(--mute); margin:10px 0 0; white-space:pre-wrap; }
+  #msg.err { color:var(--bad); }
+  .note { font-size:12.5px; color:var(--warn); background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:8px 10px; margin-top:10px; line-height:1.5; }
+  .stats { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 10px; }
+  .chip { border:1px solid #d1d5db; background:#fff; border-radius:999px; padding:5px 13px; font-size:13px; }
+  .chip b { font-weight:700; }
+  table { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
+  th, td { border-bottom:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
+  th { background:#f3f4f6; position:sticky; top:0; z-index:1; white-space:nowrap; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .code { font-weight:600; word-break:break-all; }
+  .sub { color:var(--mute); font-size:11.5px; margin-top:2px; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; }
+  .t-ok { background:#f0fdf4; color:var(--ok); } .t-warn { background:#fef3c7; color:#92400e; }
+  .t-bad { background:#fef2f2; color:var(--bad); } .t-gray { background:#f3f4f6; color:#4b5563; }
+  .tablewrap { max-height:62vh; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>상품가격체크</h1>
+  <p class="desc">재고추가 엑셀을 올리고 환율과 추가비용을 넣으면, 원본 양식은 그대로 두고 <b>오른쪽 끝에 원가 · 판매상태 · 최근 판매이력</b> 열만 덧붙여 줘요. 판매상태와 판매이력은 「품번 리스트 재고확인」과 같은 데이터를 써요.</p>
+
+  <div class="step">
+    <h3>1. 재고추가 파일</h3>
+    <div class="dropzone" id="drop" tabindex="0" role="button" aria-label="재고추가 파일 선택">
+      <div id="dropText">재고추가 엑셀(.xlsx)을 끌어다 놓거나 클릭해서 선택하세요</div>
+      <input type="file" id="fileInput" accept=".xlsx">
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>2. 원가 계산 값</h3>
+    <div class="inputs">
+      <label for="rate">환율 (원)<input id="rate" type="number" inputmode="decimal" step="any" min="0" value="1500"></label>
+      <label for="extra">추가비용 (%)<input id="extra" type="number" inputmode="decimal" step="any" min="0" value="38"></label>
+      <button class="btn" id="runBtn">실행</button>
+    </div>
+    <div class="formula" id="formulaTxt"></div>
+    <div id="msg" role="status"></div>
+  </div>
+
+  <div class="step" id="resultBox" style="display:none;">
+    <h3>3. 결과</h3>
+    <div id="asOf" style="font-size:13px;color:var(--mute);"></div>
+    <div class="stats" id="stats"></div>
+    <div style="margin:8px 0;"><button class="btn btn-sub" id="dlBtn">원본 양식 + 새 열 엑셀로 받기</button></div>
+    <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>UNIT PRICE</th><th>원가</th><th>판매상태</th><th>최근 판매이력</th></tr></thead><tbody id="tbody"></tbody></table></div>
+    <div class="note">판매상태는 바이스트 사이트 기준이에요. 「판매중」은 노출 중이고 살 수 있는 옵션이 있는 상품, 「품절」은 노출 중인데 옵션이 모두 품절, 「미노출」은 사이트에서 숨김, 「미등록」은 사이트에 없는 품번이에요. 판매이력은 이카운트 판매현황(순판매 = 판매 − 반품)이고, 판매현황이 올라간 기간까지만 반영돼요.</div>
+  </div>
+</div>
+
+<script src="assets/libs/exceljs-4.4.0.min.js"></script>
+<script>
+const API = 'https://buyest.co.kr/list_check_api.php';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const S = { file: null, rows: [], blocks: [], results: [], params: null, asOf: 0, salesMeta: null };
+
+function getAuth(){ try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth')); return (a && a.id) ? a : null; } catch(e){ return null; } }
+function setMsg(t, err){ const m = $('msg'); m.textContent = t || ''; m.className = err ? 'err' : ''; }
+try { const p = JSON.parse(localStorage.getItem('buyest.costcheck.params') || 'null'); if (p) { if (p.rate) $('rate').value = p.rate; if (p.extra != null) $('extra').value = p.extra; } } catch(e){}
+
+function formulaPreview(){
+  const r = Number($('rate').value), e = Number($('extra').value);
+  $('formulaTxt').innerHTML = (r > 0 && e >= 0) ? `원가 = UNIT PRICE × <b>${r.toLocaleString()}</b> × <b>${(1 + e / 100).toFixed(4).replace(/0+$/, '').replace(/\.$/, '')}</b>  (예: 100 → ${(100 * r * (1 + e / 100)).toLocaleString()})` : '';
+}
+['rate', 'extra'].forEach(id => $(id).addEventListener('input', formulaPreview)); formulaPreview();
+
+/* ---------- 파일 선택 ---------- */
+$('drop').addEventListener('click', () => $('fileInput').click());
+$('drop').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('fileInput').click(); } });
+['dragenter','dragover'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.remove('drag'); }));
+$('drop').addEventListener('drop', e => setFile(e.dataTransfer.files[0]));
+$('fileInput').addEventListener('change', e => { setFile(e.target.files[0]); e.target.value = ''; });
+function setFile(f){
+  if (!f) return;
+  if (!/\.xlsx$/i.test(f.name)) { setMsg('.xlsx 파일만 올릴 수 있어요. .xls 파일은 엑셀에서 .xlsx 로 저장한 뒤 올려 주세요.', true); return; }
+  S.file = f; $('dropText').textContent = '📄 ' + f.name + '  (다시 누르면 다른 파일 선택)'; $('drop').classList.add('has');
+  $('resultBox').style.display = 'none'; setMsg('');
+}
+
+/* ---------- 엑셀 읽기 ---------- */
+function cellText(c){
+  let v = c.value;
+  if (v == null) return '';
+  if (typeof v === 'object') { if (v.richText) v = v.richText.map(t => t.text).join(''); else if (v.result !== undefined) v = v.result; else if (v.text !== undefined) v = v.text; else return ''; }
+  if (v == null || typeof v === 'object') return '';
+  return String(v).replace(/\s+/g, ' ').trim();
+}
+function cellNum(c){
+  let v = c.value;
+  if (v && typeof v === 'object' && v.result !== undefined) v = v.result;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') { const n = Number(v.replace(/,/g, '')); return isFinite(n) && v.trim() ? n : null; }
+  return null;
+}
+// 시트 안에 "UNIT PRICE" 머리글 줄이 여러 번 나온다(브랜드 블록마다). 머리글 아래 줄 중 품번 + 숫자 단가가 있는 줄이 상품 줄.
+function scanSheet(ws){
+  const headers = [], items = [];
+  let cur = null;
+  ws.eachRow({ includeEmpty: false }, (row, r) => {
+    let pc = 0, mc = 0;
+    row.eachCell({ includeEmpty: false }, (c, n) => { const t = cellText(c).toUpperCase(); if (t === 'UNIT PRICE') pc = n; else if (t === 'MODEL') mc = n; });
+    if (pc) { cur = { row: r, priceCol: pc, modelCol: mc || 4 }; headers.push(cur); return; }
+    if (!cur) return;
+    const model = cellText(row.getCell(cur.modelCol));
+    const price = cellNum(row.getCell(cur.priceCol));
+    if (model && price != null && price > 0) items.push({ row: r, model, price, hdr: cur });
+  });
+  return { headers, items };
+}
+
+/* ---------- 판매상태 / 판매이력 ---------- */
+function siteStatus(it){
+  if (!it || !it.site || !it.site.length) return '미등록';
+  const live = it.site.filter(p => p.display === 'Y');
+  if (!live.length) return '미노출';
+  return live.some(p => p.opt_avail > 0) ? '판매중' : '품절';
+}
+function pickKey(hits){
+  // 정확 일치 우선. 앞부분 일치(같은 모델 다른 컬러)는 정확 일치가 없을 때만 참고.
+  const ex = (hits || []).find(h => h.type === 'exact'); if (ex) return { key: ex.key, exact: true };
+  const pf = (hits || [])[0]; return pf ? { key: pf.key, exact: false } : null;
+}
+function saleText(it, hasMeta){
+  if (!hasMeta) return '판매현황 없음';
+  const sl = it && it.sales;
+  if (!sl || !(sl.tot || sl.d365)) return '판매이력 없음';
+  return `${sl.last ? sl.last + ' · ' : ''}3개월 ${sl.d90}개 / 1년 ${sl.d365}개 / 전체 ${sl.tot}개`;
+}
+
+/* ---------- 실행 ---------- */
+$('runBtn').addEventListener('click', async () => {
+  const auth = getAuth();
+  if (!auth) { setMsg('툴킷에 로그인한 뒤 새로고침해 주세요. (상단 인트라넷 홈에서 로그인)', true); return; }
+  if (!S.file) { setMsg('재고추가 엑셀 파일을 먼저 올려 주세요.', true); return; }
+  const rate = Number($('rate').value), extra = Number($('extra').value);
+  if (!(rate > 0)) { setMsg('환율을 0보다 큰 숫자로 넣어 주세요.', true); return; }
+  if (!(extra >= 0) || $('extra').value === '') { setMsg('추가비용(%)을 숫자로 넣어 주세요. 없으면 0.', true); return; }
+  $('runBtn').disabled = true; setMsg('파일 읽는 중…');
+  try {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await S.file.arrayBuffer());
+    const ws = wb.worksheets[0];
+    const scan = scanSheet(ws);
+    if (!scan.items.length) throw new Error('UNIT PRICE 열과 MODEL 열이 있는 재고추가 양식을 찾지 못했어요. 첫 번째 시트에 두 머리글이 있는지 확인해 주세요.');
+
+    setMsg(`품번 ${scan.items.length}개를 서버에서 확인하는 중…`);
+    const cells = [...new Set(scan.items.map(i => i.model).filter(m => m.length >= 4))];
+    const hits = {}, items = {}; let asOf = 0, salesMeta = null;
+    for (let off = 0; off < cells.length; off += 2000) {
+      const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: auth.id, pass: auth.pass, cells: cells.slice(off, off + 2000) }) });
+      const d = await res.json();
+      if (!d.ok) throw new Error(d.need_login ? '로그인 정보가 맞지 않아요. 툴킷에서 다시 로그인해 주세요.' : (d.error || '서버 오류'));
+      Object.keys(d.hits || {}).forEach(k => { hits[cells[off + Number(k)]] = d.hits[k]; });
+      Object.assign(items, d.items || {}); asOf = d.as_of; salesMeta = d.sales_meta;
+    }
+    const mult = Number((1 + extra / 100).toFixed(6));
+    const results = scan.items.map(i => {
+      const pk = pickKey(hits[i.model]), it = pk ? items[pk.key] : null;
+      let status = siteStatus(it);
+      if (pk && !pk.exact) status = '미등록 (같은 모델 다른 컬러 있음)';
+      return { ...i, cost: i.price * rate * mult, status, sale: pk && !pk.exact ? saleText(null, !!salesMeta) : saleText(it, !!salesMeta) };
+    });
+    Object.assign(S, { wb, ws, scan, results, params: { rate, mult, extra }, asOf, salesMeta });
+    try { localStorage.setItem('buyest.costcheck.params', JSON.stringify({ rate, extra })); } catch(e){}
+    renderResult(); setMsg('');
+  } catch (e) { setMsg('실패: ' + (e && e.message ? e.message : e), true); }
+  $('runBtn').disabled = false;
+});
+
+function statusCls(s){ return s === '판매중' ? 't-ok' : s === '품절' ? 't-bad' : s === '미노출' ? 't-warn' : 't-gray'; }
+function renderResult(){
+  $('resultBox').style.display = '';
+  const R = S.results, cnt = s => R.filter(r => r.status === s).length;
+  $('stats').innerHTML = [['전체 상품 줄', R.length], ['판매중', cnt('판매중')], ['품절', cnt('품절')], ['미노출', cnt('미노출')], ['미등록', R.filter(r => r.status.startsWith('미등록')).length]]
+    .map(([t, n]) => `<span class="chip">${t} <b>${n.toLocaleString()}</b></span>`).join('');
+  const sm = S.salesMeta;
+  $('asOf').innerHTML = `환율 ${S.params.rate.toLocaleString()} · 추가비용 ${S.params.extra}%` + (sm ? ` · 판매현황 기준 <b>${esc(sm.from)} ~ ${esc(sm.to)}</b>` : ' · <span style="color:#b45309">판매현황이 아직 없어요 (「품번 리스트 재고확인」에서 올려 주세요)</span>');
+  $('tbody').innerHTML = R.map(r => `<tr><td class="num">${r.row}</td><td class="code">${esc(r.model)}</td><td class="num">${r.price.toLocaleString()}</td><td class="num"><b>${Math.round(r.cost).toLocaleString()}</b></td>
+    <td><span class="tag ${statusCls(r.status)}">${esc(r.status)}</span></td><td>${esc(r.sale)}</td></tr>`).join('');
+}
+
+/* ---------- 원본 양식 그대로 + 오른쪽 열 추가 ---------- */
+$('dlBtn').addEventListener('click', async () => {
+  $('dlBtn').disabled = true;
+  try {
+    const { ws, wb, scan, results, params } = S;
+    const c0 = ws.columnCount + 1;                       // 원본의 마지막 열 다음부터
+    const cost = c0, st = c0 + 1, sale = c0 + 2;
+    const copyBase = (dst, src, numFmt) => { const s = src.style || {}; dst.style = { font: s.font, border: s.border, fill: s.fill, alignment: { ...(s.alignment || {}), vertical: 'middle', wrapText: true } }; if (numFmt) dst.numFmt = numFmt; };
+    scan.headers.forEach(h => {
+      const src = ws.getRow(h.row).getCell(h.priceCol);
+      [[cost, '원가'], [st, '판매상태'], [sale, '최근 판매이력']].forEach(([c, t]) => { const cell = ws.getRow(h.row).getCell(c); cell.value = t; copyBase(cell, src); cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
+    });
+    results.forEach(r => {
+      const row = ws.getRow(r.row), src = row.getCell(r.hdr.priceCol), colL = src.address.replace(/\d+$/, '');
+      const c1 = row.getCell(cost); c1.value = { formula: `${colL}${r.row}*${params.rate}*${params.mult}`, result: r.cost }; copyBase(c1, src, '#,##0');
+      const c2 = row.getCell(st); c2.value = r.status; copyBase(c2, src, '@'); c2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      if (r.status === '품절') c2.font = { ...(c2.font || {}), bold: true, color: { argb: 'FFB91C1C' } };
+      else if (r.status === '판매중') c2.font = { ...(c2.font || {}), bold: true, color: { argb: 'FF15803D' } };
+      const c3 = row.getCell(sale); c3.value = r.sale; copyBase(c3, src, '@'); c3.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+    });
+    ws.getColumn(cost).width = 14; ws.getColumn(st).width = 16; ws.getColumn(sale).width = 40;
+    const buf = await wb.xlsx.writeBuffer();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = S.file.name.replace(/\.xlsx$/i, '') + '_가격체크.xlsx'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) { setMsg('엑셀 만들기 실패: ' + (e && e.message ? e.message : e), true); }
+  $('dlBtn').disabled = false;
+});
+</script>
+</body>
+</html>
