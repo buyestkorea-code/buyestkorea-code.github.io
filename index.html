@@ -976,6 +976,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M12.6 3H20a1 1 0 0 1 1 1v7.4a1 1 0 0 1-.29.7l-8.3 8.3a1 1 0 0 1-1.42 0l-7.4-7.4a1 1 0 0 1 0-1.42l8.3-8.3a1 1 0 0 1 .71-.28Z"/><circle cx="16" cy="8" r="1.3"/></svg></span>
         MD 품절<span class="chip chip-ready">사용가능</span>
       </button>
+      <button class="nav-item" data-nav="sabangMatchTest">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 15a4 4 0 0 1 0-6h2"/><path d="M15 9a4 4 0 0 1 0 6h-2"/><path d="M9 12h6"/><path d="M4 4v4M2 6h4"/></svg></span>
+        TEST 사방넷-이카운트 매칭 관리<span class="chip chip-ready">시험판</span>
+      </button>
       <button class="nav-item" data-nav="buyestSoldOut">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
         바이스트사이트 품절<span class="chip chip-ready">사용가능</span>
@@ -1605,6 +1609,11 @@
       </section>
 
       <!-- ============ TEST: 이카운트 재고 매칭 (서버 재고 자동 사용 시험판) ============ -->
+      <!-- ============ TEST: 사방넷-이카운트 매칭 관리 (자동/수동 매칭 서버 저장) ============ -->
+      <section data-view="sabangMatchTest">
+        <iframe data-src="sabang-match.html" title="사방넷-이카운트 매칭 관리" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <section data-view="icmTest">
         <div class="workspace">
           <div class="panel">
@@ -1966,7 +1975,7 @@ window.__loadLib = (function(){
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', videoStudio:'영상 스튜디오', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
-    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'TEST 이카운트 재고 매칭', stocktake:'재고조사 (바코드 실사)',
+    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'TEST 이카운트 재고 매칭', sabangMatchTest:'TEST 사방넷-이카운트 매칭 관리', stocktake:'재고조사 (바코드 실사)',
     listCheck:'품번 리스트 재고확인', barcodeStock:'바코드 재고조회', ecountQty:'이카운트재고조회', kreamSoldOut:'크림 품절 정리',
     orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', barcodeListTest:'TEST 바코드→리스트화', priceCheckTest:'TEST 최저가 조회', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
   };
