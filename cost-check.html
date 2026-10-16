@@ -59,7 +59,7 @@
   <div class="step">
     <h3>2. 원가 계산 값</h3>
     <div class="inputs">
-      <label for="rate">환율 (원)<input id="rate" type="number" inputmode="decimal" step="any" min="0" value="1500"></label>
+      <label for="rate">환율 (원)<input id="rate" type="number" inputmode="decimal" step="any" min="0" value="1550"></label>
       <label for="extra">추가비용 (%)<input id="extra" type="number" inputmode="decimal" step="any" min="0" value="38"></label>
       <label for="margin">판매마진 (%)<input id="margin" type="number" inputmode="decimal" step="any" min="0" value="48"></label>
       <button class="btn" id="runBtn">실행</button>
@@ -197,7 +197,13 @@ $('runBtn').addEventListener('click', async () => {
       if (pk && !pk.exact) status = '미등록 (같은 모델 다른 컬러 있음)';
       return { ...i, cost: i.price * rate * mult, sell: i.price * rate * mult * (1 + margin / 100), status, sale: pk && !pk.exact ? saleText(null, !!salesMeta) : saleText(it, !!salesMeta) };
     });
-    Object.assign(S, { buf0, scan, results, params: { rate, mult, extra, margin, mm: Number((1 + margin / 100).toFixed(6)) }, asOf, salesMeta });
+    // 한 화면에 보이도록: 상품 줄에 아무 값도 없는 열(사이즈 칸·소재·비고 등)은 숨긴다. 핵심 머리글 열은 항상 보인다.
+    const KEEP = ['TOTAL', 'UNIT PRICE', 'EXTENDED PRICE', '시즌', '작업여부', '원산지'], keepCols = new Set(), used = new Set();
+    scan.headers.forEach(hh => ws.getRow(hh.row).eachCell({ includeEmpty: false }, (c, n) => { if (KEEP.includes(cellText(c).toUpperCase())) keepCols.add(n); }));
+    const hdrRows = new Set(scan.headers.map(x => x.row)), first = scan.headers.length ? scan.headers[0].row : 0;
+    ws.eachRow({ includeEmpty: false }, (row, r) => { if (r <= first || hdrRows.has(r)) return; row.eachCell({ includeEmpty: false }, (c, n) => { if (n > 4 && cellText(c) !== '') used.add(n); }); });
+    const hide = []; for (let c = 5; c <= ws.columnCount; c++) if (!used.has(c) && !keepCols.has(c)) hide.push(c);
+    Object.assign(S, { buf0, scan, hide, results, params: { rate, mult, extra, margin, hide, mm: Number((1 + margin / 100).toFixed(6)) }, asOf, salesMeta });
     try { localStorage.setItem('buyest.costcheck.params', JSON.stringify({ rate, extra, margin })); } catch(e){}
     renderResult(); setMsg('');
   } catch (e) { setMsg('실패: ' + (e && e.message ? e.message : e), true); }
@@ -246,13 +252,20 @@ async function buildXlsx(buf, scan, results, p){
   const xfs = m[2].match(/<xf\b[^>]*\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g) || [];
   const setAttr = (tag, name, val) => { const re = new RegExp('\\s' + name + '="[^"]*"'); return re.test(tag) ? tag.replace(re, ` ${name}="${val}"`) : tag.replace(/^<xf\b/, `<xf ${name}="${val}"`); };
   const newXfs = [], cache = new Map();
-  const makeStyle = (base, numFmtId, horizontal) => {
-    const key = base + '|' + numFmtId + '|' + horizontal;
+  // 예상판매가 강조용 글꼴·채우기 추가
+  const addTo = (tag, xml) => { const n = Number(st.match(new RegExp('<' + tag + ' count="(\\d+)"'))[1]); st = st.replace(new RegExp('<' + tag + ' count="\\d+"'), '<' + tag + ' count="' + (n + 1) + '"').replace('</' + tag + '>', xml + '</' + tag + '>'); return n; };
+  const fontBold = addTo('fonts', '<font><b/><sz val="10"/><color rgb="FF006100"/><name val="맑은 고딕"/><family val="2"/></font>');
+  const fontWhite = addTo('fonts', '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="맑은 고딕"/><family val="2"/></font>');
+  const fillLight = addTo('fills', '<fill><patternFill patternType="solid"><fgColor rgb="FFC6EFCE"/><bgColor indexed="64"/></patternFill></fill>');
+  const fillDark = addTo('fills', '<fill><patternFill patternType="solid"><fgColor rgb="FF548235"/><bgColor indexed="64"/></patternFill></fill>');
+  const makeStyle = (base, numFmtId, horizontal, hi) => {
+    const key = base + '|' + numFmtId + '|' + horizontal + '|' + (hi || '');
     if (cache.has(key)) return cache.get(key);
     const xf = xfs[base] || xfs[0];
     const mm = xf.match(/^(<xf\b[^>]*?)(\/?)>([\s\S]*)$/);
     let open = mm[1], inner = mm[2] ? '' : mm[3].replace(/<\/xf>\s*$/, '');
     open = setAttr(setAttr(setAttr(open, 'numFmtId', numFmtId), 'applyNumberFormat', 1), 'applyAlignment', 1);
+    if (hi) { const fo = hi === 'head' ? fontWhite : fontBold, fi = hi === 'head' ? fillDark : fillLight; open = setAttr(setAttr(setAttr(setAttr(open, 'fontId', fo), 'applyFont', 1), 'fillId', fi), 'applyFill', 1); }
     inner = inner.replace(/<alignment\b[^>]*\/>/, '') + `<alignment horizontal="${horizontal}" vertical="center" wrapText="1"/>`;
     newXfs.push(open + '>' + inner + '</xf>');
     const idx = xfs.length + newXfs.length - 1; cache.set(key, idx); return idx;
@@ -267,13 +280,14 @@ async function buildXlsx(buf, scan, results, p){
   const pcol = h => colLetter(h);
   scan.headers.forEach(h => {
     const base = cellStyle(rowsXml.get(h.row) || '', pcol(h.priceCol)), s = makeStyle(base, 0, 'center');
-    [[L.cost, '원가'], [L.sell, '예상판매가'], [L.stat, '판매상태'], [L.sale, '최근 판매이력']].forEach(([c, t]) => put(h.row, `<c r="${c}${h.row}" s="${s}" t="inlineStr"><is><t>${xmlEsc(t)}</t></is></c>`));
+    const sHead = makeStyle(base, 0, 'center', 'head');
+    [[L.cost, '원가'], [L.sell, '예상판매가'], [L.stat, '판매상태'], [L.sale, '최근 판매이력']].forEach(([c, t]) => put(h.row, `<c r="${c}${h.row}" s="${t === '예상판매가' ? sHead : s}" t="inlineStr"><is><t>${xmlEsc(t)}</t></is></c>`));
   });
   results.forEach(r => {
     const x = pcol(r.hdr.priceCol), base = cellStyle(rowsXml.get(r.row) || '', x);
-    const sNum = makeStyle(base, 3, 'right'), sCtr = makeStyle(base, 0, 'center'), sLeft = makeStyle(base, 0, 'left');
+    const sNum = makeStyle(base, 3, 'right'), sSell = makeStyle(base, 3, 'right', 'hi'), sCtr = makeStyle(base, 0, 'center'), sLeft = makeStyle(base, 0, 'left');
     put(r.row, `<c r="${L.cost}${r.row}" s="${sNum}"><f>${x}${r.row}*${p.rate}*${p.mult}</f><v>${r.cost}</v></c>`
-      + `<c r="${L.sell}${r.row}" s="${sNum}"><f>${L.cost}${r.row}*${p.mm}</f><v>${r.sell}</v></c>`
+      + `<c r="${L.sell}${r.row}" s="${sSell}"><f>${L.cost}${r.row}*${p.mm}</f><v>${r.sell}</v></c>`
       + `<c r="${L.stat}${r.row}" s="${sCtr}" t="inlineStr"><is><t>${xmlEsc(r.status)}</t></is></c>`
       + `<c r="${L.sale}${r.row}" s="${sLeft}" t="inlineStr"><is><t>${xmlEsc(r.sale)}</t></is></c>`);
   });
@@ -285,15 +299,27 @@ async function buildXlsx(buf, scan, results, p){
     return `<row r="${r}"${attrs}>${inner || ''}${a}</row>`;
   });
   sx = sx.replace(/<dimension ref="([A-Z]+\d+):[A-Z]+(\d+)"/, `<dimension ref="$1:${L.sale}$2"`);
-  const widths = [[cCost, 14], [cSell, 14], [cStat, 16], [cSale, 44]];
-  sx = sx.replace(/<col min="(\d+)" max="16384"([^>]*)\/>/, (all, mn, rest) => {
-    if (Number(mn) !== cCost) return all;
-    return widths.map(([c, w]) => `<col min="${c}" max="${c}" width="${w}" customWidth="1"/>`).join('') + `<col min="${cSale + 1}" max="16384"${rest}/>`;
+  // 열 폭 + 비어 있는 열 숨기기 (삭제가 아니라 숨김이라 수식은 그대로)
+  const hide = new Set(p.hide || []);
+  const defs = {}; let tail = ' style="4"';
+  const colsM = sx.match(/<cols>([\s\S]*?)<\/cols>/);
+  (colsM ? colsM[1].match(/<col\b[^>]*\/>/g) || [] : []).forEach(t => {
+    const mn = Number(t.match(/\bmin="(\d+)"/)[1]), mx = Number(t.match(/\bmax="(\d+)"/)[1]);
+    const at = t.replace(/^<col\b/, '').replace(/\/>$/, '').replace(/\s(min|max|hidden)="[^"]*"/g, '');
+    if (mx >= 16384) { tail = at; return; }
+    for (let c = mn; c <= Math.min(mx, lastCol); c++) defs[c] = at;
   });
-  if (!sx.includes(`<col min="${cCost}" max="${cCost}"`)) {      // 원본 열 정의가 다른 모양이면 맨 뒤에 덧붙임
-    const cw = widths.map(([c, w]) => `<col min="${c}" max="${c}" width="${w}" customWidth="1"/>`).join('');
-    sx = /<\/cols>/.test(sx) ? sx.replace('</cols>', cw + '</cols>') : sx.replace(/(<sheetData>)/, `<cols>${cw}</cols>$1`);
+  const out = []; let run = null;
+  const flush = () => { if (run) out.push(`<col min="${run.a}" max="${run.b}"${run.at}${run.hid ? ' hidden="1"' : ''}/>`); run = null; };
+  for (let c = 1; c <= lastCol; c++) {
+    const at = defs[c] || tail, hid = hide.has(c);
+    if (run && run.at === at && run.hid === hid) run.b = c; else { flush(); run = { a: c, b: c, at, hid }; }
   }
+  flush();
+  const newCols = [[cCost, 14], [cSell, 15], [cStat, 14], [cSale, 40]].map(([c, w]) => `<col min="${c}" max="${c}" width="${w}" customWidth="1"${tail.replace(/\s(width|customWidth|bestFit)="[^"]*"/g, '')}/>`).join('');
+  const colsXml = `<cols>${out.join('')}${newCols}<col min="${cSale + 1}" max="16384"${tail}/></cols>`;
+  sx = colsM ? sx.replace(colsM[0], colsXml) : sx.replace(/(<sheetData>)/, colsXml + '$1');
+  sx = sx.replace(/<sheetView\b[^>]*>/, tag => tag.replace(/\s(zoomScale|zoomScaleNormal)="[^"]*"/g, '').replace(/^<sheetView/, '<sheetView zoomScale="85" zoomScaleNormal="85"'));
   st = st.replace(m[0], `<cellXfs count="${xfs.length + newXfs.length}">${m[2]}${newXfs.join('')}</cellXfs>`);
   // 열어보면 바로 다시 계산되게
   const wbNew = /<calcPr\b[^>]*\/>/.test(wbXml) ? wbXml.replace(/<calcPr\b([^>]*)\/>/, (all, a) => /fullCalcOnLoad/.test(a) ? all : `<calcPr${a} fullCalcOnLoad="1"/>`) : wbXml.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
