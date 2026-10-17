@@ -65,8 +65,8 @@
   <div class="step">
     <h3>1. 리스트 올리기</h3>
     <div class="dropzone" id="drop" tabindex="0" role="button" aria-label="리스트 파일 선택">
-      <div>엑셀·CSV 파일을 끌어다 놓거나 클릭해서 선택하세요 (여러 개 가능)</div>
-      <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv,.txt" multiple>
+      <div>엑셀·CSV·PDF(패킹리스트/인보이스) 파일을 끌어다 놓거나 클릭해서 선택하세요 (여러 개 가능)</div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv,.txt,.pdf" multiple>
     </div>
     <div class="files" id="fileList"></div>
     <div style="margin-top:10px;font-size:13px;color:var(--mute);">또는 아래에 품번이나 목록을 그대로 붙여넣기 (한 줄에 하나)</div>
@@ -120,7 +120,73 @@ $('clearBtn').addEventListener('click', () => { S.files = []; $('paste').value =
 function addFiles(list){ for (const f of list) S.files.push(f); renderFiles(); }
 function renderFiles(){ $('fileList').innerHTML = S.files.map(f => `<span>${esc(f.name)}</span>`).join(''); }
 
+/* ---------- PDF (글자가 들어있는 패킹리스트/인보이스) 읽기 ----------
+   페이지마다 글자를 줄 단위로 모은 뒤, "... Made In: 국가 수량" 으로 끝나는 줄 = 품목 한 줄로 본다.
+   줄 앞쪽 품번(예: 4E3400 G000 / AX-T006-051)과 아래 "Color 코드" 줄을 칸으로 나눠 엑셀 행처럼 돌려준다.
+   스캔(이미지) PDF 는 글자가 없어 읽을 수 없다 → 안내 메시지. */
+let _pdfReady = null;
+function loadPdfJs(){
+  if (window.pdfjsLib) return Promise.resolve();
+  if (_pdfReady) return _pdfReady;
+  _pdfReady = new Promise((ok, no) => {
+    const sc = document.createElement('script'); sc.src = 'assets/libs/pdf.min.js';
+    sc.onload = () => { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/libs/pdf.worker.min.js'; ok(); } catch(e){ no(e); } };
+    sc.onerror = () => no(new Error('PDF 읽기 모듈을 불러오지 못했어요'));
+    document.head.appendChild(sc);
+  });
+  return _pdfReady;
+}
+function pdfLines(items){
+  const rows = [];
+  items.forEach(it => {
+    if (!it.str || !it.str.trim()) return;
+    const y = it.transform[5], x = it.transform[4];
+    let r = rows.find(r => Math.abs(r.y - y) < 3);
+    if (!r) { r = { y, parts: [] }; rows.push(r); }
+    r.parts.push({ x, s: it.str.trim() });
+  });
+  rows.sort((a, b) => b.y - a.y);
+  return rows.map(r => r.parts.sort((a, b) => a.x - b.x).map(p => p.s).join(' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+}
+const PDF_HDR = /^(.+?)\s+Made\s*In:?\s*\S*\s+(\d+)\s*$/i;
+function pdfItemCells(head, color){
+  const toks = head.split(' ');
+  const code1 = toks[0];
+  const t2 = toks[1] || '';
+  // 두 번째 토큰이 품번의 뒷부분(G000, AO29, AKLS)인지: 숫자가 섞인 3~5자리 영숫자, 또는 하이픈 없는 품번 뒤의 4글자 대문자
+  const second = /^[A-Z0-9]{3,5}$/.test(t2) && (/\d/.test(t2) || (!code1.includes('-') && t2.length === 4 && !/^(POLO|SHOE|SHOES|BAG|BAGS|COAT|PANT|PANTS|SKIRT|DRESS|SHIRT|HAT|CAP)$/.test(t2)));
+  const cells = [code1];
+  if (second) { cells.push(code1 + ' ' + t2); if (color) cells.push(code1 + ' ' + t2 + ' ' + color); }
+  else if (color) cells.push(code1 + ' ' + color);
+  cells.push(head);   // 설명 전체(브랜드·시즌 포함)
+  return cells;
+}
+async function readPdfRows(file){
+  await loadPdfJs();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const out = []; let n = 0, textChars = 0;
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    const lines = pdfLines(tc.items);
+    textChars += lines.join('').length;
+    for (let i = 0; i < lines.length; i++) {
+      const m = PDF_HDR.exec(lines[i]);
+      if (!m) continue;
+      let color = '';
+      for (let j = i + 1; j < Math.min(i + 5, lines.length) && !PDF_HDR.test(lines[j]); j++) {
+        const c = /^Color\s+([A-Z0-9]{4,6})/.exec(lines[j]);
+        if (c && /[A-Z]/.test(c[1]) && /\d/.test(c[1])) { color = c[1]; break; }
+      }
+      out.push({ file: file.name, sheet: '', r: ++n, cells: pdfItemCells(m[1].trim(), color).concat([m[2]]) });
+    }
+  }
+  if (!out.length) throw new Error(textChars < 50 ? file.name + ': 글자가 없는 스캔(이미지) PDF 라서 읽을 수 없어요. 인보이스 자동인식(OCR)으로 변환하거나 엑셀로 올려 주세요.' : file.name + ': PDF 에서 품목 줄을 찾지 못했어요. (패킹리스트 형식이 아닌 것 같아요)');
+  return out;
+}
+
 async function readFileRows(file){
+  if (/\.pdf$/i.test(file.name)) return readPdfRows(file);
   const out = [];
   const buf = await file.arrayBuffer();
   const wb = await XLSXW.read(buf, { type: 'array', cellDates: false });
