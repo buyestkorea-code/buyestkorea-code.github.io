@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "file": "buyest-video-studio-v1.0.0.zip",
-  "sha256": "b6e7a78f4ed5a05f0217fe7e619a8216bb736891251cda944fdd60460078c599",
-  "notes": "첫 배포"
+  "version": "1.1.0",
+  "file": "buyest-video-studio-v1.1.0.zip",
+  "sha256": "bfa609897077e0164e641cc415f9bf75aa00c69e5ef17e3af53cb80e3b5494c8",
+  "notes": "⓪ 기획·대본 탭 추가 (훅 공식·대본·캡션 검사·프롬프트 복사) · 릴스 첫 2초 훅·사진별 화면 글자"
 }
