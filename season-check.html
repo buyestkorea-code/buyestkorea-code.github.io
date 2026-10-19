@@ -46,7 +46,7 @@
 <body>
 <div id="app">
   <h1>물류팀 시즌체크</h1>
-  <p class="desc">1차 가공한 재고추가 엑셀(예: <b>재고추가(경호)</b>)을 올리면, 각 품번을 이카운트·바이스트 DB에서 찾아 <b>시즌 칸 · 판매중상품명 · 최근들어온내역</b>을 채워 줘요. 입고 상품을 눈으로 확인하면서 <b>작업여부</b>는 직접 적을 수 있게 비워 둬요. 또 과거 입고 이력으로 <b>사이즈(옵션값) 칸을 예측해서 노란색으로 미리 채워</b> 줘요 (틀리면 고치면 돼요). 모델이 <b>XXXXX (YYYYY)</b> 형태면 XXXXX로 먼저 찾고, DB에 없을 때만 YYYYY로 찾아요.</p>
+  <p class="desc">1차 가공한 재고추가 엑셀(예: <b>재고추가(경호)</b>)을 올리면, 각 품번을 이카운트·바이스트 DB에서 찾아 <b>시즌 칸 · 판매중상품명 · 최근들어온내역</b>을 채워 줘요. 입고 상품을 눈으로 확인하면서 <b>작업여부</b>는 직접 적을 수 있게 비워 둬요. 또 과거 입고 이력으로 <b>사이즈(옵션값) 머리글과 상품 줄마다 사이즈별 수량을 예측해서 노란색으로 미리 채워</b> 줘요 (틀려도 되니 실물 보고 고치면 돼요). 모델이 <b>XXXXX (YYYYY)</b> 형태면 XXXXX로 먼저 찾고, DB에 없을 때만 YYYYY로 찾아요.</p>
 
   <div class="step">
     <h3>1. 재고추가 파일</h3>
@@ -79,7 +79,7 @@
     <div id="asOf" style="font-size:13px;color:var(--mute);"></div>
     <div class="stats" id="stats"></div>
     <div style="margin:8px 0;"><button class="btn btn-sub" id="dlBtn">원본 양식 + 시즌체크 엑셀로 받기</button></div>
-    <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>시즌</th><th>판매중상품명</th><th>이카운트 재고</th><th>최근들어온내역</th><th>머리글에 채운 사이즈 (참고용)</th><th>작업여부</th></tr></thead><tbody id="tbody"></tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>시즌</th><th>판매중상품명</th><th>이카운트 재고</th><th>최근들어온내역</th><th>채운 사이즈별 수량 (예측)</th><th>작업여부</th></tr></thead><tbody id="tbody"></tbody></table></div>
     <div class="note">시즌 칸 읽는 법 — <b>26FW판매중</b>: 사이트에서 노출 중이고 살 수 있는 상품(시즌은 상품명 맨 앞에서 읽고, 상품명에 시즌이 없으면 사이트 등록일로 추정해 이름 칸에 표시) · <b>전품</b>: 노출 중인데 옵션이 모두 품절 · <b>미노출</b>: 사이트에서 숨김 · <b>다른색상판매</b>: 같은 모델의 다른 컬러만 있음 · <b>과거판매</b>: 사이트엔 없지만 이카운트 판매이력이 있음 · <b>신상</b>: 사이트에 없는 품번(이카운트에만 있어도 신상) · <b>확인필요</b>: 품번이 4자 미만이라 검색 불가. 작업여부는 비워 두니 확인하며 직접 적어 주세요.</div>
   </div>
 </div>
@@ -259,6 +259,44 @@ function planOptions(scan, predMap){
   }
   return plan;
 }
+/* ---------- 상품 줄마다 사이즈별 수량 채우기 ---------- */
+// 사이즈 라벨 → 열 번호 (머리글에 우리가 채운 스케일이면 TU 다음 칸부터, 이미 적혀 있던 머리글이면 그 칸 그대로)
+function colMapFor(h, b){
+  const m = {};
+  if (b && b.scale) b.scale.forEach((lab, k) => { m[lab] = h.model + 2 + k; });
+  else h.scale.forEach(s => { if (s.label !== 'TU') m[s.label] = s.c; });
+  return m;
+}
+// 과거 입고 분포(sizes)를 이번 수량에 맞춰 비례 배분 (합계가 정확히 qty 가 되도록 나머지는 소수점이 큰 순서로)
+function scaleDist(sizes, qty, tot){
+  const ks = Object.keys(sizes), raw = ks.map(k => Number(sizes[k]) * qty / tot), fl = raw.map(Math.floor);
+  let rest = qty - fl.reduce((a, b) => a + b, 0);
+  raw.map((v, i) => [v - fl[i], i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (rest > 0) { fl[i]++; rest--; } });
+  const out = {}; ks.forEach((k, i) => { if (fl[i] > 0) out[k] = fl[i]; }); return out;
+}
+// 참고할 과거 이력이 없을 때: 스케일 가운데 사이즈부터 한 칸에 1개씩, 남는 수량은 가운데부터 돌아가며 더함
+function evenSpread(labels, qty){
+  const n = labels.length, k = Math.min(qty, n), start = Math.floor((n - k) / 2), chosen = labels.slice(start, start + k), mid = (k - 1) / 2;
+  const order = chosen.map((l, i) => [Math.abs(i - mid), l]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+  const out = {}; chosen.forEach(l => { out[l] = 1; });
+  for (let r = qty - k, i = 0; r > 0; r--, i++) out[order[i % order.length]]++;
+  return out;
+}
+function allocFor(it, b, cands){
+  const none = { alloc: null, allocCols: null, allocText: '' };
+  const qty = Math.round(it.qty || 0);
+  if (qty <= 0 || Object.keys(it.sizes || {}).length) return none;   // 수량이 없거나 이미 사이즈별로 적혀 있으면 건드리지 않음
+  const cm = colMapFor(it.hdr, b), labels = Object.keys(cm).sort((x, y) => cm[x] - cm[y]);
+  if (!labels.length) return none;
+  let alloc = null, src = '';
+  for (const c of cands) {
+    const ks = Object.keys(c.sizes || {}); if (!ks.length || !ks.every(k => k in cm)) continue;
+    const tot = ks.reduce((a, k) => a + Number(c.sizes[k]), 0); if (!(tot > 0)) continue;
+    alloc = scaleDist(c.sizes, qty, tot); src = c.lv === 'key' ? '같은 품번 이력' : c.lv === 'vf' ? '같은 업체·품번 앞부분 이력' : '품번 앞부분 이력'; break;
+  }
+  if (!alloc) { alloc = evenSpread(labels, qty); src = '이력 없음 — 가운데 사이즈에 고르게'; }
+  return { alloc, allocCols: cm, allocText: labels.filter(l => alloc[l]).map(l => `${l}×${alloc[l]}`).join(' ') + ` (${src})` };
+}
 function optTextFor(b, p){
   if (!b) return '';
   if (b.skip) return b.skip === '이미 입력됨' ? '' : `옵션 예측 없음 (${b.skip})`;
@@ -302,10 +340,10 @@ $('runBtn').addEventListener('click', async () => {
 
     // 옵션값(사이즈 스케일) 예측: 서버가 줄마다 과거 입고 이력으로 예측 → 머리글(블록) 단위로 투표
     setMsg('옵션값(사이즈)을 예측하는 중…');
-    const predMap = {}; let predWarn = '';
+    const predMap = {}, distMap = {}; let predWarn = '';
     try {
-      const pr = await post(API_SC, { user: auth.id, pass: auth.pass, action: 'predict', date, lines: scan.items.map((it, n) => ({ i: n, model: it.main, vendor: it.batch })) });
-      (pr.preds || []).forEach(p => { predMap[p.i] = p.pred; });
+      const pr = await post(API_SC, { user: auth.id, pass: auth.pass, action: 'predict', date, lines: scan.items.map((it, n) => ({ i: n, model: it.main, vendor: it.batch, qty: it.qty })) });
+      (pr.preds || []).forEach(p => { predMap[p.i] = p.pred; distMap[p.i] = p.dist || []; });
     } catch (e) { if (/로그인/.test(e.message)) throw e; predWarn = '옵션값 예측을 불러오지 못했어요 (시즌 확인은 계속 진행). ' + e.message; }
     const plan = planOptions(scan, predMap);
 
@@ -314,7 +352,7 @@ $('runBtn').addEventListener('click', async () => {
       const hs = []; const seen = new Set();
       [d.key, normKey(i.main), i.alt ? normKey(i.alt) : ''].forEach(k => (history[k] || []).forEach(h => { const id = h.date + '|' + h.label; if (!seen.has(id)) { seen.add(id); hs.push(h); } }));
       hs.sort((x, y) => y.date.localeCompare(x.date));
-      return { ...i, key: d.key, entryKey: (d.exact && d.key) || normKey(i.main), seasonText: fmtSeason(o), o, hist: fmtHist(hs), hasHist: hs.length > 0, optText: optTextFor(plan.get(i.hdr), predMap[n]) };
+      return { ...i, key: d.key, entryKey: (d.exact && d.key) || normKey(i.main), seasonText: fmtSeason(o), o, hist: fmtHist(hs), hasHist: hs.length > 0, optText: optTextFor(plan.get(i.hdr), predMap[n]), ...allocFor(i, plan.get(i.hdr), distMap[n] || []) };
     });
     // 한 화면에 보이도록 비어 있는 원산지·소재·비고 칸은 숨긴다 (삭제 아님)
     const hide = [], hdrRows = new Set(scan.headers.map(x => x.row)), used = new Set(), first = scan.headers[0].row;
@@ -337,7 +375,7 @@ function renderResult(){
     <td class="code">${esc(r.main)}${r.alt ? `<div class="sub">괄호: ${esc(r.alt)}${r.o.tag ? ' → 이쪽으로 찾음' : ''}</div>` : ''}${r.batch ? `<div class="sub">${esc(r.batch)}</div>` : ''}</td>
     <td><span class="tag ${r.o.cls}">${esc(r.seasonText)}</span></td>
     <td>${esc(r.o.name)}</td><td class="num">${r.o.ec == null ? '' : Number(r.o.ec).toLocaleString()}</td>
-    <td>${esc(r.hist)}</td><td>${esc(r.optText)}</td><td class="blank">(직접 입력)</td></tr>`).join('');
+    <td>${esc(r.hist)}</td><td>${esc(r.allocText)}</td><td class="blank">(직접 입력)</td></tr>`).join('');
 }
 
 /* ---------- 원본 양식 그대로 + 시즌 칸 채우기 + 오른쪽에 두 열 추가 (엑셀 안의 XML 을 직접 고쳐 원본 서식을 보존) ---------- */
@@ -345,17 +383,19 @@ const colLetter = n => { let s = ''; while (n > 0) { const m = (n - 1) % 26; s =
 const colNum = L => [...L].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0);
 const xmlEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const strCell = (ref, s, text) => `<c r="${ref}"${s != null ? ` s="${s}"` : ''} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(text)}</t></is></c>`;
+const numCell = (ref, s, n) => `<c r="${ref}"${s != null ? ` s="${s}"` : ''}><v>${n}</v></c>`;
 
 // 한 줄의 XML 에서 지정한 칸을 문자열로 바꾸거나(있으면 서식 유지) 열 순서에 맞게 끼워 넣는다
-function putText(rowInner, rowNum, col, text, forceS){
+function putText(rowInner, rowNum, col, text, forceS, isNum){
+  const mk = (ref, s, t) => isNum ? numCell(ref, s, t) : strCell(ref, s, t);
   const ref = colLetter(col) + rowNum;
   const re = new RegExp('<c r="' + ref + '"([^>]*?)(\\/>|>[\\s\\S]*?<\\/c>)');
   const m = rowInner.match(re);
-  if (m) { const s = forceS != null ? forceS : (m[1].match(/\bs="(\d+)"/) || [])[1]; return rowInner.replace(re, () => strCell(ref, s != null ? s : null, text)); }
+  if (m) { const s = forceS != null ? forceS : (m[1].match(/\bs="(\d+)"/) || [])[1]; return rowInner.replace(re, () => mk(ref, s != null ? s : null, text)); }
   let at = rowInner.length;
   const cre = /<c r="([A-Z]+)\d+"/g; let c;
   while ((c = cre.exec(rowInner))) { if (colNum(c[1]) > col) { at = c.index; break; } }
-  return rowInner.slice(0, at) + strCell(ref, forceS != null ? forceS : null, text) + rowInner.slice(at);
+  return rowInner.slice(0, at) + mk(ref, forceS != null ? forceS : null, text) + rowInner.slice(at);
 }
 
 async function buildXlsx(buf, scan, results, hide, plan){
@@ -403,6 +443,7 @@ async function buildXlsx(buf, scan, results, hide, plan){
     } else {
       const hd = it.hdr, s = styleOf(body, rn, hd.work || hd.season);
       body = putText(body, rn, hd.season, it.seasonText);
+      if (it.alloc) Object.keys(it.alloc).forEach(lab => { const col = it.allocCols[lab]; body = putText(body, rn, col, it.alloc[lab], predStyle(styleOf(body, rn, col) || styleOf(body, rn, hd.model + 1) || s), true); });
       body += strCell(colLetter(cName) + rn, s, it.o.name) + strCell(colLetter(cHist) + rn, s, it.hist);
     }
     return `<row r="${r}"${attrs}>${body}</row>`;
@@ -431,6 +472,9 @@ async function buildXlsx(buf, scan, results, hide, plan){
   const colsXml = `<cols>${out.join('')}${newCols}<col min="${cHist + 1}" max="16384"${tail}/></cols>`;
   sx = colsM ? sx.replace(colsM[0], colsXml) : sx.replace(/(<sheetData>)/, colsXml + '$1');
   zip.file(sheetPath, sx);
+  // 채운 수량이 TOTAL 등 수식에 바로 반영되도록 열 때 다시 계산
+  const wbNew = /<calcPr\b[^>]*\/>/.test(wbXml) ? wbXml.replace(/<calcPr\b([^>]*)\/>/, (all, a) => /fullCalcOnLoad/.test(a) ? all : `<calcPr${a} fullCalcOnLoad="1"/>`) : wbXml.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
+  zip.file('xl/workbook.xml', wbNew);
   return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', compression: 'DEFLATE' });
 }
 
