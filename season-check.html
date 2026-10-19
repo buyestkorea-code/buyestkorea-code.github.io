@@ -25,7 +25,7 @@
   .inputs input:focus-visible, .btn:focus-visible, .dropzone:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
   .chk { font-size:13px; color:#374151; margin-top:10px; display:flex; gap:6px; align-items:center; }
   #msg { font-size:13.5px; color:var(--mute); margin:10px 0 0; white-space:pre-wrap; }
-  #msg.err { color:var(--bad); }
+  #msg.err, #learnMsg.err { color:var(--bad); }
   .note { font-size:12.5px; color:var(--warn); background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:8px 10px; margin-top:10px; line-height:1.55; }
   .stats { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 10px; }
   .chip { border:1px solid #d1d5db; background:#fff; border-radius:999px; padding:5px 13px; font-size:13px; }
@@ -46,7 +46,7 @@
 <body>
 <div id="app">
   <h1>물류팀 시즌체크</h1>
-  <p class="desc">1차 가공한 재고추가 엑셀(예: <b>재고추가(경호)</b>)을 올리면, 각 품번을 이카운트·바이스트 DB에서 찾아 <b>시즌 칸 · 판매중상품명 · 최근들어온내역</b>을 채워 줘요. 입고 상품을 눈으로 확인하면서 <b>작업여부</b>는 직접 적을 수 있게 비워 둬요. 모델이 <b>XXXXX (YYYYY)</b> 형태면 XXXXX로 먼저 찾고, DB에 없을 때만 YYYYY로 찾아요.</p>
+  <p class="desc">1차 가공한 재고추가 엑셀(예: <b>재고추가(경호)</b>)을 올리면, 각 품번을 이카운트·바이스트 DB에서 찾아 <b>시즌 칸 · 판매중상품명 · 최근들어온내역</b>을 채워 줘요. 입고 상품을 눈으로 확인하면서 <b>작업여부</b>는 직접 적을 수 있게 비워 둬요. 또 과거 입고 이력으로 <b>사이즈(옵션값) 칸을 예측해서 노란색으로 미리 채워</b> 줘요 (틀리면 고치면 돼요). 모델이 <b>XXXXX (YYYYY)</b> 형태면 XXXXX로 먼저 찾고, DB에 없을 때만 YYYYY로 찾아요.</p>
 
   <div class="step">
     <h3>1. 재고추가 파일</h3>
@@ -67,12 +67,19 @@
     <div id="msg" role="status"></div>
   </div>
 
+  <div class="step">
+    <h3>옵션값 학습 (선택)</h3>
+    <p class="desc" style="margin:0 0 8px;">직원이 사이즈 수량까지 채운 <b>완성본</b>(예: 2026.10.08 재고추가.xlsx)을 올리면 그 품번의 옵션값이 DB에 쌓여서, 다음 입고부터 예측이 더 정확해져요. 과거 파일(2021~2026년, 약 8만 줄)은 이미 들어 있어요.</p>
+    <div class="dropzone" id="learnDrop" tabindex="0" role="button" aria-label="완성본 파일 선택"><div>완성본 엑셀(.xlsx) 선택</div><input type="file" id="learnInput" accept=".xlsx"></div>
+    <div id="learnMsg" style="font-size:13.5px;color:var(--mute);margin-top:8px;" role="status"></div>
+  </div>
+
   <div class="step" id="resultBox" style="display:none;">
     <h3>3. 결과</h3>
     <div id="asOf" style="font-size:13px;color:var(--mute);"></div>
     <div class="stats" id="stats"></div>
     <div style="margin:8px 0;"><button class="btn btn-sub" id="dlBtn">원본 양식 + 시즌체크 엑셀로 받기</button></div>
-    <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>시즌</th><th>판매중상품명</th><th>이카운트 재고</th><th>최근들어온내역</th><th>작업여부</th></tr></thead><tbody id="tbody"></tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>시즌</th><th>판매중상품명</th><th>이카운트 재고</th><th>최근들어온내역</th><th>옵션예측 (사이즈 칸)</th><th>작업여부</th></tr></thead><tbody id="tbody"></tbody></table></div>
     <div class="note">시즌 칸 읽는 법 — <b>26FW판매중</b>: 사이트에서 노출 중이고 살 수 있는 상품(시즌은 상품명 맨 앞에서 읽고, 상품명에 시즌이 없으면 사이트 등록일로 추정해 이름 칸에 표시) · <b>전품</b>: 노출 중인데 옵션이 모두 품절 · <b>미노출</b>: 사이트에서 숨김 · <b>다른색상판매</b>: 같은 모델의 다른 컬러만 있음 · <b>과거판매</b>: 사이트엔 없지만 이카운트 판매이력이 있음 · <b>신상</b>: 사이트에 없는 품번(이카운트에만 있어도 신상) · <b>확인필요</b>: 품번이 4자 미만이라 검색 불가. 작업여부는 비워 두니 확인하며 직접 적어 주세요.</div>
   </div>
 </div>
@@ -132,15 +139,21 @@ function scanSheet(ws){
     const cols = {};
     row.eachCell({ includeEmpty: false }, (c, n) => {
       const t = cellText(c).toUpperCase();
-      if (t === 'MODEL') cols.model = n; else if (t === '시즌') cols.season = n; else if (t === '작업여부') cols.work = n; else if (t === 'INV. QTY' || t === 'INV.QTY') cols.qty = n;
+      if (t === 'MODEL') cols.model = n; else if (t === '시즌') cols.season = n; else if (t === '작업여부') cols.work = n; else if (t === 'INV. QTY' || t === 'INV.QTY') cols.qty = n; else if (t === 'TOTAL') cols.total = n; else if (t === 'UNIT PRICE') cols.price = n;
     });
-    if (cols.model && cols.season) { cur = { row: r, ...cols }; headers.push(cur); return; }
+    if (cols.model && cols.season) {
+      cur = { row: r, ...cols, scale: [] };   // 이 블록 머리글의 사이즈 칸(MODEL ~ TOTAL 사이)에 이미 적힌 옵션 라벨
+      if (cur.total) for (let c = cur.model + 1; c < cur.total; c++) { const t = cellText(row.getCell(c)); if (t) cur.scale.push({ c, label: t }); }
+      headers.push(cur); return;
+    }
     const a = cellText(row.getCell(1));
     if (/^20\d{2}[.\-]\d{1,2}[.\-]\d{1,2}\b/.test(a)) { title = a; return; }   // 인보이스 제목 줄(병합 셀이라 MODEL 칸에도 같은 글자가 보임)
     if (!cur) return;
     const model = cellText(row.getCell(cur.model));
     if (!model || /^TOTAL$/i.test(model)) return;
-    items.push({ row: r, model, qty: cur.qty ? (cellNum(row.getCell(cur.qty)) || 0) : 0, hdr: cur, batch: title.replace(/^20\d{2}[.\-]\d{1,2}[.\-]\d{1,2}\s*/, '') });
+    const sizes = {}; cur.scale.forEach(sc => { const q = cellNum(row.getCell(sc.c)); if (q > 0) sizes[sc.label] = (sizes[sc.label] || 0) + q; });
+    items.push({ row: r, model, qty: cur.qty ? (cellNum(row.getCell(cur.qty)) || 0) : 0, price: cur.price ? cellNum(row.getCell(cur.price)) : null, sizes,
+      seasonTxt: cellText(row.getCell(cur.season)), workTxt: cur.work ? cellText(row.getCell(cur.work)) : '', hdr: cur, batch: title.replace(/^20\d{2}[.\-]\d{1,2}[.\-]\d{1,2}\s*/, '') });
   });
   return { headers, items };
 }
@@ -215,6 +228,38 @@ function describe(d){
 const fmtSeason = o => (o.status === '신상' || o.status === '다른색상판매' || o.status === '확인필요') ? o.status : (o.season || '') + o.status;
 const fmtHist = list => (list || []).map(h => { const m = h.date.match(/(\d+)-(\d+)-(\d+)/); return `${Number(m[2])}월${Number(m[3])}일 ${h.label}`; }).join(' / ');
 
+/* ---------- 옵션값(사이즈 스케일) 예측 ---------- */
+const WV = { ec: 5, key: 3, f: 2, vf: 1, vs: 0.5, s: 0.25 };   // 근거별 가중치 (같은 품번 이력이 가장 믿을 만하고, 품번 형태만 맞는 건 약함)
+const jac = (a, b) => { const A = new Set(a), B = new Set(b); let n = 0; A.forEach(x => B.has(x) && n++); return n / (A.size + B.size - n || 1); };
+const scaleBrief = sc => sc.length ? (sc.length > 3 ? `${sc[0]}~${sc[sc.length - 1]} (${sc.length}칸)` : sc.join(',')) : '';
+// 머리글 하나(= 한 블록)마다: 이미 사이즈가 적혀 있으면 그대로 두고, 비어 있으면 블록 안 줄들의 예측을 투표해서 정한다
+function planOptions(scan, predMap){
+  const plan = new Map();
+  scan.headers.forEach(h => {
+    const its = scan.items.map((it, n) => ({ it, n })).filter(x => x.it.hdr === h);
+    if (h.scale.some(s => s.label !== 'TU')) { plan.set(h, { skip: '이미 입력됨' }); return; }
+    if (!h.total || h.total - h.model < 3) { plan.set(h, { skip: '사이즈 칸 없음' }); return; }
+    const votes = {}; let total = 0;
+    its.forEach(({ n }) => { const p = predMap[n]; if (!p || !p.scale) return; const w = (WV[p.lv] || 0.25) * (p.conf || 0); total += w;
+      const v = votes[p.scale] || (votes[p.scale] = { w: 0, lvW: 0, why: '', n: 0 }); v.w += w; v.n++; if ((WV[p.lv] || 0) > v.lvW) { v.lvW = WV[p.lv] || 0; v.why = p.why; v.lv = p.lv; } });
+    const e = Object.entries(votes).sort((a, b) => b[1].w - a[1].w);
+    if (!e.length) { plan.set(h, { skip: '근거 이력 없음' }); return; }
+    const share = total ? e[0][1].w / total : 0, top = e[0][1];
+    const conf = (top.lv === 'ec' || top.lv === 'key') && share >= 0.6 ? '높음' : (share >= 0.7 && (top.lv === 'f' || top.lv === 'vf')) ? '높음' : (share >= 0.5 && top.lv !== 's') ? '보통' : '낮음';
+    let scale = e[0][0].split(','), cut = false; const slots = h.total - h.model - 2;   // TU 칸 다음부터 TOTAL 앞까지
+    if (scale.length > slots) { scale = scale.slice(0, slots); cut = true; }
+    plan.set(h, { scale, conf, why: top.why, lv: top.lv, cut, alt: e[1] ? e[1][0].split(',') : null, lines: its.length });
+  });
+  return plan;
+}
+function optTextFor(b, p){
+  if (!b) return '';
+  if (b.skip) return b.skip === '이미 입력됨' ? '' : `옵션 예측 없음 (${b.skip})`;
+  let t = `${scaleBrief(b.scale)} · ${b.why} · 신뢰 ${b.conf}${b.cut ? ' · 칸 부족으로 일부 생략' : ''}`;
+  if (p && p.scale && jac(p.scale.split(','), b.scale) < 0.6) t += ` / 이 줄만 ${scaleBrief(p.scale.split(','))} 가능성`;
+  return t;
+}
+
 /* ---------- 실행 ---------- */
 $('runBtn').addEventListener('click', async () => {
   const auth = getAuth();
@@ -248,18 +293,27 @@ $('runBtn').addEventListener('click', async () => {
     try { history = (await post(API_SC, { user: auth.id, pass: auth.pass, action: 'lookup', keys: [...keys].filter(k => k.length >= 4), exclude: { date, label } })).history || {}; }
     catch (e) { if (/로그인/.test(e.message)) throw e; history = {}; setMsg('최근 입고 내역을 불러오지 못했어요 (시즌 확인은 계속 진행). ' + e.message); }
 
-    const results = decided.map(({ i, d }) => {
+    // 옵션값(사이즈 스케일) 예측: 서버가 줄마다 과거 입고 이력으로 예측 → 머리글(블록) 단위로 투표
+    setMsg('옵션값(사이즈)을 예측하는 중…');
+    const predMap = {};
+    try {
+      const pr = await post(API_SC, { user: auth.id, pass: auth.pass, action: 'predict', date, lines: scan.items.map((it, n) => ({ i: n, model: it.main, vendor: it.batch })) });
+      (pr.preds || []).forEach(p => { predMap[p.i] = p.pred; });
+    } catch (e) { if (/로그인/.test(e.message)) throw e; setMsg('옵션값 예측을 불러오지 못했어요 (시즌 확인은 계속 진행). ' + e.message); }
+    const plan = planOptions(scan, predMap);
+
+    const results = decided.map(({ i, d }, n) => {
       const o = normKey(i.main).length < 4 ? { status: '확인필요', cls: 't-warn', season: '', name: '품번이 너무 짧아 찾지 못함', ec: null, tag: '' } : describe(d);
       const hs = []; const seen = new Set();
       [d.key, normKey(i.main), i.alt ? normKey(i.alt) : ''].forEach(k => (history[k] || []).forEach(h => { const id = h.date + '|' + h.label; if (!seen.has(id)) { seen.add(id); hs.push(h); } }));
       hs.sort((x, y) => y.date.localeCompare(x.date));
-      return { ...i, key: d.key, entryKey: (d.exact && d.key) || normKey(i.main), seasonText: fmtSeason(o), o, hist: fmtHist(hs), hasHist: hs.length > 0 };
+      return { ...i, key: d.key, entryKey: (d.exact && d.key) || normKey(i.main), seasonText: fmtSeason(o), o, hist: fmtHist(hs), hasHist: hs.length > 0, optText: optTextFor(plan.get(i.hdr), predMap[n]) };
     });
     // 한 화면에 보이도록 비어 있는 원산지·소재·비고 칸은 숨긴다 (삭제 아님)
     const hide = [], hdrRows = new Set(scan.headers.map(x => x.row)), used = new Set(), first = scan.headers[0].row;
     ws.eachRow({ includeEmpty: false }, (row, r) => { if (r <= first || hdrRows.has(r)) return; row.eachCell({ includeEmpty: false }, (c, n) => { if (cellText(c) !== '') used.add(n); }); });
     scan.headers.forEach(h => ws.getRow(h.row).eachCell({ includeEmpty: false }, (c, n) => { if (['원산지', '소재', '비고'].includes(cellText(c)) && !used.has(n) && !hide.includes(n)) hide.push(n); }));
-    Object.assign(S, { buf0, scan, results, hide, date, label, asOf: A.asOf, saved: false });
+    Object.assign(S, { buf0, scan, results, hide, plan, date, label, asOf: A.asOf, saved: false });
     renderResult(); setMsg('');
   } catch (e) { setMsg('실패: ' + (e && e.message ? e.message : e), true); }
   $('runBtn').disabled = false;
@@ -268,7 +322,7 @@ $('runBtn').addEventListener('click', async () => {
 function renderResult(){
   $('resultBox').style.display = '';
   const R = S.results, cnt = s => R.filter(r => r.o.status === s).length;
-  $('stats').innerHTML = [['전체 상품 줄', R.length], ['판매중', cnt('판매중')], ['전품(품절)', cnt('전품')], ['미노출', cnt('미노출')], ['다른색상판매', cnt('다른색상판매')], ['신상', cnt('신상')], ['확인필요', cnt('확인필요')], ['최근 입고 이력 있음', R.filter(r => r.hasHist).length]]
+  $('stats').innerHTML = [['전체 상품 줄', R.length], ['판매중', cnt('판매중')], ['전품(품절)', cnt('전품')], ['미노출', cnt('미노출')], ['다른색상판매', cnt('다른색상판매')], ['신상', cnt('신상')], ['확인필요', cnt('확인필요')], ['최근 입고 이력 있음', R.filter(r => r.hasHist).length], ['옵션 예측한 블록', [...S.plan.values()].filter(b => b.scale).length + ' / ' + S.plan.size]]
     .map(([t, n]) => `<span class="chip">${t} <b>${n.toLocaleString()}</b></span>`).join('');
   const mm = S.date.match(/(\d+)-(\d+)-(\d+)/);
   $('asOf').innerHTML = `이번 입고: <b>${Number(mm[2])}월${Number(mm[3])}일 ${esc(S.label)}</b>` + (S.asOf ? ` · 이카운트 재고 기준 ${new Date(S.asOf * 1000).toLocaleString('ko-KR')}` : '');
@@ -276,7 +330,7 @@ function renderResult(){
     <td class="code">${esc(r.main)}${r.alt ? `<div class="sub">괄호: ${esc(r.alt)}${r.o.tag ? ' → 이쪽으로 찾음' : ''}</div>` : ''}${r.batch ? `<div class="sub">${esc(r.batch)}</div>` : ''}</td>
     <td><span class="tag ${r.o.cls}">${esc(r.seasonText)}</span></td>
     <td>${esc(r.o.name)}</td><td class="num">${r.o.ec == null ? '' : Number(r.o.ec).toLocaleString()}</td>
-    <td>${esc(r.hist)}</td><td class="blank">(직접 입력)</td></tr>`).join('');
+    <td>${esc(r.hist)}</td><td>${esc(r.optText)}</td><td class="blank">(직접 입력)</td></tr>`).join('');
 }
 
 /* ---------- 원본 양식 그대로 + 시즌 칸 채우기 + 오른쪽에 두 열 추가 (엑셀 안의 XML 을 직접 고쳐 원본 서식을 보존) ---------- */
@@ -286,18 +340,18 @@ const xmlEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').repla
 const strCell = (ref, s, text) => `<c r="${ref}"${s != null ? ` s="${s}"` : ''} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(text)}</t></is></c>`;
 
 // 한 줄의 XML 에서 지정한 칸을 문자열로 바꾸거나(있으면 서식 유지) 열 순서에 맞게 끼워 넣는다
-function putText(rowInner, rowNum, col, text){
+function putText(rowInner, rowNum, col, text, forceS){
   const ref = colLetter(col) + rowNum;
   const re = new RegExp('<c r="' + ref + '"([^>]*?)(\\/>|>[\\s\\S]*?<\\/c>)');
   const m = rowInner.match(re);
-  if (m) { const s = (m[1].match(/\bs="(\d+)"/) || [])[1]; return rowInner.replace(re, () => strCell(ref, s != null ? s : null, text)); }
+  if (m) { const s = forceS != null ? forceS : (m[1].match(/\bs="(\d+)"/) || [])[1]; return rowInner.replace(re, () => strCell(ref, s != null ? s : null, text)); }
   let at = rowInner.length;
   const cre = /<c r="([A-Z]+)\d+"/g; let c;
   while ((c = cre.exec(rowInner))) { if (colNum(c[1]) > col) { at = c.index; break; } }
-  return rowInner.slice(0, at) + strCell(ref, null, text) + rowInner.slice(at);
+  return rowInner.slice(0, at) + strCell(ref, forceS != null ? forceS : null, text) + rowInner.slice(at);
 }
 
-async function buildXlsx(buf, scan, results, hide, saveInfo){
+async function buildXlsx(buf, scan, results, hide, plan){
   const zip = await JSZip.loadAsync(buf);
   const wbXml = await zip.file('xl/workbook.xml').async('string');
   const rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
@@ -310,7 +364,21 @@ async function buildXlsx(buf, scan, results, hide, saveInfo){
 
   const dim = (sx.match(/<dimension ref="[A-Z]+\d+:([A-Z]+)(\d+)"/) || []);
   const lastCol = colNum(dim[1] || 'AF');
-  const cName = lastCol + 1, cHist = lastCol + 2;
+  const cName = lastCol + 1, cHist = lastCol + 2, cOpt = lastCol + 3;
+
+  // 예측해서 채운 사이즈 라벨 칸은 눈에 띄게 (원래 서식을 복제해 연한 노랑 배경만 바꿈) — 확인 후 지우거나 고치면 됨
+  let st = await zip.file('xl/styles.xml').async('string');
+  const xm = st.match(/<cellXfs count="(\d+)">([\s\S]*?)<\/cellXfs>/), fm = st.match(/<fills count="(\d+)"/);
+  const xfs = xm ? (xm[2].match(/<xf\b[^>]*\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g) || []) : [], newXfs = [], xfCache = new Map();
+  let fillId = null;
+  if (xm && fm) { fillId = Number(fm[1]); st = st.replace(/<fills count="\d+"/, `<fills count="${fillId + 1}"`).replace('</fills>', '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill></fills>'); }
+  const setAttr = (tag, name, val) => { const re = new RegExp('\\s' + name + '="[^"]*"'); return re.test(tag) ? tag.replace(re, ` ${name}="${val}"`) : tag.replace(/^<xf\b/, `<xf ${name}="${val}"`); };
+  const predStyle = base => {
+    if (fillId == null) return base;
+    const b = base == null ? 0 : Number(base); if (xfCache.has(b)) return xfCache.get(b);
+    newXfs.push(setAttr(setAttr(xfs[b] || xfs[0], 'fillId', fillId), 'applyFill', 1));
+    const idx = xfs.length + newXfs.length - 1; xfCache.set(b, idx); return idx;
+  };
 
   const hdrByRow = new Map(scan.headers.map(h => [h.row, h]));
   const byRow = new Map(results.map(r => [r.row, r]));
@@ -322,16 +390,18 @@ async function buildXlsx(buf, scan, results, hide, saveInfo){
     let body = inner || '';
     attrs = attrs.replace(/\sspans="[^"]*"/, '');
     if (h) {
-      const s = styleOf(body, rn, h.work || h.season);
-      body += strCell(colLetter(cName) + rn, s, '판매중상품명') + strCell(colLetter(cHist) + rn, s, '최근들어온내역');
+      const s = styleOf(body, rn, h.work || h.season), b = plan && plan.get(h);
+      if (b && b.scale) b.scale.forEach((lab, k) => { const col = h.model + 2 + k; body = putText(body, rn, col, lab, predStyle(styleOf(body, rn, col) || styleOf(body, rn, h.model + 1) || s)); });
+      body += strCell(colLetter(cName) + rn, s, '판매중상품명') + strCell(colLetter(cHist) + rn, s, '최근들어온내역') + strCell(colLetter(cOpt) + rn, s, '옵션예측');
     } else {
       const hd = it.hdr, s = styleOf(body, rn, hd.work || hd.season);
       body = putText(body, rn, hd.season, it.seasonText);
-      body += strCell(colLetter(cName) + rn, s, it.o.name) + strCell(colLetter(cHist) + rn, s, it.hist);
+      body += strCell(colLetter(cName) + rn, s, it.o.name) + strCell(colLetter(cHist) + rn, s, it.hist) + strCell(colLetter(cOpt) + rn, s, it.optText || '');
     }
     return `<row r="${r}"${attrs}>${body}</row>`;
   });
-  sx = sx.replace(/<dimension ref="([A-Z]+\d+):[A-Z]+(\d+)"/, `<dimension ref="$1:${colLetter(cHist)}$2"`);
+  sx = sx.replace(/<dimension ref="([A-Z]+\d+):[A-Z]+(\d+)"/, `<dimension ref="$1:${colLetter(cOpt)}$2"`);
+  if (xm) { st = st.replace(xm[0], `<cellXfs count="${xfs.length + newXfs.length}">${xm[2]}${newXfs.join('')}</cellXfs>`); zip.file('xl/styles.xml', st); }
 
   // 열 폭 + 빈 원산지·소재·비고 열 숨기기 (삭제가 아니라 숨김)
   const hideSet = new Set(hide), defs = {}; let tail = ' style="4"';
@@ -350,17 +420,44 @@ async function buildXlsx(buf, scan, results, hide, saveInfo){
   }
   flush();
   const plain = tail.replace(/\s(width|customWidth|bestFit)="[^"]*"/g, '');
-  const newCols = [[cName, 44], [cHist, 26]].map(([c, w]) => `<col min="${c}" max="${c}" width="${w}" customWidth="1"${plain}/>`).join('');
-  const colsXml = `<cols>${out.join('')}${newCols}<col min="${cHist + 1}" max="16384"${tail}/></cols>`;
+  const newCols = [[cName, 44], [cHist, 26], [cOpt, 50]].map(([c, w]) => `<col min="${c}" max="${c}" width="${w}" customWidth="1"${plain}/>`).join('');
+  const colsXml = `<cols>${out.join('')}${newCols}<col min="${cOpt + 1}" max="16384"${tail}/></cols>`;
   sx = colsM ? sx.replace(colsM[0], colsXml) : sx.replace(/(<sheetData>)/, colsXml + '$1');
   zip.file(sheetPath, sx);
   return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', compression: 'DEFLATE' });
 }
 
+// 서버 이력(옵션값 DB)에 저장할 한 줄: 파일에 원래 적혀 있던 사이즈 머리글·수량만 저장한다 (예측값은 저장하지 않음)
+const entryOf = (r, srcName) => ({ key: r.entryKey, model: r.main, batch: r.batch, vendor: r.batch, price: r.price || 0, season: r.seasonTxt || '', work: r.workTxt || '',
+  scale: r.hdr.scale.map(s => s.label), sizes: r.sizes || {}, src: srcName || (S.file && S.file.name) || '툴킷 저장' });
+
+/* ---------- 완성본 올려서 옵션값 DB 에 학습 ---------- */
+$('learnDrop').addEventListener('click', () => $('learnInput').click());
+$('learnInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const out = $('learnMsg'); out.className = ''; out.textContent = '읽는 중…';
+  try {
+    const auth = getAuth(); if (!auth) throw new Error('툴킷에 로그인한 뒤 새로고침해 주세요.');
+    if (!/\.xlsx$/i.test(f.name)) throw new Error('.xlsx 파일만 올릴 수 있어요.');
+    const m = f.name.match(/(20\d{2})[.\-_ ]+(\d{1,2})[.\-_ ]+(\d{1,2})/); if (!m) throw new Error('파일 이름 앞에 날짜(예: 2026.10.08 재고추가.xlsx)가 있어야 해요.');
+    const date = m[1] + '-' + pad2(m[2]) + '-' + pad2(m[3]), label = (f.name.match(/재고\s*추가|입고|반입/) || ['재고추가'])[0].replace(/\s+/g, '');
+    const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer());
+    const scan = scanSheet(wb.worksheets[0]);
+    if (!scan.items.length) throw new Error('MODEL 열과 시즌 열이 있는 재고추가 양식을 찾지 못했어요.');
+    const learned = scan.items.filter(i => i.hdr.scale.some(s => s.label !== 'TU') && Object.keys(i.sizes).length);
+    if (!learned.length) throw new Error('사이즈 칸(2A, 3A … 또는 신발 사이즈)에 수량이 입력된 줄이 없어요. 완성본 파일을 올려 주세요.');
+    scan.items.forEach(i => Object.assign(i, splitModel(i.model)));
+    const agg = {};
+    scan.items.forEach(i => { const r = { ...i, entryKey: normKey(i.main) }; if (r.entryKey.length < 4) return; const id = r.entryKey + '|' + (r.price || 0) + '|' + r.qty; if (!agg[id]) agg[id] = entryOf(r, f.name), agg[id].qty = Number(r.qty) || 0; });
+    const d = await post(API_SC, { user: auth.id, pass: auth.pass, action: 'record', date, label, entries: Object.values(agg) });
+    out.textContent = `${date} ${label}: ${d.saved}줄을 저장했어요 (사이즈 수량이 입력된 ${learned.length}줄은 옵션값 예측에 쓰여요).`;
+  } catch (err) { out.className = 'err'; out.textContent = '실패: ' + (err && err.message ? err.message : err); }
+});
+
 $('dlBtn').addEventListener('click', async () => {
   $('dlBtn').disabled = true;
   try {
-    const blob = await buildXlsx(S.buf0, S.scan, S.results, S.hide);
+    const blob = await buildXlsx(S.buf0, S.scan, S.results, S.hide, S.plan);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = S.file.name.replace(/\.xlsx$/i, '') + '_시즌체크.xlsx'; document.body.appendChild(a); a.click(); a.remove();
@@ -368,7 +465,7 @@ $('dlBtn').addEventListener('click', async () => {
     if ($('saveChk').checked && !S.saved) {
       const auth = getAuth();
       const agg = {};
-      S.results.forEach(r => { const e = agg[r.entryKey] || (agg[r.entryKey] = { key: r.entryKey, model: r.main, qty: 0, batch: r.batch }); e.qty += Number(r.qty) || 0; });
+      S.results.forEach(r => { const id = r.entryKey + '|' + (r.price || 0); if (!agg[id]) { agg[id] = entryOf(r); agg[id].qty = 0; } agg[id].qty += Number(r.qty) || 0; });
       const d = await post(API_SC, { user: auth.id, pass: auth.pass, action: 'record', date: S.date, label: S.label, entries: Object.values(agg) });
       S.saved = true; setMsg(`엑셀을 받았고, 이번 입고 ${d.saved}개 품번을 서버에 저장했어요. (같은 날짜·이름으로 다시 받아도 중복 저장되지 않아요)`);
     }
