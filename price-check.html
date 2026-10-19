@@ -17,23 +17,60 @@
   h1 .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--warnbg);color:var(--warn);}
   .lead{color:var(--sub);font-size:13px;margin:0 0 14px;line-height:1.6;}
   .btn{font:600 14px var(--font);padding:9px 15px;border:1px solid transparent;border-radius:8px;cursor:pointer;white-space:nowrap;}
-  .btn:focus-visible,textarea:focus-visible,input:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .btn:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible,tr[data-key]:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
   .btn-pri{background:var(--pri);color:#fff;} .btn-out{background:#fff;color:var(--ink);border-color:var(--line);}
   .btn-sm{padding:6px 11px;font-size:12.5px;}
   .btn:disabled{opacity:.45;cursor:not-allowed;}
-  textarea,input[type=text]{font:14px var(--font);padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%;}
+  textarea,input[type=text],input[type=search],select{font:14px var(--font);padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%;}
+  select{width:auto;padding:8px 10px;}
   textarea{min-height:92px;resize:vertical;line-height:1.5;}
 
   .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;}
   .row .grow{flex:1;}
-  .hint{font-size:12px;color:var(--sub);}
-  .prog{display:none;margin-top:10px;} .prog.on{display:block;}
-  .prog .bar{height:6px;background:#eee;border-radius:99px;overflow:hidden;} .prog .bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .3s;}
-  .prog .msg{font-size:12.5px;color:var(--sub);margin-top:6px;}
+  .hint{font-size:12px;color:var(--sub);line-height:1.55;}
+  .or{font-size:12px;color:var(--sub);margin:0 2px;}
+  .filebtn{position:relative;overflow:hidden;display:inline-block;}
+  .filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;}
 
-  /* 결과 카드 */
-  .res{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden;}
+  /* 올린 파일 미리보기 */
+  .pv{margin-top:12px;border-top:1px dashed var(--line);padding-top:12px;}
+  .pv .samples{font-size:12.5px;color:var(--sub);margin:6px 0 0;line-height:1.6;word-break:break-all;}
+  .pv .samples b{color:var(--ink);font-weight:600;}
+
+  /* 대기열 */
+  .qbox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
+  .qtop{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;}
+  .qnum .lab{font-size:12px;color:var(--sub);} .qnum .n{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums;}
+  .qnum .n small{font-size:13px;font-weight:600;color:var(--sub);margin-left:2px;}
+  .qnum.bad .n{color:var(--bad);}
+  .bar{height:8px;background:#eee;border-radius:99px;overflow:hidden;margin:12px 0 6px;}
+  .bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .3s;}
+  .qmsg{font-size:12.5px;color:var(--sub);min-height:18px;}
+  .qmsg.warn{color:var(--warn);font-weight:600;}
+
+  /* 목록 */
+  .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px;}
+  .tools input[type=search]{max-width:220px;padding:8px 11px;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;flex-wrap:wrap;}
+  .seg button{font:600 12.5px var(--font);padding:7px 11px;border:0;background:#fff;cursor:pointer;color:var(--sub);white-space:nowrap;}
+  .seg button.on{background:var(--pri);color:#fff;}
+  .seg button b{font-weight:700;margin-left:3px;opacity:.75;}
+  .lst{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  table.l{width:100%;border-collapse:collapse;font-size:13px;}
+  table.l th{font-size:11.5px;color:var(--sub);font-weight:700;text-align:left;padding:8px 10px;background:#fafaf8;border-bottom:1px solid var(--line);white-space:nowrap;}
+  table.l td{padding:9px 10px;border-bottom:1px solid #f0f0ec;vertical-align:middle;}
+  table.l tr[data-key]{cursor:pointer;} table.l tr[data-key]:hover td{background:#fafaf8;}
+  table.l tr[data-key].open td{background:#f4f6ff;}
+  table.l td.r,table.l th.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  table.l td.c{font-weight:700;} table.l td.dim{color:#9aa0a7;}
+  table.l .cd{font-weight:700;word-break:break-all;} table.l .og{font-size:11.5px;color:var(--sub);overflow-wrap:anywhere;margin-top:1px;}
+  table.l tr.exp > td{padding:0;background:#fff;border-bottom:2px solid var(--line);}
+  .pager{display:flex;gap:8px;align-items:center;justify-content:center;padding:10px;font-size:12.5px;color:var(--sub);}
+  .empty{padding:34px 16px;text-align:center;color:var(--sub);line-height:1.7;}
+
+  /* 상세 카드 (펼침) */
+  .res{background:var(--card);overflow:hidden;}
   .res-h{padding:12px 14px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid var(--line);}
   .res-h .code{font-size:16px;font-weight:800;letter-spacing:-.01em;word-break:break-all;}
   .res-h .orig{font-size:12px;color:var(--sub);margin-top:2px;overflow-wrap:anywhere;}
@@ -63,7 +100,7 @@
   .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:2px solid var(--pri);background:var(--pri);}
   .legend i.par{border-color:var(--blue);background:var(--blue);} .legend i.part{border-color:#b9bcc2;background:#fff;}
 
-  /* 표 */
+  /* 상세 표 */
   table.t{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
   table.t th{font-size:11.5px;color:var(--sub);font-weight:700;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);}
   table.t td{padding:7px 8px;border-bottom:1px solid #f0f0ec;vertical-align:top;}
@@ -77,13 +114,13 @@
   details.fold summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--sub);padding:4px 0;}
   .res-f{padding:10px 14px;background:#fafaf8;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .res-f input{flex:1;min-width:150px;padding:7px 10px;font-size:13px;}
-  .spin{display:inline-block;width:14px;height:14px;border:2px solid #ddd;border-top-color:var(--ok);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px;}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid #ddd;border-top-color:var(--ok);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:5px;}
   @keyframes sp{to{transform:rotate(360deg);}}
-  @media (prefers-reduced-motion:reduce){.spin{animation:none;}.prog .bar i{transition:none;}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none;}.bar i{transition:none;}}
   .gate{background:var(--card);border:1px solid var(--line);border-radius:14px;text-align:center;padding:48px 20px;}
   #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#15171a;color:#fff;padding:10px 18px;border-radius:9px;font-size:14px;z-index:100;display:none;max-width:90vw;}
   #toast.err{background:var(--bad);}
-  @media (max-width:560px){.fig .num{font-size:25px;} table.t td.ti{min-width:120px;}}
+  @media (max-width:640px){.fig .num{font-size:25px;} table.t td.ti{min-width:120px;} table.l th.hm,table.l td.hm{display:none;}}
 </style>
 </head>
 <body>
@@ -95,12 +132,15 @@
 'use strict';
 /* ============================================================
    최저가 조회 (TEST) — 품번으로 다나와 검색 결과를 가져와 같은 상품만 골라 최저가를 보여준다. 참고용.
+   - 몇 개든 한꺼번에 올려두면(붙여넣기·엑셀) 대기열에 쌓고 10초 간격으로 알아서 차례로 조회한다. 같은 품번은 한 번만 조회.
+   - 대기열·결과는 이 브라우저(IndexedDB)에 저장 — 창을 닫아도 다음에 열면 남은 것부터 이어서 한다. (조회가 도는 동안엔 이 화면이 열려 있어야 한다)
    - 서버(price_check_api.php)는 다나와 HTML 을 대신 받아주기만 한다(10초 간격·24시간 캐시). 파싱·필터·계산은 전부 이 파일.
    - 같은 상품 판정은 "공백·하이픈을 뺀 품번이 상품명에 들어있는가"로 한다. 색상까지 일치(full) / 색상 다르거나 불명(part)을 나눈다.
    ============================================================ */
 const API = 'https://buyest.co.kr/price_check_api.php';
-const LS_KEY = 'pc.state.v1';
-const MAX_LINES = 12;
+const MAX_LINES = 20000;      // 한 번에 올릴 수 있는 줄 수
+const PAGE = 100;             // 목록 한 쪽에 보여줄 품번 수
+const GAP_SEC = 10;           // 다나와 요청 간격(서버가 강제하는 값과 같음) — 남은 시간 계산용
 
 /*PARSER_START*/
 const decodeEnt = s => String(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#0?39;/g,"'").replace(/&nbsp;/g,' ').replace(/&amp;/g,'&');
@@ -228,38 +268,75 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp
 const won = n => n == null ? '-' : Number(n).toLocaleString('ko-KR') + '원';
 function getAuth(){ try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return (a && a.id) ? a : null; } catch(e){ return null; } }
 const AUTH = getAuth();
-function toast(msg, kind){ const t=$('toast'); t.textContent=msg; t.className=kind||''; t.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display='none';}, kind==='err'?4500:2200); }
+function toast(msg, kind){ const t=$('toast'); t.textContent=msg; t.className=kind||''; t.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display='none';}, kind==='err'?5000:2600); }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const searchUrl = q => 'https://search.danawa.com/dsearch.php?query=' + encodeURIComponent(q);
-const fmtTime = ts => { const d = new Date(ts * 1000), p = n => String(n).padStart(2,'0'); return `${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+const p2 = n => String(n).padStart(2, '0');
+const fmtTime = ts => { const d = new Date(ts * 1000); return `${p2(d.getMonth()+1)}/${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+const fmtDur = sec => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60); return h ? `${h}시간 ${m}분` : m ? `${m}분` : `${sec}초`; };
+
+/* ---------- 저장소 (IndexedDB) — 대기열·결과를 이 브라우저에 보관 ---------- */
+const DB = { db: null, ok: false };
+function idbOpen(){
+  return new Promise(res => {
+    try {
+      const r = indexedDB.open('pc_v2', 1);
+      r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('tasks', { keyPath: 'key' }); d.createObjectStore('results', { keyPath: 'key' }); };
+      r.onsuccess = () => { DB.db = r.result; DB.ok = true; res(true); };
+      r.onerror = () => res(false); r.onblocked = () => res(false);
+    } catch (e) { res(false); }
+  });
+}
+function idbRun(stores, fn){
+  return new Promise(res => {
+    if (!DB.ok) return res(false);
+    try { const tx = DB.db.transaction(stores, 'readwrite'); fn(tx); tx.oncomplete = () => res(true); tx.onerror = () => res(false); tx.onabort = () => res(false); } catch (e) { res(false); }
+  });
+}
+const idbPut = (store, val) => idbRun(store, tx => { tx.objectStore(store).put(val); });
+const idbPutMany = (store, arr) => idbRun(store, tx => { const os = tx.objectStore(store); arr.forEach(v => os.put(v)); });
+const idbDel = key => idbRun(['tasks', 'results'], tx => { tx.objectStore('tasks').delete(key); tx.objectStore('results').delete(key); });
+const idbClear = () => idbRun(['tasks', 'results'], tx => { tx.objectStore('tasks').clear(); tx.objectStore('results').clear(); });
+const idbGet = (store, key) => new Promise(res => { if (!DB.ok) return res(null); try { const r = DB.db.transaction(store).objectStore(store).get(key); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); } catch (e) { res(null); } });
+const idbAll = store => new Promise(res => { if (!DB.ok) return res([]); try { const r = DB.db.transaction(store).objectStore(store).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); } catch (e) { res([]); } });
 
 /* ---------- 상태 ---------- */
-const S = { results: [], running: false, cancel: false };
-let saveTimer = null;
-function saveSoon(){ clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(LS_KEY, JSON.stringify(S.results.filter(r => r.status !== 'loading').slice(0, 60))); } catch(e){} }, 300); }
-function restore(){ try { const d = JSON.parse(localStorage.getItem(LS_KEY)||'null'); if (Array.isArray(d)) S.results = d; } catch(e){} }
+const S = {
+  tasks: new Map(),      // key -> task {key,input,label,rows:[{no,input,src}],status:'wait'|'run'|'done'|'error',error,customQuery,force,tries,sum}
+  order: [],             // 올린 순서대로의 key
+  queue: [],             // 앞으로 조회할 key (맨 앞 = 다음 차례)
+  running: false, paused: false, cur: null, seq: 0,   // seq = 올린 순서 번호(다시 불러올 때 순서 복원용)
+  filter: 'all', q: '', page: 0, open: new Set(),
+  msg: '', msgWarn: false,
+  pending: null,         // 올려 둔 엑셀 파일 미리보기
+  memRes: new Map(),     // IndexedDB 를 못 쓸 때만 결과를 메모리에 둔다
+  detail: new Map(),     // 펼친 상세 카드 HTML 캐시
+};
+const getTask = k => S.tasks.get(k);
+async function getResult(key){ return DB.ok ? await idbGet('results', key) : (S.memRes.get(key) || null); }
+function setMsg(m, warn){ S.msg = m; S.msgWarn = !!warn; const e = $('qmsg'); if (e) { e.textContent = m; e.className = 'qmsg' + (warn ? ' warn' : ''); } }
 
 /* ---------- 서버 ---------- */
 async function fetchHtml(q, force, onWait){
   for (let tries = 0; tries < 8; tries++) {
-    if (S.cancel) throw new Error('중지됨');
+    if (S.paused) { const e = new Error('일시정지'); e.paused = true; throw e; }
     const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'fetch', actor: AUTH.id, q, force: !!force }) });
     const j = await res.json();
     if (j.ok) return j;
     if (j.busy) { onWait && onWait('다른 조회가 진행 중이에요. 잠시 기다립니다…'); await sleep((j.retry_after || 6) * 1000); continue; }
-    const e = new Error(j.error || '조회 실패'); e.blocked = !!j.blocked; e.cap = !!j.cap; throw e;
+    const e = new Error(j.error || '조회 실패'); e.blocked = !!j.blocked; e.cap = !!j.cap; e.retry_after = j.retry_after || 0; throw e;
   }
-  throw new Error('서버가 계속 바빠요. 잠시 후 다시 시도해주세요.');
+  throw new Error('서버가 계속 바빠요.');
 }
 
-/** 한 줄(품번) 조회: 검색어 후보를 순서대로 시도해서 같은 상품이 처음 잡히는 검색어에서 멈춘다. */
+/** 한 품번 조회: 검색어 후보를 순서대로 시도해서 같은 상품이 처음 잡히는 검색어에서 멈춘다. */
 async function lookup(entry, force, onMsg){
   const code = extractCode(entry.input);
   const queries = entry.customQuery ? [entry.customQuery] : code.queries;
   let best = null;
   for (let qi = 0; qi < queries.length; qi++) {
     const q = queries[qi];
-    onMsg && onMsg(`「${q}」 검색 중… (다나와 요청은 10초 간격으로 보냅니다)`);
+    onMsg && onMsg(`「${q}」 조회 중…`);
     const r = await fetchHtml(q, force, onMsg);
     const items = (r.items && r.items.length) ? fromCompact(r.items) : parseItems(r.html);
     const cls = classify(items, code);
@@ -271,72 +348,270 @@ async function lookup(entry, force, onMsg){
   return { code, best };
 }
 
-/* ---------- 실행 ---------- */
-async function run(lines){
-  if (S.running) return;
-  S.running = true; S.cancel = false; render();
-  const prog = $('prog'), bar = $('progBar'), msg = $('progMsg'); prog.classList.add('on');
-  let n = 0;
-  for (const line of lines) {
-    if (S.cancel) break;
-    n++; bar.style.width = ((n - 1) / lines.length * 100) + '%';
-    const entry = { id: 'r' + Date.now() + '_' + n, input: line, status: 'loading' };
-    S.results.unshift(entry); renderResults();
-    try {
-      await fill(entry, false, m => { msg.textContent = `${n}/${lines.length} · ${m}`; });
-    } catch(e) {
-      entry.status = 'error'; entry.error = e.message || String(e);
-      if (e.blocked || e.cap) { toast(entry.error, 'err'); S.cancel = true; }
-    }
-    renderResults(); saveSoon();
-  }
-  bar.style.width = '100%'; msg.textContent = S.cancel ? '중지했어요.' : '조회를 마쳤어요.';
-  S.running = false; render(); setTimeout(() => prog.classList.remove('on'), 2500);
-}
-async function fill(entry, force, onMsg){
-  const { code, best } = await lookup(entry, force, onMsg);
-  entry.code = { tokens: code.tokens, base: code.base, queries: code.queries };
-  entry.q = best.q; entry.cached = best.cached; entry.fetched_at = best.fetched_at;
-  entry.full = best.cls.full; entry.part = best.cls.part; entry.excluded = best.cls.excluded; entry.total = best.cls.total;
-  entry.status = 'done';
+function summarize(r){
+  const prim = r.full.length ? r.full : r.part, m = minOf(prim);
+  const par = minOf(prim.filter(x => x.parallel)), dom = minOf(prim.filter(x => !x.parallel));
+  return { nf: r.full.length, np: r.part.length, nex: r.exCount, total: r.total, q: r.q, cached: r.cached, at: r.fetched_at,
+    basis: r.full.length ? 'full' : r.part.length ? 'part' : 'none', min: m ? m.eff : null, mall: m ? (m.malls || [m.mall]).join('·') : '',
+    dom: dom ? dom.eff : null, par: par ? par.eff : null, med: median(prim.map(x => x.eff)) };
 }
 
-/* ---------- 화면 ---------- */
+/* ---------- 대기열 ---------- */
+function addLines(items){
+  let added = 0, merged = 0, skipped = 0; const touched = new Map();
+  for (const it of items) {
+    const input = String(it.input == null ? '' : it.input).trim();
+    if (!input) { skipped++; continue; }
+    const code = extractCode(input), key = code.fullN || normCode(input);
+    if (!key) { skipped++; continue; }
+    let t = S.tasks.get(key);
+    if (t) { t.rows.push({ no: it.no, input, src: it.src || '' }); merged++; touched.set(key, t); continue; }
+    t = { key, seq: ++S.seq, input, label: code.tokens.join(' '), rows: [{ no: it.no, input, src: it.src || '' }], status: 'wait', sum: null };
+    S.tasks.set(key, t); S.order.push(key); S.queue.push(key); added++; touched.set(key, t);
+  }
+  idbPutMany('tasks', Array.from(touched.values()));
+  return { added, merged, skipped };
+}
+async function sleepPausable(sec, label){
+  const end = Date.now() + sec * 1000;
+  while (Date.now() < end && !S.paused) { setMsg(label(Math.ceil((end - Date.now()) / 1000)), true); await sleep(1000); }
+}
+async function processTask(t){
+  t.status = 'run'; S.cur = t; S.detail.delete(t.key); updateAll();
+  for (;;) {
+    try {
+      const { code, best } = await lookup({ input: t.input, customQuery: t.customQuery }, t.force, m => setMsg(`${t.label} · ${m}`));
+      const r = { key: t.key, input: t.input, code: { tokens: code.tokens, base: code.base, queries: code.queries }, q: best.q, cached: best.cached, fetched_at: best.fetched_at,
+        full: best.cls.full, part: best.cls.part, excluded: best.cls.excluded.slice(0, 60), exCount: best.cls.excluded.length, total: best.cls.total };
+      t.sum = summarize(r); t.status = 'done'; t.error = ''; t.force = false; t.tries = 0;
+      if (!DB.ok) S.memRes.set(t.key, r);
+      await idbPut('results', r); await idbPut('tasks', t);
+      S.cur = null; return;
+    } catch (e) {
+      if (e.paused) { t.status = 'wait'; S.queue.unshift(t.key); S.cur = null; idbPut('tasks', t); return; }
+      if (e.blocked) {
+        await sleepPausable((e.retry_after || 1800) + 5, s => `다나와가 접근을 막아서 쉬는 중이에요. ${fmtDur(s)} 뒤 자동으로 이어갑니다.`);
+        if (S.paused) { t.status = 'wait'; S.queue.unshift(t.key); S.cur = null; idbPut('tasks', t); return; }
+        continue;
+      }
+      if (e.cap) { S.paused = true; t.status = 'wait'; S.queue.unshift(t.key); S.cur = null; idbPut('tasks', t); setMsg('오늘 조회 한도에 도달했어요. 남은 품번은 저장돼 있어요 — 내일 「이어서 조회」를 눌러주세요.', true); return; }
+      t.tries = (t.tries || 0) + 1;
+      if (t.tries < 3) { await sleepPausable(15, s => `연결 오류 — ${s}초 뒤 다시 시도해요. (${e.message || e})`); if (S.paused) { t.status = 'wait'; S.queue.unshift(t.key); S.cur = null; return; } continue; }
+      t.status = 'error'; t.error = e.message || String(e); S.cur = null; idbPut('tasks', t); return;
+    }
+  }
+}
+async function pump(){
+  if (S.running) return;
+  S.running = true; S.paused = false; updateAll();
+  while (!S.paused) {
+    const key = S.queue.shift(); if (key === undefined) break;
+    const t = getTask(key); if (!t || t.status === 'done') continue;
+    await processTask(t);
+    updateAll();
+  }
+  S.running = false;
+  if (!S.paused) setMsg(counts().err ? '조회를 마쳤어요. 실패한 건은 「실패 다시 시도」로 이어갈 수 있어요.' : '조회를 모두 마쳤어요.');
+  updateAll();
+}
+function pause(){ S.paused = true; setMsg('지금 건까지 마치고 멈춥니다…'); updateQueueUI(); }
+function retryErrors(){
+  let n = 0;
+  for (const k of S.order) { const t = getTask(k); if (t.status === 'error') { t.status = 'wait'; t.tries = 0; S.queue.push(k); idbPut('tasks', t); n++; } }
+  if (n) { toast(`실패 ${n}건을 다시 대기열에 넣었어요.`); pump(); }
+}
+
+/* ---------- 집계 ---------- */
+function counts(){
+  const c = { all: S.tasks.size, rows: 0, wait: 0, run: 0, done: 0, err: 0, hit: 0, partOnly: 0, none: 0 };
+  for (const t of S.tasks.values()) {
+    c.rows += t.rows.length;
+    if (t.status === 'wait') c.wait++; else if (t.status === 'run') c.run++; else if (t.status === 'error') c.err++;
+    else if (t.status === 'done') { c.done++; if (t.sum.nf) c.hit++; else if (t.sum.np) c.partOnly++; else c.none++; }
+  }
+  return c;
+}
+const FILTERS = [['all','전체'], ['hit','정확 일치'], ['partOnly','색상 다른 것만'], ['none','같은 상품 없음'], ['pending','대기·조회 중'], ['error','실패']];
+function passes(t, f){
+  if (f === 'all') return true;
+  if (f === 'pending') return t.status === 'wait' || t.status === 'run';
+  if (f === 'error') return t.status === 'error';
+  if (t.status !== 'done') return false;
+  return f === 'hit' ? t.sum.nf > 0 : f === 'partOnly' ? (t.sum.nf === 0 && t.sum.np > 0) : (t.sum.nf === 0 && t.sum.np === 0);
+}
+function filtered(){
+  const q = S.q.trim().toLowerCase(), nq = normCode(q).toLowerCase(), out = [];
+  for (const k of S.order) {
+    const t = getTask(k); if (!t || !passes(t, S.filter)) continue;
+    if (q && !((nq && t.key.toLowerCase().includes(nq)) || t.input.toLowerCase().includes(q) || t.label.toLowerCase().includes(q))) continue;
+    out.push(t);
+  }
+  return out;
+}
+
+/* ---------- 화면 뼈대 ---------- */
 function render(){
   if (!AUTH) {
     $('app').innerHTML = `<h1>최저가 조회</h1><div class="gate"><p class="lead" style="font-size:15px;margin:0 0 16px;">로그인한 직원만 사용할 수 있어요.<br>인트라넷 홈에서 로그인한 뒤 새로고침해주세요.</p><button class="btn btn-pri" onclick="location.reload()">새로고침</button></div>`;
     return;
   }
-  const prevText = $('lines') ? $('lines').value : '';
   $('app').innerHTML = `
     <h1>최저가 조회 <span class="badge">TEST</span></h1>
-    <p class="lead">품번(또는 상품명 전체)을 한 줄에 하나씩 넣으면 다나와에서 같은 상품만 골라 최저가를 보여줘요. <b>참고용</b>이에요 — 판매가를 바꾸기 전엔 「다나와에서 보기」로 한 번 확인하세요.</p>
+    <p class="lead">품번(또는 상품명 전체)을 올리면 다나와에서 같은 상품만 골라 최저가를 보여줘요. <b>참고용</b>이에요 — 판매가를 바꾸기 전엔 「다나와에서 보기」로 한 번 확인하세요.<br>
+    몇 개를 올려도 돼요. 대기열에 쌓아 두고 <b>10초 간격으로 알아서 차례로</b> 조회하며, 같은 품번은 한 번만 조회해요. 시간이 걸리니 <b>조회가 도는 동안 이 화면을 열어 두세요</b>(닫아도 다음에 열면 남은 것부터 이어가요).</p>
     <div class="box">
-      <textarea id="lines" placeholder="예) SH1WS0006 P6634 HA241&#10;◆당일◆24FW MM6 XT-4 뮬 스니커즈 스펙트럼 블루 SH1WS0006 P6634 HA241&#10;1A000 13 595B1 999" ${S.running ? 'disabled' : ''}>${esc(prevText)}</textarea>
+      <textarea id="lines" placeholder="품번 또는 상품명을 한 줄에 하나씩 붙여 넣기&#10;예) SH1WS0006 P6634 HA241&#10;◆당일◆24FW ALTHAUS 그레노블 로고 패딩자켓 블랙 1A000 13 595B1 999"></textarea>
       <div class="row">
-        <button class="btn btn-pri" id="goBtn" ${S.running ? 'disabled' : ''}>${S.running ? '조회 중…' : '조회'}</button>
-        ${S.running ? '<button class="btn btn-out" id="stopBtn">중지</button>' : ''}
-        <span class="hint grow">한 번에 최대 ${MAX_LINES}줄. 처음 찾는 품번은 한 건에 10초 이상 걸려요(다나와 요청 간격 규칙). 같은 품번은 24시간 동안 저장된 결과를 바로 보여줘요.</span>
+        <button class="btn btn-pri" id="addBtn" data-act="add">대기열에 추가</button>
+        <span class="or">또는</span>
+        <label class="btn btn-out filebtn">엑셀·CSV 파일 올리기<input type="file" id="fileIn" accept=".xlsx,.xls,.csv" aria-label="엑셀 또는 CSV 파일 올리기"></label>
+        <span class="hint grow">엑셀은 품번·상품명이 든 열을 자동으로 찾아요. 최대 ${MAX_LINES.toLocaleString()}줄. (CSV는 UTF-8 권장)</span>
       </div>
-      <div class="prog" id="prog"><div class="bar"><i id="progBar"></i></div><div class="msg" id="progMsg"></div></div>
+      <div id="pv"></div>
     </div>
-    <div class="row" style="margin:0 0 10px;">
-      <button class="btn btn-out btn-sm" id="xlsBtn" ${S.results.some(r=>r.status==='done') ? '' : 'disabled'}>엑셀로 저장</button>
-      <button class="btn btn-out btn-sm" id="clrBtn" ${S.results.length ? '' : 'disabled'}>결과 지우기</button>
-    </div>
-    <div id="results"></div>`;
-  $('goBtn').onclick = () => {
-    const lines = $('lines').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    if (!lines.length) return toast('품번을 한 줄 이상 입력해주세요.', 'err');
-    if (lines.length > MAX_LINES) return toast(`한 번에 ${MAX_LINES}줄까지만 조회할 수 있어요. (${lines.length}줄 입력됨)`, 'err');
-    run(lines);
-  };
-  if ($('stopBtn')) $('stopBtn').onclick = () => { S.cancel = true; $('progMsg').textContent = '지금 건까지 마치고 멈춥니다…'; };
-  $('xlsBtn').onclick = exportXlsx;
-  $('clrBtn').onclick = () => { if (confirm('조회 결과를 모두 지울까요?')) { S.results = []; saveSoon(); render(); } };
-  renderResults();
+    <div class="qbox" id="qbox"></div>
+    <div id="listbox"></div>`;
+  $('fileIn').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) onFile(f); };
+  updateAll();
 }
 
+/* ---------- 엑셀 올리기 ---------- */
+async function onFile(f){
+  try {
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+    if (!aoa.length) return toast('파일에 내용이 없어요.', 'err');
+    const first = (aoa[0] || []).map(c => String(c).trim());
+    const NAME = /품번|상품명|품목명|제품명|상품코드|스타일|style|code|name/i;
+    let col = first.findIndex(h => NAME.test(h)), hasHeader = col >= 0;
+    if (col < 0) { col = 0; hasHeader = !first.some(c => /\d/.test(c)); }
+    const width = aoa.reduce((m, r) => Math.max(m, r.length), 0);
+    S.pending = { name: f.name, aoa, first, col, hasHeader, width };
+    renderPending();
+  } catch (e) { toast('파일을 읽지 못했어요: ' + (e.message || e), 'err'); }
+}
+const colName = i => { let s = '', n = i + 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+function pendingItems(){
+  const P = S.pending, out = [];
+  for (let i = P.hasHeader ? 1 : 0; i < P.aoa.length; i++) {
+    const v = String((P.aoa[i] || [])[P.col] == null ? '' : P.aoa[i][P.col]).trim();
+    if (v) out.push({ no: i + 1, input: v, src: P.name });
+  }
+  return out;
+}
+function renderPending(){
+  const el = $('pv'); if (!el) return;
+  const P = S.pending;
+  if (!P) { el.innerHTML = ''; return; }
+  const items = pendingItems(), sample = items.slice(0, 3).map(x => esc(x.input.length > 50 ? x.input.slice(0, 50) + '…' : x.input));
+  const opts = Array.from({ length: P.width }, (_, i) => `<option value="${i}" ${i === P.col ? 'selected' : ''}>${colName(i)}열${P.first[i] ? ' — ' + esc(P.first[i].slice(0, 20)) : ''}</option>`).join('');
+  el.innerHTML = `<div class="pv"><div><b>${esc(P.name)}</b> · ${P.aoa.length.toLocaleString()}행 · 사용할 열 <select id="pvCol" aria-label="품번이 든 열">${opts}</select>
+    <label class="hint" style="margin-left:8px;"><input type="checkbox" id="pvHdr" ${P.hasHeader ? 'checked' : ''}> 첫 줄은 머리글</label></div>
+    <p class="samples">${items.length ? '예시: <b>' + sample.join('</b> · <b>') + '</b>' : '이 열에는 값이 없어요. 다른 열을 골라주세요.'}</p>
+    <div class="row"><button class="btn btn-pri" data-act="pvAdd" ${items.length ? '' : 'disabled'}>${items.length.toLocaleString()}줄 대기열에 추가</button><button class="btn btn-out" data-act="pvCancel">취소</button></div></div>`;
+  $('pvCol').onchange = e => { P.col = +e.target.value; renderPending(); };
+  $('pvHdr').onchange = e => { P.hasHeader = e.target.checked; renderPending(); };
+}
+function doAdd(items, label){
+  if (!items.length) return toast('올릴 품번이 없어요.', 'err');
+  if (items.length > MAX_LINES) { toast(`한 번에 ${MAX_LINES.toLocaleString()}줄까지 올릴 수 있어요. 앞의 ${MAX_LINES.toLocaleString()}줄만 넣었어요.`, 'err'); items = items.slice(0, MAX_LINES); }
+  const r = addLines(items);
+  toast(`${label}: 새 품번 ${r.added.toLocaleString()}개 추가${r.merged ? ` · 같은 품번 ${r.merged.toLocaleString()}줄은 합쳤어요` : ''}${r.skipped ? ` · 빈 줄 ${r.skipped}` : ''}`);
+  S.page = 0; updateAll();
+  if (S.queue.length && !S.running) pump();
+}
+
+/* ---------- 대기열 영역 ---------- */
+function updateQueueUI(){
+  const box = $('qbox'); if (!box) return;
+  const c = counts(), remain = c.wait + c.run, doneN = c.done + c.err;
+  const pct = c.all ? Math.round(doneN / c.all * 100) : 0;
+  const eta = remain ? `남은 ${remain.toLocaleString()}건 · 약 ${fmtDur(remain * GAP_SEC)} <span class="hint">(처음 조회하는 품번 기준, 저장된 건 더 빨라요)</span>` : '';
+  const live = S.running && !S.paused;
+  box.innerHTML = c.all ? `
+    <div class="qtop">
+      <div class="qnum"><div class="lab">품번</div><div class="n">${c.all.toLocaleString()}<small>개 (${c.rows.toLocaleString()}줄)</small></div></div>
+      <div class="qnum"><div class="lab">조회 완료</div><div class="n">${c.done.toLocaleString()}</div></div>
+      <div class="qnum"><div class="lab">대기·조회 중</div><div class="n">${remain.toLocaleString()}</div></div>
+      <div class="qnum ${c.err ? 'bad' : ''}"><div class="lab">실패</div><div class="n">${c.err.toLocaleString()}</div></div>
+    </div>
+    <div class="bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+    <div class="qmsg ${S.msgWarn ? 'warn' : ''}" id="qmsg">${esc(S.msg || (live ? '' : remain ? '멈춰 있어요. 「이어서 조회」를 누르면 남은 품번부터 다시 시작해요.' : ''))}</div>
+    <div class="qmsg">${eta}${c.run && S.cur ? ` · 지금: <b>${esc(S.cur.label)}</b>` : ''}</div>
+    <div class="row">
+      ${live ? '<button class="btn btn-out" data-act="pause">일시정지</button>' : (remain ? '<button class="btn btn-pri" data-act="resume">이어서 조회</button>' : '')}
+      ${c.err ? '<button class="btn btn-out" data-act="retryErr">실패 다시 시도</button>' : ''}
+      <button class="btn btn-out" data-act="xlsAll" ${c.done ? '' : 'disabled'}>엑셀로 받기 (전체)</button>
+      <button class="btn btn-out" data-act="xlsFlt" ${c.done ? '' : 'disabled'} title="아래 목록에서 지금 선택한 필터·검색 결과만">엑셀로 받기 (지금 목록)</button>
+      <span class="grow"></span>
+      <button class="btn btn-out btn-sm" data-act="clear">모두 지우기</button>
+    </div>` : `<div class="hint" style="text-align:center;padding:10px;">아직 올린 품번이 없어요. 위에 붙여 넣거나 엑셀 파일을 올려주세요.</div>`;
+}
+
+/* ---------- 목록 ---------- */
+let listTimer = null;
+function scheduleList(){ if (listTimer) return; listTimer = setTimeout(() => { listTimer = null; renderList(); }, 1200); }
+function updateAll(){ updateQueueUI(); scheduleList(); }
+
+function chipFor(t){
+  if (t.status === 'wait') return '<span class="chip gray">대기</span>';
+  if (t.status === 'run') return '<span class="chip blue"><span class="spin"></span>조회 중</span>';
+  if (t.status === 'error') return `<span class="chip bad" title="${esc(t.error)}">실패</span>`;
+  const s = t.sum;
+  return s.nf ? `<span class="chip ok">정확 ${s.nf}건</span>` : s.np ? `<span class="chip warn">색상 다른 ${s.np}건</span>` : '<span class="chip bad">없음</span>';
+}
+function listRow(t){
+  const s = t.sum, open = S.open.has(t.key), done = t.status === 'done';
+  const dim = done && s.basis === 'part' ? ' dim' : '';
+  const same = t.input.replace(/\s+/g, ' ') === t.label;
+  const og = same ? '' : `<div class="og">${esc(t.input.length > 70 ? t.input.slice(0, 70) + '…' : t.input)}</div>`;
+  const no = t.rows.length > 1 ? `${t.rows.length}줄` : esc(t.rows[0].no);
+  return `<tr data-key="${esc(t.key)}" tabindex="0" class="${open ? 'open' : ''}" aria-expanded="${open}">
+    <td class="hm" style="color:var(--sub);white-space:nowrap">${no}</td>
+    <td><div class="cd">${esc(t.label)}</div>${og}</td>
+    <td class="r c${dim}">${done && s.min != null ? won(s.min) : '-'}</td>
+    <td class="r hm${done && s.dom != null ? '' : ' dim'}">${done && s.dom != null ? won(s.dom) : '-'}</td>
+    <td class="r hm${done && s.par != null ? '' : ' dim'}">${done && s.par != null ? won(s.par) : '-'}</td>
+    <td>${chipFor(t)}</td></tr>
+    ${open ? `<tr class="exp"><td colspan="6"><div id="exp_${esc(t.key)}">${S.detail.get(t.key) || '<div class="hint" style="padding:14px">불러오는 중…</div>'}</div></td></tr>` : ''}`;
+}
+function renderList(){
+  const box = $('listbox'); if (!box) return;
+  const c = counts();
+  if (!c.all) { box.innerHTML = ''; return; }
+  const cnt = { all: c.all, hit: c.hit, partOnly: c.partOnly, none: c.none, pending: c.wait + c.run, error: c.err };
+  const list = filtered(), pages = Math.max(1, Math.ceil(list.length / PAGE));
+  if (S.page >= pages) S.page = pages - 1;
+  const slice = list.slice(S.page * PAGE, (S.page + 1) * PAGE);
+  const focusSearch = document.activeElement && document.activeElement.id === 'srch';
+  box.innerHTML = `
+    <div class="tools">
+      <div class="seg" role="group" aria-label="목록 필터">${FILTERS.map(([k, n]) => `<button data-f="${k}" class="${S.filter === k ? 'on' : ''}" aria-pressed="${S.filter === k}">${n}<b>${(cnt[k] || 0).toLocaleString()}</b></button>`).join('')}</div>
+      <input type="search" id="srch" placeholder="품번·상품명 검색" value="${esc(S.q)}" aria-label="목록 검색">
+      <span class="hint">행을 누르면 상세가 펼쳐져요.</span>
+    </div>
+    <div class="lst">
+      <table class="l"><thead><tr><th class="hm">줄</th><th>품번</th><th class="r">최저가(합계)</th><th class="r hm">국내 표기 최저</th><th class="r hm">해외·병행 최저</th><th>상태</th></tr></thead>
+      <tbody>${slice.length ? slice.map(listRow).join('') : '<tr><td colspan="6"><div class="empty">조건에 맞는 품번이 없어요.</div></td></tr>'}</tbody></table>
+      ${pages > 1 ? `<div class="pager"><button class="btn btn-out btn-sm" data-pg="-1" ${S.page <= 0 ? 'disabled' : ''}>이전</button>${S.page + 1} / ${pages}쪽 (${list.length.toLocaleString()}개)<button class="btn btn-out btn-sm" data-pg="1" ${S.page >= pages - 1 ? 'disabled' : ''}>다음</button></div>` : ''}
+    </div>`;
+  if (focusSearch) { const e = $('srch'); e.focus(); e.setSelectionRange(e.value.length, e.value.length); }
+  slice.forEach(t => { if (S.open.has(t.key) && !S.detail.has(t.key)) loadDetail(t); });
+}
+async function loadDetail(t){
+  let html;
+  if (t.status === 'done') {
+    const r = await getResult(t.key);
+    html = r ? cardHtml(Object.assign({ id: t.key, status: 'done' }, r)) : '<div class="note bad" style="margin:14px">저장된 결과를 찾지 못했어요. 「이 검색어로 다시 조회」를 눌러주세요.</div>' + footHtml({ id: t.key, q: t.sum && t.sum.q, input: t.input });
+  } else if (t.status === 'error') html = `<div class="res-b"><div class="note bad">${esc(t.error)}</div></div>` + footHtml({ id: t.key, input: t.input, code: { queries: extractCode(t.input).queries } });
+  else html = '<div class="hint" style="padding:14px">아직 조회 전이에요. 차례가 되면 자동으로 조회해요.</div>' + footHtml({ id: t.key, input: t.input, code: { queries: extractCode(t.input).queries } });
+  S.detail.set(t.key, html);
+  const el = document.getElementById('exp_' + t.key); if (el) el.innerHTML = html;
+}
+
+/* ---------- 상세 카드 (펼침) ---------- */
 function ladderHtml(r){
   const pts = r.full.map(x => ({ x, k: x.parallel ? 'par' : '' })).concat(r.part.map(x => ({ x, k: 'part' })));
   if (pts.length < 2) return '';
@@ -351,23 +626,21 @@ function ladderHtml(r){
       <span class="tick" style="left:${pos(med)}%"></span>${lab(med, '중앙값 ' + won(med), 54)}
       ${dots}${lab(lo, won(lo), 0)}${hi !== lo ? lab(hi, won(hi), 0) : ''}</div>`;
 }
-function rowHtml(x, isMin){
+function dRow(x, isMin){
   const mallTxt = x.malls && x.malls.length > 1 ? x.malls.join('·') : x.mall;
   const shipTxt = x.catalog ? '-' : x.ship == null ? '확인필요' : x.ship === 0 ? '무료' : won(x.ship);
   return `<tr class="${isMin ? 'min' : ''}"><td>${esc(mallTxt)}</td><td class="ti"><a href="${esc(x.href)}" target="_blank" rel="noopener">${esc(x.title)}</a>${x.parallel ? '<span class="tag par">해외·병행</span>' : ''}${x.ad ? '<span class="tag ad">광고</span>' : ''}${x.catalog ? '<span class="tag cat">몰 묶음 최저가</span>' : ''}</td><td class="r">${won(x.price)}</td><td class="r">${shipTxt}</td><td class="r"><b>${won(x.eff)}</b></td></tr>`;
 }
 const tableHead = '<table class="t"><thead><tr><th>판매처</th><th>상품명</th><th class="r">판매가</th><th class="r">배송비</th><th class="r">합계</th></tr></thead><tbody>';
-
 function cardHtml(r){
-  const head = `<div class="res-h"><div class="main"><div class="code">${esc((r.code && r.code.tokens ? r.code.tokens.join(' ') : r.input))}</div><div class="orig">${r.input && r.code && r.input !== r.code.tokens.join(' ') ? esc(r.input) : ''}</div></div>`;
-  if (r.status === 'loading') return `<div class="res">${head}<span class="chip gray"><span class="spin"></span>조회 중</span></div><div class="res-b hint">잠시만 기다려주세요…</div></div>`;
-  if (r.status === 'error') return `<div class="res">${head}<span class="chip bad">실패</span></div><div class="res-b"><div class="note bad">${esc(r.error)}</div></div>${footHtml(r)}</div>`;
   const nf = r.full.length, np = r.part.length;
   const prim = nf ? r.full : r.part, primLabel = nf ? '정확 일치 최저가' : '최저가(색상 불명)';
+  const exN = r.exCount != null ? r.exCount : r.excluded.length;
   const chip = nf ? `<span class="chip ok">정확 일치 ${nf}건</span>` : np ? `<span class="chip warn">색상 다른 ${np}건만</span>` : `<span class="chip bad">같은 상품 없음</span>`;
+  const head = `<div class="res-h"><div class="main"><div class="code">${esc(r.code.tokens.join(' '))}</div><div class="orig">${r.input && r.input !== r.code.tokens.join(' ') ? esc(r.input) : ''}</div></div>${chip}</div>`;
   let body = '';
   if (!prim.length) {
-    body = `<div class="note bad">다나와에서 같은 품번의 상품을 찾지 못했어요. (검색 ${r.total}건 중 ${r.excluded.length}건 제외) 아래에서 검색어를 바꿔 다시 조회하거나 「다나와에서 보기」로 확인해보세요.</div>`;
+    body = `<div class="note bad">다나와에서 같은 품번의 상품을 찾지 못했어요. (검색 ${r.total}건 중 ${exN}건 제외) 아래에서 검색어를 바꿔 다시 조회하거나 「다나와에서 보기」로 확인해보세요.</div>`;
   } else {
     const m = prim[0];
     const parMin = minOf(prim.filter(x => x.parallel)), domMin = minOf(prim.filter(x => !x.parallel));
@@ -382,67 +655,108 @@ function cardHtml(r){
     if (prim.length < 3) body += `<div class="note warn">비교할 건수가 ${prim.length}건뿐이라 신뢰하기 어려워요.</div>`;
     if (prim.some(x => x.shipUnknown)) body += `<div class="note warn">배송비를 읽지 못한 상품이 있어요(합계에 0원으로 계산). 「다나와에서 보기」로 확인하세요.</div>`;
     body += ladderHtml(r);
-    body += tableHead + prim.slice(0, 5).map((x, i) => rowHtml(x, i === 0)).join('') + '</tbody></table>';
-    if (prim.length > 5) body += `<details class="fold"><summary>나머지 ${prim.length - 5}건 보기</summary>${tableHead}${prim.slice(5).map(x => rowHtml(x, false)).join('')}</tbody></table></details>`;
+    body += tableHead + prim.slice(0, 5).map((x, i) => dRow(x, i === 0)).join('') + '</tbody></table>';
+    if (prim.length > 5) body += `<details class="fold"><summary>나머지 ${prim.length - 5}건 보기</summary>${tableHead}${prim.slice(5).map(x => dRow(x, false)).join('')}</tbody></table></details>`;
   }
-  if (nf && np) body += `<details class="fold"><summary>색상 다르거나 표기 없는 ${np}건 (가격 계산 제외)</summary>${tableHead}${r.part.map(x => rowHtml(x, false)).join('')}</tbody></table></details>`;
+  if (nf && np) body += `<details class="fold"><summary>색상 다르거나 표기 없는 ${np}건 (가격 계산 제외)</summary>${tableHead}${r.part.map(x => dRow(x, false)).join('')}</tbody></table></details>`;
   if (r.excluded.length) {
     const why = {}; r.excluded.forEach(e => why[e.why] = (why[e.why] || 0) + 1);
-    body += `<details class="fold"><summary>제외한 ${r.excluded.length}건 — ${Object.keys(why).map(k => k + ' ' + why[k]).join(' · ')}</summary><table class="t"><tbody>${r.excluded.map(e => `<tr><td style="white-space:nowrap">${esc(e.it.mall || '')}</td><td class="ti"><a href="${esc(e.it.href)}" target="_blank" rel="noopener">${esc(e.it.title)}</a></td><td class="r">${won(e.it.price)}</td><td><span class="chip gray">${esc(e.why)}</span></td></tr>`).join('')}</tbody></table></details>`;
+    body += `<details class="fold"><summary>제외한 ${exN}건${exN > r.excluded.length ? ` (앞의 ${r.excluded.length}건만 저장)` : ''} — ${Object.keys(why).map(k => k + ' ' + why[k]).join(' · ')}</summary><table class="t"><tbody>${r.excluded.map(e => `<tr><td style="white-space:nowrap">${esc(e.it.mall || '')}</td><td class="ti"><a href="${esc(e.it.href)}" target="_blank" rel="noopener">${esc(e.it.title)}</a></td><td class="r">${won(e.it.price)}</td><td><span class="chip gray">${esc(e.why)}</span></td></tr>`).join('')}</tbody></table></details>`;
   }
   const meta = `<div class="hint" style="margin-top:10px;">검색어 「${esc(r.q)}」 · 다나와 ${r.total}건 중 ${nf + np}건 사용 · ${r.cached ? '저장된 결과' : '새로 조회'} ${fmtTime(r.fetched_at)}</div>`;
-  return `<div class="res">${head}${chip}</div><div class="res-b">${body}${meta}</div>${footHtml(r)}</div>`;
+  return `<div class="res">${head}<div class="res-b">${body}${meta}</div>${footHtml(r)}</div>`;
 }
 function footHtml(r){
   const q = r.q || (r.code && r.code.queries && r.code.queries[0]) || r.input;
   return `<div class="res-f" data-id="${esc(r.id)}"><input type="text" value="${esc(q)}" aria-label="검색어" data-act="q"><button class="btn btn-out btn-sm" data-act="requery">이 검색어로 다시 조회</button><button class="btn btn-out btn-sm" data-act="force" title="저장된 결과가 10분 넘었을 때만 새로 받아와요">새로 받기</button><a class="btn btn-out btn-sm" style="text-decoration:none" href="${esc(searchUrl(q))}" target="_blank" rel="noopener">다나와에서 보기</a><button class="btn btn-out btn-sm" data-act="del">삭제</button></div>`;
 }
-function renderResults(){
-  const box = $('results'); if (!box) return;
-  box.innerHTML = S.results.length ? S.results.map(cardHtml).join('') : '<div class="box hint" style="text-align:center;padding:30px;">조회 결과가 여기에 쌓여요. 위에 품번을 넣고 「조회」를 눌러주세요.</div>';
-  $('xlsBtn') && ($('xlsBtn').disabled = !S.results.some(r => r.status === 'done'));
-  $('clrBtn') && ($('clrBtn').disabled = !S.results.length);
-}
-document.addEventListener('click', async ev => {
-  const b = ev.target.closest('[data-act]'); if (!b) return;
-  const bar = b.closest('.res-f'); if (!bar) return;
-  const r = S.results.find(x => x.id === bar.dataset.id); if (!r) return;
-  const act = b.dataset.act;
-  if (act === 'del') { S.results = S.results.filter(x => x !== r); saveSoon(); return renderResults(); }
-  if (act === 'requery' || act === 'force') {
-    if (S.running) return toast('다른 조회가 끝난 뒤에 다시 눌러주세요.', 'err');
-    const q = bar.querySelector('input').value.trim(); if (!q) return toast('검색어를 입력해주세요.', 'err');
-    S.running = true; S.cancel = false; r.customQuery = q; r.status = 'loading'; renderResults();
-    try { await fill(r, act === 'force', () => {}); } catch(e) { r.status = 'error'; r.error = e.message || String(e); }
-    S.running = false; renderResults(); saveSoon();
-  }
-});
 
-/* ---------- 엑셀 ---------- */
-function exportXlsx(){
-  const done = S.results.filter(r => r.status === 'done'); if (!done.length) return;
-  const sum = [['품번','검색어','정확 일치 건수','색상 다른 건수','제외 건수','최저가(합계)','국내 표기 최저','해외·병행 표기 최저','중앙값','최저가 판매처','조회 시각','원본 입력']];
+/* ---------- 엑셀 받기 ---------- */
+async function exportXlsx(scope){
+  const tasks = (scope === 'filtered' ? filtered() : S.order.map(getTask)).filter(Boolean);
+  if (!tasks.some(t => t.status === 'done')) return toast('받을 결과가 아직 없어요.', 'err');
+  setMsg('엑셀 파일을 만드는 중…');
+  const resMap = new Map();
+  if (DB.ok) (await idbAll('results')).forEach(r => resMap.set(r.key, r)); else S.memRes.forEach((r, k) => resMap.set(k, r));
+  const stText = { wait: '대기', run: '조회 중', error: '실패', done: '' };
+  const sum = [['원본 행','입력','품번','상태','정확 일치 건수','색상 다른 건수','제외 건수','최저가(합계)','최저가 기준','국내 표기 최저','해외·병행 표기 최저','중앙값','최저가 판매처','검색어','조회 시각','출처 파일']];
   const det = [['품번','구분','판매처','상품명','판매가','배송비','합계','해외·병행 표기','광고','링크']];
   const exc = [['품번','판매처','상품명','판매가','제외 사유','링크']];
-  for (const r of done) {
-    const prim = r.full.length ? r.full : r.part, code = r.code.tokens.join(' ');
-    const pm = minOf(prim.filter(x => x.parallel)), dm = minOf(prim.filter(x => !x.parallel));
-    sum.push([code, r.q, r.full.length, r.part.length, r.excluded.length, prim.length ? prim[0].eff : '', dm ? dm.eff : '', pm ? pm.eff : '', median(prim.map(x => x.eff)) || '', prim.length ? (prim[0].malls || [prim[0].mall]).join('·') : '', new Date(r.fetched_at * 1000).toLocaleString('ko-KR'), r.input]);
-    const push = (x, t) => det.push([code, t, (x.malls || [x.mall]).join('·'), x.title, x.price, x.ship == null ? '' : x.ship, x.eff, x.parallel ? 'Y' : '', x.ad ? 'Y' : '', x.href]);
+  for (const t of tasks) {
+    const s = t.sum, done = t.status === 'done';
+    const state = done ? (s.nf ? '정확 일치' : s.np ? '색상 다른 것만' : '같은 상품 없음') : (stText[t.status] + (t.status === 'error' ? ': ' + (t.error || '') : ''));
+    for (const row of t.rows) {
+      sum.push([row.no, row.input, t.label, state, done ? s.nf : '', done ? s.np : '', done ? s.nex : '', done && s.min != null ? s.min : '', done ? (s.basis === 'full' ? '정확 일치' : s.basis === 'part' ? '색상 불명' : '') : '',
+        done && s.dom != null ? s.dom : '', done && s.par != null ? s.par : '', done && s.med != null ? s.med : '', done ? s.mall : '', done ? s.q : '', done ? new Date(s.at * 1000).toLocaleString('ko-KR') : '', row.src]);
+    }
+    const r = resMap.get(t.key); if (!r) continue;
+    const push = (x, tag) => det.push([t.label, tag, (x.malls || [x.mall]).join('·'), x.title, x.price, x.ship == null ? '' : x.ship, x.eff, x.parallel ? 'Y' : '', x.ad ? 'Y' : '', x.href]);
     r.full.forEach(x => push(x, '정확 일치')); r.part.forEach(x => push(x, '색상 다르거나 불명'));
-    r.excluded.forEach(e => exc.push([code, e.it.mall, e.it.title, e.it.price == null ? '' : e.it.price, e.why, e.it.href]));
+    r.excluded.forEach(e => exc.push([t.label, e.it.mall, e.it.title, e.it.price == null ? '' : e.it.price, e.why, e.it.href]));
   }
   const wb = XLSX.utils.book_new();
   const add = (aoa, name, wch) => { const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = wch.map(w => ({ wch: w })); XLSX.utils.book_append_sheet(wb, ws, name); };
-  add(sum, '요약', [22,22,10,10,10,13,13,15,13,18,18,40]);
-  add(det, '상세', [22,16,14,56,11,9,11,12,6,40]);
-  add(exc, '제외', [22,14,56,11,24,40]);
-  const d = new Date(), p = n => String(n).padStart(2, '0');
-  XLSX.writeFile(wb, `최저가조회_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.xlsx`);
+  add(sum, '요약', [8,44,24,14,10,10,8,13,11,13,15,13,18,22,18,20]);
+  add(det, '상세', [24,16,14,56,11,9,11,12,6,40]);
+  add(exc, '제외', [24,14,56,11,26,40]);
+  const d = new Date();
+  XLSX.writeFile(wb, `최저가조회_${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}.xlsx`);
+  setMsg(`엑셀로 저장했어요. (${sum.length - 1}줄)`);
 }
 
-restore(); render();
-window.__pc = { extractCode, parseItems, fromCompact, classify, normCode };   // 점검용 훅
+/* ---------- 이벤트 ---------- */
+document.addEventListener('click', async ev => {
+  const g = ev.target.closest('[data-act],[data-f],[data-pg],tr[data-key]'); if (!g) return;
+  if (ev.target.closest('a')) return;
+  if (g.dataset.f) { S.filter = g.dataset.f; S.page = 0; return renderList(); }
+  if (g.dataset.pg) { S.page += +g.dataset.pg; return renderList(); }
+  const act = g.dataset.act;
+  if (g.matches('tr[data-key]') && !act) { const k = g.dataset.key; if (S.open.has(k)) S.open.delete(k); else S.open.add(k); return renderList(); }
+  if (act === 'add') { const lines = $('lines').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean); if (!lines.length) return toast('품번을 한 줄 이상 입력해주세요.', 'err'); doAdd(lines.map((s, i) => ({ no: i + 1, input: s, src: '붙여넣기' })), '붙여넣기'); $('lines').value = ''; return; }
+  if (act === 'pvAdd') { const P = S.pending; if (!P) return; const items = pendingItems(); S.pending = null; renderPending(); return doAdd(items, P.name); }
+  if (act === 'pvCancel') { S.pending = null; return renderPending(); }
+  if (act === 'pause') return pause();
+  if (act === 'resume') { S.paused = false; setMsg(''); return pump(); }
+  if (act === 'retryErr') return retryErrors();
+  if (act === 'xlsAll') return exportXlsx('all');
+  if (act === 'xlsFlt') return exportXlsx('filtered');
+  if (act === 'clear') {
+    if (!confirm('올려 둔 품번과 조회 결과를 모두 지울까요? (되돌릴 수 없어요)')) return;
+    S.paused = true; S.queue = []; S.tasks.clear(); S.order = []; S.open.clear(); S.detail.clear(); S.memRes.clear(); S.cur = null; await idbClear(); S.running = false; S.paused = false; setMsg('');
+    return updateAll();
+  }
+  const bar = g.closest('.res-f'); if (!bar) return;
+  const t = getTask(bar.dataset.id); if (!t) return;
+  if (act === 'del') { S.tasks.delete(t.key); S.order = S.order.filter(k => k !== t.key); S.queue = S.queue.filter(k => k !== t.key); S.open.delete(t.key); S.detail.delete(t.key); S.memRes.delete(t.key); await idbDel(t.key); return updateAll(); }
+  if (act === 'requery' || act === 'force') {
+    const q = bar.querySelector('input').value.trim(); if (!q) return toast('검색어를 입력해주세요.', 'err');
+    t.customQuery = q; t.force = act === 'force'; t.status = 'wait'; t.tries = 0; S.detail.delete(t.key);
+    S.queue = S.queue.filter(k => k !== t.key); S.queue.unshift(t.key); await idbPut('tasks', t);
+    updateAll(); if (!S.running) pump();
+  }
+});
+document.addEventListener('keydown', ev => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('tr[data-key]')) { ev.preventDefault(); ev.target.click(); } });
+let srchTimer = null;
+document.addEventListener('input', ev => { if (ev.target.id === 'srch') { clearTimeout(srchTimer); srchTimer = setTimeout(() => { S.q = ev.target.value; S.page = 0; renderList(); }, 250); } });
+window.addEventListener('beforeunload', ev => { if (S.running && !S.paused && S.queue.length) { ev.preventDefault(); ev.returnValue = ''; } });
+
+/* ---------- 시작: 지난번 대기열 불러오기 ---------- */
+(async function start(){
+  render();
+  if (!AUTH) return;
+  await idbOpen();
+  if (!DB.ok) setMsg('이 브라우저에서는 조회 결과를 저장할 수 없어요(시크릿 모드 등). 창을 닫으면 사라지니 엑셀로 받아 두세요.', true);
+  const tasks = await idbAll('tasks');
+  tasks.sort((a, b) => (a.seq || 0) - (b.seq || 0));
+  for (const t of tasks) {
+    S.seq = Math.max(S.seq, t.seq || 0);
+    if (t.status === 'run') t.status = 'wait';
+    S.tasks.set(t.key, t); S.order.push(t.key); if (t.status === 'wait') S.queue.push(t.key);
+  }
+  updateAll();
+  if (S.queue.length) { setMsg(`지난번에 남은 ${S.queue.length.toLocaleString()}건을 이어서 조회합니다.`); pump(); }
+})();
+window.__pc = { extractCode, parseItems, fromCompact, classify, normCode, S, addLines };   // 점검용 훅
 </script>
 </body>
 </html>
