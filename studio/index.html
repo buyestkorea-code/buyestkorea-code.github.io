@@ -7,174 +7,549 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d0d0d'/%3E%3Crect x='10' y='5' width='12' height='22' rx='2' fill='none' stroke='%23c8a96a' stroke-width='2'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=Noto+Serif+KR:wght@400;600&display=swap" rel="stylesheet" />
 <style>
-  :root {
-    --ink:#0d0d0d; --ivory:#f5f1ea; --paper:#fbf9f5; --gold:#c8a96a; --gold-deep:#8f7438;
-    --muted:#6f6a61; --line:#ddd6c8; --warn:#fff4d6; --warn-line:#e6cf8a;
-    --serif:"Noto Serif KR","Batang",serif; --sans:"Noto Sans KR","Malgun Gothic",sans-serif; --mono:ui-monospace,Consolas,monospace;
-  }
-  *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
-  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.7 var(--sans)}
-  a{color:inherit}
-  .wrap{width:min(1040px,100% - 40px);margin-inline:auto}
-  :focus-visible{outline:3px solid var(--gold);outline-offset:3px}
-
-  /* ── 상단: 검은 면 + 릴 프레임 ── */
-  .hero{background:var(--ink);color:var(--ivory);padding:56px 0 64px;overflow:hidden}
-  .hero .wrap{display:grid;grid-template-columns:1.25fr .75fr;gap:48px;align-items:center}
-  .back{font-size:13px;color:#a9a396;text-decoration:none;letter-spacing:.04em}
-  .back:hover{color:var(--gold)}
-  h1{font:700 clamp(34px,5.4vw,60px)/1.12 var(--serif);margin:20px 0 18px;letter-spacing:-.01em}
-  h1 em{font-style:normal;color:var(--gold)}
-  .lead{font-size:18px;color:#d9d3c6;max-width:30em;margin:0 0 30px}
-  .cta{display:flex;gap:12px;flex-wrap:wrap}
-  .btn{display:inline-flex;align-items:center;gap:10px;padding:16px 26px;border-radius:12px;font:700 17px var(--sans);text-decoration:none;border:2px solid var(--gold);transition:transform .15s,background .15s}
-  .btn.solid{background:var(--gold);color:var(--ink)}
-  .btn.line{color:var(--gold)}
-  .btn:hover{transform:translateY(-2px)}
-  .btn.solid:hover{background:#d8bc82}
-  .btn.line:hover{background:rgba(200,169,106,.12)}
-  .ver{margin-top:22px;font:13px var(--mono);color:#a9a396}
-  .ver b{color:var(--gold);font-weight:500}
-
-  .reel{justify-self:center;width:min(240px,60vw);aspect-ratio:9/16;border:2px solid var(--gold);border-radius:22px;position:relative;
-        background:linear-gradient(180deg,#1b1812 0%,#0d0d0d 100%);padding:26px 14px}
-  .reel::before,.reel::after{content:"";position:absolute;top:18px;bottom:18px;width:6px;
-        background:repeating-linear-gradient(180deg,var(--gold) 0 10px,transparent 10px 24px);opacity:.55;border-radius:3px}
-  .reel::before{left:9px} .reel::after{right:9px}
-  .reel .frame{height:100%;border-radius:8px;background:var(--ivory);color:var(--ink);display:grid;grid-template-rows:1fr auto;overflow:hidden}
-  .reel .shot{background:linear-gradient(135deg,#d8c9a8,#b9976a);position:relative}
-  .reel .shot i{position:absolute;inset:auto 14% 14% 14%;height:34%;background:rgba(13,13,13,.78);border-radius:4px}
-  .reel .meta{padding:10px 12px;font:700 12px var(--serif);letter-spacing:.08em;text-align:center}
-  .reel .bar{height:4px;background:#e4dccb}
-  .reel .bar span{display:block;height:100%;width:0;background:var(--gold-deep);animation:fill 3.6s ease-out .4s forwards}
-  @keyframes fill{to{width:100%}}
-  @media (prefers-reduced-motion:reduce){.reel .bar span{animation:none;width:100%}.btn{transition:none}}
-
-  /* ── 본문 ── */
-  section{padding:56px 0 8px}
-  h2{font:700 28px/1.3 var(--serif);margin:0 0 6px}
-  .sub{color:var(--muted);margin:0 0 26px}
-  ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:14px;counter-reset:s}
-  ol.steps li{counter-increment:s;background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px 18px 74px;position:relative}
-  ol.steps li::before{content:counter(s);position:absolute;left:20px;top:16px;width:38px;height:38px;border-radius:50%;background:var(--ink);color:var(--gold);
-        display:grid;place-items:center;font:700 18px var(--serif)}
-  ol.steps b{display:block;font-size:17px;margin-bottom:2px}
-  ol.steps span{color:var(--muted);font-size:15px}
-  .note{background:var(--warn);border:1px solid var(--warn-line);border-radius:12px;padding:14px 18px;margin-top:16px;font-size:15px}
-  .note b{font-weight:700}
-  kbd{font:13px var(--mono);background:var(--ivory);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
-  details{background:#fff;border:1px solid var(--line);border-radius:12px;padding:0 20px;margin-bottom:10px}
-  summary{cursor:pointer;padding:16px 0;font-weight:700;list-style:none}
-  summary::-webkit-details-marker{display:none}
-  summary::after{content:"+";float:right;color:var(--gold-deep);font-size:22px;line-height:1}
-  details[open] summary::after{content:"–"}
-  details p{margin:0 0 16px;color:#3b3832}
-  footer{margin-top:64px;padding:28px 0 40px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
-
-  @media (max-width:760px){
-    .hero .wrap{grid-template-columns:1fr;gap:36px}
-    .reel{order:-1;width:150px}
-    ol.steps li{padding-left:66px}
-  }
+  :root { --bg:#f6f4f0; --card:#fff; --fg:#1b1b1b; --muted:#7a756d; --line:#e4dfd6; --accent:#9c7a3c; --ok:#2f7d4f; --err:#b23a3a; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:20px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-bottom:1px solid var(--line); background:var(--card); }
+  header h1 { margin:0; font-size:20px; letter-spacing:2px; }
+  header h1 span { color:var(--accent); }
+  .brand-toggle { display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .brand-toggle button { border:0; background:none; padding:8px 16px; cursor:pointer; font-size:14px; }
+  .brand-toggle button.on { background:var(--fg); color:#fff; }
+  nav { display:flex; gap:4px; padding:16px 24px 0; flex-wrap:wrap; }
+  nav button { border:1px solid var(--line); border-bottom:0; background:#ece8e1; padding:12px 18px; border-radius:10px 10px 0 0; cursor:pointer; font-size:15px; }
+  nav button.on { background:var(--card); font-weight:600; }
+  main { max-width:1100px; margin:0 24px 24px; background:var(--card); border:1px solid var(--line); border-radius:0 12px 12px 12px; padding:24px; }
+  .tab { display:none; } .tab.on { display:block; }
+  .desc { color:var(--muted); font-size:14px; margin:0 0 20px; line-height:1.6; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; }
+  label { display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+  input, select, textarea { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff; }
+  textarea { min-height:140px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; }
+  .drop { border:2px dashed var(--line); border-radius:12px; padding:24px; text-align:center; color:var(--muted); cursor:pointer; margin:16px 0; }
+  .thumbs { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; justify-content:center; }
+  .thumb { position:relative; width:84px; }
+  .thumb img { width:84px; height:112px; object-fit:cover; border-radius:6px; display:block; }
+  .thumb .tb { display:flex; justify-content:space-between; margin-top:2px; }
+  .thumb .tb button { border:0; background:#eee; border-radius:4px; font-size:12px; cursor:pointer; padding:2px 6px; }
+  .go { margin-top:18px; background:var(--fg); color:#fff; border:0; padding:14px 26px; border-radius:10px; font-size:15px; cursor:pointer; }
+  .go:disabled { opacity:.4; cursor:default; }
+  .bar { height:8px; background:#eee; border-radius:4px; overflow:hidden; margin:10px 0; }
+  .bar div { height:100%; background:var(--accent); width:0; transition:width .2s; }
+  .ok { color:var(--ok); } .err { color:var(--err); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td, th { text-align:left; padding:8px; border-bottom:1px solid var(--line); }
+  .step { border:1px solid var(--line); border-radius:12px; padding:18px; margin:0 0 18px; }
+  .step h3 { margin:0 0 4px; font-size:16px; } .step .desc { margin-bottom:14px; }
+  .hooks { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:10px; max-height:420px; overflow:auto; padding:2px; }
+  .hook { display:flex; gap:10px; align-items:flex-start; border:1px solid var(--line); border-radius:10px; padding:10px 12px; cursor:pointer; margin:0; color:var(--fg); font-size:14px; }
+  .hook:has(input:checked) { border-color:var(--accent); background:#fbf7ef; }
+  .hook input { width:auto; margin-top:3px; } .hook .ref { color:var(--muted); font-size:11px; }
+  .hook .ht { margin:6px 0 4px; font-size:15px; } .hook .when { color:var(--muted); font-size:12px; margin-bottom:6px; }
+  .pc { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; margin:2px 4px 2px 0; }
+  .pc.ok { background:#e6f2ea; color:var(--ok); } .pc.warn { background:#fdf3dc; color:#8a6a12; } .pc.bad { background:#f8e3e3; color:var(--err); }
+  .beat { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:10px; }
+  .beat .br { display:flex; gap:10px; align-items:center; margin-bottom:6px; } .beat .bt { color:var(--muted); font-size:12px; flex:1; }
+  .beat .bg { display:grid; grid-template-columns:1fr 1fr; gap:10px; } .beat textarea { min-height:56px; font-family:inherit; font-size:14px; }
+  .mini { border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+  .row .go { margin-top:0; }
+  .cap125 { background:#f3f1ec; border-radius:10px; padding:12px 14px; font-size:14px; line-height:1.6; margin:10px 0 6px; }
+  .cap125 .more { color:var(--muted); } #p-caption { font-family:inherit; font-size:14px; min-height:180px; }
+  .sub { background:#fff; color:var(--fg); border:1px solid var(--fg); }
+  /* 미리보기 + 렌더 */
+  .studio-split { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:24px; align-items:start; }
+  .pv { position:sticky; top:12px; text-align:center; }
+  .pv canvas { width:270px; height:480px; background:#111; border-radius:12px; display:block; margin:0 auto; box-shadow:0 6px 24px rgba(0,0,0,.15); }
+  .pv input[type=range] { padding:0; margin-top:10px; }
+  .pv .pvrow { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:8px; font-size:12px; color:var(--muted); }
+  .job { margin-top:20px; border:1px solid var(--line); border-radius:10px; padding:14px; display:none; }
+  .job video { max-width:320px; width:100%; border-radius:10px; margin-top:10px; display:block; }
+  .job .msg { font-size:13px; color:var(--muted); }
+  .tslot { display:grid; grid-template-columns:130px 1fr; gap:10px; align-items:center; margin-bottom:8px; }
+  .titem { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+  .titem .tr { display:grid; grid-template-columns:1fr 90px 90px; gap:8px; align-items:end; }
+  .titem textarea { min-height:52px; font-family:inherit; font-size:14px; }
+  .gate { max-width:520px; margin:80px auto; background:#fff; border:1px solid var(--line); border-radius:12px; padding:36px 28px; text-align:center; line-height:1.7; }
+  .note { background:#f3f1ec; border-radius:10px; padding:12px 14px; font-size:13px; color:#3b3832; line-height:1.6; margin:0 0 16px; }
+  @media (max-width:900px){ .studio-split { grid-template-columns:1fr; } .pv { position:static; } }
+  @media (max-width:700px){ .beat .bg { grid-template-columns:1fr; } .titem .tr { grid-template-columns:1fr 1fr; } .titem .tr > :first-child { grid-column:1/-1; } }
+  @media (max-width:600px){ main{ margin:0 12px 12px; padding:16px; } nav{ padding:12px 12px 0; } }
 </style>
 </head>
 <body>
+<div id="gate" class="gate" style="display:none">
+  <h2 style="margin:0 0 10px">BUYEST 영상 스튜디오</h2>
+  <p>로그인한 직원만 사용할 수 있어요.<br>툴키트 첫 화면에서 로그인한 뒤 이 화면을 새로고침해 주세요.</p>
+  <p><button class="go" onclick="location.reload()">새로고침</button></p>
+</div>
 
-<header class="hero">
-  <div class="wrap">
-    <div>
-      <a class="back" href="../">← 툴키트로 돌아가기</a>
-      <h1>사진을 올리면<br><em>릴스</em>가 만들어집니다</h1>
-      <p class="lead">영상은 내 PC가 직접 만들고, 완성된 파일은 바로 내려받습니다. 설치는 처음 한 번이면 끝나고, 새 버전은 버튼 한 번으로 바뀝니다.</p>
-      <div class="cta">
-        <a class="btn solid" href="http://localhost:3939" target="_blank" rel="noopener">스튜디오 열기</a>
-        <a class="btn line" id="dl" href="BUYEST-Studio-Install.bat" download>설치 파일 받기</a>
-      </div>
-      <p class="ver" id="ver">최신 버전 확인 중…</p>
-    </div>
-    <div class="reel" aria-hidden="true">
-      <div class="frame">
-        <div class="shot"><i></i></div>
-        <div class="meta">BUYEST</div>
-      </div>
-      <div class="bar" style="position:absolute;left:30px;right:30px;bottom:14px;border-radius:2px"><span></span></div>
-    </div>
+<div id="app" style="display:none">
+<header>
+  <h1>BUYEST <span>영상 스튜디오</span></h1>
+  <div class="brand-toggle" id="brandToggle">
+    <button data-brand="buyest" class="on">BUYEST</button>
+    <button data-brand="kids">BUYEST Kids</button>
   </div>
+  <div id="health" style="font-size:12px;color:var(--muted)"></div>
+  <div id="me" style="font-size:13px"></div>
 </header>
 
-<main class="wrap">
+<nav id="tabs">
+  <button data-tab="plan" class="on">⓪ 기획·대본</button>
+  <button data-tab="reel">① 상품 릴스</button>
+  <button data-tab="tpl">② 템플릿 영상 (자막·콜라주)</button>
+  <button data-tab="montage">③ 기획 영상 요청서</button>
+  <button data-tab="history">내가 만든 영상</button>
+</nav>
 
-  <section id="install">
-    <h2>처음 한 번만 설치하세요</h2>
-    <p class="sub">이미 설치했다면 위의 <b>스튜디오 열기</b>만 누르면 됩니다.</p>
-    <ol class="steps">
-      <li><b>설치 파일을 받습니다</b><span>위의 <b>설치 파일 받기</b> 버튼을 누르면 <kbd>BUYEST-Studio-Install.bat</kbd> 이 내려받아집니다.</span></li>
-      <li><b>받은 파일을 더블클릭합니다</b><span>파란 “Windows의 PC 보호” 화면이 뜨면 <b>추가 정보</b> → <b>실행</b>을 누르세요. 회사에서 만든 파일이라 안전합니다.</span></li>
-      <li><b>검은 창이 끝날 때까지 기다립니다</b><span>5~10분 걸립니다. 중간에 “이 앱이 변경하도록 허용하시겠습니까?”가 뜨면 <b>예</b>를 누르세요. 창은 닫지 마세요.</span></li>
-      <li><b>“설치 완료”가 보이면 끝입니다</b><span>브라우저에 스튜디오가 열리고, 바탕화면에 <b>BUYEST 영상 스튜디오</b> 아이콘이 생깁니다. 이후 PC를 켜면 자동으로 준비됩니다.</span></li>
-    </ol>
+<main>
+  <!-- ⓪ 기획·대본 -->
+  <section class="tab on" id="tab-plan">
+    <p class="desc">상품 정보를 넣으면 <b>훅 → 대본 → 캡션</b>까지 잡아 줍니다. 인터넷·AI 없이 이 브라우저 안에서만 돌아요. 다 되면 <b>① 상품 릴스로 보내기</b>를 눌러 바로 영상을 만들거나, 프롬프트를 복사해 Claude·미르에 붙여 넣으세요.</p>
+
+    <div class="step">
+      <h3>1. 상품 정보</h3>
+      <div class="grid">
+        <div><label>브랜드명</label><input id="p-brand" placeholder="MONCLER" /></div>
+        <div><label>상품명</label><input id="p-product" placeholder="키즈 마야 패딩" /></div>
+        <div><label>바이스트 가격</label><input id="p-price" placeholder="₩890,000" /></div>
+        <div><label>백화점가 (있으면)</label><input id="p-dept" placeholder="₩1,290,000" /></div>
+        <div><label>수량·숫자 (있으면)</label><input id="p-count" placeholder="3" /></div>
+        <div><label>사이즈 (있으면)</label><input id="p-size" placeholder="4A~10A" /></div>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <div><label>상품 포인트 (한 줄에 하나, 첫 줄이 훅에 들어감)</label><textarea id="p-points" style="font-family:inherit;font-size:14px;min-height:96px" placeholder="광택 나일론 원단&#10;후드 탈부착&#10;사이즈 4A~10A"></textarea></div>
+        <div><label>이번에 실제로 있었던 일 (좋은 각도가 여기서 나와요)</label><textarea id="p-story" style="font-family:inherit;font-size:14px;min-height:96px" placeholder="밀라노 부티크에서 3장만 입고, 작년에 일주일 만에 품절"></textarea></div>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <div><label>마지막 요청 (하나만)</label><input id="p-cta" placeholder="댓글에 '사이즈' 남겨 주세요" /></div>
+        <div><label>댓글 키워드</label><input id="p-keyword" placeholder="사이즈" /></div>
+        <div><label>목표 길이(초) · 15~45초</label><input id="p-len" type="number" value="20" min="10" max="60" /></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3>2. 훅 고르기 — 첫 2초</h3>
+      <p class="desc">공식 12가지에 상품 정보가 자동으로 채워집니다. 하나 골라서 아래에서 고쳐 쓰세요. 숫자가 있고, 인사로 시작하지 않고, 3초 안에 끝나는 훅이 좋습니다.</p>
+      <div class="hooks" id="p-hooklist"></div>
+      <label style="margin-top:14px">최종 훅</label>
+      <input id="p-hook" placeholder="위에서 고르거나 직접 쓰기" />
+      <div id="p-hookcheck" style="margin-top:6px"></div>
+      <div class="row"><button class="go" id="p-build">대본·캡션 만들기 →</button></div>
+    </div>
+
+    <div class="step" id="p-step2">
+      <h3>3. 대본 — 비트별 말과 화면 글자</h3>
+      <p class="desc">한 비트에 생각 하나. 말과 화면 글자는 따로 씁니다(화면 글자가 소리보다 먼저 읽혀요). 시간은 한국어 분당 110어절 기준이고, 마지막 줄이 훅의 낱말을 다시 말하면 다시 보기가 늘어납니다.</p>
+      <div id="p-beats"><p class="desc">2단계에서 <b>대본·캡션 만들기</b>를 누르세요.</p></div>
+      <div id="p-timing" style="margin-top:8px;font-size:14px"></div>
+    </div>
+
+    <div class="step">
+      <h3>4. 캡션</h3>
+      <p class="desc">피드에서는 앞 125자만 보입니다. 그 안에 핵심과 요청 하나. 캡션 속 링크는 눌리지 않고, 해시태그는 5개 이하.</p>
+      <div class="cap125" id="p-cap125"></div>
+      <textarea id="p-caption" placeholder="대본·캡션 만들기를 누르면 초안이 들어옵니다"></textarea>
+      <div id="p-capcheck" style="margin-top:6px"></div>
+      <div class="row"><button class="mini" id="p-capdraft">초안 다시 만들기</button><button class="mini" id="p-capcopy">캡션 복사</button><button class="mini" id="p-captxt">대본+캡션 txt 저장</button></div>
+    </div>
+
+    <div class="step">
+      <h3>5. 영상으로 · 프롬프트로</h3>
+      <div class="grid" style="margin-bottom:6px">
+        <div><label>영상 스타일 (프롬프트에 들어가고, 고르면 자막 모양도 추천됩니다)</label><select id="p-style"></select></div>
+      </div>
+      <div class="row">
+        <button class="go" id="p-toreel">① 상품 릴스로 보내기 →</button>
+        <button class="go sub" id="p-tomontage">③ 기획 영상 요청서로 보내기</button>
+      </div>
+      <p class="desc" style="margin:14px 0 6px">브랜드 말투 규칙과 금지 표현이 들어간 프롬프트를 복사해 Claude 나 미르에 붙여 넣으세요.</p>
+      <div class="row" style="margin-top:0">
+        <button class="mini" data-prompt="plan">한 주 계획 프롬프트</button>
+        <button class="mini" data-prompt="script">대본 다듬기 프롬프트</button>
+        <button class="mini" data-prompt="caption">캡션 프롬프트</button>
+        <button class="mini" data-prompt="mirr">미르 영상 제작 프롬프트</button>
+      </div>
+      <div class="row"><button class="mini" id="p-save">임시 저장</button><select id="p-drafts" style="width:auto;min-width:220px"></select></div>
+    </div>
   </section>
 
-  <section id="use">
-    <h2>쓰는 방법</h2>
-    <p class="sub">스튜디오는 이 PC 안에서만 열립니다. 다른 사람은 접속할 수 없습니다.</p>
-    <ol class="steps">
-      <li><b>로그인합니다</b><span>툴키트에서 쓰는 아이디와 비밀번호를 그대로 입력하세요.</span></li>
-      <li><b>⓪ 기획·대본으로 훅과 대본을 잡습니다</b><span>위쪽에서 BUYEST 또는 BUYEST Kids를 고른 뒤 상품 정보를 적고, 훅 공식 12개 중 하나를 고르면 대본·화면 글자·캡션이 만들어집니다. Claude·미르에 붙여 넣을 프롬프트도 버튼 한 번으로 복사돼요.</span></li>
-      <li><b>① 상품 릴스로 보내고 사진을 올립니다</b><span>훅·화면 글자·가격·마지막 문구가 자동으로 채워집니다. 상품 사진을 최대 12장까지 올리세요. (기획 없이 바로 써도 됩니다)</span></li>
-      <li><b>“릴스 만들기”를 누릅니다</b><span>1~2분 걸립니다. 진행 막대가 100%가 될 때까지 기다리세요.</span></li>
-      <li><b>“MP4 다운로드”를 누릅니다</b><span>파일 이름은 <kbd>브랜드_상품명_날짜.mp4</kbd> 로 저장됩니다. 만든 영상은 <b>7일 뒤 자동으로 지워지니</b> 바로 받아 두세요.</span></li>
-    </ol>
+  <!-- ① 상품 릴스 -->
+  <section class="tab" id="tab-reel">
+    <p class="desc">상품 사진을 올리고 정보를 입력하면 <b>훅(첫 2초) → 사진 팬/줌 + 화면 글자 → 가격·CTA</b> 순서의 9:16 릴스가 이 브라우저 안에서 만들어집니다. 사진은 밖으로 나가지 않아요. ⓪ 기획·대본에서 보내면 아래 칸이 자동으로 채워집니다.</p>
+    <div class="studio-split">
+      <div>
+        <div class="grid">
+          <div><label>브랜드명 (예: MONCLER)</label><input id="r-brandName" /></div>
+          <div><label>상품명</label><input id="r-productName" /></div>
+          <div><label>가격 표기</label><input id="r-price" placeholder="₩1,290,000" /></div>
+          <div><label>마지막 문구 (CTA)</label><input id="r-cta" value="DM으로 문의주세요" /></div>
+          <div><label>사진당 시간(초)</label><input id="r-sec" type="number" value="2.5" step="0.5" min="1" max="6" /></div>
+          <div><label>자막 모양</label><select id="r-cap"></select></div>
+        </div>
+        <div class="grid" style="margin-top:14px">
+          <div><label>훅 — 첫 사진 위에 0~2초 (비우면 로고 인트로)</label><input id="r-hook" placeholder="₩890,000에 몽클레르 키즈 패딩, 정품일까요?" /></div>
+          <div><label>화면 글자 — 두 번째 사진부터 한 줄씩 (비우면 상품명)</label><textarea id="r-lines" style="font-family:inherit;font-size:14px;min-height:72px" placeholder="밀라노 부티크 직수입&#10;택·영수증 그대로&#10;사이즈 4A~10A"></textarea></div>
+        </div>
+        <div class="drop" id="r-drop">여기를 눌러 상품 사진 선택 (최대 12장, 아래 ◀ ▶ 로 순서 바꾸기)
+          <input type="file" id="r-files" accept="image/*" multiple hidden />
+          <div class="thumbs" id="r-thumbs"></div>
+        </div>
+        <button class="go" id="r-go">릴스 만들기 (MP4)</button>
+        <div class="job" id="r-job"></div>
+      </div>
+      <div class="pv" id="r-pv"></div>
+    </div>
   </section>
 
-  <section id="update">
-    <h2>새 버전이 나오면</h2>
-    <p class="sub">스튜디오 맨 위에 노란 안내가 뜹니다.</p>
-    <ol class="steps">
-      <li><b>“새 버전이 있습니다” 안내를 확인합니다</b><span>영상을 만드는 중이라면 끝난 뒤에 누르세요.</span></li>
-      <li><b><kbd>지금 업데이트</kbd> 를 누릅니다</b><span>1~2분 뒤 화면이 저절로 새로고침되고 끝납니다. 로그인과 지난 영상은 그대로 남습니다.</span></li>
-    </ol>
+  <!-- ② 템플릿 -->
+  <section class="tab" id="tab-tpl">
+    <p class="desc">촬영본·사진 위에 자막과 그래픽을 얹는 템플릿입니다. 템플릿을 고르고 사진(또는 영상)을 올린 뒤 문구와 나오는 시간만 바꾸면 됩니다.</p>
+    <div class="studio-split">
+      <div>
+        <div class="grid">
+          <div><label>템플릿</label><select id="t-template"></select></div>
+          <div><label>자막 모양</label><select id="t-cap"></select></div>
+        </div>
+        <p class="note" id="t-desc" style="margin-top:14px"></p>
+        <div id="t-slots"></div>
+        <div id="t-texts"></div>
+        <button class="go" id="t-go">영상 만들기 (MP4)</button>
+        <div class="job" id="t-job"></div>
+      </div>
+      <div class="pv" id="t-pv"></div>
+    </div>
   </section>
 
-  <section id="help">
-    <h2>문제가 생기면</h2>
-    <p class="sub">대부분 아래 네 가지입니다.</p>
-    <details>
-      <summary>“스튜디오 열기”를 눌렀는데 페이지가 열리지 않아요</summary>
-      <p>스튜디오가 아직 꺼져 있는 상태입니다. 바탕화면의 <b>BUYEST 영상 스튜디오</b> 아이콘을 먼저 더블클릭하세요. 작업 표시줄에 검은 창이 생기고, 잠시 뒤 브라우저가 열립니다.</p>
-    </details>
-    <details>
-      <summary>검은 창이 떠 있는데 닫아도 되나요?</summary>
-      <p>닫으면 스튜디오가 꺼집니다. 영상을 만드는 동안과 쓰는 동안에는 <b>최소화만</b> 해 두세요. 끄고 싶을 때만 닫으면 됩니다.</p>
-    </details>
-    <details>
-      <summary>로그인이 안 돼요</summary>
-      <p>툴키트와 같은 아이디·비밀번호입니다. “관리자 승인 후 사용할 수 있습니다”라고 나오면 가입 승인이 아직 안 된 것이니 관리자에게 문의하세요. 5번 틀리면 15분 동안 잠깁니다.</p>
-    </details>
-    <details>
-      <summary>설치 중에 빨간 글씨가 나왔어요</summary>
-      <p>그 화면을 캡처해서 담당자에게 보내주세요. 인터넷이 끊겼다면 연결을 확인하고 설치 파일을 다시 더블클릭하면 이어서 설치됩니다.</p>
-    </details>
+  <!-- ③ 기획 영상 요청서 -->
+  <section class="tab" id="tab-montage">
+    <p class="note">AI 에이전트가 스톡 영상·BGM까지 찾아 편집하는 방식은 개인정보·라이선스(AGPL) 때문에 웹에서 직접 돌릴 수 없어, 이 탭은 <b>요청서(프롬프트)를 만들어 주는 곳</b>입니다. 아래에서 요청서를 만든 뒤 복사해서 Claude Code(OpenMontage 폴더)나 미르에 붙여 넣으세요.</p>
+    <div class="grid">
+      <div><label>제작 유형</label>
+        <select id="m-pipeline">
+          <option value="">에이전트가 선택</option>
+          <option>애니메이션 설명 영상</option>
+          <option>다큐멘터리 몽타주</option>
+          <option>시네마틱 티저</option>
+          <option>숏폼 클립 재가공</option>
+        </select></div>
+      <div><label>출력 규격</label>
+        <select id="m-platform">
+          <option>Instagram Reels 9:16</option>
+          <option>Instagram Feed 4:5</option>
+          <option>YouTube Shorts 9:16</option>
+          <option>YouTube 16:9 1080p</option>
+        </select></div>
+      <div><label>영상 스타일</label><select id="m-style"></select></div>
+    </div>
+    <label style="margin-top:14px">기획 내용 (⓪ 기획·대본에서 보내면 자동으로 채워집니다)</label>
+    <textarea id="m-brief" style="font-family:inherit;font-size:14px" placeholder="예) 이탈리아 부티크에서 직접 바잉하는 과정을 보여주는 30초 브랜드 소개 영상. 밀라노 거리 스톡 영상 + 차분한 BGM, 마지막에 'BUYEST — 18년의 바잉' 문구."></textarea>
+    <div class="row"><button class="go" id="m-go">요청서 만들기</button></div>
+    <div id="m-outbox" style="display:none">
+      <label style="margin-top:14px">완성된 요청서</label>
+      <textarea id="m-out" readonly style="min-height:260px;font-family:inherit;font-size:14px"></textarea>
+      <div class="row"><button class="mini" id="m-copy">요청서 복사</button><button class="mini" id="m-dl">brief.md 로 저장</button></div>
+    </div>
   </section>
 
+  <!-- 내가 만든 영상 -->
+  <section class="tab" id="tab-history">
+    <p class="desc">이 브라우저에서 만든 영상이 7일 동안 보관됩니다 (최대 12개). 다른 PC에서는 보이지 않으니 만든 즉시 내려받아 두세요.</p>
+    <table><thead><tr><th>시간</th><th>도구</th><th>이름</th><th>크기</th><th></th></tr></thead><tbody id="hist"></tbody></table>
+  </section>
 </main>
+</div>
 
-<footer>
-  <div class="wrap">BUYEST 영상 스튜디오 · 영상은 이 PC에서만 만들어지고, 업로드한 사진은 밖으로 나가지 않습니다.</div>
-</footer>
-
+<script src="vendor/mp4-muxer.js"></script>
+<script src="engine.js"></script>
+<script src="planner.js"></script>
 <script>
-// 툴키트 화면 안(iframe)에서 열렸으면 "툴키트로 돌아가기" 링크는 필요 없다
-if (window.self !== window.top) document.querySelector(".back").style.display = "none";
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-// 최신 버전 표시 (같은 사이트의 latest.json)
-fetch("latest.json?t=" + Date.now()).then(r => r.json()).then(l => {
-  const el = document.getElementById("ver");
-  el.innerHTML = "최신 버전 <b>v" + l.version + "</b>" + (l.notes ? " · " + l.notes.replace(/[<>&]/g, "") : "");
-}).catch(() => { document.getElementById("ver").textContent = ""; });
+  // ── 로그인 확인: 툴키트 인트라넷 로그인(localStorage)을 그대로 쓴다 ──
+  let AUTH = null;
+  try { const a = JSON.parse(localStorage.getItem("buyest.dash.auth") || "null"); if (a && a.id) AUTH = a; } catch (_) {}
+  if (!AUTH) { $("#gate").style.display = "block"; return; }
+  $("#app").style.display = "block";
+  $("#me").textContent = AUTH.id + " 님";
+
+  // ── 브랜드 / 탭 ──
+  let brand = "buyest";
+  function setBrand(b) {
+    brand = b; document.querySelectorAll("#brandToggle button").forEach((x) => x.classList.toggle("on", x.dataset.brand === b));
+    document.dispatchEvent(new CustomEvent("brandchange", { detail: b }));
+  }
+  function openTab(t) {
+    document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("on", x.dataset.tab === t));
+    document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("on", x.id === "tab-" + t));
+    if (t === "history") loadHistory();
+    document.dispatchEvent(new CustomEvent("tabopen", { detail: t }));
+  }
+  window.STUDIO = { brand: () => brand, setBrand, openTab };
+  $("#brandToggle").onclick = (e) => { const b = e.target.dataset.brand; if (b) setBrand(b); };
+  $("#tabs").onclick = (e) => { const t = e.target.dataset.tab; if (t) openTab(t); };
+
+  $("#health").textContent = SE.supported() ? "이 브라우저에서 영상 만들기 가능 ✓" : "⚠ 이 브라우저는 영상 만들기를 지원하지 않아요 (최신 Chrome·Edge 사용)";
+
+  // ── 자막 모양 셀렉트 ──
+  ["#r-cap", "#t-cap"].forEach((id) => ($(id).innerHTML = SE.CAPTION_THEMES.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")));
+
+  // ── 미리보기 (캔버스 한 장 + 슬라이더 + 재생) ──
+  function Preview(host, getScene) {
+    host.innerHTML = `<canvas width="${SE.W}" height="${SE.H}"></canvas>
+      <input type="range" min="0" max="0" value="0" />
+      <div class="pvrow"><button class="mini" data-play>▶ 재생</button><span data-time>0.0 / 0.0초</span></div>
+      <div class="pvrow" style="margin-top:4px">미리보기는 실제 영상과 같은 화면입니다</div>`;
+    const cv = host.querySelector("canvas"), ctx = cv.getContext("2d"), rg = host.querySelector("input"), tm = host.querySelector("[data-time]"), pl = host.querySelector("[data-play]");
+    let scene = null, playing = false, busy = false, want = null;
+    async function paint(frame) {
+      if (!scene) { ctx.fillStyle = "#111"; ctx.fillRect(0, 0, SE.W, SE.H); return; }
+      want = frame; if (busy) return; busy = true;
+      try {
+        while (want != null) { const f = want; want = null; if (scene.prepare) await scene.prepare(f); scene.draw(ctx, f); }
+      } catch (e) { console.error(e); }
+      busy = false;
+    }
+    function show(frame) {
+      rg.value = frame; tm.textContent = `${(frame / SE.FPS).toFixed(1)} / ${(scene.frames / SE.FPS).toFixed(1)}초`; paint(frame);
+    }
+    rg.oninput = () => { stop(); if (scene) show(Number(rg.value)); };
+    function stop() { playing = false; pl.textContent = "▶ 재생"; }
+    pl.onclick = () => {
+      if (!scene) return;
+      if (playing) return stop();
+      playing = true; pl.textContent = "■ 정지";
+      let f = Number(rg.value); if (f >= scene.frames - 1) f = 0;
+      const t0 = performance.now() - (f / SE.FPS) * 1000;
+      const tick = () => {
+        if (!playing) return;
+        const fr = Math.floor(((performance.now() - t0) / 1000) * SE.FPS);
+        if (fr >= scene.frames) { stop(); return; }
+        show(fr); requestAnimationFrame(tick);
+      };
+      tick();
+    };
+    return {
+      async refresh(keepFrame) {
+        const s = await getScene(); stop();
+        scene = s; if (!s) { paint(0); return; }
+        rg.max = s.frames - 1; const f = keepFrame ? Math.min(Number(rg.value), s.frames - 1) : Math.min(Math.round(SE.FPS * 0.9), s.frames - 1);
+        show(f);
+      },
+    };
+  }
+
+  // ── 렌더 실행 + 결과 박스 ──
+  async function runJob(box, btn, tool, nameParts, makeScene) {
+    btn.disabled = true; box.style.display = "block";
+    const ac = new AbortController();
+    box.innerHTML = `<b>준비 중…</b><div class="bar"><div></div></div><div class="msg"></div><button class="mini" data-cancel>취소</button>`;
+    box.querySelector("[data-cancel]").onclick = () => ac.abort();
+    const bar = box.querySelector(".bar div"), msg = box.querySelector(".msg");
+    try {
+      const scene = await makeScene();
+      const blob = await SE.renderToMp4(scene, {
+        signal: ac.signal,
+        onProgress: (p, ms) => {
+          bar.style.width = Math.round(p * 100) + "%";
+          const left = p > 0.02 ? Math.max(0, Math.round((ms / p - ms) / 1000)) : null;
+          msg.textContent = `${Math.round(p * 100)}%` + (left != null ? ` · 남은 시간 약 ${left}초` : "") + " · 이 탭을 닫지 마세요";
+        },
+      });
+      const name = fileName(nameParts);
+      const url = URL.createObjectURL(blob);
+      box.innerHTML = `<b class="ok">완료</b> <span class="msg">${(blob.size / 1048576).toFixed(1)}MB</span>
+        <video src="${url}" controls playsinline></video>
+        <p><a class="mini" href="${url}" download="${esc(name)}" style="text-decoration:none;color:inherit">MP4 다운로드</a> <span class="msg">${esc(name)}</span></p>`;
+      await hist.add({ tool, name, blob });
+    } catch (e) {
+      box.innerHTML = `<b class="err">${ac.signal.aborted ? "취소했습니다" : "실패"}</b><p class="msg">${ac.signal.aborted ? "" : esc(e.message || e)}</p>`;
+      console.error(e);
+    }
+    btn.disabled = false;
+  }
+  function fileName(parts) {
+    const d = new Date(); const pad = (n) => String(n).padStart(2, "0");
+    const clean = (s) => String(s || "").trim().replace(/[\\/:*?"<>|\s]+/g, "_");
+    return [brand === "kids" ? "BUYESTKids" : "BUYEST", ...parts.map(clean).filter(Boolean), `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`].join("_") + ".mp4";
+  }
+
+  // ── 보관함 (IndexedDB, 7일) ──
+  const hist = (() => {
+    const KEEP = 7 * 864e5, MAX = 12;
+    const open = () => new Promise((res, rej) => {
+      const r = indexedDB.open("buyest-studio", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("renders", { keyPath: "id" });
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+    const tx = async (mode, fn) => { const db = await open(); return new Promise((res, rej) => { const t = db.transaction("renders", mode); const out = fn(t.objectStore("renders")); t.oncomplete = () => res(out && out.result !== undefined ? out.result : out); t.onerror = () => rej(t.error); }); };
+    return {
+      async list() {
+        try {
+          const all = (await tx("readonly", (s) => s.getAll())) || [];
+          const now = Date.now(); const old = all.filter((x) => now - x.at > KEEP);
+          for (const o of old) await this.del(o.id);
+          return all.filter((x) => now - x.at <= KEEP).sort((a, b) => b.at - a.at);
+        } catch (_) { return []; }
+      },
+      async add(x) {
+        try {
+          await tx("readwrite", (s) => s.put({ id: Date.now() + "-" + Math.random().toString(36).slice(2, 6), at: Date.now(), user: AUTH.id, ...x }));
+          const all = await this.list(); for (const o of all.slice(MAX)) await this.del(o.id);
+        } catch (_) {}
+      },
+      async del(id) { try { await tx("readwrite", (s) => s.delete(id)); } catch (_) {} },
+    };
+  })();
+  async function loadHistory() {
+    const list = await hist.list();
+    $("#hist").innerHTML = list.map((j) => {
+      const d = new Date(j.at); const pad = (n) => String(n).padStart(2, "0");
+      return `<tr><td>${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}</td><td>${esc(j.tool)}</td><td>${esc(j.name)}</td><td>${(j.blob.size / 1048576).toFixed(1)}MB</td>
+        <td><a href="#" data-view="${j.id}">보기</a> · <a href="#" data-dl="${j.id}">다운로드</a> · <a href="#" data-del="${j.id}">삭제</a></td></tr>`;
+    }).join("") || `<tr><td colspan="5">아직 만든 영상이 없습니다</td></tr>`;
+    $("#hist").onclick = async (e) => {
+      const a = e.target.closest("a"); if (!a) return; e.preventDefault();
+      const id = a.dataset.view || a.dataset.dl || a.dataset.del; const item = list.find((x) => x.id === id); if (!item) return;
+      if (a.dataset.del) { await hist.del(id); loadHistory(); return; }
+      const url = URL.createObjectURL(item.blob);
+      if (a.dataset.view) window.open(url, "_blank");
+      else { const l = document.createElement("a"); l.href = url; l.download = item.name; l.click(); }
+    };
+  }
+
+  // ═══ ① 상품 릴스 ═══
+  const rFiles = $("#r-files");
+  const bmpCache = new WeakMap();
+  async function bitmapOf(file) { if (!bmpCache.has(file)) bmpCache.set(file, SE.loadImage(file)); return bmpCache.get(file); }
+  function setFiles(arr) { const dt = new DataTransfer(); arr.slice(0, 12).forEach((f) => dt.items.add(f)); rFiles.files = dt.files; drawThumbs(); reelPv.refresh(true); }
+  function drawThumbs() {
+    const box = $("#r-thumbs"); box.innerHTML = "";
+    [...rFiles.files].forEach((f, i) => {
+      const d = document.createElement("div"); d.className = "thumb";
+      const img = new Image(); img.src = URL.createObjectURL(f);
+      d.append(img);
+      const tb = document.createElement("div"); tb.className = "tb";
+      tb.innerHTML = `<button data-m="-1">◀</button><button data-x="1">✕</button><button data-m="1">▶</button>`;
+      tb.onclick = (e) => {
+        e.stopPropagation(); const arr = [...rFiles.files];
+        if (e.target.dataset.x) arr.splice(i, 1);
+        else if (e.target.dataset.m) { const j = i + Number(e.target.dataset.m); if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; }
+        else return;
+        setFiles(arr);
+      };
+      d.append(tb); box.append(d);
+    });
+  }
+  $("#r-drop").onclick = (e) => { if (e.target.closest(".thumb")) return; rFiles.click(); };
+  rFiles.onchange = () => { setFiles([...rFiles.files]); };
+  async function reelParams() {
+    return {
+      brand, brandName: $("#r-brandName").value.trim(), productName: $("#r-productName").value.trim(), price: $("#r-price").value.trim(), cta: $("#r-cta").value.trim(),
+      secondsPerPhoto: Number($("#r-sec").value) || 2.5, hook: $("#r-hook").value.trim().slice(0, 60),
+      lines: $("#r-lines").value.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 12).map((x) => x.slice(0, 40)), capTheme: $("#r-cap").value,
+    };
+  }
+  async function reelScene() {
+    const P = await reelParams();
+    await SE.ensureFonts([P.brandName, P.productName, P.price, P.cta, P.hook, ...P.lines].join(" "));
+    const imgs = await Promise.all([...rFiles.files].slice(0, 12).map(bitmapOf));
+    return SE.buildReelScene(P, imgs);
+  }
+  const reelPv = Preview($("#r-pv"), async () => (rFiles.files.length ? reelScene() : null));
+  let rTimer; ["#r-brandName", "#r-productName", "#r-price", "#r-cta", "#r-sec", "#r-hook", "#r-lines", "#r-cap"].forEach((id) => $(id).addEventListener("input", () => { clearTimeout(rTimer); rTimer = setTimeout(() => reelPv.refresh(true), 250); }));
+  document.addEventListener("brandchange", () => reelPv.refresh(true));
+  $("#r-go").onclick = () => {
+    if (!rFiles.files.length) return alert("사진을 선택해주세요");
+    runJob($("#r-job"), $("#r-go"), "상품 릴스", [$("#r-brandName").value, $("#r-productName").value], reelScene);
+  };
+
+  // ═══ ② 템플릿 ═══
+  const tplSel = $("#t-template");
+  tplSel.innerHTML = SE.TEMPLATES.map((t, i) => `<option value="${i}">${t.name}</option>`).join("");
+  let TS = null; // 지금 고른 템플릿의 편집 상태
+  function loadTemplate() {
+    const tpl = SE.TEMPLATES[Number(tplSel.value)];
+    TS = { tpl, files: {}, media: {}, texts: tpl.texts.map((x) => ({ ...x })), edited: false };
+    $("#t-desc").textContent = tpl.desc + (tpl.brandLock === "kids" ? " (BUYEST Kids 톤으로 고정)" : "");
+    $("#t-slots").innerHTML = tpl.slots.map((s) => `<div class="tslot"><label style="margin:0">${esc(s.label)}</label><input type="file" data-slot="${s.id}" accept="${s.accept}" /></div>`).join("");
+    $("#t-slots").querySelectorAll("input").forEach((inp) => (inp.onchange = async () => {
+      const f = inp.files[0]; delete TS.media[inp.dataset.slot];
+      if (f) { try { TS.media[inp.dataset.slot] = await SE.loadMedia(f); } catch (e) { alert(e.message); inp.value = ""; } }
+      fitTextsToVideo();
+      tplPv.refresh(false);
+    }));
+    renderTexts();
+    tplPv.refresh(false);
+  }
+  function renderTexts() {
+    $("#t-texts").innerHTML = TS.texts.map((x, i) => `<div class="titem"><div class="tr">
+      <div><label>${esc(x.label)}${x.key !== undefined ? " — 항목 이름 / 내용" : ""}</label>${x.key !== undefined ? `<input data-i="${i}" data-k="key" value="${esc(x.key)}" style="margin-bottom:6px" />` : ""}<textarea data-i="${i}" data-k="text" rows="2">${esc(x.text)}</textarea></div>
+      <div><label>시작(초)</label><input type="number" step="0.5" min="0" data-i="${i}" data-k="start" value="${x.start}" /></div>
+      <div><label>길이(초)</label><input type="number" step="0.5" min="0.5" data-i="${i}" data-k="dur" value="${x.dur}" /></div></div></div>`).join("");
+    $("#t-texts").querySelectorAll("[data-i]").forEach((el) => (el.oninput = () => {
+      const x = TS.texts[el.dataset.i], k = el.dataset.k; x[k] = (k === "start" || k === "dur") ? Number(el.value) || 0 : el.value;
+      if (k === "start" || k === "dur") TS.edited = true;
+      clearTimeout(tTimer); tTimer = setTimeout(() => tplPv.refresh(true), 200);
+    }));
+  }
+  // 촬영본 길이가 템플릿 기본 길이와 다르면, 직접 시간을 고치지 않은 경우에 한해 문구 시간을 영상 길이에 맞춰 늘이거나 줄인다
+  function fitTextsToVideo() {
+    const tpl = TS.tpl; if (!tpl.durationFromVideo || TS.edited) return;
+    const clip = TS.media[tpl.slots[0].id];
+    const d = clip && clip.isVideo && clip.duration ? Math.min(60, Math.max(3, Math.round(clip.duration * 10) / 10)) : tpl.duration;
+    const k = d / tpl.duration;
+    TS.texts.forEach((x, i) => { const o = tpl.texts[i]; x.start = Math.round(o.start * k * 10) / 10; x.dur = Math.round(o.dur * k * 10) / 10; });
+    renderTexts();
+  }
+  let tTimer;
+  async function tplScene() {
+    if (!TS) return null;
+    const tpl = TS.tpl; const b = tpl.brandLock || brand;
+    await SE.ensureFonts(TS.texts.map((x) => (x.key || "") + " " + x.text).join(" "));
+    return SE.buildTemplateScene(tpl, { T: SE.themeOf(b), theme: $("#t-cap").value, media: TS.media, texts: TS.texts });
+  }
+  const tplPv = Preview($("#t-pv"), tplScene);
+  tplSel.onchange = loadTemplate;
+  $("#t-cap").onchange = () => tplPv.refresh(true);
+  document.addEventListener("brandchange", () => tplPv.refresh(true));
+  document.addEventListener("tabopen", (e) => { if (e.detail === "tpl") tplPv.refresh(true); if (e.detail === "reel") reelPv.refresh(true); });
+  $("#t-go").onclick = () => {
+    const miss = TS.tpl.slots.filter((s) => !s.optional && !TS.media[s.id]);
+    if (miss.length) return alert(`${miss.map((s) => s.label).join(", ")}을(를) 올려주세요`);
+    runJob($("#t-job"), $("#t-go"), "템플릿: " + TS.tpl.name, [TS.tpl.id, (TS.texts.find((x) => x.title || x.id === "name") || {}).text], tplScene);
+  };
+  loadTemplate();
+
+  // ═══ ③ 기획 영상 요청서 ═══
+  $("#m-go").onclick = () => {
+    const brief = $("#m-brief").value.trim(); if (!brief) return alert("영상 기획 내용을 입력해주세요");
+    const label = brand === "kids" ? "BUYEST Kids (아동 명품 부티크)" : "BUYEST (명품 병행수입)";
+    const st = (window.STYLES || []).find((x) => x.id === $("#m-style").value);
+    const md = [
+      `# BUYEST 영상 제작 요청`,
+      `- 브랜드: ${label}`,
+      `- 파이프라인: ${$("#m-pipeline").value || "에이전트가 선택"}`,
+      `- 출력 규격: ${$("#m-platform").value}`,
+      st && st.id ? `- 영상 스타일: ${st.name} — ${st.prompt}` : "",
+      "", "## 기획", brief, "",
+      "## 규칙",
+      "- 실제 브랜드 로고·상표는 직원이 제공한 자료에 있는 것만 사용",
+      "- 스톡 소스는 라이선스가 확인되는 무료 소스만 사용",
+      "- 한국어 자막",
+    ].filter((x) => x !== "").join("\n");
+    $("#m-out").value = md; $("#m-outbox").style.display = "block";
+  };
+  $("#m-copy").onclick = async (e) => { try { await navigator.clipboard.writeText($("#m-out").value); } catch (_) { $("#m-out").select(); document.execCommand("copy"); } const o = e.target.textContent; e.target.textContent = "복사됨 ✓"; setTimeout(() => (e.target.textContent = o), 1400); };
+  $("#m-dl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([$("#m-out").value], { type: "text/markdown;charset=utf-8" })); a.download = "brief.md"; a.click(); };
+
+  reelPv.refresh(false);
+})();
 </script>
 </body>
 </html>
