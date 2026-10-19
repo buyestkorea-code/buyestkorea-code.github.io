@@ -79,7 +79,7 @@
     <div id="asOf" style="font-size:13px;color:var(--mute);"></div>
     <div class="stats" id="stats"></div>
     <div style="margin:8px 0;"><button class="btn btn-sub" id="dlBtn">원본 양식 + 시즌체크 엑셀로 받기</button></div>
-    <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>시즌</th><th>판매중상품명</th><th>이카운트 재고</th><th>최근들어온내역</th><th>옵션예측 (사이즈 칸)</th><th>작업여부</th></tr></thead><tbody id="tbody"></tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>시즌</th><th>판매중상품명</th><th>이카운트 재고</th><th>최근들어온내역</th><th>머리글에 채운 사이즈 (참고용)</th><th>작업여부</th></tr></thead><tbody id="tbody"></tbody></table></div>
     <div class="note">시즌 칸 읽는 법 — <b>26FW판매중</b>: 사이트에서 노출 중이고 살 수 있는 상품(시즌은 상품명 맨 앞에서 읽고, 상품명에 시즌이 없으면 사이트 등록일로 추정해 이름 칸에 표시) · <b>전품</b>: 노출 중인데 옵션이 모두 품절 · <b>미노출</b>: 사이트에서 숨김 · <b>다른색상판매</b>: 같은 모델의 다른 컬러만 있음 · <b>과거판매</b>: 사이트엔 없지만 이카운트 판매이력이 있음 · <b>신상</b>: 사이트에 없는 품번(이카운트에만 있어도 신상) · <b>확인필요</b>: 품번이 4자 미만이라 검색 불가. 작업여부는 비워 두니 확인하며 직접 적어 주세요.</div>
   </div>
 </div>
@@ -234,7 +234,7 @@ const jac = (a, b) => { const A = new Set(a), B = new Set(b); let n = 0; A.forEa
 const scaleBrief = sc => sc.length ? (sc.length > 3 ? `${sc[0]}~${sc[sc.length - 1]} (${sc.length}칸)` : sc.join(',')) : '';
 // 머리글 하나(= 한 블록)마다: 이미 사이즈가 적혀 있으면 그대로 두고, 비어 있으면 블록 안 줄들의 예측을 투표해서 정한다
 function planOptions(scan, predMap){
-  const plan = new Map();
+  const plan = new Map(), pending = [];
   scan.headers.forEach(h => {
     const its = scan.items.map((it, n) => ({ it, n })).filter(x => x.it.hdr === h);
     if (h.scale.some(s => s.label !== 'TU')) { plan.set(h, { skip: '이미 입력됨' }); return; }
@@ -243,13 +243,20 @@ function planOptions(scan, predMap){
     its.forEach(({ n }) => { const p = predMap[n]; if (!p || !p.scale) return; const w = (WV[p.lv] || 0.25) * (p.conf || 0); total += w;
       const v = votes[p.scale] || (votes[p.scale] = { w: 0, lvW: 0, why: '', n: 0 }); v.w += w; v.n++; if ((WV[p.lv] || 0) > v.lvW) { v.lvW = WV[p.lv] || 0; v.why = p.why; v.lv = p.lv; } });
     const e = Object.entries(votes).sort((a, b) => b[1].w - a[1].w);
-    if (!e.length) { plan.set(h, { skip: '근거 이력 없음' }); return; }
+    if (!e.length) { pending.push(h); return; }   // 근거가 없어도 비워 두지 않는다 (아래에서 추정값으로 채움)
     const share = total ? e[0][1].w / total : 0, top = e[0][1];
     const conf = (top.lv === 'ec' || top.lv === 'key') && share >= 0.6 ? '높음' : (share >= 0.7 && (top.lv === 'f' || top.lv === 'vf')) ? '높음' : (share >= 0.5 && top.lv !== 's') ? '보통' : '낮음';
     let scale = e[0][0].split(','), cut = false; const slots = h.total - h.model - 2;   // TU 칸 다음부터 TOTAL 앞까지
     if (scale.length > slots) { scale = scale.slice(0, slots); cut = true; }
     plan.set(h, { scale, conf, why: top.why, lv: top.lv, cut, alt: e[1] ? e[1][0].split(',') : null, lines: its.length });
   });
+  // 근거 이력이 전혀 없는 블록: 이 파일에서 예측된 블록 중 줄 수가 가장 많은 스케일, 그것도 없으면 가장 흔한 의류 사이즈로 채운다 (틀려도 되니 일단 넣고 실물 보고 고치는 방식)
+  if (pending.length) {
+    const cnt = {}; plan.forEach(b => { if (b.scale) cnt[b.scale.join(',')] = (cnt[b.scale.join(',')] || 0) + (b.lines || 1); });
+    const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+    const fb = (top ? top[0] : 'XXS,XS,S,M,L,XL,XXL,XXXL').split(',');
+    pending.forEach(h => { const slots = h.total - h.model - 2; plan.set(h, { scale: fb.slice(0, slots), conf: '추정', why: '근거 이력 없음 — 임의 추정', lines: 0 }); });
+  }
   return plan;
 }
 function optTextFor(b, p){
@@ -364,7 +371,7 @@ async function buildXlsx(buf, scan, results, hide, plan){
 
   const dim = (sx.match(/<dimension ref="[A-Z]+\d+:([A-Z]+)(\d+)"/) || []);
   const lastCol = colNum(dim[1] || 'AF');
-  const cName = lastCol + 1, cHist = lastCol + 2, cOpt = lastCol + 3;
+  const cName = lastCol + 1, cHist = lastCol + 2;
 
   // 예측해서 채운 사이즈 라벨 칸은 눈에 띄게 (원래 서식을 복제해 연한 노랑 배경만 바꿈) — 확인 후 지우거나 고치면 됨
   let st = await zip.file('xl/styles.xml').async('string');
@@ -392,15 +399,15 @@ async function buildXlsx(buf, scan, results, hide, plan){
     if (h) {
       const s = styleOf(body, rn, h.work || h.season), b = plan && plan.get(h);
       if (b && b.scale) b.scale.forEach((lab, k) => { const col = h.model + 2 + k; body = putText(body, rn, col, lab, predStyle(styleOf(body, rn, col) || styleOf(body, rn, h.model + 1) || s)); });
-      body += strCell(colLetter(cName) + rn, s, '판매중상품명') + strCell(colLetter(cHist) + rn, s, '최근들어온내역') + strCell(colLetter(cOpt) + rn, s, '옵션예측');
+      body += strCell(colLetter(cName) + rn, s, '판매중상품명') + strCell(colLetter(cHist) + rn, s, '최근들어온내역');
     } else {
       const hd = it.hdr, s = styleOf(body, rn, hd.work || hd.season);
       body = putText(body, rn, hd.season, it.seasonText);
-      body += strCell(colLetter(cName) + rn, s, it.o.name) + strCell(colLetter(cHist) + rn, s, it.hist) + strCell(colLetter(cOpt) + rn, s, it.optText || '');
+      body += strCell(colLetter(cName) + rn, s, it.o.name) + strCell(colLetter(cHist) + rn, s, it.hist);
     }
     return `<row r="${r}"${attrs}>${body}</row>`;
   });
-  sx = sx.replace(/<dimension ref="([A-Z]+\d+):[A-Z]+(\d+)"/, `<dimension ref="$1:${colLetter(cOpt)}$2"`);
+  sx = sx.replace(/<dimension ref="([A-Z]+\d+):[A-Z]+(\d+)"/, `<dimension ref="$1:${colLetter(cHist)}$2"`);
   if (xm) { st = st.replace(xm[0], `<cellXfs count="${xfs.length + newXfs.length}">${xm[2]}${newXfs.join('')}</cellXfs>`); zip.file('xl/styles.xml', st); }
 
   // 열 폭 + 빈 원산지·소재·비고 열 숨기기 (삭제가 아니라 숨김)
@@ -420,8 +427,8 @@ async function buildXlsx(buf, scan, results, hide, plan){
   }
   flush();
   const plain = tail.replace(/\s(width|customWidth|bestFit)="[^"]*"/g, '');
-  const newCols = [[cName, 44], [cHist, 26], [cOpt, 50]].map(([c, w]) => `<col min="${c}" max="${c}" width="${w}" customWidth="1"${plain}/>`).join('');
-  const colsXml = `<cols>${out.join('')}${newCols}<col min="${cOpt + 1}" max="16384"${tail}/></cols>`;
+  const newCols = [[cName, 44], [cHist, 26]].map(([c, w]) => `<col min="${c}" max="${c}" width="${w}" customWidth="1"${plain}/>`).join('');
+  const colsXml = `<cols>${out.join('')}${newCols}<col min="${cHist + 1}" max="16384"${tail}/></cols>`;
   sx = colsM ? sx.replace(colsM[0], colsXml) : sx.replace(/(<sheetData>)/, colsXml + '$1');
   zip.file(sheetPath, sx);
   return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', compression: 'DEFLATE' });
