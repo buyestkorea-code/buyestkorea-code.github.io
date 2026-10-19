@@ -10,6 +10,7 @@
     --acc:#2F5D53; --acc-soft:#E3ECE8; --warn:#B4791B; --warn-soft:#F7E9D2; --bad:#B23B3B; --bad-soft:#F6E2E0; --ok:#3F7D4A; --ok-soft:#E4F1E6;
   }
   *{box-sizing:border-box;}
+  [hidden]{display:none !important;}
   html,body{margin:0;}
   body{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:var(--bg);color:var(--ink);padding:18px 20px 40px;font-size:13.5px;}
   h1{font-size:20px;margin:0;letter-spacing:-.01em;}
@@ -46,7 +47,20 @@
   .pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:99px;}
   .pill.warn{background:var(--warn-soft);color:var(--warn);} .pill.bad{background:var(--bad-soft);color:var(--bad);} .pill.ok{background:var(--ok-soft);color:var(--ok);} .pill.mut{background:var(--soft);color:var(--mut);}
   .panel h2{display:flex;align-items:center;gap:8px;}
-  .panel .blk{border-top:1px solid var(--soft);margin-top:14px;padding-top:12px;}
+  .panel{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;}
+  .panel .blk{margin-top:2px;}
+  .ptabs{display:flex;gap:2px;margin:8px 0 14px;border-bottom:1px solid var(--line);}
+  .ptabs button{border:0;background:none;font:inherit;font-weight:700;font-size:12.5px;padding:8px 12px;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ptabs button.on{color:var(--acc);border-bottom-color:var(--acc);}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 16px;min-width:118px;}
+  .stat b{display:block;font-size:21px;font-weight:800;line-height:1.25;font-variant-numeric:tabular-nums;}
+  .stat span{font-size:11.5px;color:var(--mut);}
+  .stat.warn b{color:var(--warn);} .stat.bad b{color:var(--bad);} .stat.ok b{color:var(--ok);}
+  th.grp{text-align:center;color:var(--ink);border-bottom:1px solid var(--soft);padding-bottom:4px;}
+  .dd2{font-weight:800;font-variant-numeric:tabular-nums;}
+  .hint{padding:26px 6px;color:var(--mut);line-height:1.7;}
+  .hint b{color:var(--ink);}
   .f{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
   .f label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--mut);font-weight:600;}
   .f .w{grid-column:1/-1;}
@@ -90,13 +104,14 @@
   </div>
   <div class="tabs"><button data-tab="staff" class="on">직원 현황</button><button data-tab="upcoming">다가오는 일정</button><button data-tab="pay">급여명세서</button><button data-tab="contract">근로계약서</button><button data-tab="guide">기준 · 설명</button></div>
 
+  <div id="stats" class="stats"></div>
   <div id="tab-staff" class="layout">
     <div class="card"><div class="tw"><table>
-      <thead><tr><th>이름</th><th>입사일 · 근속</th><th>다음 추가연차</th><th class="n">월차</th><th class="n">연차</th><th class="n">휴가</th><th class="n">복지포인트</th><th class="n">벌점</th></tr></thead>
+      <thead><tr><th rowspan="2">이름</th><th rowspan="2">입사일 · 근속</th><th rowspan="2">다음 추가연차</th><th class="grp" colspan="3">올해 부여 (일)</th><th class="n" rowspan="2">복지포인트<span class="sub">올해 잔여</span></th><th class="n" rowspan="2">벌점<span class="sub">올해</span></th></tr><tr><th class="n">월차</th><th class="n">연차</th><th class="n">휴가</th></tr></thead>
       <tbody id="rows"></tbody></table></div>
       <div class="note">행을 누르면 오른쪽에서 입사일·메모를 수정하고, 휴가·복지포인트를 가감하고, 근태·벌점을 기록할 수 있어요. 숫자는 선택한 연도의 <b>부여 합계</b>입니다(사용 차감은 27년부터 휴가 연동 예정).</div>
     </div>
-    <div class="card panel" id="panel"><div class="empty">왼쪽에서 직원을 선택해 주세요.</div></div>
+    <div class="card panel" id="panel"><div class="hint"><b>직원을 눌러 관리하세요</b><br>· 입사일·소속·메모 수정<br>· 월차·연차·휴가·복지포인트 가감<br>· 지각·벌점·면담 기록<br><br>입사일이 비어 있는 직원은 먼저 입사일부터 넣어 주세요. 근속일과 추가연차 일정이 자동으로 계산돼요.</div></div>
   </div>
 
   <div id="tab-upcoming" class="card" hidden><h2>앞으로 120일 일정</h2><ul class="up" id="upList"></ul></div>
@@ -152,7 +167,7 @@
   if(!AUTH || !AUTH.id){ gate.hidden = false; gate.textContent = '로그인 후에 열 수 있어요. 툴킷에 로그인한 뒤 새로고침해 주세요.'; return; }
 
   var $ = function(id){ return document.getElementById(id); };
-  var year = new Date().getFullYear(), users = [], sel = null, COMPANIES = ['바이스트', '에스엘에스 글로벌'];
+  var ptab = 'info', year = new Date().getFullYear(), users = [], sel = null, COMPANIES = ['바이스트', '에스엘에스 글로벌'];
   var TYPES = {leave_month:'월차', leave_year:'연차', leave_extra:'휴가', welfare:'복지포인트'};
   var CATS = [['지각',1],['조퇴',1],['결근',3],['무단결근',5],['업무 실수',1],['면담',0],['교육·자격',0],['경조사',0],['포상·칭찬',-1],['기타',0]];
 
@@ -209,9 +224,9 @@
       var tr = document.createElement('tr');
       tr.className = 'row' + (u.username === sel ? ' sel' : '') + (u.active ? '' : ' off');
       var joinCell = u.join_date ? dot(u.join_date) + '<span class="sub">' + tn.days.toLocaleString('ko-KR') + '일째 · ' + (tn.y ? tn.y + '년 ' : '') + tn.m + '개월</span>' : '<span class="pill warn">입사일 미등록</span>';
-      var exCell = ex ? '+1일 · ' + ex.n + '주년<span class="sub">' + dot(ymd(ex.date)) + ' · ' + ddText(ex.dd) + '</span>' : '–';
+      var exCell = ex ? '<span class="dd2">' + ddText(ex.dd) + '</span><span class="sub">' + dot(ymd(ex.date)) + ' · ' + ex.n + '주년 (+1일)</span>' : '–';
       var pts = u.rec.points;
-      tr.innerHTML = '<td><span class="nm">' + h(u.username) + '</span>' + (u.role === 'admin' ? ' <span class="pill mut">관리자</span>' : '') + (u.active ? '' : ' <span class="pill mut">퇴사·휴직</span>') + '</td>' +
+      tr.innerHTML = '<td><span class="nm">' + h(u.username) + '</span>' + (u.role === 'admin' ? ' <span class="pill mut">관리자</span>' : '') + (u.active ? '' : ' <span class="pill mut">퇴사·휴직</span>') + '<span class="sub">' + (u.company === '에스엘에스 글로벌' ? 'SLS글로벌' : h(u.company || '바이스트')) + '</span></td>' +
         '<td>' + joinCell + '</td><td>' + exCell + '</td>' +
         '<td class="n">' + num(u.leave.month) + '</td><td class="n">' + num(u.leave.year) + '</td><td class="n">' + num(u.leave.extra) + '</td>' +
         '<td class="n">' + num(u.welfare) + '</td><td class="n">' + (pts ? '<span class="pill ' + (pts > 0 ? 'bad' : 'ok') + '">' + (pts > 0 ? '+' : '') + pts + '</span>' : '0') + '</td>';
@@ -219,6 +234,13 @@
       tb.appendChild(tr);
     });
     if(!users.length) tb.innerHTML = '<tr><td colspan="8" class="empty">직원이 없어요.</td></tr>';
+    var act = users.filter(function(u){ return u.active; }), noJoin = act.filter(function(u){ return !u.join_date; }).length;
+    var soon = 0; act.forEach(function(u){ var x = anniv(u.join_date, true); if(x && x.dd <= 60) soon++; });
+    var pen = users.reduce(function(a, u){ return a + (u.rec && u.rec.points > 0 ? 1 : 0); }, 0);
+    $('stats').innerHTML = '<div class="stat"><b>' + act.length + '명</b><span>재직</span></div>' +
+      '<div class="stat' + (noJoin ? ' warn' : ' ok') + '"><b>' + noJoin + '명</b><span>입사일 미등록</span></div>' +
+      '<div class="stat"><b>' + soon + '명</b><span>60일 안 추가연차 가산</span></div>' +
+      '<div class="stat' + (pen ? ' bad' : '') + '"><b>' + pen + '명</b><span>올해 벌점 있음</span></div>';
   }
 
   function renderUpcoming(){
@@ -249,19 +271,27 @@
     var p = $('panel');
     p.innerHTML =
       '<h2>' + h(u.username) + ' <span class="sub" style="display:inline">' + year + '년 기준</span></h2>' +
-      '<div class="f"><label>입사일<input type="date" id="pJoin" value="' + (u.join_date || '') + '"></label><label>생일<input type="date" id="pBirth" value="' + (u.birthday || '') + '"></label>' +
+      '<div class="ptabs"><button data-pp="info">정보</button><button data-pp="ledger">휴가 · 복지포인트</button><button data-pp="rec">근태 · 벌점</button></div>' +
+      '<div data-pp-box="info"><div class="f"><label>입사일<input type="date" id="pJoin" value="' + (u.join_date || '') + '"></label><label>생일<input type="date" id="pBirth" value="' + (u.birthday || '') + '"></label>' +
       '<label>소속 회사<select id="pCo">' + COMPANIES.map(function(c){ return '<option' + (c === (u.company || COMPANIES[0]) ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label><label>계약·수습 만료일<input type="date" id="pEnd" value="' + (u.contract_end || '') + '"></label><label>재직 상태<select id="pAct"><option value="1"' + (u.active ? ' selected' : '') + '>재직</option><option value="0"' + (u.active ? '' : ' selected') + '>퇴사·휴직</option></select></label>' +
       '<label class="w">메모 (관리자만 보임)<textarea id="pMemo" maxlength="2000">' + h(u.memo || '') + '</textarea></label></div>' +
-      '<button class="btn pri" id="pSave">정보 저장</button>' +
-      '<div class="blk"><h2>휴가 · 복지포인트 가감</h2>' +
+      '<button class="btn pri" id="pSave">정보 저장</button></div>' +
+      '<div class="blk" data-pp-box="ledger"><h2>휴가 · 복지포인트 가감</h2>' +
       '<div class="f"><label>구분<select id="lType"><option value="leave_month">월차 (일)</option><option value="leave_year">연차 (일)</option><option value="leave_extra">휴가 (일)</option><option value="welfare">복지포인트 (P)</option></select></label>' +
       '<label>증감 (빼려면 −)<input type="number" id="lDelta" step="0.5" placeholder="예: 12 또는 -1"></label>' +
       '<label class="w">사유<input type="text" id="lMemo" maxlength="200" placeholder="예: 26년 연초 부여 / 정정"></label></div>' +
       '<button class="btn pri" id="lAdd">기록</button><ul class="hist" id="lHist"></ul></div>' +
-      '<div class="blk"><h2>근태 · 벌점 · 면담 기록</h2>' +
+      '<div class="blk" data-pp-box="rec"><h2>근태 · 벌점 · 면담 기록</h2>' +
       '<div class="f"><label>날짜<input type="date" id="rDate" value="' + ymd(new Date()) + '"></label><label>항목<select id="rCat">' + CATS.map(function(c){ return '<option value="' + c[0] + '">' + c[0] + '</option>'; }).join('') + '</select></label>' +
       '<label>점수 (벌점 +, 상점 −)<input type="number" id="rPts" step="1" value="1"></label><label>내용<input type="text" id="rMemo" maxlength="300" placeholder="메모"></label></div>' +
       '<button class="btn pri" id="rAdd">기록</button><ul class="hist" id="rHist"></ul></div>';
+    function showPP(k){
+      ptab = k;
+      [].forEach.call(p.querySelectorAll('[data-pp-box]'), function(x){ x.hidden = x.dataset.ppBox !== k; });
+      [].forEach.call(p.querySelectorAll('.ptabs button'), function(x){ x.classList.toggle('on', x.dataset.pp === k); });
+    }
+    [].forEach.call(p.querySelectorAll('.ptabs button'), function(x){ x.addEventListener('click', function(){ showPP(x.dataset.pp); }); });
+    showPP(ptab);
     $('rCat').addEventListener('change', function(){ var c = CATS.filter(function(x){ return x[0] === $('rCat').value; })[0]; $('rPts').value = c ? c[1] : 0; });
     $('pSave').addEventListener('click', function(){
       api('hr_profile_set', {target:name, join_date:$('pJoin').value, birthday:$('pBirth').value, contract_end:$('pEnd').value, company:$('pCo').value, memo:$('pMemo').value, active:$('pAct').value === '1' ? 1 : 0})
@@ -416,6 +446,7 @@
     b.addEventListener('click', function(){
       [].forEach.call(document.querySelectorAll('.tabs button'), function(x){ x.classList.toggle('on', x === b); });
       ['staff', 'upcoming', 'pay', 'contract', 'guide'].forEach(function(t){ $('tab-' + t).hidden = (t !== b.dataset.tab); });
+      $('stats').hidden = (b.dataset.tab !== 'staff');
       if(b.dataset.tab === 'pay') loadPayList();
       if(b.dataset.tab === 'contract') loadContracts();
     });

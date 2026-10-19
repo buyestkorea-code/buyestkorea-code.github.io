@@ -92,7 +92,6 @@
       r++;
     }
     if(!records.length) warnings.push('직원 내역을 하나도 찾지 못했어요');
-    if(expected != null && expected !== records.length) warnings.push('시트의 "인원 : ' + expected + '"과 읽은 인원(' + records.length + '명)이 달라요');
     if(!meta.ym) warnings.push('귀속월(○○월분)을 찾지 못했어요 — 직접 골라 주세요');
     return {meta:meta, records:records, warnings:warnings, expected:expected};
   }
