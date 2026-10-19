@@ -295,11 +295,11 @@ $('runBtn').addEventListener('click', async () => {
 
     // 옵션값(사이즈 스케일) 예측: 서버가 줄마다 과거 입고 이력으로 예측 → 머리글(블록) 단위로 투표
     setMsg('옵션값(사이즈)을 예측하는 중…');
-    const predMap = {};
+    const predMap = {}; let predWarn = '';
     try {
       const pr = await post(API_SC, { user: auth.id, pass: auth.pass, action: 'predict', date, lines: scan.items.map((it, n) => ({ i: n, model: it.main, vendor: it.batch })) });
       (pr.preds || []).forEach(p => { predMap[p.i] = p.pred; });
-    } catch (e) { if (/로그인/.test(e.message)) throw e; setMsg('옵션값 예측을 불러오지 못했어요 (시즌 확인은 계속 진행). ' + e.message); }
+    } catch (e) { if (/로그인/.test(e.message)) throw e; predWarn = '옵션값 예측을 불러오지 못했어요 (시즌 확인은 계속 진행). ' + e.message; }
     const plan = planOptions(scan, predMap);
 
     const results = decided.map(({ i, d }, n) => {
@@ -314,7 +314,7 @@ $('runBtn').addEventListener('click', async () => {
     ws.eachRow({ includeEmpty: false }, (row, r) => { if (r <= first || hdrRows.has(r)) return; row.eachCell({ includeEmpty: false }, (c, n) => { if (cellText(c) !== '') used.add(n); }); });
     scan.headers.forEach(h => ws.getRow(h.row).eachCell({ includeEmpty: false }, (c, n) => { if (['원산지', '소재', '비고'].includes(cellText(c)) && !used.has(n) && !hide.includes(n)) hide.push(n); }));
     Object.assign(S, { buf0, scan, results, hide, plan, date, label, asOf: A.asOf, saved: false });
-    renderResult(); setMsg('');
+    renderResult(); setMsg(predWarn, !!predWarn);
   } catch (e) { setMsg('실패: ' + (e && e.message ? e.message : e), true); }
   $('runBtn').disabled = false;
 });
