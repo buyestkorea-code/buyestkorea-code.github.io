@@ -641,7 +641,7 @@
   #meToolsMobileSlot:not(:empty){ margin-bottom:18px; }
   #meToolsMobileSlot .me-sync{ margin-left:auto; font-size:11px; color:var(--ink-muted); white-space:nowrap; }
   #meToolsMobileSlot .me-sync:empty{ display:none; }
-  @media (max-width:640px){ .me-herorow{ display:none; } }
+  @media (max-width:640px){ .me-herorow{ display:flex; } .me-herorow .me-hero{ display:none; } .me-hrcard{ flex:1 1 100%; } }
   #meToolsMobileSlot .me-hero-pick{ background:none; border:none; padding:0; color:var(--accent); font-weight:600; }
   #meToolsMobileSlot .me-hero-pick:hover{ background:none; text-decoration:underline; }
   #meToolsMobileSlot .me-toolgrid-hero button{ background:var(--surface); border-color:var(--border); }
@@ -2443,6 +2443,9 @@ window.__loadLib = (function(){
       var lv = r.leave || {};
       if(lv.month || lv.year || lv.extra) html += '<div class="ln"><span>' + y + ' 휴가 부여</span><b>월차 ' + (lv.month || 0) + ' · 연차 ' + (lv.year || 0) + ' · 휴가 ' + (lv.extra || 0) + '</b></div>';
       card.innerHTML = html; card.hidden = false;
+      // 급여명세서 받기 · 근로계약서 서명 (assets/hr-me.js, 카드를 처음 그릴 때 한 번만 불러옴)
+      var mountMe = function(){ if(window.HRME && AUTH) window.HRME.mount(card, HR_API, AUTH); };
+      if(window.HRME) mountMe(); else { var sc = document.createElement('script'); sc.src = 'assets/hr-me.js'; sc.onload = mountMe; document.head.appendChild(sc); }
     }
     /* ---------------- 개인 메모/할일/링크/도구 ---------------- */
     var saveTimer, dirty = false;

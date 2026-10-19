@@ -66,12 +66,20 @@
   .up li{display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px solid var(--soft);}
   .up .dd{min-width:64px;font-weight:800;font-variant-numeric:tabular-nums;}
   .up .t{flex:1;}
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:16px;background:#FBFAF6;}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:1000px){.two{grid-template-columns:1fr;}}
+  .warnbox{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:8px 12px;font-size:12.5px;margin:8px 0;line-height:1.6;}
+  textarea.tpl{min-height:260px;line-height:1.6;}
   #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:9px;font-size:13px;display:none;z-index:20;}
   #toast.err{background:var(--bad);}
   .gate{padding:40px 10px;color:var(--mut);}
 </style>
 </head>
 <body>
+<script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/hr-payroll-parse.js"></script>
+<script src="assets/hr-pdf.js"></script>
 <div id="gate" class="gate" hidden></div>
 <div id="app" hidden>
   <div class="top">
@@ -80,7 +88,7 @@
     <div class="yr"><button id="yPrev" aria-label="이전 해">‹</button><b id="yLabel"></b><button id="yNext" aria-label="다음 해">›</button></div>
     <button class="btn" id="reload">새로고침</button>
   </div>
-  <div class="tabs"><button data-tab="staff" class="on">직원 현황</button><button data-tab="upcoming">다가오는 일정</button><button data-tab="guide">기준 · 설명</button></div>
+  <div class="tabs"><button data-tab="staff" class="on">직원 현황</button><button data-tab="upcoming">다가오는 일정</button><button data-tab="pay">급여명세서</button><button data-tab="contract">근로계약서</button><button data-tab="guide">기준 · 설명</button></div>
 
   <div id="tab-staff" class="layout">
     <div class="card"><div class="tw"><table>
@@ -93,6 +101,35 @@
 
   <div id="tab-upcoming" class="card" hidden><h2>앞으로 120일 일정</h2><ul class="up" id="upList"></ul></div>
 
+  <div id="tab-pay" hidden>
+    <div class="card drop"><h2>월 급여대장 올리기</h2>
+      <div class="note" style="margin:0 0 8px">급여 프로그램에서 뽑은 "급여대장" 엑셀(.xlsx)을 올리면 직원별 명세서로 나뉘어 서버에 <b>암호화</b>되어 저장돼요. <b>귀속월은 파일 이름 기준</b>이에요. 직원은 자기 소속 회사의 명세서만 받아요.</div>
+      <input type="file" id="payFile" accept=".xlsx,.xls">
+      <div id="payPrev" hidden>
+        <div class="f" style="margin-top:10px"><label>귀속월<input type="month" id="payYm"></label><label>회사<select id="payCo"></select></label></div>
+        <div id="payWarn"></div>
+        <div class="tw"><table><thead><tr><th>사번</th><th>이름</th><th>계정</th><th class="n">지급합계</th><th class="n">공제합계</th><th class="n">차인지급액</th></tr></thead><tbody id="payRows"></tbody></table></div>
+        <div style="margin-top:10px"><button class="btn pri" id="payGo">이 달 급여명세서로 올리기</button></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>올라간 급여명세서</h2><div class="tw"><table><thead><tr><th>귀속월</th><th>회사</th><th class="n">인원</th><th>올린 시각</th><th></th></tr></thead><tbody id="payList"></tbody></table></div></div>
+  </div>
+  <div id="tab-contract" hidden>
+    <div class="two">
+      <div class="card"><h2>근로계약서 양식</h2>
+        <div class="f"><label>회사<select id="ctCo"></select></label><label>양식 연도<input type="text" id="ctYearTxt" readonly></label></div>
+        <textarea class="tpl" id="ctBody" placeholder="계약서 내용"></textarea>
+        <div class="note">자동으로 바뀌는 말: {성명} {입사일} {회사명} {계약시작} {계약종료} {작성일}. 올해 양식이 없으면 지난해 양식을 이어서 써요. 법적 요건은 노무 전문가 확인을 권해요.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn pri" id="ctSave">양식 저장</button><button class="btn" id="ctDefault">기본 양식 넣기</button></div>
+      </div>
+      <div class="card"><h2>서명 현황</h2>
+        <div id="ctSum" class="note" style="margin:0 0 8px"></div>
+        <button class="btn pri sm" id="ctGen">올해 계약서 일괄 생성</button>
+        <div class="note">재직 중이고 입사일이 등록된 직원 전원에게 만들어져요. 매년 1월 첫 접속 때 자동으로도 만들어져요. 이미 있는 사람은 건너뛰어요.</div>
+        <div class="tw"><table><thead><tr><th>이름</th><th>회사</th><th>상태</th><th>서명일</th><th></th></tr></thead><tbody id="ctRows"></tbody></table></div>
+      </div>
+    </div>
+  </div>
   <div id="tab-guide" class="card" hidden>
     <h2>기준 · 설명</h2>
     <div class="note" style="margin:0;font-size:13px;line-height:1.8">
@@ -115,7 +152,7 @@
   if(!AUTH || !AUTH.id){ gate.hidden = false; gate.textContent = '로그인 후에 열 수 있어요. 툴킷에 로그인한 뒤 새로고침해 주세요.'; return; }
 
   var $ = function(id){ return document.getElementById(id); };
-  var year = new Date().getFullYear(), users = [], sel = null;
+  var year = new Date().getFullYear(), users = [], sel = null, COMPANIES = ['바이스트', '에스엘에스 글로벌'];
   var TYPES = {leave_month:'월차', leave_year:'연차', leave_extra:'휴가', welfare:'복지포인트'};
   var CATS = [['지각',1],['조퇴',1],['결근',3],['무단결근',5],['업무 실수',1],['면담',0],['교육·자격',0],['경조사',0],['포상·칭찬',-1],['기타',0]];
 
@@ -158,7 +195,7 @@
     api('hr_list').then(function(r){
       if(!r || !r.ok){ gate.hidden = false; app.hidden = true; gate.textContent = (r && r.error) || '불러오지 못했어요'; return; }
       gate.hidden = true; app.hidden = false;
-      users = r.users || [];
+      users = r.users || []; if(r.companies) COMPANIES = r.companies;
       renderRows(); renderUpcoming();
       if(sel){ var u = find(sel); if(u) openPanel(sel); }
     }).catch(function(){ gate.hidden = false; gate.textContent = '서버에 연결하지 못했어요.'; });
@@ -213,7 +250,7 @@
     p.innerHTML =
       '<h2>' + h(u.username) + ' <span class="sub" style="display:inline">' + year + '년 기준</span></h2>' +
       '<div class="f"><label>입사일<input type="date" id="pJoin" value="' + (u.join_date || '') + '"></label><label>생일<input type="date" id="pBirth" value="' + (u.birthday || '') + '"></label>' +
-      '<label>계약·수습 만료일<input type="date" id="pEnd" value="' + (u.contract_end || '') + '"></label><label>재직 상태<select id="pAct"><option value="1"' + (u.active ? ' selected' : '') + '>재직</option><option value="0"' + (u.active ? '' : ' selected') + '>퇴사·휴직</option></select></label>' +
+      '<label>소속 회사<select id="pCo">' + COMPANIES.map(function(c){ return '<option' + (c === (u.company || COMPANIES[0]) ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label><label>계약·수습 만료일<input type="date" id="pEnd" value="' + (u.contract_end || '') + '"></label><label>재직 상태<select id="pAct"><option value="1"' + (u.active ? ' selected' : '') + '>재직</option><option value="0"' + (u.active ? '' : ' selected') + '>퇴사·휴직</option></select></label>' +
       '<label class="w">메모 (관리자만 보임)<textarea id="pMemo" maxlength="2000">' + h(u.memo || '') + '</textarea></label></div>' +
       '<button class="btn pri" id="pSave">정보 저장</button>' +
       '<div class="blk"><h2>휴가 · 복지포인트 가감</h2>' +
@@ -227,7 +264,7 @@
       '<button class="btn pri" id="rAdd">기록</button><ul class="hist" id="rHist"></ul></div>';
     $('rCat').addEventListener('change', function(){ var c = CATS.filter(function(x){ return x[0] === $('rCat').value; })[0]; $('rPts').value = c ? c[1] : 0; });
     $('pSave').addEventListener('click', function(){
-      api('hr_profile_set', {target:name, join_date:$('pJoin').value, birthday:$('pBirth').value, contract_end:$('pEnd').value, memo:$('pMemo').value, active:$('pAct').value === '1' ? 1 : 0})
+      api('hr_profile_set', {target:name, join_date:$('pJoin').value, birthday:$('pBirth').value, contract_end:$('pEnd').value, company:$('pCo').value, memo:$('pMemo').value, active:$('pAct').value === '1' ? 1 : 0})
         .then(function(r){ if(r && r.ok){ toast('저장했어요'); load(); } else toast((r && r.error) || '저장 실패', true); });
     });
     $('lAdd').addEventListener('click', function(){
@@ -258,10 +295,129 @@
     });
   }
 
+  /* ===================== 급여명세서 올리기 ===================== */
+  var parsed = null;
+  function won(v){ return v == null ? '–' : Math.round(v).toLocaleString('ko-KR'); }
+  function fileYm(name, metaYm){
+    var m = /(\d{2,4})\s*년\s*(\d{1,2})\s*월/.exec(name);
+    if(m){ var y = +m[1]; if(y < 100) y += 2000; return y + '-' + ('0' + m[2]).slice(-2); }
+    m = /(\d{1,2})\s*월/.exec(name);
+    if(m){ var yy = metaYm ? metaYm.slice(0, 4) : String(new Date().getFullYear()); return yy + '-' + ('0' + m[1]).slice(-2); }
+    return metaYm || '';
+  }
+  function fileCompany(name, detected){
+    if(/SLS|에스엘에스/i.test(name)) return '에스엘에스 글로벌';
+    if(/바이스트|BUYEST/i.test(name)) return '바이스트';
+    return detected || '';
+  }
+  function fillCo(sel, val){ sel.innerHTML = COMPANIES.map(function(c){ return '<option' + (c === val ? ' selected' : '') + '>' + c + '</option>'; }).join(''); }
+  function renderPayPrev(){
+    if(!parsed) return;
+    var co = $('payCo').value, rows = '';
+    parsed.records.forEach(function(r){
+      var u = find(r.name), tag;
+      if(!u) tag = '<span class="pill warn">계정 없음</span>';
+      else if((u.company || COMPANIES[0]) !== co) tag = '<span class="pill mut">소속 ' + h(u.company) + ' · 본인에게 안 보임</span>';
+      else tag = '<span class="pill ok">연결됨</span>';
+      rows += '<tr><td>' + h(r.emp_no) + '</td><td class="nm">' + h(r.name) + (r.status ? ' <span class="pill mut">' + h(r.status) + '</span>' : '') + '</td><td>' + tag + '</td><td class="n">' + won(r.pay_total) + '</td><td class="n">' + won(r.ded_total) + '</td><td class="n">' + won(r.net) + '</td></tr>';
+    });
+    $('payRows').innerHTML = rows;
+  }
+  $('payFile').addEventListener('change', function(){
+    var f = this.files[0]; if(!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){
+      try{
+        var wb = XLSX.read(new Uint8Array(rd.result), {type:'array', cellDates:true});
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:null, raw:true});
+        var r = HRPARSE.parse(rows);
+        if(r.error){ toast(r.error, true); $('payPrev').hidden = true; return; }
+        parsed = r; parsed.fname = f.name;
+        var ym = fileYm(f.name, r.meta.ym), co = fileCompany(f.name, r.meta.company);
+        $('payYm').value = ym; fillCo($('payCo'), co || COMPANIES[0]);
+        var w = r.warnings.slice();
+        if(r.meta.ym && ym && r.meta.ym !== ym) w.unshift('파일 이름은 ' + ym + '인데 시트 안에는 "' + r.meta.ym + '월분"으로 적혀 있어요. 파일 이름(' + ym + ')을 기준으로 올려요.');
+        $('payWarn').innerHTML = w.length ? '<div class="warnbox">' + w.map(h).join('<br>') + '</div>' : '<div class="note">검산 통과: 지급합계 − 공제합계 = 차인지급액 (' + r.records.length + '명)</div>';
+        renderPayPrev(); $('payPrev').hidden = false;
+      }catch(e){ toast('엑셀을 읽지 못했어요: ' + (e && e.message || e), true); }
+    };
+    rd.readAsArrayBuffer(f);
+  });
+  $('payCo').addEventListener('change', renderPayPrev);
+  $('payGo').addEventListener('click', function(){
+    if(!parsed) return;
+    var ym = $('payYm').value, co = $('payCo').value;
+    if(!ym){ toast('귀속월을 골라 주세요', true); return; }
+    if(!confirm(ym + ' · ' + co + ' 급여명세서 ' + parsed.records.length + '명을 올릴까요?\n(같은 월·회사가 이미 있으면 통째로 교체돼요)')) return;
+    api('payroll_upload', {ym:ym, company:co, pay_date:parsed.meta.pay_date, records:parsed.records}).then(function(r){
+      if(r && r.ok){ toast(r.count + '명 올렸어요'); parsed = null; $('payPrev').hidden = true; $('payFile').value = ''; loadPayList(); }
+      else toast((r && r.error) || '올리지 못했어요', true);
+    }).catch(function(){ toast('서버에 연결하지 못했어요', true); });
+  });
+  function loadPayList(){
+    api('payroll_months').then(function(r){
+      var it = (r && r.items) || [];
+      $('payList').innerHTML = it.length ? it.map(function(x){
+        return '<tr><td class="nm">' + h(x.ym) + '</td><td>' + h(x.company) + '</td><td class="n" title="' + h(x.names.join(', ')) + '">' + x.count + '명</td><td>' + h(x.uploaded_at) + '</td><td><button class="btn sm" data-ym="' + h(x.ym) + '" data-co="' + h(x.company) + '">삭제</button></td></tr>';
+      }).join('') : '<tr><td colspan="5" class="empty">아직 올린 급여명세서가 없어요.</td></tr>';
+      [].forEach.call($('payList').querySelectorAll('button'), function(b){ b.addEventListener('click', function(){
+        if(confirm(b.dataset.ym + ' · ' + b.dataset.co + ' 명세서를 삭제할까요? (엑셀을 다시 올리면 복구돼요)')) api('payroll_delete', {ym:b.dataset.ym, company:b.dataset.co}).then(loadPayList);
+      }); });
+    });
+  }
+
+  /* ===================== 근로계약서 ===================== */
+  var DEFAULT_TPL = '근 로 계 약 서\n\n{회사명}(이하 "회사")와 {성명}(이하 "근로자")은 다음과 같이 근로계약을 체결한다.\n\n1. 계약기간: {계약시작} ~ {계약종료} (입사일 {입사일})\n2. 근무장소: 회사가 지정하는 사업장\n3. 업무내용: 회사가 지정하는 업무\n4. 소정근로시간: 주 40시간 (휴게시간 제외), 시업·종업 시각은 회사 취업규칙에 따른다\n5. 임금: 월 기본급 및 수당은 매월 급여명세서에 따르며, 지급일은 매월 20일로 한다\n6. 휴일·휴가: 주휴일, 연차유급휴가 및 월차는 근로기준법과 회사 규정에 따른다\n7. 기타: 이 계약에 정하지 않은 사항은 근로기준법과 회사 취업규칙에 따른다\n\n위 내용을 확인하고 동의하며, 계약서를 전자서명으로 체결한다.\n\n작성일: {작성일}';
+  $('ctYearTxt').value = year + '년';
+  function ctCompany(){ return $('ctCo').value || COMPANIES[0]; }
+  function loadTpl(){
+    $('ctYearTxt').value = year + '년';
+    api('contract_tpl_get', {company:ctCompany()}).then(function(r){
+      $('ctBody').value = (r && r.ok && r.body) ? r.body : '';
+      if(r && r.ok && r.body && !r.saved) toast(year + '년 양식이 없어서 지난해 양식을 불러왔어요. 저장하면 올해 양식이 돼요');
+    });
+  }
+  function loadContracts(){
+    if(!$('ctCo').options.length){ fillCo($('ctCo'), COMPANIES[0]); $('ctCo').addEventListener('change', loadTpl); }
+    loadTpl();
+    api('contract_list').then(function(r){
+      var it = (r && r.items) || [], signed = it.filter(function(x){ return x.status === 'signed'; }).length;
+      $('ctSum').innerHTML = '<b>' + year + '년</b> · 서명 ' + signed + ' / 전체 ' + it.length + '명 · 미서명 ' + (it.length - signed) + '명';
+      $('ctRows').innerHTML = it.length ? it.map(function(x){
+        return '<tr><td class="nm">' + h(x.username) + '</td><td>' + h(x.company) + '</td><td>' + (x.status === 'signed' ? '<span class="pill ok">서명 완료</span>' : '<span class="pill warn">미서명</span>') + '</td><td>' + h(x.signed_at ? String(x.signed_at).slice(0, 16) : '–') + '</td>' +
+          '<td><button class="btn sm" data-v="' + x.id + '">보기·PDF</button> <button class="btn sm" data-d="' + x.id + '">삭제</button></td></tr>';
+      }).join('') : '<tr><td colspan="5" class="empty">' + year + '년 계약서가 아직 없어요. 양식을 저장하고 "일괄 생성"을 눌러 주세요.</td></tr>';
+      [].forEach.call($('ctRows').querySelectorAll('button[data-v]'), function(b){ b.addEventListener('click', function(){
+        api('contract_get', {id:+b.dataset.v}).then(function(g){
+          if(!g || !g.ok){ toast((g && g.error) || '열지 못했어요', true); return; }
+          var e = HRPDF.contractEl(g.item, g.item.username);
+          HRPDF.download([e], '근로계약서_' + g.item.year + '_' + g.item.username + '.pdf').then(function(){ e.remove(); }, function(){ e.remove(); toast('PDF를 만들지 못했어요', true); });
+        });
+      }); });
+      [].forEach.call($('ctRows').querySelectorAll('button[data-d]'), function(b){ b.addEventListener('click', function(){
+        if(confirm('이 계약서를 삭제할까요? (서명도 함께 지워져요. 양식을 고친 뒤 다시 생성할 때 써요)')) api('contract_void', {id:+b.dataset.d}).then(loadContracts);
+      }); });
+    });
+  }
+  $('ctDefault').addEventListener('click', function(){ if(!$('ctBody').value.trim() || confirm('현재 내용을 기본 양식으로 바꿀까요?')) $('ctBody').value = DEFAULT_TPL; });
+  $('ctSave').addEventListener('click', function(){
+    api('contract_tpl_set', {company:ctCompany(), body:$('ctBody').value}).then(function(r){ toast(r && r.ok ? '양식을 저장했어요' : ((r && r.error) || '저장 실패'), !(r && r.ok)); });
+  });
+  $('ctGen').addEventListener('click', function(){
+    if(!confirm(year + '년 근로계약서를 재직자 전원에게 만들까요?')) return;
+    api('contract_generate').then(function(r){
+      if(!r || !r.ok){ toast((r && r.error) || '실패', true); return; }
+      toast('새로 ' + r.created + '건 만들었어요' + (r.existing ? ' (이미 있던 ' + r.existing + '건은 건너뜀)' : '') + (r.missing_template && r.missing_template.length ? ' · 양식 없음: ' + r.missing_template.join(', ') : ''), !!(r.missing_template && r.missing_template.length));
+      loadContracts();
+    });
+  });
+
   [].forEach.call(document.querySelectorAll('.tabs button'), function(b){
     b.addEventListener('click', function(){
       [].forEach.call(document.querySelectorAll('.tabs button'), function(x){ x.classList.toggle('on', x === b); });
-      ['staff', 'upcoming', 'guide'].forEach(function(t){ $('tab-' + t).hidden = (t !== b.dataset.tab); });
+      ['staff', 'upcoming', 'pay', 'contract', 'guide'].forEach(function(t){ $('tab-' + t).hidden = (t !== b.dataset.tab); });
+      if(b.dataset.tab === 'pay') loadPayList();
+      if(b.dataset.tab === 'contract') loadContracts();
     });
   });
   $('yPrev').addEventListener('click', function(){ year--; load(); });
