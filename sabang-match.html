@@ -63,6 +63,7 @@
 <div class="tools" id="tools" style="display:none">
   <input type="text" id="q" placeholder="사방넷 코드·상품명·이카운트 코드 검색" style="min-width:280px">
   <button class="btn sec sm" id="bulkBtn" style="display:none">보이는 자동 후보 한꺼번에 확정(수동매칭 저장)</button>
+  <button class="btn sec sm" id="dlListBtn">지금 보는 목록 엑셀 받기</button>
   <button class="btn sec sm" id="dlBtn">재고 변경분 엑셀 받기</button>
   <button class="btn sec sm" id="dlManualBtn">수동매칭 목록 엑셀</button>
   <span class="msg" id="tmsg" style="margin:0"></span>
@@ -308,6 +309,8 @@ function render(){
   const more = $('moreBar'); more.innerHTML = '';
   const info = document.createElement('span'); info.className = 'msg'; info.style.margin = 0; info.textContent = `${fmt(vis.length)}줄 중 ${fmt(shown.length)}줄 표시 (화면이 멈추지 않도록 일부만 그립니다)`; more.appendChild(info);
   if(vis.length > shown.length){ const b = document.createElement('button'); b.className = 'btn sec sm'; b.textContent = '300줄 더 보기'; b.onclick = () => { S.limit += 300; render(); }; more.appendChild(b); }
+  const FL = { all:'전체', change:'재고 변경 예정', auto:'자동 확정', manual:'수동매칭', review:'확인 필요', un:'미매칭·재고 있음', un0:'이카운트 미등록·재고 0', recheck:'수동매칭 재확인', none:'대응 없음(확정)' };
+  $('dlListBtn').textContent = `지금 보는 목록 엑셀 받기 — ${FL[S.filter] || ''} ${fmt(vis.length)}건`;
   const bulk = $('bulkBtn');
   const bulkable = vis.filter(x => (x.res.status === 'auto' || x.res.status === 'review') && x.res.items.length && groupCount(x.res) === 1);
   bulk.style.display = (S.filter === 'review' || S.filter === 'auto') && bulkable.length ? '' : 'none';
@@ -446,6 +449,27 @@ $('dlBtn').onclick = () => {
   const d = new Date(), p = n => String(n).padStart(2,'0');
   XLSX.writeFile(wb, `사방넷_재고변경_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}.xlsx`);
   $('tmsg').textContent = `${fmt(ch.length)}줄을 내려받았어요.`;
+};
+/* 지금 선택한 분류(통계 칸) + 검색어에 해당하는 줄 전체(화면에 일부만 그려도 엑셀은 전부)를 내려받는다 — 사방넷 코드 포함 */
+$('dlListBtn').onclick = () => {
+  const vis = visibleRows();
+  if(!vis.length){ $('tmsg').textContent = '내려받을 줄이 없어요.'; return; }
+  vis.sort((a, b) => (ORDER[a.res.status] - ORDER[b.res.status]));
+  const FL = { all:'전체', change:'재고변경예정', auto:'자동확정', manual:'수동매칭', review:'확인필요', un:'미매칭_재고있음', un0:'이카운트미등록_재고0', recheck:'수동매칭재확인', none:'대응없음확정' };
+  const aoa = [['사방넷 코드','사방넷 상품명','옵션','사방넷 현재고','상태','이카운트 코드','이카운트 상품명','이카운트 재고(반영값)','사유','메모','등록자','등록일시']];
+  vis.forEach(x => {
+    const r = x.row, res = x.res, mn = S.manual[r.code];
+    aoa.push([r.code, r.name, r.spec, r.cur, STATUS[res.status][0], res.items.map(i => i.code).join(', '), res.items.map(i => i.name + ' [' + i.spec + ']').join(' / '),
+      res.newVal == null ? '' : res.newVal, res.reasons.join(' · '), mn ? mn.memo : '', mn ? mn.u : '', mn ? new Date(mn.t*1000).toLocaleString('ko-KR') : '']);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:14},{wch:46},{wch:10},{wch:10},{wch:16},{wch:22},{wch:50},{wch:12},{wch:40},{wch:30},{wch:12},{wch:20}];
+  // 사방넷 코드·이카운트 코드는 앞자리 0/하이픈이 유지되도록 텍스트로 저장
+  for(let i = 1; i < aoa.length; i++){ [0, 5].forEach(c => { const ref = XLSX.utils.encode_cell({ r:i, c }); if(ws[ref]){ ws[ref].t = 's'; ws[ref].z = '@'; } }); }
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, (FL[S.filter] || '목록').slice(0, 30));
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  XLSX.writeFile(wb, `사방넷매칭_${FL[S.filter] || '목록'}_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}.xlsx`);
+  $('tmsg').textContent = `${fmt(vis.length)}건을 내려받았어요.`;
 };
 $('dlManualBtn').onclick = () => {
   const list = Object.values(S.manual); if(!list.length){ $('tmsg').textContent = '저장된 수동매칭이 없어요.'; return; }
