@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>물류팀 시즌체크</title>
+<style>
+  :root { --ink:#111827; --mute:#6b7280; --line:#e5e7eb; --bg:#fafafa; --ok:#15803d; --warn:#b45309; --bad:#b91c1c; --blue:#1d4ed8; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1240px; margin: 28px auto; padding: 0 20px 60px; background: var(--bg); color: var(--ink); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.desc { color: #4b5563; font-size: 13.5px; margin: 0 0 14px; line-height: 1.55; }
+  .step { background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; margin:14px 0; }
+  .step h3 { margin:0 0 8px; font-size:15px; }
+  .btn { font-size:14.5px; padding:9px 20px; border:none; border-radius:6px; cursor:pointer; background:#111827; color:#fff; }
+  .btn:disabled { background:#d1d5db; color:#6b7280; cursor:not-allowed; }
+  .btn-sub { background:#0f766e; }
+  .dropzone { border:1.5px dashed #d1d5db; border-radius:8px; padding:22px 16px; text-align:center; color:var(--mute); cursor:pointer; transition:border-color .12s, background .12s; }
+  .dropzone:hover, .dropzone.drag { border-color:#111827; background:#f3f4f6; color:var(--ink); }
+  .dropzone input { display:none; }
+  .dropzone.has { border-style:solid; color:var(--ink); background:#f9fafb; }
+  .inputs { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; }
+  .inputs label { display:block; font-size:13px; color:#374151; font-weight:600; }
+  .inputs input[type=text], .inputs input[type=date] { display:block; margin-top:5px; width:170px; padding:8px 10px; font-size:15px; border:1px solid #d1d5db; border-radius:6px; }
+  .inputs input:focus-visible, .btn:focus-visible, .dropzone:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+  .chk { font-size:13px; color:#374151; margin-top:10px; display:flex; gap:6px; align-items:center; }
+  #msg { font-size:13.5px; color:var(--mute); margin:10px 0 0; white-space:pre-wrap; }
+  #msg.err { color:var(--bad); }
+  .note { font-size:12.5px; color:var(--warn); background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:8px 10px; margin-top:10px; line-height:1.55; }
+  .stats { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 10px; }
+  .chip { border:1px solid #d1d5db; background:#fff; border-radius:999px; padding:5px 13px; font-size:13px; }
+  .chip b { font-weight:700; }
+  table { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
+  th, td { border-bottom:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
+  th { background:#f3f4f6; position:sticky; top:0; z-index:1; white-space:nowrap; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .code { font-weight:600; word-break:break-all; }
+  .sub { color:var(--mute); font-size:11.5px; margin-top:2px; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; }
+  .t-ok { background:#f0fdf4; color:var(--ok); } .t-warn { background:#fef3c7; color:#92400e; }
+  .t-bad { background:#fef2f2; color:var(--bad); } .t-gray { background:#f3f4f6; color:#4b5563; } .t-new { background:#eff6ff; color:var(--blue); }
+  .tablewrap { max-height:62vh; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+  td.blank { color:#9ca3af; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>물류팀 시즌체크</h1>
+  <p class="desc">1차 가공한 재고추가 엑셀(예: <b>재고추가(경호)</b>)을 올리면, 각 품번을 이카운트·바이스트 DB에서 찾아 <b>시즌 칸 · 판매중상품명 · 최근들어온내역</b>을 채워 줘요. 입고 상품을 눈으로 확인하면서 <b>작업여부</b>는 직접 적을 수 있게 비워 둬요. 모델이 <b>XXXXX (YYYYY)</b> 형태면 XXXXX로 먼저 찾고, DB에 없을 때만 YYYYY로 찾아요.</p>
+
+  <div class="step">
+    <h3>1. 재고추가 파일</h3>
+    <div class="dropzone" id="drop" tabindex="0" role="button" aria-label="재고추가 파일 선택">
+      <div id="dropText">재고추가 엑셀(.xlsx)을 끌어다 놓거나 클릭해서 선택하세요</div>
+      <input type="file" id="fileInput" accept=".xlsx">
+    </div>
+  </div>
+
+  <div class="step">
+    <h3>2. 이번 입고 정보</h3>
+    <div class="inputs">
+      <label for="entDate">입고일<input id="entDate" type="date"></label>
+      <label for="entLabel">입고 이름<input id="entLabel" type="text" value="재고추가" maxlength="40"></label>
+      <button class="btn" id="runBtn">실행</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="saveChk" checked> 엑셀을 받을 때 이번 입고 내역을 서버에 저장 (다음 입고부터 「최근들어온내역」에 표시, 최근 3개월)</label>
+    <div id="msg" role="status"></div>
+  </div>
+
+  <div class="step" id="resultBox" style="display:none;">
+    <h3>3. 결과</h3>
+    <div id="asOf" style="font-size:13px;color:var(--mute);"></div>
+    <div class="stats" id="stats"></div>
+    <div style="margin:8px 0;"><button class="btn btn-sub" id="dlBtn">원본 양식 + 시즌체크 엑셀로 받기</button></div>
+    <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>시즌</th><th>판매중상품명</th><th>이카운트 재고</th><th>최근들어온내역</th><th>작업여부</th></tr></thead><tbody id="tbody"></tbody></table></div>
+    <div class="note">시즌 칸 읽는 법 — <b>26FW판매중</b>: 사이트에서 노출 중이고 살 수 있는 상품(시즌은 상품명 맨 앞에서 읽고, 상품명에 시즌이 없으면 사이트 등록일로 추정해 이름 칸에 표시) · <b>전품</b>: 노출 중인데 옵션이 모두 품절 · <b>미노출</b>: 사이트에서 숨김 · <b>다른색상판매</b>: 같은 모델의 다른 컬러만 있음 · <b>과거판매</b>: 사이트엔 없지만 이카운트 판매이력이 있음 · <b>신상</b>: 사이트에 없는 품번(이카운트에만 있어도 신상) · <b>확인필요</b>: 품번이 4자 미만이라 검색 불가. 작업여부는 비워 두니 확인하며 직접 적어 주세요.</div>
+  </div>
+</div>
+
+<script src="assets/libs/exceljs-4.4.0.min.js"></script>
+<script src="assets/libs/jszip-3.10.1.min.js"></script>
+<script>
+const API = 'https://buyest.co.kr/list_check_api.php';
+const API_SC = 'https://buyest.co.kr/season_check_api.php';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const S = { file: null, buf0: null, scan: null, results: [], hide: [], date: '', label: '', saved: false };
+
+function getAuth(){ try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth')); return (a && a.id) ? a : null; } catch(e){ return null; } }
+function setMsg(t, err){ const m = $('msg'); m.textContent = t || ''; m.className = err ? 'err' : ''; }
+const normKey = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const pad2 = n => String(n).padStart(2, '0');
+$('entDate').value = (() => { const d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); })();
+
+/* ---------- 파일 선택 ---------- */
+$('drop').addEventListener('click', () => $('fileInput').click());
+$('drop').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('fileInput').click(); } });
+['dragenter','dragover'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.remove('drag'); }));
+$('drop').addEventListener('drop', e => setFile(e.dataTransfer.files[0]));
+$('fileInput').addEventListener('change', e => { setFile(e.target.files[0]); e.target.value = ''; });
+function setFile(f){
+  if (!f) return;
+  if (!/\.xlsx$/i.test(f.name)) { setMsg('.xlsx 파일만 올릴 수 있어요. .xls 파일은 엑셀에서 .xlsx 로 저장한 뒤 올려 주세요.', true); return; }
+  S.file = f; $('dropText').textContent = '📄 ' + f.name + '  (다시 누르면 다른 파일 선택)'; $('drop').classList.add('has');
+  // 파일명 앞의 날짜(2026.10.08 …)를 입고일로 채운다
+  const m = f.name.match(/(20\d{2})[.\-_ ]+(\d{1,2})[.\-_ ]+(\d{1,2})/);
+  if (m) $('entDate').value = m[1] + '-' + pad2(m[2]) + '-' + pad2(m[3]);
+  const lb = f.name.match(/재고\s*추가|입고|반입/); if (lb) $('entLabel').value = lb[0].replace(/\s+/g, '');
+  $('resultBox').style.display = 'none'; setMsg('');
+}
+
+/* ---------- 엑셀 읽기 ---------- */
+function cellText(c){
+  let v = c.value;
+  if (v == null) return '';
+  if (typeof v === 'object') { if (v.richText) v = v.richText.map(t => t.text).join(''); else if (v.result !== undefined) v = v.result; else if (v.text !== undefined) v = v.text; else return ''; }
+  if (v == null || typeof v === 'object') return '';
+  return String(v).replace(/\s+/g, ' ').trim();
+}
+function cellNum(c){
+  let v = c.value;
+  if (v && typeof v === 'object' && v.result !== undefined) v = v.result;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') { const n = Number(v.replace(/,/g, '')); return isFinite(n) && v.trim() ? n : null; }
+  return null;
+}
+// 시트 안에 "MODEL" 머리글 줄이 여러 번 나온다(브랜드/인보이스 블록마다). 머리글 아래에서 MODEL 칸이 채워진 줄 = 상품 줄.
+function scanSheet(ws){
+  const headers = [], items = []; let cur = null, title = '';
+  ws.eachRow({ includeEmpty: false }, (row, r) => {
+    const cols = {};
+    row.eachCell({ includeEmpty: false }, (c, n) => {
+      const t = cellText(c).toUpperCase();
+      if (t === 'MODEL') cols.model = n; else if (t === '시즌') cols.season = n; else if (t === '작업여부') cols.work = n; else if (t === 'INV. QTY' || t === 'INV.QTY') cols.qty = n;
+    });
+    if (cols.model && cols.season) { cur = { row: r, ...cols }; headers.push(cur); return; }
+    const a = cellText(row.getCell(1));
+    if (/^20\d{2}[.\-]\d{1,2}[.\-]\d{1,2}\b/.test(a)) { title = a; return; }   // 인보이스 제목 줄(병합 셀이라 MODEL 칸에도 같은 글자가 보임)
+    if (!cur) return;
+    const model = cellText(row.getCell(cur.model));
+    if (!model || /^TOTAL$/i.test(model)) return;
+    items.push({ row: r, model, qty: cur.qty ? (cellNum(row.getCell(cur.qty)) || 0) : 0, hdr: cur, batch: title.replace(/^20\d{2}[.\-]\d{1,2}[.\-]\d{1,2}\s*/, '') });
+  });
+  return { headers, items };
+}
+// "XXXXX (YYYYY)" → 먼저 XXXXX, 없으면 YYYYY
+function splitModel(m){
+  const x = m.match(/^(.*?)\s*[\(（]\s*([^()（）]+?)\s*[\)）]\s*$/);
+  return x && x[1] ? { main: x[1].trim(), alt: x[2].trim() } : { main: m.trim(), alt: '' };
+}
+
+/* ---------- 서버 조회 ---------- */
+async function post(url, body){
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await res.json();
+  if (!d.ok) throw new Error(d.need_login ? '로그인 정보가 맞지 않아요. 툴킷에서 다시 로그인해 주세요.' : (d.error || '서버 오류'));
+  return d;
+}
+async function lookupCells(auth, cells){
+  const hits = {}, items = {}; let asOf = 0;
+  for (let off = 0; off < cells.length; off += 2000) {
+    const d = await post(API, { user: auth.id, pass: auth.pass, cells: cells.slice(off, off + 2000) });
+    Object.keys(d.hits || {}).forEach(k => { hits[cells[off + Number(k)]] = d.hits[k]; });
+    Object.assign(items, d.items || {}); asOf = d.as_of;
+  }
+  return { hits, items, asOf };
+}
+const exactKey = hits => { const e = (hits || []).find(h => h.type === 'exact'); return e ? e.key : null; };
+
+// 상품명에 시즌이 없는 예전 등록 상품은 사이트 등록일로 추정한다 (1~6월 등록 = 그해 SS, 7~12월 등록 = 그해 FW)
+const seasonFromDate = ts => { if (!ts) return ''; const d = new Date(ts * 1000); return String(d.getFullYear()).slice(2) + (d.getMonth() < 6 ? 'SS' : 'FW'); };
+const seasonOf = name => { const m = String(name || '').match(/^\s*(\d{2})\s?(FW|SS|AW|SP)\b/i); return m ? m[1] + m[2].toUpperCase() : ''; };
+
+// 품번 하나의 최종 상태 (상품가격체크와 같은 규칙: 판매중 / 품절 / 미노출 / 미등록)
+function decide(main, alt, A, B){
+  const sources = [{ q: main, R: A, via: '' }];
+  if (alt) sources.push({ q: alt, R: B, via: '괄호 안 품번' });
+  for (const s of sources) {
+    const k = s.R && exactKey(s.R.hits[s.q]);
+    if (k) return { key: k, exact: true, it: s.R.items[k], via: s.via, q: s.q };
+  }
+  for (const s of sources) {   // 정확 일치가 없으면 앞부분 일치(같은 모델 다른 컬러)
+    const h = s.R && (s.R.hits[s.q] || [])[0];
+    if (h) return { key: h.key, exact: false, it: s.R.items[h.key], via: s.via, q: s.q };
+  }
+  return { key: null, exact: false, it: null, via: '', q: main };
+}
+function describe(d){
+  const it = d.it, out = { status: '신상', cls: 't-new', season: '', name: '', ec: null, tag: d.via };
+  if (!it) return out;
+  out.ec = it.ec ? it.ec.qty : null;
+  const site = it.site || [];
+  if (!d.exact) {
+    const nm = site.find(p => p.display === 'Y') || site[0];
+    if (!nm) { out.ec = null; return out; }   // 같은 모델 다른 컬러가 이카운트에만 있으면 사이트엔 아직 없는 신상
+    out.status = '다른색상판매'; out.cls = 't-warn'; out.name = nm ? nm.name : (it.sales_name || '');
+    out.season = seasonOf(out.name); return out;
+  }
+  if (!site.length) {
+    out.season = seasonOf(it.sales_name);
+    if (it.sales && (it.sales.tot || it.sales.d365)) { out.status = '과거판매'; out.cls = 't-gray'; out.name = it.sales_name || ''; }
+    return out;
+  }
+  const live = site.filter(p => p.display === 'Y');
+  let pick, base;
+  if (!live.length) { pick = site[0]; base = '미노출'; out.cls = 't-warn'; }
+  else if (live.some(p => p.opt_avail > 0)) { pick = live.find(p => p.opt_avail > 0); base = '판매중'; out.cls = 't-ok'; }
+  else { pick = live[0]; base = '전품'; out.cls = 't-bad'; }   // 전품 = 노출 중인데 옵션이 모두 품절 (현장에서 쓰는 표현)
+  out.name = pick.name + (pick.tag === 'kids' ? ' (키즈)' : '');
+  out.season = seasonOf(pick.name);
+  if (!out.season && pick.rdate) { out.season = seasonFromDate(pick.rdate); out.guess = true; out.name += ' (시즌: 등록일로 추정)'; }
+  out.status = base; return out;
+}
+const fmtSeason = o => (o.status === '신상' || o.status === '다른색상판매' || o.status === '확인필요') ? o.status : (o.season || '') + o.status;
+const fmtHist = list => (list || []).map(h => { const m = h.date.match(/(\d+)-(\d+)-(\d+)/); return `${Number(m[2])}월${Number(m[3])}일 ${h.label}`; }).join(' / ');
+
+/* ---------- 실행 ---------- */
+$('runBtn').addEventListener('click', async () => {
+  const auth = getAuth();
+  if (!auth) { setMsg('툴킷에 로그인한 뒤 새로고침해 주세요. (상단 인트라넷 홈에서 로그인)', true); return; }
+  if (!S.file) { setMsg('재고추가 엑셀 파일을 먼저 올려 주세요.', true); return; }
+  const date = $('entDate').value, label = $('entLabel').value.trim();
+  if (!date) { setMsg('입고일을 골라 주세요.', true); return; }
+  if (!label) { setMsg('입고 이름(예: 재고추가)을 적어 주세요.', true); return; }
+  $('runBtn').disabled = true; setMsg('파일 읽는 중…');
+  try {
+    const wb = new ExcelJS.Workbook();
+    const buf0 = await S.file.arrayBuffer();
+    await wb.xlsx.load(buf0);
+    const ws = wb.worksheets[0];
+    const scan = scanSheet(ws);
+    if (!scan.items.length) throw new Error('MODEL 열과 시즌 열이 있는 재고추가 양식을 찾지 못했어요. 첫 번째 시트에 두 머리글이 있는지 확인해 주세요.');
+    scan.items.forEach(i => Object.assign(i, splitModel(i.model)));
+
+    setMsg(`품번 ${scan.items.length}줄을 서버에서 찾는 중…`);
+    const mains = [...new Set(scan.items.map(i => i.main).filter(m => normKey(m).length >= 4))];
+    const A = await lookupCells(auth, mains);
+    // 먼저 찾은 쪽(XXXXX)에서 정확 일치가 안 나온 줄만 괄호 안(YYYYY)으로 다시 찾는다
+    const alts = [...new Set(scan.items.filter(i => i.alt && !exactKey(A.hits[i.main])).map(i => i.alt).filter(a => normKey(a).length >= 4))];
+    const B = alts.length ? await lookupCells(auth, alts) : { hits: {}, items: {} };
+
+    const decided = scan.items.map(i => ({ i, d: decide(i.main, i.alt, A, B) }));
+    setMsg('최근 입고 내역을 확인하는 중…');
+    const keys = new Set();
+    decided.forEach(({ i, d }) => { if (d.key) keys.add(d.key); keys.add(normKey(i.main)); if (i.alt) keys.add(normKey(i.alt)); });
+    let history = {};
+    try { history = (await post(API_SC, { user: auth.id, pass: auth.pass, action: 'lookup', keys: [...keys].filter(k => k.length >= 4), exclude: { date, label } })).history || {}; }
+    catch (e) { if (/로그인/.test(e.message)) throw e; history = {}; setMsg('최근 입고 내역을 불러오지 못했어요 (시즌 확인은 계속 진행). ' + e.message); }
+
+    const results = decided.map(({ i, d }) => {
+      const o = normKey(i.main).length < 4 ? { status: '확인필요', cls: 't-warn', season: '', name: '품번이 너무 짧아 찾지 못함', ec: null, tag: '' } : describe(d);
+      const hs = []; const seen = new Set();
+      [d.key, normKey(i.main), i.alt ? normKey(i.alt) : ''].forEach(k => (history[k] || []).forEach(h => { const id = h.date + '|' + h.label; if (!seen.has(id)) { seen.add(id); hs.push(h); } }));
+      hs.sort((x, y) => y.date.localeCompare(x.date));
+      return { ...i, key: d.key, entryKey: (d.exact && d.key) || normKey(i.main), seasonText: fmtSeason(o), o, hist: fmtHist(hs), hasHist: hs.length > 0 };
+    });
+    // 한 화면에 보이도록 비어 있는 원산지·소재·비고 칸은 숨긴다 (삭제 아님)
+    const hide = [], hdrRows = new Set(scan.headers.map(x => x.row)), used = new Set(), first = scan.headers[0].row;
+    ws.eachRow({ includeEmpty: false }, (row, r) => { if (r <= first || hdrRows.has(r)) return; row.eachCell({ includeEmpty: false }, (c, n) => { if (cellText(c) !== '') used.add(n); }); });
+    scan.headers.forEach(h => ws.getRow(h.row).eachCell({ includeEmpty: false }, (c, n) => { if (['원산지', '소재', '비고'].includes(cellText(c)) && !used.has(n) && !hide.includes(n)) hide.push(n); }));
+    Object.assign(S, { buf0, scan, results, hide, date, label, asOf: A.asOf, saved: false });
+    renderResult(); setMsg('');
+  } catch (e) { setMsg('실패: ' + (e && e.message ? e.message : e), true); }
+  $('runBtn').disabled = false;
+});
+
+function renderResult(){
+  $('resultBox').style.display = '';
+  const R = S.results, cnt = s => R.filter(r => r.o.status === s).length;
+  $('stats').innerHTML = [['전체 상품 줄', R.length], ['판매중', cnt('판매중')], ['전품(품절)', cnt('전품')], ['미노출', cnt('미노출')], ['다른색상판매', cnt('다른색상판매')], ['신상', cnt('신상')], ['확인필요', cnt('확인필요')], ['최근 입고 이력 있음', R.filter(r => r.hasHist).length]]
+    .map(([t, n]) => `<span class="chip">${t} <b>${n.toLocaleString()}</b></span>`).join('');
+  const mm = S.date.match(/(\d+)-(\d+)-(\d+)/);
+  $('asOf').innerHTML = `이번 입고: <b>${Number(mm[2])}월${Number(mm[3])}일 ${esc(S.label)}</b>` + (S.asOf ? ` · 이카운트 재고 기준 ${new Date(S.asOf * 1000).toLocaleString('ko-KR')}` : '');
+  $('tbody').innerHTML = R.map(r => `<tr><td class="num">${r.row}</td>
+    <td class="code">${esc(r.main)}${r.alt ? `<div class="sub">괄호: ${esc(r.alt)}${r.o.tag ? ' → 이쪽으로 찾음' : ''}</div>` : ''}${r.batch ? `<div class="sub">${esc(r.batch)}</div>` : ''}</td>
+    <td><span class="tag ${r.o.cls}">${esc(r.seasonText)}</span></td>
+    <td>${esc(r.o.name)}</td><td class="num">${r.o.ec == null ? '' : Number(r.o.ec).toLocaleString()}</td>
+    <td>${esc(r.hist)}</td><td class="blank">(직접 입력)</td></tr>`).join('');
+}
+
+/* ---------- 원본 양식 그대로 + 시즌 칸 채우기 + 오른쪽에 두 열 추가 (엑셀 안의 XML 을 직접 고쳐 원본 서식을 보존) ---------- */
+const colLetter = n => { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+const colNum = L => [...L].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0);
+const xmlEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const strCell = (ref, s, text) => `<c r="${ref}"${s != null ? ` s="${s}"` : ''} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(text)}</t></is></c>`;
+
+// 한 줄의 XML 에서 지정한 칸을 문자열로 바꾸거나(있으면 서식 유지) 열 순서에 맞게 끼워 넣는다
+function putText(rowInner, rowNum, col, text){
+  const ref = colLetter(col) + rowNum;
+  const re = new RegExp('<c r="' + ref + '"([^>]*?)(\\/>|>[\\s\\S]*?<\\/c>)');
+  const m = rowInner.match(re);
+  if (m) { const s = (m[1].match(/\bs="(\d+)"/) || [])[1]; return rowInner.replace(re, () => strCell(ref, s != null ? s : null, text)); }
+  let at = rowInner.length;
+  const cre = /<c r="([A-Z]+)\d+"/g; let c;
+  while ((c = cre.exec(rowInner))) { if (colNum(c[1]) > col) { at = c.index; break; } }
+  return rowInner.slice(0, at) + strCell(ref, null, text) + rowInner.slice(at);
+}
+
+async function buildXlsx(buf, scan, results, hide, saveInfo){
+  const zip = await JSZip.loadAsync(buf);
+  const wbXml = await zip.file('xl/workbook.xml').async('string');
+  const rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
+  const rid = (wbXml.match(/<sheet\b[^>]*\br:id="([^"]+)"/) || [])[1];
+  const relTag = (rels.match(new RegExp('<Relationship\\b[^>]*\\bId="' + rid + '"[^>]*>')) || [])[0] || '';
+  const target = (relTag.match(/\bTarget="([^"]+)"/) || [])[1];
+  if (!target) throw new Error('시트 위치를 찾지 못했어요.');
+  const sheetPath = target.startsWith('/') ? target.slice(1) : 'xl/' + target;
+  let sx = await zip.file(sheetPath).async('string');
+
+  const dim = (sx.match(/<dimension ref="[A-Z]+\d+:([A-Z]+)(\d+)"/) || []);
+  const lastCol = colNum(dim[1] || 'AF');
+  const cName = lastCol + 1, cHist = lastCol + 2;
+
+  const hdrByRow = new Map(scan.headers.map(h => [h.row, h]));
+  const byRow = new Map(results.map(r => [r.row, r]));
+  const styleOf = (rowInner, rowNum, col) => { const mm = rowInner.match(new RegExp('<c r="' + colLetter(col) + rowNum + '"[^>]*?\\bs="(\\d+)"')); return mm ? mm[1] : null; };
+
+  sx = sx.replace(/<row r="(\d+)"([^>]*?)(\/>|>([\s\S]*?)<\/row>)/g, (all, r, attrs, tail, inner) => {
+    const rn = Number(r), h = hdrByRow.get(rn), it = byRow.get(rn);
+    if (!h && !it) return all;
+    let body = inner || '';
+    attrs = attrs.replace(/\sspans="[^"]*"/, '');
+    if (h) {
+      const s = styleOf(body, rn, h.work || h.season);
+      body += strCell(colLetter(cName) + rn, s, '판매중상품명') + strCell(colLetter(cHist) + rn, s, '최근들어온내역');
+    } else {
+      const hd = it.hdr, s = styleOf(body, rn, hd.work || hd.season);
+      body = putText(body, rn, hd.season, it.seasonText);
+      body += strCell(colLetter(cName) + rn, s, it.o.name) + strCell(colLetter(cHist) + rn, s, it.hist);
+    }
+    return `<row r="${r}"${attrs}>${body}</row>`;
+  });
+  sx = sx.replace(/<dimension ref="([A-Z]+\d+):[A-Z]+(\d+)"/, `<dimension ref="$1:${colLetter(cHist)}$2"`);
+
+  // 열 폭 + 빈 원산지·소재·비고 열 숨기기 (삭제가 아니라 숨김)
+  const hideSet = new Set(hide), defs = {}; let tail = ' style="4"';
+  const colsM = sx.match(/<cols>([\s\S]*?)<\/cols>/);
+  (colsM ? colsM[1].match(/<col\b[^>]*\/>/g) || [] : []).forEach(t => {
+    const mn = Number(t.match(/\bmin="(\d+)"/)[1]), mx = Number(t.match(/\bmax="(\d+)"/)[1]);
+    const at = t.replace(/^<col\b/, '').replace(/\/>$/, '').replace(/\s(min|max|hidden)="[^"]*"/g, '');
+    if (mx >= 16384) { tail = at; return; }
+    for (let c = mn; c <= Math.min(mx, lastCol); c++) defs[c] = at;
+  });
+  const out = []; let run = null;
+  const flush = () => { if (run) out.push(`<col min="${run.a}" max="${run.b}"${run.at}${run.hid ? ' hidden="1"' : ''}/>`); run = null; };
+  for (let c = 1; c <= lastCol; c++) {
+    const at = defs[c] || tail, hid = hideSet.has(c);
+    if (run && run.at === at && run.hid === hid) run.b = c; else { flush(); run = { a: c, b: c, at, hid }; }
+  }
+  flush();
+  const plain = tail.replace(/\s(width|customWidth|bestFit)="[^"]*"/g, '');
+  const newCols = [[cName, 44], [cHist, 26]].map(([c, w]) => `<col min="${c}" max="${c}" width="${w}" customWidth="1"${plain}/>`).join('');
+  const colsXml = `<cols>${out.join('')}${newCols}<col min="${cHist + 1}" max="16384"${tail}/></cols>`;
+  sx = colsM ? sx.replace(colsM[0], colsXml) : sx.replace(/(<sheetData>)/, colsXml + '$1');
+  zip.file(sheetPath, sx);
+  return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', compression: 'DEFLATE' });
+}
+
+$('dlBtn').addEventListener('click', async () => {
+  $('dlBtn').disabled = true;
+  try {
+    const blob = await buildXlsx(S.buf0, S.scan, S.results, S.hide);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = S.file.name.replace(/\.xlsx$/i, '') + '_시즌체크.xlsx'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    if ($('saveChk').checked && !S.saved) {
+      const auth = getAuth();
+      const agg = {};
+      S.results.forEach(r => { const e = agg[r.entryKey] || (agg[r.entryKey] = { key: r.entryKey, model: r.main, qty: 0, batch: r.batch }); e.qty += Number(r.qty) || 0; });
+      const d = await post(API_SC, { user: auth.id, pass: auth.pass, action: 'record', date: S.date, label: S.label, entries: Object.values(agg) });
+      S.saved = true; setMsg(`엑셀을 받았고, 이번 입고 ${d.saved}개 품번을 서버에 저장했어요. (같은 날짜·이름으로 다시 받아도 중복 저장되지 않아요)`);
+    }
+  } catch (e) { setMsg('처리 실패: ' + (e && e.message ? e.message : e), true); }
+  $('dlBtn').disabled = false;
+});
+</script>
+</body>
+</html>
