@@ -106,7 +106,7 @@
   let running=false, stopFlag=false;
   const key=q=>q.code+'|'+(q.color||'');
 
-  $('worker').value=lsGet(LS_W,'')||'';
+  $('worker').value=lsGet(LS_W,'')||'https://buyest-photo-finder.buyest.workers.dev';
   $('btnSaveWorker').onclick=()=>{lsSet(LS_W,$('worker').value.trim().replace(/\/+$/,''));alert('저장했습니다.');};
   const W=()=>($('worker').value.trim()||'').replace(/\/+$/,'');
 
