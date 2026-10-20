@@ -1,3 +1,6 @@
 name = "buyest-photo-finder"
 main = "worker.js"
 compatibility_date = "2025-01-01"
+
+# --- 배포 전 한 번만 ---
+# 1) 구글 검색 키:   npx wrangler secret put SERPER_KEY        (키는 이 파일·GitHub에 적지 않는다)
