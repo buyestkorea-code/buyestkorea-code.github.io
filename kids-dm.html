@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>키즈 인스타 DM 자동화</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root {
+    --ink:#17202e; --mute:#667085; --line:#e3e6ec; --paper:#f5f6f8; --card:#fff;
+    --brand:#e8501f; --brand-soft:#fff1ea; --brand-ink:#b83a10;
+    --ok:#167a4a; --ok-soft:#e8f6ee; --bad:#c0392b; --bad-soft:#fdecea; --warn:#9a6700; --warn-soft:#fff6dd;
+    --ig-bg:#eef0f4; --bubble-me:#3b82f6;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body { font-family:"Pretendard","Malgun Gothic",-apple-system,sans-serif; background:var(--paper); color:var(--ink); line-height:1.5; }
+  button { font-family:inherit; }
+  .wrap { max-width:1120px; margin:0 auto; padding:22px 20px 80px; }
+  .top { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  h1 { font-size:21px; margin:0; font-weight:800; letter-spacing:-.01em; }
+  h1 small { font-weight:500; font-size:13px; color:var(--mute); margin-left:8px; }
+  .banner { background:var(--warn-soft); color:var(--warn); border:1px solid #f1dd9b; border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:12px; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:20px; }
+  .tab { background:none; border:0; padding:10px 16px; font-size:14.5px; font-weight:600; color:var(--mute); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tab[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--brand); }
+  .tab:focus-visible, .btn:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, .pick:focus-visible, .switch:focus-visible { outline:2px solid #1d4ed8; outline-offset:2px; }
+  .btn { border:0; border-radius:8px; padding:10px 18px; font-size:14.5px; font-weight:700; cursor:pointer; background:var(--ink); color:#fff; }
+  .btn.brand { background:var(--brand); }
+  .btn.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
+  .btn.small { padding:6px 12px; font-size:13px; }
+  .btn:disabled { background:#d5d9e0; color:#7b8494; cursor:not-allowed; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; }
+  .muted { color:var(--mute); }
+  .err { color:var(--bad); font-size:13.5px; margin-top:8px; }
+  .hidden { display:none !important; }
+
+  /* 홈 통계 */
+  .stats { display:grid; grid-template-columns:1fr 1fr 1.4fr; gap:12px; margin-bottom:18px; }
+  .stat .n { font-size:34px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.1; }
+  .stat .l { font-size:13px; color:var(--mute); margin-top:4px; }
+  .bars { display:flex; align-items:flex-end; gap:6px; height:64px; margin-top:6px; }
+  .bar { flex:1; background:var(--brand-soft); border-radius:4px 4px 0 0; position:relative; min-height:3px; }
+  .bar.has { background:var(--brand); }
+  .bar span { position:absolute; bottom:-18px; left:50%; transform:translateX(-50%); font-size:10.5px; color:var(--mute); white-space:nowrap; }
+  .bars-wrap { padding-bottom:20px; }
+
+  /* 자동화 목록 */
+  .autos { display:grid; gap:10px; }
+  .auto { display:grid; grid-template-columns:64px 1fr auto; gap:14px; align-items:center; padding:12px; }
+  .thumb { width:64px; height:64px; border-radius:8px; background:var(--ig-bg) center/cover no-repeat; flex:none; }
+  .auto h3 { margin:0 0 2px; font-size:15.5px; }
+  .auto .sub { font-size:13px; color:var(--mute); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .chip { font-size:12px; font-weight:600; padding:2px 9px; border-radius:99px; background:var(--paper); color:#475467; }
+  .chip.ok { background:var(--ok-soft); color:var(--ok); } .chip.bad { background:var(--bad-soft); color:var(--bad); } .chip.warn { background:var(--warn-soft); color:var(--warn); } .chip.brand { background:var(--brand-soft); color:var(--brand-ink); }
+  .act { display:flex; align-items:center; gap:10px; }
+  .switch { width:46px; height:26px; border-radius:99px; border:0; background:#cfd4dc; position:relative; cursor:pointer; flex:none; transition:background .15s; }
+  .switch::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform .15s; box-shadow:0 1px 2px rgba(0,0,0,.25); }
+  .switch[aria-checked="true"] { background:var(--ok); }
+  .switch[aria-checked="true"]::after { transform:translateX(20px); }
+  .empty { text-align:center; padding:44px 16px; }
+  .empty h3 { margin:0 0 6px; font-size:17px; }
+
+  /* 마법사 */
+  .wizard { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:22px; align-items:start; }
+  .steps { display:flex; gap:8px; margin-bottom:16px; }
+  .stepdot { flex:1; padding:8px 10px; border-radius:8px; background:#fff; border:1px solid var(--line); font-size:13.5px; font-weight:600; color:var(--mute); }
+  .stepdot.on { border-color:var(--brand); color:var(--ink); background:var(--brand-soft); }
+  .stepdot.done { color:var(--ok); }
+  h2 { font-size:17px; margin:0 0 4px; }
+  .lead { font-size:13.5px; color:var(--mute); margin:0 0 14px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:10px; }
+  .pick { position:relative; border:2px solid transparent; border-radius:10px; overflow:hidden; background:var(--ig-bg); aspect-ratio:1; padding:0; cursor:pointer; }
+  .pick img { width:100%; height:100%; object-fit:cover; display:block; }
+  .pick.sel { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-soft); }
+  .pick .tag { position:absolute; left:6px; bottom:6px; font-size:11px; font-weight:700; background:rgba(23,32,46,.82); color:#fff; padding:2px 7px; border-radius:99px; }
+  .pick .ty { position:absolute; right:6px; top:6px; font-size:11px; background:rgba(255,255,255,.9); border-radius:6px; padding:1px 6px; font-weight:700; }
+  .field { margin-bottom:16px; }
+  .field > label, .lab { display:block; font-size:13.5px; font-weight:700; margin-bottom:6px; }
+  .hint { font-size:12.5px; color:var(--mute); margin-top:4px; }
+  input[type=text], textarea, select { width:100%; border:1px solid #d0d5dd; border-radius:8px; padding:10px 12px; font:inherit; font-size:14.5px; background:#fff; color:var(--ink); }
+  textarea { resize:vertical; min-height:110px; }
+  .seg { display:flex; gap:6px; flex-wrap:wrap; }
+  .seg label { border:1px solid #d0d5dd; border-radius:99px; padding:6px 14px; font-size:13.5px; cursor:pointer; font-weight:600; background:#fff; }
+  .seg input { position:absolute; opacity:0; pointer-events:none; }
+  .seg input:checked + span { color:var(--brand-ink); }
+  .seg label:has(input:checked) { border-color:var(--brand); background:var(--brand-soft); color:var(--brand-ink); }
+  .seg label:has(input:focus-visible) { outline:2px solid #1d4ed8; outline-offset:2px; }
+  .count { font-size:12.5px; color:var(--mute); text-align:right; margin-top:4px; font-variant-numeric:tabular-nums; }
+  .count.over { color:var(--bad); font-weight:700; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .nav { display:flex; justify-content:space-between; margin-top:18px; gap:8px; }
+  .sum dt { font-size:12.5px; color:var(--mute); margin-top:12px; } .sum dd { margin:2px 0 0; font-weight:600; white-space:pre-wrap; word-break:break-word; }
+
+  /* 폰 미리보기 */
+  .phone { position:sticky; top:12px; background:#fff; border:1px solid var(--line); border-radius:26px; padding:14px 12px 16px; box-shadow:0 8px 30px rgba(23,32,46,.08); }
+  .phone .cap { text-align:center; font-size:12px; color:var(--mute); margin-bottom:10px; font-weight:600; }
+  .scene { background:var(--ig-bg); border-radius:16px; padding:12px; margin-bottom:10px; }
+  .scene h4 { margin:0 0 8px; font-size:11.5px; color:var(--mute); font-weight:700; letter-spacing:.02em; }
+  .cm { font-size:13px; margin-bottom:6px; } .cm b { margin-right:6px; }
+  .cm.re { margin-left:18px; padding-left:8px; border-left:2px solid #cdd2db; }
+  .bub { background:#fff; border-radius:16px 16px 16px 4px; padding:9px 12px; font-size:13.5px; max-width:92%; white-space:pre-wrap; word-break:break-word; box-shadow:0 1px 1px rgba(0,0,0,.05); }
+  .bub a { color:#1d4ed8; text-decoration:underline; word-break:break-all; }
+  .bub.ph { color:#9aa3b2; }
+
+  /* 표 */
+  .tbl { width:100%; border-collapse:collapse; font-size:13.5px; }
+  .tbl th, .tbl td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .tbl th { font-size:12.5px; color:var(--mute); font-weight:700; }
+  .gate { max-width:460px; margin:70px auto; text-align:center; }
+  .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:99px; font-size:14px; font-weight:600; z-index:9; box-shadow:0 6px 20px rgba(0,0,0,.25); }
+
+  @media (max-width:860px) {
+    .wizard { grid-template-columns:1fr; }
+    .phone { position:static; }
+    .stats { grid-template-columns:1fr 1fr; } .stats .card:last-child { grid-column:1 / -1; }
+    .auto { grid-template-columns:52px 1fr; } .thumb { width:52px; height:52px; } .auto .act { grid-column:1 / -1; justify-content:space-between; }
+  }
+  @media (prefers-reduced-motion:reduce) { .switch, .switch::after { transition:none; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+const API = 'https://buyestkids-dm.buyest.workers.dev/api';
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const bytes = s => new TextEncoder().encode(s).length;
+const DEFAULT_REPLIES = '댓글 감사합니다 😊 DM 보내드렸어요! 확인 부탁드려요\n관심 가져주셔서 감사해요 :) DM 확인 부탁드립니다 (조금 늦을 수도 있어요)\n감사합니다! DM으로 안내 드렸으니 확인해 주세요 💌';
+
+let AUTH = null;
+try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); if (a && a.id && a.pass) AUTH = a; } catch (e) {}
+
+const S = { tab: 'home', ov: null, media: null, tpls: null, log: null, step: 1, d: blank(), loading: false, err: '' };
+function blank() { return { id: null, media_id: '', media_link: '', media_thumb: '', media_caption: '', name: '', match_mode: 'any', keywords: '', message: '', link_url: '', reply_texts: DEFAULT_REPLIES }; }
+
+async function api(action, body = {}) {
+  const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, user: AUTH.id, pass: AUTH.pass, ...body }) });
+  const j = await r.json().catch(() => ({ ok: false, error: '응답을 읽지 못했어요.' }));
+  if (!j.ok) throw new Error(j.error || '처리하지 못했어요.');
+  return j;
+}
+function toast(t) { const e = document.createElement('div'); e.className = 'toast'; e.textContent = t; document.body.appendChild(e); setTimeout(() => e.remove(), 2200); }
+const uiMsg = m => m.replace(/\{link\}/g, '{링크}');
+const apiMsg = m => m.replace(/\{링크\}/g, '{link}');
+
+/* ---------- 데이터 로드 ---------- */
+async function loadHome() { S.loading = true; S.err = ''; render(); try { S.ov = await api('overview'); } catch (e) { S.err = e.message; } S.loading = false; render(); }
+async function loadMedia() { if (S.media) return; try { S.media = (await api('media')).media; } catch (e) { S.err = e.message; } render(); }
+async function loadTpls() { try { S.tpls = (await api('tpl_list')).templates; } catch (e) { S.err = e.message; } render(); }
+async function loadLog() { try { S.log = (await api('log')).items; } catch (e) { S.err = e.message; } render(); }
+
+function go(tab) {
+  S.tab = tab; S.err = '';
+  if (tab === 'home') loadHome();
+  else if (tab === 'new') { if (!S.d.id && S.step > 3) S.step = 1; loadMedia(); if (!S.tpls) loadTpls(); render(); }
+  else if (tab === 'tpl') { loadTpls(); }
+  else if (tab === 'log') { loadLog(); }
+}
+
+/* ---------- 렌더 ---------- */
+function render() {
+  const app = $('#app');
+  if (!AUTH) { app.innerHTML = `<div class="gate card"><h2>툴킷에 로그인해 주세요</h2><p class="lead">이 도구는 툴킷 로그인 정보로 열려요. 툴킷 첫 화면에서 로그인한 뒤 이 메뉴를 다시 열어 주세요.</p></div>`; return; }
+  const tabs = [['home','홈'],['new', S.d.id ? '자동화 수정' : '새 자동화'],['tpl','템플릿'],['log','기록']];
+  app.innerHTML = `
+    <div class="top"><h1>키즈 인스타 DM 자동화<small>buyest_kids</small></h1><button class="btn ghost small" id="refresh">새로고침</button></div>
+    ${S.ov && S.ov.testMode ? '<div class="banner">시험 모드예요. 지금은 DM이 실제로 나가지 않고 기록만 남아요.</div>' : ''}
+    <div class="tabs" role="tablist">${tabs.map(([k, t]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab === k}">${t}</button>`).join('')}</div>
+    <div id="view"></div>`;
+  $('#refresh').onclick = () => { S.media = null; go(S.tab); };
+  app.querySelectorAll('.tab').forEach(b => b.onclick = () => { if (b.dataset.tab === 'new' && S.tab !== 'new') { /* 이어서 작성 */ } go(b.dataset.tab); });
+  const v = $('#view');
+  if (S.err) v.insertAdjacentHTML('beforeend', `<div class="card err" role="alert">${esc(S.err)}</div>`);
+  ({ home: viewHome, new: viewNew, tpl: viewTpl, log: viewLog })[S.tab](v);
+}
+
+function matchLabel(r) { return r.match_mode === 'any' ? '모든 댓글' : r.match_mode === 'exact' ? `"${r.keywords}"와 같은 댓글` : `"${r.keywords}" 포함 댓글`; }
+
+function viewHome(v) {
+  if (!S.ov) { v.insertAdjacentHTML('beforeend', '<p class="muted">불러오는 중이에요…</p>'); return; }
+  const o = S.ov, t = o.totals;
+  const rate = t.sent ? Math.round(t.clickers / t.sent * 100) : 0;
+  const days = []; for (let i = 6; i >= 0; i--) { const d = new Date(Date.now() + 9 * 3600e3 - i * 86400e3).toISOString().slice(0, 10); const f = o.days.find(x => x.d === d); days.push({ d, n: f ? f.n : 0 }); }
+  const max = Math.max(1, ...days.map(x => x.n));
+  v.insertAdjacentHTML('beforeend', `
+    <div class="stats">
+      <div class="card stat"><div class="n">${t.sent.toLocaleString()}</div><div class="l">보낸 DM</div></div>
+      <div class="card stat"><div class="n">${t.clickers.toLocaleString()}<span style="font-size:15px;font-weight:600;color:var(--mute)"> 명</span></div><div class="l">링크를 누른 사람${t.sent ? ` · 클릭률 ${rate}%` : ''}</div></div>
+      <div class="card stat"><div class="l" style="margin:0 0 4px">최근 7일 보낸 DM</div><div class="bars-wrap"><div class="bars">${days.map(x => `<div class="bar ${x.n ? 'has' : ''}" style="height:${Math.max(5, x.n / max * 100)}%" title="${x.d} · ${x.n}건"><span>${x.d.slice(8)}일</span></div>`).join('')}</div></div></div>
+    </div>
+    <div class="top"><h2 style="margin:0">내 자동화</h2><button class="btn brand" id="mk">+ 새 자동화 만들기</button></div>
+    <div class="autos" id="autos"></div>`);
+  $('#mk').onclick = () => { S.d = blank(); S.step = 1; go('new'); };
+  const box = $('#autos');
+  if (!o.rules.length) { box.innerHTML = `<div class="card empty"><h3>아직 자동화가 없어요</h3><p class="muted">게시물을 고르고 보낼 문구만 적으면 끝나요.</p><button class="btn brand" id="mk2">첫 자동화 만들기</button></div>`; $('#mk2').onclick = $('#mk').onclick; return; }
+  box.innerHTML = o.rules.map(r => `
+    <div class="card auto">
+      <div class="thumb" style="${r.media_thumb ? `background-image:url('${esc(r.media_thumb)}')` : ''}"></div>
+      <div>
+        <h3>${esc(r.name || '이름 없는 자동화')}</h3>
+        <div class="sub">${esc(matchLabel(r))} → DM${r.reply_texts ? ' + 공개 답글' : ''}</div>
+        <div class="chips">
+          <span class="chip ${r.enabled ? 'ok' : ''}">${r.enabled ? '켜져 있음' : '꺼져 있음'}</span>
+          <span class="chip brand">보낸 DM ${r.sent}</span>
+          <span class="chip">링크 누른 사람 ${r.clickers}</span>
+          ${r.failed ? `<span class="chip bad">실패 ${r.failed}</span>` : ''}
+          ${r.tested ? `<span class="chip warn">시험 ${r.tested}</span>` : ''}
+        </div>
+      </div>
+      <div class="act">
+        <button class="btn ghost small" data-edit="${r.id}">수정</button>
+        <button class="btn ghost small" data-del="${r.id}">삭제</button>
+        <button class="switch" role="switch" aria-checked="${!!r.enabled}" aria-label="${esc(r.name || '자동화')} 켜고 끄기" data-tg="${r.id}"></button>
+      </div>
+    </div>`).join('');
+  box.querySelectorAll('[data-tg]').forEach(b => b.onclick = async () => {
+    const on = b.getAttribute('aria-checked') !== 'true';
+    if (on && !confirm('이 자동화를 켤까요?\n켜면 이 게시물에 달리는 댓글에 DM이 나가요.')) return;
+    try { await api('rule_toggle', { id: Number(b.dataset.tg), on }); toast(on ? '켰어요' : '껐어요'); loadHome(); } catch (e) { S.err = e.message; render(); }
+  });
+  box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
+    const r = o.rules.find(x => x.id === Number(b.dataset.edit));
+    S.d = { id: r.id, media_id: r.media_id, media_link: r.media_link || '', media_thumb: r.media_thumb || '', media_caption: r.media_caption || '', name: r.name || '', match_mode: r.match_mode, keywords: r.keywords === '*' ? '' : r.keywords, message: uiMsg(r.message), link_url: r.link_url || '', reply_texts: r.reply_texts || '' };
+    S.step = 2; go('new');
+  });
+  box.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    if (!confirm('이 자동화를 삭제할까요?\n지난 발송 기록은 남지만 되돌릴 수 없어요.')) return;
+    try { await api('rule_delete', { id: Number(b.dataset.del) }); toast('삭제했어요'); loadHome(); } catch (e) { S.err = e.message; render(); }
+  });
+}
+
+/* ---------- 새 자동화 마법사 ---------- */
+function previewHTML() {
+  const d = S.d, first = (d.reply_texts || '').split('\n').map(s => s.trim()).filter(Boolean)[0];
+  const sample = d.match_mode === 'any' ? '예뻐요!' : (d.keywords.split(',')[0] || '').trim() || '댓글';
+  const msg = apiMsg(d.message);
+  const dm = d.message.trim()
+    ? esc(uiMsg(msg)).replace(/\{링크\}/g, `<a>buyestkids-dm…/go/a1b2c3</a>`)
+    : '<span class="bub ph" style="background:none;box-shadow:none;padding:0">보낼 DM 내용을 적으면 여기에 보여요</span>';
+  return `<div class="phone"><div class="cap">고객이 보게 될 화면</div>
+    <div class="scene"><h4>① 게시물 댓글</h4>
+      <div class="cm"><b>고객</b>${esc(sample)}</div>
+      ${first ? `<div class="cm re"><b>buyest_kids</b>${esc(first)}</div>` : ''}</div>
+    <div class="scene"><h4>② 받는 DM</h4><div class="bub">${dm}</div></div></div>`;
+}
+function refreshPreview() { const p = $('.phone'); if (p) p.outerHTML = previewHTML(); }
+
+function viewNew(v) {
+  const d = S.d;
+  const steps = ['게시물 고르기', 'DM 쓰기', '확인하고 저장'];
+  v.insertAdjacentHTML('beforeend', `<div class="wizard"><div>
+    <div class="steps">${steps.map((t, i) => `<div class="stepdot ${S.step === i + 1 ? 'on' : S.step > i + 1 ? 'done' : ''}">${S.step > i + 1 ? '✓ ' : ''}${t}</div>`).join('')}</div>
+    <div class="card" id="stepbox"></div></div>${previewHTML()}</div>`);
+  const box = $('#stepbox');
+  if (S.step === 1) {
+    box.innerHTML = `<h2>어느 게시물에 자동화를 걸까요?</h2><p class="lead">이 게시물에 댓글을 달면 DM이 가요. 최근 게시물 24개가 보여요.</p><div class="grid" id="grid">${S.media ? '' : '<p class="muted">게시물을 불러오는 중이에요…</p>'}</div><div class="nav"><span></span><button class="btn" id="next" ${d.media_id ? '' : 'disabled'}>다음</button></div>`;
+    if (S.media) {
+      $('#grid').innerHTML = S.media.map(m => `<button class="pick ${d.media_id === m.id ? 'sel' : ''}" data-m="${m.id}" aria-label="${esc(m.caption || '게시물')} 선택" aria-pressed="${d.media_id === m.id}"><img src="${esc(m.thumb)}" alt="" referrerpolicy="no-referrer" loading="lazy"><span class="ty">${m.type === 'VIDEO' ? '릴스' : m.type === 'CAROUSEL_ALBUM' ? '여러 장' : '사진'}</span>${m.rules ? `<span class="tag">자동화 ${m.rules}</span>` : ''}</button>`).join('') || '<p class="muted">게시물이 없어요.</p>';
+      $('#grid').querySelectorAll('.pick').forEach(b => b.onclick = () => {
+        const m = S.media.find(x => x.id === b.dataset.m);
+        if (d.media_id !== m.id && !d.name) d.name = (m.caption || '').split('\n')[0].slice(0, 20) || new Date(m.date).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) + ' 게시물';
+        Object.assign(d, { media_id: m.id, media_link: m.link, media_thumb: m.thumb, media_caption: m.caption });
+        render();
+      });
+    }
+    $('#next').onclick = () => { S.step = 2; render(); };
+  } else if (S.step === 2) {
+    const tplOpts = (S.tpls || []).map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+    box.innerHTML = `<h2>어떤 DM을 보낼까요?</h2><p class="lead">오른쪽 미리보기에서 고객이 받는 모습을 바로 확인할 수 있어요.</p>
+      ${tplOpts ? `<div class="field"><label for="tplSel">저장한 템플릿 불러오기</label><select id="tplSel"><option value="">선택하세요</option>${tplOpts}</select></div>` : ''}
+      <div class="field"><span class="lab">언제 DM을 보낼까요?</span><div class="seg" role="radiogroup" aria-label="DM 보내는 조건">
+        ${[['any','모든 댓글'],['contains','특정 단어가 들어간 댓글'],['exact','단어가 정확히 같은 댓글']].map(([k, t]) => `<label><input type="radio" name="mm" value="${k}" ${d.match_mode === k ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>
+        <div id="kwBox" class="${d.match_mode === 'any' ? 'hidden' : ''}" style="margin-top:8px"><input type="text" id="kw" placeholder="예: 링크, 정보 (쉼표로 여러 개)" value="${esc(d.keywords)}" aria-label="반응할 단어"></div></div>
+      <div class="field"><label for="msg">DM 내용</label><textarea id="msg" placeholder="예: 댓글 남겨주셔서 감사해요! 자세한 안내는 여기에서 확인하실 수 있어요 👉 {링크}">${esc(d.message)}</textarea>
+        <div class="row" style="margin-top:6px;justify-content:space-between"><button class="btn ghost small" id="insLink" type="button">{링크} 자리 넣기</button><div class="count" id="cnt"></div></div></div>
+      <div class="field"><label for="lnk">링크 주소 <span class="muted" style="font-weight:500">(선택)</span></label><input type="text" id="lnk" placeholder="https://www.buyestkids.com/…" value="${esc(d.link_url)}"><div class="hint">DM의 {링크} 자리에 들어가요. 몇 명이 눌렀는지 자동으로 세요.</div></div>
+      <div class="field"><label for="rep">댓글에 다는 공개 답글 <span class="muted" style="font-weight:500">(선택)</span></label><textarea id="rep" style="min-height:96px" placeholder="한 줄에 문구 하나">${esc(d.reply_texts)}</textarea><div class="hint">한 줄에 하나씩 적으면 번갈아 가며 달려요. 같은 말이 반복되면 스팸처럼 보일 수 있어요. 비워 두면 답글은 달지 않아요.</div></div>
+      <div id="e2" class="err" role="alert"></div>
+      <div class="nav"><button class="btn ghost" id="back">이전</button><button class="btn" id="next">다음</button></div>`;
+    const upd = () => {
+      d.message = $('#msg').value; d.link_url = $('#lnk').value; d.reply_texts = $('#rep').value; d.keywords = ($('#kw') || { value: '' }).value;
+      const n = bytes(apiMsg(d.message).replace('{link}', 'x'.repeat(60)));
+      const c = $('#cnt'); c.textContent = `${n} / 1000 바이트 (한글 약 ${Math.floor(1000 / 3)}자)`; c.className = 'count' + (n > 1000 ? ' over' : ''); refreshPreview();
+    };
+    ['msg', 'lnk', 'rep', 'kw'].forEach(id => { const e = $('#' + id); if (e) e.oninput = upd; });
+    box.querySelectorAll('input[name=mm]').forEach(r => r.onchange = () => { d.match_mode = r.value; $('#kwBox').classList.toggle('hidden', r.value === 'any'); refreshPreview(); });
+    $('#insLink').onclick = () => { const t = $('#msg'), p = t.selectionStart || t.value.length; t.value = t.value.slice(0, p) + '{링크}' + t.value.slice(p); t.focus(); upd(); };
+    if ($('#tplSel')) $('#tplSel').onchange = e => { const t = S.tpls.find(x => String(x.id) === e.target.value); if (!t) return; Object.assign(d, { match_mode: t.match_mode, keywords: t.keywords === '*' ? '' : t.keywords, message: uiMsg(t.message), link_url: t.link_url || '', reply_texts: t.reply_texts || '' }); render(); };
+    $('#back').onclick = () => { S.step = 1; render(); };
+    $('#next').onclick = () => {
+      upd();
+      const e2 = $('#e2');
+      if (!d.message.trim()) { e2.textContent = '보낼 DM 내용을 적어 주세요.'; return; }
+      if (d.match_mode !== 'any' && !d.keywords.trim()) { e2.textContent = '반응할 단어를 적어 주세요.'; return; }
+      if (d.message.includes('{링크}') && !d.link_url.trim()) { e2.textContent = '{링크} 자리가 있는데 링크 주소가 비어 있어요.'; return; }
+      if (bytes(apiMsg(d.message).replace('{link}', 'x'.repeat(60))) > 1000) { e2.textContent = 'DM이 너무 길어요. 조금 줄여 주세요.'; return; }
+      S.step = 3; render();
+    };
+    upd();
+  } else {
+    box.innerHTML = `<h2>이대로 저장할까요?</h2><p class="lead">저장 후 켜면 바로 이 게시물에 달리는 댓글에 DM이 나가요.</p>
+      <div class="field"><label for="nm">자동화 이름</label><input type="text" id="nm" maxlength="40" value="${esc(d.name)}" placeholder="예: 10월 신상 안내"></div>
+      <dl class="sum"><dt>게시물</dt><dd>${esc(d.media_caption ? d.media_caption.split('\n')[0] : '선택한 게시물')}</dd>
+        <dt>조건</dt><dd>${esc(matchLabel({ match_mode: d.match_mode, keywords: d.keywords }))}</dd>
+        <dt>DM 내용</dt><dd>${esc(d.message)}</dd>
+        <dt>링크</dt><dd>${esc(d.link_url || '없음')}</dd>
+        <dt>공개 답글</dt><dd>${esc(d.reply_texts.trim() ? d.reply_texts.trim().split('\n').length + '가지 문구를 번갈아 사용' : '달지 않음')}</dd></dl>
+      <div class="row" style="margin-top:14px"><label style="font-size:13.5px"><input type="checkbox" id="asTpl"> 이 내용을 템플릿으로도 저장</label></div>
+      <div id="e3" class="err" role="alert"></div>
+      <div class="nav"><button class="btn ghost" id="back">이전</button><div class="row"><button class="btn ghost" id="saveOff">저장만 하기 (꺼 둠)</button><button class="btn brand" id="saveOn">저장하고 켜기</button></div></div>`;
+    $('#back').onclick = () => { S.step = 2; render(); };
+    const save = async on => {
+      d.name = $('#nm').value.trim() || '이름 없는 자동화';
+      $('#e3').textContent = ''; ['saveOff', 'saveOn'].forEach(i => $('#' + i).disabled = true);
+      try {
+        const payload = { id: d.id, name: d.name, media_id: d.media_id, media_link: d.media_link, media_thumb: d.media_thumb, media_caption: d.media_caption, match_mode: d.match_mode, keywords: d.keywords, message: apiMsg(d.message), link_url: d.link_url, reply_texts: d.reply_texts };
+        const r = await api('rule_save', payload);
+        if ($('#asTpl').checked) await api('tpl_save', { name: d.name, match_mode: d.match_mode, keywords: d.keywords, message: apiMsg(d.message), link_url: d.link_url, reply_texts: d.reply_texts });
+        if (on) await api('rule_toggle', { id: r.id, on: true });
+        toast(on ? '저장하고 켰어요' : '저장했어요 (꺼 둠)'); S.d = blank(); S.step = 1; S.tpls = null; S.media = null; go('home');
+      } catch (e) { $('#e3').textContent = e.message; ['saveOff', 'saveOn'].forEach(i => $('#' + i).disabled = false); }
+    };
+    $('#saveOff').onclick = () => save(false);
+    $('#saveOn').onclick = () => { if (confirm('저장하고 바로 켤까요?\n켜는 순간부터 새 댓글에 DM이 나가요.')) save(true); };
+  }
+}
+
+/* ---------- 템플릿 / 기록 ---------- */
+function viewTpl(v) {
+  if (!S.tpls) { v.insertAdjacentHTML('beforeend', '<p class="muted">불러오는 중이에요…</p>'); return; }
+  if (!S.tpls.length) { v.insertAdjacentHTML('beforeend', `<div class="card empty"><h3>저장한 템플릿이 없어요</h3><p class="muted">자동화를 만들 때 "템플릿으로도 저장"을 켜면 여기에 모여요. 다음부터는 골라서 쓰면 돼요.</p></div>`); return; }
+  v.insertAdjacentHTML('beforeend', `<div class="autos">${S.tpls.map(t => `<div class="card"><h3 style="margin:0 0 4px">${esc(t.name)}</h3><div class="muted" style="font-size:13px;white-space:pre-wrap">${esc(uiMsg(t.message))}</div><div class="chips"><span class="chip">${esc(matchLabel(t))}</span>${t.link_url ? `<span class="chip">링크 있음</span>` : ''}${t.reply_texts ? `<span class="chip">공개 답글 ${t.reply_texts.split('\n').length}가지</span>` : ''}</div><div class="row" style="margin-top:10px"><button class="btn ghost small" data-use="${t.id}">이 템플릿으로 만들기</button><button class="btn ghost small" data-rm="${t.id}">삭제</button></div></div>`).join('')}</div>`);
+  v.querySelectorAll('[data-use]').forEach(b => b.onclick = () => { const t = S.tpls.find(x => x.id === Number(b.dataset.use)); S.d = Object.assign(blank(), { match_mode: t.match_mode, keywords: t.keywords === '*' ? '' : t.keywords, message: uiMsg(t.message), link_url: t.link_url || '', reply_texts: t.reply_texts || '' }); S.step = 1; go('new'); });
+  v.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => { if (!confirm('이 템플릿을 삭제할까요?')) return; try { await api('tpl_delete', { id: Number(b.dataset.rm) }); toast('삭제했어요'); loadTpls(); } catch (e) { S.err = e.message; render(); } });
+}
+const ST = { sent: ['보냄', 'ok'], failed: ['실패', 'bad'], dry_run: ['시험', 'warn'], blocked: ['막힘', 'bad'], pending: ['처리 중', ''] };
+function viewLog(v) {
+  if (!S.log) { v.insertAdjacentHTML('beforeend', '<p class="muted">불러오는 중이에요…</p>'); return; }
+  if (!S.log.length) { v.insertAdjacentHTML('beforeend', `<div class="card empty"><h3>아직 기록이 없어요</h3><p class="muted">댓글이 달려 DM이 나가면 여기에 쌓여요.</p></div>`); return; }
+  const fmt = ts => new Date(ts).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  v.insertAdjacentHTML('beforeend', `<div class="card" style="overflow-x:auto"><table class="tbl"><thead><tr><th>시각</th><th>자동화</th><th>DM</th><th>공개 답글</th><th>링크 클릭</th></tr></thead><tbody>${S.log.map(i => { const s = ST[i.status] || [i.status, '']; const r = i.reply_status ? (ST[i.reply_status] || [i.reply_status, '']) : null; return `<tr><td>${fmt(i.created_at)}</td><td>${esc(i.rule_name || '(삭제된 자동화)')}</td><td><span class="chip ${s[1]}">${s[0]}</span>${i.error ? `<div class="muted" style="font-size:12px">오류 ${esc(i.error)}</div>` : ''}</td><td>${r ? `<span class="chip ${r[1]}">${r[0]}</span>` : '<span class="muted">—</span>'}${i.reply_error ? `<div class="muted" style="font-size:12px">오류 ${esc(i.reply_error)}</div>` : ''}</td><td>${i.clicks || 0}회</td></tr>`; }).join('')}</tbody></table></div>`);
+}
+
+if (AUTH) loadHome(); else render();
+</script>
+</body>
+</html>
