@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>TEST 이카운트 오늘 변동 자동확인</title>
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 1180px; margin: 40px auto; padding: 0 20px; background: #fafafa; color: #222; }
+  h1 { font-size: 20px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; background: #fef3c7; color: #92400e; }
+  .badge.on { background: #dcfce7; color: #166534; } .badge.off { background: #e5e7eb; color: #374151; }
+  .btn { font-size: 14px; padding: 9px 18px; border: none; border-radius: 6px; cursor: pointer; background: #111827; color: #fff; margin-right: 6px; }
+  .btn.sec { background: #fff; color: #111827; border: 1px solid #d1d5db; }
+  .btn.danger { background: #b91c1c; }
+  .btn.sm { font-size: 12px; padding: 5px 10px; margin: 2px 4px 2px 0; }
+  .btn:disabled { background: #d1d5db; color: #6b7280; cursor: not-allowed; border-color: #d1d5db; }
+  input[type=date], input[type=text] { font: inherit; padding: 7px 9px; border: 1px solid #d1d5db; border-radius: 6px; }
+  input.pc { width: 170px; font-size: 12px; padding: 4px 6px; }
+  #meta { color: #6b7280; margin: 12px 0; font-size: 13px; line-height: 1.7; }
+  #meta b { color: #222; }
+  .note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; font-size: 13px; margin: 14px 0; line-height: 1.6; }
+  .err { background: #fef2f2; color: #b91c1c; border-radius: 6px; padding: 10px 14px; margin-top: 14px; }
+  .okbox { background: #f0fdf4; color: #166534; border-radius: 6px; padding: 10px 14px; margin-top: 14px; line-height: 1.6; }
+  .fbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+  .fchip { border: 1px solid #d1d5db; background: #fff; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; font-family: inherit; color: #222; }
+  .fchip b { margin-left: 6px; }
+  .fchip.on { border-color: #111827; background: #111827; color: #fff; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; background: #fff; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
+  th { background: #f3f4f6; }
+  .chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .c-ready { background: #dbeafe; color: #1d4ed8; } .c-review { background: #fef2f2; color: #b91c1c; }
+  .c-ok { background: #f0fdf4; color: #15803d; } .c-grey { background: #e5e7eb; color: #374151; } .c-warn { background: #fef3c7; color: #92400e; }
+  .up { color: #15803d; } .down { color: #b91c1c; }
+  small { color: #6b7280; }
+  details { margin-top: 14px; font-size: 12.5px; } details table { font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>TEST 이카운트 오늘 변동 자동확인 <span class="badge">시험판</span> <span class="badge off" id="autoBadge">자동반영 확인중</span></h1>
+  <p>서버가 매시간 모아 두는 이카운트 재고를 직전 값과 비교해 <b>오늘 바뀐 품목</b>을 찾고, 사이트 품절/판매 상태를 맞춰요. 엑셀 업로드나 이카운트 재호출은 필요 없어요.<br>
+     키즈사이트에도 올라간 상품은 기존 품절 반영과 같은 방식으로 키즈 DB·검색인덱스까지 같이 맞춰져요.</p>
+  <div class="note">
+    <b>자동 처리 규칙</b> · 오전 11시~오후 7시 사이 매시 자동 확인·반영(서버가 이카운트 재고를 받는 마지막 시각이 19:07) · <b>모호함 없는 건</b>만 자동 반영 · <b>옵션 못 찾음 / 같은 사이즈에 이카운트 코드 여러 개(합산 확정 전) / 사이트 상품 없음 / 반영 오류</b>는 건드리지 않고 <b>확인필요</b>에 쌓여요. 직원이 처리할 때까지 날짜가 바뀌어도 계속 남아요 · 처리하면 서버에 저장돼 <b>다음부터는 자동</b>이에요(상품코드 연결, 합산 확정) · 퇴근이 늦어 7시 이후에 재고가 바뀌면 <b>수동 실행</b>을 눌러 주세요(이카운트 재고를 새로 받아요. 직전 조회 후 15분 안에는 새로 못 받을 수 있어요).
+  </div>
+
+  <div>
+    <input type="date" id="day"> <button class="btn sec" onclick="load()">조회</button>
+    <button class="btn danger" id="runBtn" onclick="runNow()">수동 실행 (이카운트 재고 새로 받아 반영)</button>
+  </div>
+  <div id="meta"></div>
+  <div id="msg"></div>
+  <div class="fbar" id="fbar"></div>
+  <div id="out"></div>
+  <details><summary>최근 실행 기록</summary><div id="runs"></div></details>
+
+<script>
+const API = 'https://buyest.co.kr/ecount_change_today_api.php';
+const LABEL = { review: '확인필요', ready: '자동 반영 가능', unmapped: '사이트 연결 없음', already_ok: '이미 맞음', done: '처리완료' };
+const CHIP = { review: 'c-review', ready: 'c-ready', unmapped: 'c-grey', already_ok: 'c-ok', done: 'c-ok' };
+const REASON = { option_not_found: '옵션(사이즈) 못 찾음', dup_codes: '같은 사이즈에 이카운트 코드 여러 개(합산 확정 필요)', no_product_row: '사이트 상품 없음', no_product_code: '연결된 상품코드 없음', apply_error: '반영 오류' };
+let DATA = null, FILTER = 'review';
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function p2(n) { return String(n).padStart(2, '0'); }
+function fmt(ts) { if (!ts) return '-'; const t = new Date(ts * 1000); return `${p2(t.getMonth()+1)}/${p2(t.getDate())} ${p2(t.getHours())}:${p2(t.getMinutes())}`; }
+function today() { const t = new Date(); return `${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())}`; }
+document.getElementById('day').value = today();
+
+function auth() { let a = null; try { a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); } catch (e) {} return a && a.id && a.pass ? a : null; }
+async function call(body) {
+  const a = auth(); if (!a) throw new Error('툴킷에 로그인한 뒤 사용할 수 있어요. 로그인 후 새로고침해 주세요.');
+  const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ user: a.id, pass: a.pass, day: document.getElementById('day').value }, body)) });
+  const d = await res.json();
+  if (d.need_login) throw new Error(d.error);
+  return d;
+}
+function setMsg(html, cls) { document.getElementById('msg').innerHTML = html ? `<div class="${cls || ''}">${html}</div>` : ''; }
+
+async function load(keepMsg) {
+  if (!keepMsg) setMsg('불러오는 중...');
+  try {
+    const d = await call({ action: 'list' });
+    if (!d.ok) throw new Error(d.error || '불러오기 실패');
+    DATA = d; if (!keepMsg) setMsg('');
+    if (!DATA.__f) FILTER = d.summary.review ? 'review' : (d.summary.ready ? 'ready' : 'all');
+    render();
+  } catch (e) { setMsg(esc(e.message), 'err'); }
+}
+
+async function act(body, busyText) {
+  setMsg(busyText);
+  document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+  try { return await call(body); }
+  catch (e) { setMsg(esc(e.message), 'err'); return null; }
+  finally { document.querySelectorAll('.btn').forEach(b => b.disabled = false); }
+}
+
+async function runNow() {
+  if (!DATA || DATA.day !== DATA.today) { setMsg('오늘 날짜에서만 실행할 수 있어요.', 'err'); return; }
+  if (!confirm('이카운트 재고를 새로 받아서 바뀐 품목을 비교하고, 자동 반영 가능한 건을 사이트(키즈 포함)에 반영해요. 진행할까요?')) return;
+  const d = await act({ action: 'run_now' }, '이카운트 재고 받는 중... 비교·반영 중... (최대 1~2분)'); if (!d) return;
+  showRun(d, '수동 실행'); await load(true);
+}
+async function confirmGroup(code) {
+  const it = DATA.items.find(i => i.ec_code === code);
+  if (!confirm(`${it.name || code}
+같은 사이즈의 이카운트 코드 ${it.group_codes.length}개를 합산(${it.group_qty})해서 반영하고, 이 상품·사이즈는 앞으로 자동 처리할까요?`)) return;
+  const d = await act({ action: 'confirm_group', ec_code: code }, '저장·반영 중...'); if (!d) return;
+  setMsg(d.ok ? `합산 확정 저장 + 반영 완료 (${esc(code)})` + (d.kids_sync_error ? `<br>⚠ 키즈: ${esc(d.kids_sync_error)}` : '') : esc(d.error || '실패'), d.ok && !d.kids_sync_error ? 'okbox' : 'err');
+  await load(true);
+}
+function showRun(d, title) {
+  if (!d.ok) { setMsg(esc(d.error || '실패'), 'err'); return; }
+  const sk = d.snapshot && d.snapshot.skip ? ` (비교: ${esc(d.snapshot.skip)})` : '';
+  let h = `<b>${title} 완료</b>${sk}<br>` + (d.collect ? `${esc(d.collect.msg)}<br>` : '') + `반영 ${d.applied}건 · 오류 ${d.errors}건 · 확인필요(미처리 누적) ${d.pending_total != null ? d.pending_total : d.review}건`;
+  if (d.kids_error) h += `<br>⚠ 키즈 반영 알림: ${esc(d.kids_error)}`;
+  if (d.exec_error) h += `<br>⚠ ${esc(d.exec_error)}`;
+  if (d.pending_total > 0) h += `<br>확인필요 ${d.pending_total}건이 남아 있어요. 직원이 확인해 처리해 주세요.`;
+  setMsg(h, d.errors || d.exec_error ? 'err' : 'okbox');
+}
+
+async function applyOne(code, idx) {
+  const inp = document.getElementById('pc' + idx); const pc = inp ? inp.value.trim() : '';
+  const it = DATA.items.find(i => i.ec_code === code);
+  if (!it.product_codes.length && !pc) { setMsg('BUYEST 상품코드를 입력해 주세요.', 'err'); return; }
+  if (!confirm(`${it.name || code} → 합계 재고 ${it.group_qty} 기준으로 사이트에 반영할까요?` + (pc ? `\n상품코드: ${pc}` : ''))) return;
+  const d = await act({ action: 'apply_one', ec_code: code, product_code: pc }, '반영 중...'); if (!d) return;
+  if (d.ok) setMsg(`반영 완료 (${esc(code)})` + (d.kids_sync_error ? `<br>⚠ 키즈: ${esc(d.kids_sync_error)}` : ''), d.kids_sync_error ? 'err' : 'okbox');
+  else setMsg(esc(d.error || '반영 실패'), 'err');
+  await load(true);
+}
+async function markIt(code, status) {
+  const note = status === 'pending' ? '' : (prompt('메모 (선택, 비워도 돼요)', '') || '');
+  const d = await act({ action: 'mark', ec_code: code, status, note }, '저장 중...'); if (!d) return;
+  if (!d.ok) { setMsg(esc(d.error || '저장 실패'), 'err'); return; }
+  setMsg(''); await load(true);
+}
+
+function render() {
+  const d = DATA, s = d.summary;
+  const ab = document.getElementById('autoBadge'); ab.textContent = d.auto_on ? '자동반영 ON' : '자동반영 OFF (분류만)'; ab.className = 'badge ' + (d.auto_on ? 'on' : 'off');
+  const warn = d.snap_status && d.snap_status !== 'ok' ? ` · <span class="down">스냅샷 상태: ${esc(d.snap_status)} ${esc(d.snap_message)}</span>` : '';
+  document.getElementById('meta').innerHTML =
+    `조회일 <b>${esc(d.day)}</b> · 이카운트 재고 기준 <b>${fmt(d.qty_as_of)}</b> · 오늘 비교 <b>${d.runs_today}</b>회` +
+    (d.runs_today ? ` (첫 감지 ${fmt(d.first_detected)} ~ 마지막 ${fmt(d.last_detected)})` : '') + ` · 바뀐 코드 <b>${s.changed_codes}</b>건${warn}` +
+    (d.runs_today === 0 ? '<br>이 날짜에는 아직 비교 기록이 없어요.' : '');
+  const chips = [['all', '전체', s.changed_codes], ['review', LABEL.review, s.review], ['ready', LABEL.ready, s.ready], ['unmapped', LABEL.unmapped, s.unmapped], ['already_ok', LABEL.already_ok, s.already_ok], ['done', LABEL.done, s.done]];
+  document.getElementById('fbar').innerHTML = chips.map(c => `<button class="fchip${FILTER === c[0] ? ' on' : ''}" onclick="FILTER='${c[0]}';DATA.__f=1;render()">${c[1]}<b>${c[2]}</b></button>`).join('');
+  const canAct = d.day === d.today;
+  const rows = d.items.map((i, idx) => [i, idx]).filter(([i]) => FILTER === 'all' || i.status === FILTER);
+  if (!rows.length) document.getElementById('out').innerHTML = '<p><small>표시할 항목이 없어요.</small></p>';
+  else {
+    let h = '<table><thead><tr><th>상태</th><th>이카운트 품목</th><th>변동</th><th>사이트 상품 / 예상 변경</th><th>처리</th></tr></thead><tbody>';
+    for (const [i, idx] of rows) {
+      const diff = i.new_qty - i.old_qty;
+      const why = i.reasons.length ? `<div><small>${i.reasons.map(r => REASON[r] || r).join(' · ')}</small></div>` : (i.queue && i.queue.reason === 'apply_error' ? `<div><small>반영 오류: ${esc(i.queue.note)}</small></div>` : '');
+      const sites = i.sites.length ? i.sites.map(x => {
+        if (x.state === 'option_not_found') return `<div>${esc(x.product_name)} <small>(${esc(x.size)} 옵션 못 찾음)</small></div>`;
+        const mark = x.state === 'change' ? `<span class="chip c-review">${esc(x.now_label)} → ${esc(x.to_label)}</span>` : `<span class="chip c-ok">${esc(x.now_label)} 유지</span>`;
+        return `<div>${esc(x.product_name)} <small>[${esc(x.size)} · 합계재고 ${x.total_qty}${x.group_n > 1 ? ' · 코드 ' + x.group_n + '개 합산' : ''}]</small> ${mark}</div>`;
+      }).join('') : '<small>-</small>';
+      let act = '';
+      if (canAct && (i.status === 'review' || i.status === 'unmapped' || i.status === 'ready')) {
+        act += `<input class="pc" id="pc${idx}" type="text" placeholder="${i.product_codes.length ? '상품코드(바꿀 때만)' : 'BUYEST 상품코드 입력'}" value="">`;
+        act += `<button class="btn sm" onclick="applyOne('${esc(i.ec_code)}',${idx})">반영</button>`;
+        if (i.reasons.includes('dup_codes')) act += `<button class="btn sm" onclick="confirmGroup('${esc(i.ec_code)}')">합산 확정</button>`;
+        act += `<button class="btn sm sec" onclick="markIt('${esc(i.ec_code)}','ignored')">건드리지 않음</button>`;
+      } else if (canAct && i.status === 'done') act += `<button class="btn sm sec" onclick="markIt('${esc(i.ec_code)}','pending')">다시 확인필요로</button>`;
+      if (i.queue && (i.status === 'done')) act += `<div><small>${esc(i.queue.by)} · ${fmt(i.queue.at)}${i.queue.note ? ' · ' + esc(i.queue.note) : ''}${i.queue.reason === 'auto_applied' ? ' · 자동반영' : ''}</small></div>`;
+      h += `<tr><td><span class="chip ${CHIP[i.status]}">${LABEL[i.status]}</span>${why}</td>
+        <td>${esc(i.name || '(이름 없음)')}<br><small>${esc(i.ec_code)} · ${esc(i.size)}</small></td>
+        <td>${i.old_qty} → <b>${i.new_qty}</b> <span class="${diff > 0 ? 'up' : 'down'}">(${diff > 0 ? '+' : ''}${diff})</span><br><small>${i.carried ? '<span class="chip c-warn">' + esc(i.carried) + '부터 이월</span> ' : fmt(i.last_at) + (i.times > 1 ? ' · ' + i.times + '회' : '')}</small></td>
+        <td>${sites}</td><td>${act}</td></tr>`;
+    }
+    document.getElementById('out').innerHTML = h + '</tbody></table>' + (d.truncated ? '<p><small>1,500건까지만 표시했어요.</small></p>' : '');
+  }
+  const KIND = { auto: '자동', manual: '수동 실행', one: '개별 반영' };
+  document.getElementById('runs').innerHTML = d.recent_runs.length ? '<table><thead><tr><th>시각</th><th>종류</th><th>실행자</th><th>반영</th><th>확인필요</th><th>오류</th><th>비고</th></tr></thead><tbody>' +
+    d.recent_runs.map(r => `<tr><td>${fmt(r.ts)}</td><td>${KIND[r.kind] || r.kind}</td><td>${esc(r.by_user)}</td><td>${r.applied}</td><td>${r.review}</td><td>${r.errors}</td><td>${r.dry == 1 ? '<small>자동반영 OFF — 사이트 변경 없음 (자동 가능 ' + ((r.detail && r.detail.would_apply) || 0) + '건)</small>' : ''}</td></tr>`).join('') + '</tbody></table>' : '<p><small>기록 없음</small></p>';
+}
+load();
+</script>
+</body>
+</html>

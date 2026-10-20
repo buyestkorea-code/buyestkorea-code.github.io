@@ -183,6 +183,7 @@
   @media (max-width:1100px){ .me-herorow{ flex-wrap:wrap; } .me-hrcard{ flex:1 1 100%; } }
   .navst{ margin-left:auto; flex:none; width:16px; height:16px; display:inline-flex; }
   .navst svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .navbadge{ margin-left:6px; background:#dc2626; color:#fff; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:999px; }
   .navst-ok{ color:#84C98A; } .navst-test{ color:#E0A83A; } .navst-lock{ color:var(--side-mut); }
   .nav-item.active .navst{ color:#fff; }
   .sidebar{ gap:12px; padding:16px 12px 20px; }
@@ -1053,6 +1054,10 @@
       <button class="nav-item" data-nav="buyestSoldOutTest">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
         TEST 바이스트사이트 품절<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+      </button>
+      <button class="nav-item" data-nav="ecountChangeTest">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
+        TEST 오늘 변동 자동확인<span class="navbadge" id="chgBadge" style="display:none"></span><span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
       <button class="nav-item" data-nav="seasonSoldOut">
         <span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8 3v4M16 3v4"/></svg></span>
@@ -1928,6 +1933,10 @@
       </section>
 
 
+      <section data-view="ecountChangeTest">
+        <iframe data-src="ecount-change-test.html" title="TEST 오늘 변동 자동확인" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <section data-view="seasonSoldOut">
         <iframe data-src="season-soldout.html" title="바이스트사이트 시즌품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
@@ -2035,7 +2044,7 @@ window.__loadLib = (function(){
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', videoStudio:'영상 스튜디오', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
-    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'사방넷-이카운트매칭 TEST', sabangMatchTest:'TEST 사방넷-이카운트 매칭 관리', stocktake:'재고조사 (바코드 실사)',
+    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', ecountChangeTest:'TEST 오늘 변동 자동확인', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'사방넷-이카운트매칭 TEST', sabangMatchTest:'TEST 사방넷-이카운트 매칭 관리', stocktake:'재고조사 (바코드 실사)',
     listCheck:'품번 리스트 재고확인', costCheck:'상품가격체크', seasonCheck:'물류팀 시즌체크', barcodeStock:'바코드 재고조회', ecountQty:'이카운트재고조회', kreamSoldOut:'크림 품절 정리',
     orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', hrAdmin:'직원관리', barcodeListTest:'TEST 바코드→리스트화', priceCheckTest:'TEST 최저가 조회', photoFinderTest:'TEST 사진 자동 찾기', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
   };
@@ -8638,3 +8647,16 @@ window.__loadLib = (function(){
 })();
 </script>
 <script src="colresize.js"></script>
+<script>
+/* 사이드바 "TEST 오늘 변동 자동확인" 배지: 아직 처리 안 된 확인필요 건수(5분마다). 로그인 안 했거나 실패하면 조용히 숨김 */
+(function(){
+  function tick(){
+    var a=null; try{ a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); }catch(e){}
+    var el=document.getElementById('chgBadge'); if(!el) return;
+    if(!a||!a.id||!a.pass){ el.style.display='none'; return; }
+    fetch('https://buyest.co.kr/ecount_change_today_api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:a.id,pass:a.pass,action:'badge'})})
+      .then(function(r){return r.json();}).then(function(d){ if(d&&d.ok&&d.pending>0){ el.textContent='확인필요 '+d.pending; el.style.display='inline-block'; } else el.style.display='none'; }).catch(function(){});
+  }
+  setTimeout(tick,3000); setInterval(tick,300000);
+})();
+</script>
