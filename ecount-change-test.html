@@ -32,6 +32,11 @@
   .c-ok { background: #f0fdf4; color: #15803d; } .c-grey { background: #e5e7eb; color: #374151; } .c-warn { background: #fef3c7; color: #92400e; }
   .up { color: #15803d; } .down { color: #b91c1c; }
   small { color: #6b7280; }
+  input.mapin { width: 260px; padding: 6px 8px; border: 1px solid #e0b400; background: #fff3b0; border-radius: 6px; font: inherit; font-size: 12.5px; }
+  .sugg { display: inline-block; margin: 2px 4px 2px 0; padding: 2px 8px; border: 1px solid #d1d5db; background: #fff; border-radius: 999px; font-size: 11.5px; cursor: pointer; }
+  .sugg:hover { background: #f3f4f6; }
+  .tabbtn { border: 1px solid #d1d5db; background: #fff; border-radius: 8px 8px 0 0; padding: 8px 16px; cursor: pointer; font: inherit; }
+  .tabbtn.on { background: #111827; color: #fff; border-color: #111827; }
   details { margin-top: 14px; font-size: 12.5px; } details table { font-size: 12px; }
 </style>
 <script src="assets/libs/exceljs-4.4.0.min.js"></script>
@@ -48,10 +53,12 @@
     <input type="date" id="day"> <button class="btn sec" onclick="load()">조회</button>
     <button class="btn danger" id="runBtn" onclick="runNow()">수동 실행 (이카운트 재고 새로 받아 반영)</button>
     <button class="btn sec" id="reconBtn" onclick="reconcile()">재고·사이트 상태 불일치 점검</button>
-    <button class="btn sec" id="mapBtn" onclick="downloadMapping()">연결 정리 엑셀 다운로드</button>
+    <button class="btn" id="mapEditBtn" onclick="openMapPanel()">연결 정리 (웹에서 바로 수정)</button>
+    <button class="btn sec" id="mapBtn" onclick="downloadMapping()">연결 정리 엑셀 다운로드 (최초 1회용)</button>
   </div>
   <div id="meta"></div>
   <div id="msg"></div>
+  <div id="mapPanel" style="display:none"></div>
   <div class="fbar" id="fbar"></div>
   <div id="bulkbar" style="display:none;margin:8px 0;padding:8px 12px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;font-size:13px">
     <label><input type="checkbox" id="selAll" onchange="selectAllRows(this.checked)"> 현재 목록 전체 선택</label>
@@ -111,7 +118,7 @@ async function reconApply() {
 }
 
 async function load(keepMsg) {
-  RECON = false;
+  RECON = false; showMain(true);
   if (!keepMsg) setMsg('불러오는 중...');
   try {
     const d = await call({ action: 'list' });
@@ -201,6 +208,73 @@ async function downloadMapping() {
     const a = document.createElement('a'); a.href = url; a.download = '연결정리_' + stamp + '.xlsx'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
     setMsg('<b>엑셀 다운로드 완료</b> — 이카운트 기준 ' + st.ec_listed.toLocaleString() + '줄 · 사이트 기준 ' + st.site_listed.toLocaleString() + '줄. 파일: 연결정리_' + stamp + '.xlsx (노란 칸에 적어 주세요)', 'okbox');
   } catch (err) { setMsg(esc(err.message), 'err'); }
+  document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+}
+
+let MAP = null, MAPTAB = 'ec';
+function showMain(on) { ['meta', 'fbar', 'bulkbar', 'out'].forEach(id => { const el = document.getElementById(id); if (el && id !== 'bulkbar') el.style.display = on ? '' : 'none'; }); if (!on) document.getElementById('bulkbar').style.display = 'none'; document.getElementById('mapPanel').style.display = on ? 'none' : 'block'; }
+async function openMapPanel() {
+  setMsg('연결 정리 목록을 불러오는 중... (10~30초 걸려요)');
+  document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+  try {
+    const d = await call({ action: 'mapping_export' });
+    if (!d.ok) throw new Error(d.error || '불러오기 실패');
+    MAP = d; setMsg(''); showMain(false); renderMap();
+  } catch (e) { setMsg(esc(e.message), 'err'); }
+  document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+}
+function suggChips(str, kind) {
+  if (!str) return '';
+  return str.split(' / ').map(x => { const code = kind === 'ec' ? x.replace(/ \(시즌 다름\)$/, '').trim() : x.replace(/\(재고.*$/, '').trim(); return `<span class="sugg" onclick="fillSugg(this,'${esc(code)}')" title="눌러서 입력칸에 넣기">${esc(x)}</span>`; }).join('');
+}
+function fillSugg(el, code) { const inp = el.closest('tr').querySelector('input.mapin'); inp.value = inp.value ? inp.value.replace(/\s*$/, '') + ' / ' + code : code; }
+function renderMap() {
+  const d = MAP, st = d.stat, box = document.getElementById('mapPanel');
+  const ec = d.ec_rows, si = d.site_rows;
+  let h = `<div style="margin:10px 0"><button class="btn sec sm" onclick="showMain(true);load()">← 오늘 변동 화면으로</button>
+    <b style="margin-left:8px">연결 정리</b> <small>· 맞는 코드를 입력하고 저장하면 서버 연결에 바로 반영돼요(자동 백업). 사이트 품절/판매 상태는 바뀌지 않아요.</small></div>
+    <div style="margin:6px 0 0"><button class="tabbtn ${MAPTAB === 'ec' ? 'on' : ''}" onclick="MAPTAB='ec';renderMap()">이카운트 기준 (${ec.length})</button>
+    <button class="tabbtn ${MAPTAB === 'site' ? 'on' : ''}" onclick="MAPTAB='site';renderMap()">사이트 기준 (${si.length})</button>
+    <button class="btn sm" style="margin-left:12px" onclick="saveMapAll()">입력한 것 모두 저장</button>
+    <small style="margin-left:8px">이카운트 재고 기준 ${fmt(d.asof)} · 처리 완료한 미등록 ${st.ec_unreg || 0}건 · 이카운트 없음 ${st.site_noec || 0}건</small></div>
+    <div id="mapRes"></div>`;
+  if (MAPTAB === 'ec') {
+    h += `<table><thead><tr><th>이카운트 코드</th><th>품목명</th><th>사이즈</th><th>재고</th><th>상태</th><th>추천 (눌러서 넣기)</th><th>맞는 사이트 상품코드 입력</th><th></th></tr></thead><tbody>`;
+    ec.forEach((r, i) => {
+      h += `<tr data-kind="ec" data-key="${esc(r[0])}"><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${r[3]}</td><td>${esc(r[6])}${r[6] === '사이트 상품 삭제됨' ? '<br><small>예전: ' + esc(r[8]) + '</small>' : ''}</td><td>${suggChips(r[15], 'ec')}</td>
+        <td><input class="mapin" placeholder="상품코드 (여러 개는 / 로 구분)"></td><td><button class="btn sm" onclick="saveMapRow(this)">저장</button><button class="btn sm sec" onclick="saveMapRow(this,'미등록')" title="이카운트에 재고만 먼저 올린 상품(사진 작업 전)">미등록</button></td></tr>`;
+    });
+  } else {
+    h += `<table><thead><tr><th>PID</th><th>사이트 상품코드</th><th>사이트 상품명</th><th>옵션</th><th>추천 (눌러서 넣기)</th><th>맞는 이카운트 코드 입력</th><th></th></tr></thead><tbody>`;
+    si.forEach((r, i) => {
+      h += `<tr data-kind="site" data-pid="${r[0]}" data-opt="${esc(r[4])}"><td>${r[0]}</td><td>${esc(r[1])}</td><td>${esc(r[2])}${r[3] ? ' <small>(' + esc(r[3]) + ')</small>' : ''}</td><td>${esc(r[4])}</td><td>${suggChips(r[10], 'site')}</td>
+        <td><input class="mapin" placeholder="이카운트 코드 (여러 개는 / 로 구분)"></td><td><button class="btn sm" onclick="saveMapRow(this)">저장</button><button class="btn sm sec" onclick="saveMapRow(this,'이카운트 없음')" title="사이트에 상품은 있는데 이카운트에는 없는 경우">이카운트 없음</button></td></tr>`;
+    });
+  }
+  box.innerHTML = h + '</tbody></table>';
+}
+function rowItem(tr, forced) {
+  const v = forced || tr.querySelector('input.mapin').value.trim(); if (!v) return null;
+  return tr.dataset.kind === 'ec' ? { kind: 'ec', ec_code: tr.dataset.key, value: v } : { kind: 'site', pid: Number(tr.dataset.pid), option: tr.dataset.opt, value: v };
+}
+async function saveMapRow(btn, forced) { await doMapSave([[btn.closest('tr'), rowItem(btn.closest('tr'), forced)]]); }
+async function saveMapAll() { await doMapSave(Array.from(document.querySelectorAll('#mapPanel tbody tr')).map(tr => [tr, rowItem(tr)]).filter(x => x[1])); }
+async function doMapSave(pairs) {
+  pairs = pairs.filter(x => x[1]);
+  if (!pairs.length) { document.getElementById('mapRes').innerHTML = '<div class="err">저장할 입력이 없어요.</div>'; return; }
+  if (pairs.length > 1 && !confirm(pairs.length + '건을 서버 연결에 저장할까요? (자동 백업됨, 사이트 품절/판매 상태는 바뀌지 않아요)')) return;
+  document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+  try {
+    const d = await call({ action: 'map_save', items: pairs.map(x => x[1]) });
+    if (!d.ok) throw new Error(d.error || '저장 실패');
+    const bad = d.results.filter(r => !r.ok);
+    let h = `<div class="${bad.length ? 'err' : 'okbox'}"><b>저장 완료</b> — 연결 ${d.saved}줄 추가 · 미등록 ${d.unreg} · 이카운트 없음 ${d.noec} · 실패 ${bad.length}건`;
+    if (bad.length) h += '<br>' + bad.slice(0, 15).map(r => '⚠ ' + esc(r.key) + ': ' + esc(r.msg)).join('<br>');
+    document.getElementById('mapRes').innerHTML = h + '</div>';
+    // 성공한 줄은 목록에서 제거, 실패한 줄은 남겨 둠
+    const okKeys = new Set(d.results.filter(r => r.ok).map(r => String(r.key)));
+    pairs.forEach(([tr]) => { const k = tr.dataset.kind === 'ec' ? tr.dataset.key : tr.dataset.pid + ' ' + tr.dataset.opt; if (okKeys.has(k)) tr.remove(); });
+  } catch (e) { document.getElementById('mapRes').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
   document.querySelectorAll('.btn').forEach(b => b.disabled = false);
 }
 
