@@ -46,6 +46,7 @@
   <div>
     <input type="date" id="day"> <button class="btn sec" onclick="load()">조회</button>
     <button class="btn danger" id="runBtn" onclick="runNow()">수동 실행 (이카운트 재고 새로 받아 반영)</button>
+    <button class="btn sec" id="reconBtn" onclick="reconcile()">누락 점검 (전체 대조)</button>
   </div>
   <div id="meta"></div>
   <div id="msg"></div>
@@ -58,7 +59,7 @@ const API = 'https://buyest.co.kr/ecount_change_today_api.php';
 const LABEL = { review: '확인필요', ready: '자동 반영 가능', unmapped: '사이트 연결 없음', already_ok: '이미 맞음', done: '처리완료' };
 const CHIP = { review: 'c-review', ready: 'c-ready', unmapped: 'c-grey', already_ok: 'c-ok', done: 'c-ok' };
 const REASON = { option_not_found: '옵션(사이즈) 못 찾음', dup_codes: '같은 사이즈에 이카운트 코드 여러 개(합산 확정 필요)', no_product_row: '사이트 상품 없음', no_product_code: '연결된 상품코드 없음', apply_error: '반영 오류' };
-let DATA = null, FILTER = 'review';
+let DATA = null, FILTER = 'review', RECON = false;
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function p2(n) { return String(n).padStart(2, '0'); }
@@ -76,7 +77,32 @@ async function call(body) {
 }
 function setMsg(html, cls) { document.getElementById('msg').innerHTML = html ? `<div class="${cls || ''}">${html}</div>` : ''; }
 
+async function reconcile() {
+  setMsg('전체 대조 중... (매핑된 모든 품목의 현재 재고와 사이트 상태를 비교해요. 몇 초 걸려요)');
+  document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+  try {
+    const d = await call({ action: 'reconcile' });
+    if (!d.ok) throw new Error(d.error || '대조 실패');
+    RECON = true; DATA = d; FILTER = d.summary.ready ? 'ready' : 'review';
+    setMsg('<b>전체 대조 결과</b> — 검사 ' + d.checked.toLocaleString() + '개 중 사이트와 어긋난 것 <b>' + d.summary.changed_codes + '</b>건 (자동 가능 ' + d.summary.ready + ' · 합산 확정 필요 ' + d.summary.review + ').<br>' +
+      '제외한 과거 데이터 문제: 사이트에서 사라진 상품에 연결 ' + d.noise.no_product_row.toLocaleString() + '건 · 사이즈 옵션 못 찾음 ' + d.noise.option_not_found.toLocaleString() + '건.<br>' +
+      '이 시점 이카운트 재고(' + fmt(d.qty_as_of) + ') 기준이에요. 아래 목록을 확인하고 행마다 <b>반영</b>하거나, <b>자동 가능 건 전체 반영</b>을 눌러 주세요.' +
+      (d.summary.ready ? ' <button class="btn sm" onclick="reconApply()">자동 가능 ' + d.summary.ready + '건 전체 반영</button>' : '') + ' <button class="btn sm sec" onclick="load()">오늘 변동 화면으로</button>', 'okbox');
+    render();
+  } catch (e) { setMsg(esc(e.message), 'err'); }
+  document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+}
+async function reconApply() {
+  if (!confirm('전체 대조에서 자동 가능한 ' + DATA.summary.ready + '건을 사이트(키즈 포함)에 반영할까요?')) return;
+  const d = await act({ action: 'reconcile_apply' }, '반영 중... (잠시 걸릴 수 있어요)'); if (!d) return;
+  if (!d.ok) { setMsg(esc(d.error || '실패'), 'err'); return; }
+  const msg = '<b>전체 대조 반영 완료</b> — 반영 ' + d.applied + '건 · 오류 ' + d.errors + '건 · 남은 확인필요 ' + d.left + '건' + (d.kids_error ? '<br>⚠ 키즈: ' + esc(d.kids_error) : '') + (d.exec_error ? '<br>⚠ ' + esc(d.exec_error) : '');
+  await reconcile();
+  setMsg(msg, d.errors || d.exec_error ? 'err' : 'okbox');
+}
+
 async function load(keepMsg) {
+  RECON = false;
   if (!keepMsg) setMsg('불러오는 중...');
   try {
     const d = await call({ action: 'list' });
@@ -105,9 +131,9 @@ async function confirmGroup(code) {
   const it = DATA.items.find(i => i.ec_code === code);
   if (!confirm(`${it.name || code}
 같은 사이즈의 이카운트 코드 ${it.group_codes.length}개를 합산(${it.group_qty})해서 반영하고, 이 상품·사이즈는 앞으로 자동 처리할까요?`)) return;
-  const d = await act({ action: 'confirm_group', ec_code: code }, '저장·반영 중...'); if (!d) return;
+  const d = await act({ action: 'confirm_group', ec_code: code, reconcile: RECON ? 1 : 0 }, '저장·반영 중...'); if (!d) return;
   setMsg(d.ok ? `합산 확정 저장 + 반영 완료 (${esc(code)})` + (d.kids_sync_error ? `<br>⚠ 키즈: ${esc(d.kids_sync_error)}` : '') : esc(d.error || '실패'), d.ok && !d.kids_sync_error ? 'okbox' : 'err');
-  await load(true);
+  if (RECON) { const m = document.getElementById('msg').innerHTML; await reconcile(); setMsg(m, ''); } else await load(true);
 }
 function showRun(d, title) {
   if (!d.ok) { setMsg(esc(d.error || '실패'), 'err'); return; }
@@ -124,10 +150,10 @@ async function applyOne(code, idx) {
   const it = DATA.items.find(i => i.ec_code === code);
   if (!it.product_codes.length && !pc) { setMsg('BUYEST 상품코드를 입력해 주세요.', 'err'); return; }
   if (!confirm(`${it.name || code} → 합계 재고 ${it.group_qty} 기준으로 사이트에 반영할까요?` + (pc ? `\n상품코드: ${pc}` : ''))) return;
-  const d = await act({ action: 'apply_one', ec_code: code, product_code: pc }, '반영 중...'); if (!d) return;
+  const d = await act({ action: 'apply_one', ec_code: code, product_code: pc, reconcile: RECON ? 1 : 0 }, '반영 중...'); if (!d) return;
   if (d.ok) setMsg(`반영 완료 (${esc(code)})` + (d.kids_sync_error ? `<br>⚠ 키즈: ${esc(d.kids_sync_error)}` : ''), d.kids_sync_error ? 'err' : 'okbox');
   else setMsg(esc(d.error || '반영 실패'), 'err');
-  await load(true);
+  if (RECON) { const m = document.getElementById('msg').innerHTML; await reconcile(); setMsg(m, ''); } else await load(true);
 }
 async function markIt(code, status) {
   const note = status === 'pending' ? '' : (prompt('메모 (선택, 비워도 돼요)', '') || '');
@@ -140,7 +166,8 @@ function render() {
   const d = DATA, s = d.summary;
   const ab = document.getElementById('autoBadge'); ab.textContent = d.auto_on ? '자동반영 ON' : '자동반영 OFF (분류만)'; ab.className = 'badge ' + (d.auto_on ? 'on' : 'off');
   const warn = d.snap_status && d.snap_status !== 'ok' ? ` · <span class="down">스냅샷 상태: ${esc(d.snap_status)} ${esc(d.snap_message)}</span>` : '';
-  document.getElementById('meta').innerHTML =
+  if (RECON) document.getElementById('meta').innerHTML = '';
+  else document.getElementById('meta').innerHTML =
     `조회일 <b>${esc(d.day)}</b> · 이카운트 재고 기준 <b>${fmt(d.qty_as_of)}</b> · 오늘 비교 <b>${d.runs_today}</b>회` +
     (d.runs_today ? ` (첫 감지 ${fmt(d.first_detected)} ~ 마지막 ${fmt(d.last_detected)})` : '') + ` · 바뀐 코드 <b>${s.changed_codes}</b>건${warn}` +
     (d.runs_today === 0 ? '<br>이 날짜에는 아직 비교 기록이 없어요.' : '');
