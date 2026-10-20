@@ -507,10 +507,14 @@ async function buildXlsx(buf, scan, results, hide, plan){
 
 // 서버 이력(옵션값 DB)에 저장할 한 줄: 파일에 원래 적혀 있던 사이즈 머리글·수량만 저장한다 (예측값은 저장하지 않음)
 const entryOf = (r, srcName) => ({ key: r.entryKey, model: r.main, batch: r.batch, vendor: r.batch, price: r.price || 0, season: r.seasonTxt || '', work: r.workTxt || '',
-  scale: r.hdr.scale.map(s => s.label), sizes: r.sizes || {}, src: srcName || (S.file && S.file.name) || '툴킷 저장' });
+  // 사이즈 수량이 실제로 적힌 줄의 머리글만 옵션값 근거로 저장한다 (우리가 예측해서 채운 머리글이 다시 근거가 되어 돌고 도는 것을 막음)
+  scale: Object.keys(r.sizes || {}).length ? r.hdr.scale.map(s => s.label) : [], sizes: r.sizes || {}, src: srcName || (S.file && S.file.name) || '툴킷 저장' });
 
 /* ---------- 완성본 올려서 옵션값 DB 에 학습 ---------- */
 $('learnDrop').addEventListener('click', () => $('learnInput').click());
+['dragenter', 'dragover'].forEach(ev => $('learnDrop').addEventListener(ev, e => { e.preventDefault(); $('learnDrop').classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => $('learnDrop').addEventListener(ev, e => { e.preventDefault(); $('learnDrop').classList.remove('drag'); }));
+$('learnDrop').addEventListener('drop', e => { if (e.dataTransfer.files.length) { $('learnInput').files = e.dataTransfer.files; $('learnInput').dispatchEvent(new Event('change')); } });
 $('learnInput').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   const out = $('learnMsg'); out.className = ''; out.textContent = '읽는 중…';
