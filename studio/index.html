@@ -110,7 +110,7 @@
   <!-- ⓪ 기획·대본 -->
   <!-- ★ AI 자동 릴스 -->
   <section class="tab on" id="tab-ai">
-    <p class="note" id="a-status">AI 서버 확인 중…</p>
+    <p class="note"><span id="a-status">AI 서버 확인 중…</span><br><span id="a-bal"></span> <button class="mini" id="a-balrefresh" style="margin-left:6px">잔액 새로고침</button></p>
     <div class="studio-split">
       <div>
         <div class="step">
@@ -632,7 +632,7 @@
   }
   const aFiles = $("#a-files");
   let PL = null; // 지금 콘티
-  const AI = { health: null };
+  const AI = { health: null, balance: null };
 
   function aSetFiles(arr) {
     const dt = new DataTransfer(); arr.slice(0, 8).forEach((f) => dt.items.add(f)); aFiles.files = dt.files;
@@ -664,12 +664,12 @@
   // 모델·붙여넣기 어느 쪽에서 온 콘티든 같은 모양으로 정리
   function normPlan(p, nPhotos) {
     const n = Math.max(1, nPhotos), s = (v, k) => String(v == null ? "" : v).trim().slice(0, k);
-    const shots = (Array.isArray(p.shots) ? p.shots : []).slice(0, 10).map((x) => ({
+    const shots = (Array.isArray(p.shots) ? p.shots : []).slice(0, 10).map((x, idx) => ({
       photo: Math.min(n - 1, Math.max(0, Math.round(Number(x.photo) || 1) - 1)),
       seconds: Math.min(5, Math.max(2, Math.round((Number(x.seconds) || 3) * 2) / 2)),
-      caption: s(x.caption, 30), motion: s(x.motion, 400), why: s(x.why, 120),
+      caption: s(x.caption, 30), motion: s(x.motion, 400), why: s(x.why, 120), ai: x.ai === undefined ? idx < 3 : !!x.ai,
     }));
-    if (!shots.length) shots.push({ photo: 0, seconds: 3, caption: "", motion: "slow gentle push-in, soft natural light", why: "" });
+    if (!shots.length) shots.push({ photo: 0, seconds: 3, caption: "", motion: "slow gentle push-in, soft natural light", why: "", ai: true });
     return { title: s(p.title, 60), hook: s(p.hook, 40), shots, price_line: s(p.price_line, 30), cta: s(p.cta, 40), caption: String(p.caption || "").trim().slice(0, 1500), hashtags: (p.hashtags || []).slice(0, 5), notes: s(p.notes, 400), warnings: Array.isArray(p.warnings) ? p.warnings : [] };
   }
 
@@ -682,14 +682,15 @@
     $("#a-igcap").value = (PL.caption + (PL.hashtags.length ? "\n\n" + PL.hashtags.join(" ") : "")).trim();
     const n = aFiles.files.length || 1;
     $("#a-shots").innerHTML = PL.shots.map((s, i) => `<div class="beat"><div class="br"><b>컷 ${i + 1}</b><span class="bt">${esc(s.why)}</span>
+      <label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--fg);font-size:13px"><input type="checkbox" style="width:auto" data-i="${i}" data-k="ai" ${s.ai ? "checked" : ""} />AI 움직임</label>
       <button class="mini" data-up="${i}">▲</button><button class="mini" data-dn="${i}">▼</button><button class="mini" data-del="${i}">✕</button></div>
       <div class="grid" style="margin-bottom:8px"><div><label>사진</label><select data-i="${i}" data-k="photo">${Array.from({ length: n }, (_, k) => `<option value="${k}" ${k === s.photo ? "selected" : ""}>사진 ${k + 1}</option>`).join("")}</select></div>
       <div><label>길이(초, 2~5)</label><input type="number" min="2" max="5" step="0.5" data-i="${i}" data-k="seconds" value="${s.seconds}" /></div></div>
       <div class="bg"><div><label>화면 글자 (16자 이하)</label><textarea data-i="${i}" data-k="caption" rows="2">${esc(s.caption)}</textarea></div>
       <div><label>움직임 지시 (영어, AI 영상용)</label><textarea data-i="${i}" data-k="motion" rows="2">${esc(s.motion)}</textarea></div></div></div>`).join("");
     $("#a-shots").querySelectorAll("[data-k]").forEach((el) => (el.oninput = el.onchange = () => {
-      const sh = PL.shots[el.dataset.i], k = el.dataset.k; sh[k] = k === "photo" ? Number(el.value) : k === "seconds" ? Number(el.value) || 3 : el.value;
-      aRefreshSoon();
+      const sh = PL.shots[el.dataset.i], k = el.dataset.k; sh[k] = k === "photo" ? Number(el.value) : k === "ai" ? el.checked : k === "seconds" ? Number(el.value) || 3 : el.value;
+      costText(); aRefreshSoon();
     }));
     $("#a-shots").querySelectorAll("[data-up],[data-dn],[data-del]").forEach((b) => (b.onclick = () => {
       const i = Number(b.dataset.up ?? b.dataset.dn ?? b.dataset.del);
@@ -700,14 +701,29 @@
     costText(); aPv.refresh(false);
   }
   let aTimer; const aRefreshSoon = () => { clearTimeout(aTimer); aTimer = setTimeout(() => aPv.refresh(true), 250); };
+  // muapi 모델 페이지 기준 5초 클립 1건 가격 (2026-10-20 확인, 바뀌면 여기만 고치면 됨)
+  const PRICE = { std: 0.23, pro: 0.40 }, KRW = 1400;
+  const money = (usd) => `$${usd.toFixed(2)} (약 ${Math.round((usd * KRW) / 10) * 10}원)`;
+  function aiCount() { return PL ? PL.shots.filter((s) => s.ai).length : 0; }
+  function costUsd() { return aiCount() * PRICE[$("#a-quality").value || "std"]; }
   function costText() {
-    if (!PL) return; const n = PL.shots.length;
-    $("#a-cost").textContent = `이번 영상: 클립 ${n}건 생성 요청 (muapi 요금, 하루 한도가 있을 수 있음)`;
+    if (!PL) return; const n = aiCount(), c = costUsd();
+    const bal = AI.balance == null ? "" : ` · muapi 잔액 $${AI.balance.toFixed(2)}`;
+    const over = AI.balance != null && c > AI.balance;
+    $("#a-cost").innerHTML = n ? `AI 움직임 ${n}컷 × $${PRICE[$("#a-quality").value || "std"].toFixed(2)} = <b>${money(c)}</b>${bal}${over ? ' <span class="err">— 잔액이 부족합니다</span>' : ""}` : "AI 움직임으로 만들 컷이 없습니다 (위에서 컷의 'AI 움직임'을 켜세요). 사진만으로 만들면 무료입니다.";
+  }
+  async function loadBalance() {
+    try { const b = await wapi("/api/balance"); AI.balance = b.balance; } catch (_) { AI.balance = null; }
+    showBalance(); costText(); return AI.balance;
+  }
+  function showBalance() {
+    const el = $("#a-bal"); if (!el) return;
+    el.innerHTML = AI.balance == null ? "muapi 잔액: 확인 불가" : `muapi 잔액 <b>$${AI.balance.toFixed(2)}</b> (약 ${Math.round((AI.balance * KRW) / 100) * 100}원)`;
   }
   $("#a-hook").oninput = () => { PL.hook = $("#a-hook").value; aRefreshSoon(); };
   $("#a-pline").oninput = () => { PL.price_line = $("#a-pline").value; aRefreshSoon(); };
   $("#a-cta").oninput = () => { PL.cta = $("#a-cta").value; aRefreshSoon(); };
-  $("#a-addshot").onclick = () => { if (!PL) return; PL.shots.push({ photo: 0, seconds: 3, caption: "", motion: "slow gentle push-in, soft natural light", why: "" }); renderBoard(); };
+  $("#a-addshot").onclick = () => { if (!PL) return; PL.shots.push({ photo: 0, seconds: 3, caption: "", motion: "slow gentle push-in, soft natural light", why: "", ai: false }); renderBoard(); };
   $("#a-copycap").onclick = async (e) => { try { await navigator.clipboard.writeText($("#a-igcap").value); } catch (_) { $("#a-igcap").select(); document.execCommand("copy"); } const o = e.target.textContent; e.target.textContent = "복사됨 ✓"; setTimeout(() => (e.target.textContent = o), 1400); };
 
   // 상태: 서버가 새 버전인지, 키가 들어 있는지
@@ -716,7 +732,7 @@
       const h = await wapi("/api/health"); AI.health = h;
       const ok = (b) => (b ? "✓" : "✗ (아직 연결 안 됨)");
       $("#a-status").innerHTML = `AI 서버 v${esc(h.version)} · 기획(Claude) ${ok(h.claude)} · 영상 생성(muapi) ${ok(h.muapi)}${h.limits ? "" : " · 하루 사용 한도 없음"}`;
-      if (!h.muapi) { $("#a-photo").checked = true; $("#a-motion").disabled = true; }
+      if (!h.muapi) { $("#a-photo").checked = true; $("#a-motion").disabled = true; } else loadBalance();
     } catch (e) {
       AI.health = null;
       $("#a-status").innerHTML = `AI 서버가 아직 새 버전이 아니거나 연결되지 않습니다 (${esc(e.message)}). 담당자가 Worker 를 배포하면 AI 기획·영상 생성이 켜집니다. 그 전에는 아래 <b>직접 붙여넣기</b> 방식과 ⓪~③ 탭을 쓰세요.`;
@@ -792,15 +808,17 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function genClips(note) {
     const quality = $("#a-quality").value, shots = PL.shots, uploaded = {};
-    const clips = new Array(shots.length).fill(null), state = new Array(shots.length).fill("대기");
-    const report = () => note(`AI 영상 생성 중 — ${state.filter((x) => x === "완료" || x === "받는중").length}/${shots.length} 완료${state.some((x) => x === "실패") ? ` (실패 ${state.filter((x) => x === "실패").length}컷은 사진으로 대체)` : ""}`);
+    const clips = new Array(shots.length).fill(null), state = shots.map((s) => (s.ai ? "대기" : "사진"));
+    const want = state.filter((x) => x === "대기").length;
+    const report = () => note(`AI 영상 생성 중 — ${state.filter((x) => x === "완료" || x === "받는중").length}/${want} 완료${state.some((x) => x === "실패") ? ` (실패 ${state.filter((x) => x === "실패").length}컷은 사진으로 대체)` : ""}`);
     note("사진 올리는 중…");
-    for (const idx of [...new Set(shots.map((s) => s.photo))]) {
+    for (const idx of [...new Set(shots.filter((s) => s.ai).map((s) => s.photo))]) {
       const file = aFiles.files[Math.min(idx, aFiles.files.length - 1)];
       uploaded[idx] = (await wapi("/api/upload", { method: "POST", body: { dataUrl: await toDataUrl(file, 1280, 0.85) } })).url;
     }
     const ids = [];
     for (let i = 0; i < shots.length; i++) {
+      if (!shots[i].ai) continue;
       try { const r = await wapi("/api/motion", { method: "POST", body: { imageUrl: uploaded[shots[i].photo], prompt: shots[i].motion, seconds: shots[i].seconds > 5 ? 10 : 5, quality } }); ids[i] = r.request_id || r.id; state[i] = "진행"; }
       catch (e) { state[i] = "실패"; if (e.status === 429 || e.status === 401) throw e; console.error(e); }
       report(); await sleep(600);
@@ -828,22 +846,30 @@
       } catch (e) { console.error(e); state[i] = "실패"; }
       report();
     }
-    return { clips, failed: state.filter((x) => x === "실패").length };
+    return { clips, failed: state.filter((x) => x === "실패").length, want };
   }
 
   $("#a-go").onclick = () => {
     if (!PL) return;
-    const motion = $("#a-motion").checked && !$("#a-motion").disabled;
-    if (motion && !confirm(`AI 움직임 영상 ${PL.shots.length}건을 생성합니다.\nmuapi 요금이 부과되고 몇 분 걸립니다. 계속할까요?`)) return;
+    const motion = $("#a-motion").checked && !$("#a-motion").disabled && aiCount() > 0;
+    if (motion && AI.balance != null && costUsd() > AI.balance) return alert("muapi 잔액이 부족합니다. 컷의 'AI 움직임'을 줄이거나 muapi 에서 충전해 주세요.");
+    if (motion && !confirm(`AI 움직임 영상 ${aiCount()}건을 생성합니다.\n예상 비용 ${money(costUsd())}\n(실패해도 이미 시작된 건은 요금이 나갈 수 있습니다) 계속할까요?`)) return;
+    const balBefore = motion ? AI.balance : null;
     runJob($("#a-job"), $("#a-go"), motion ? "AI 자동 릴스(움직임)" : "AI 자동 릴스(사진)", ["AI", $("#a-brand").value, $("#a-product").value], async (note) => {
       if (!motion) return storyScene(null);
       const { clips, failed } = await genClips(note);
-      if (failed === PL.shots.length) throw new Error("AI 영상이 하나도 만들어지지 않았습니다. 잠시 뒤 다시 시도하거나 '사진만으로 자동 편집'을 쓰세요.");
+      if (failed === aiCount()) throw new Error("AI 영상이 하나도 만들어지지 않았습니다. 잠시 뒤 다시 시도하거나 '사진만으로 자동 편집'을 쓰세요.");
       note(`영상을 합치는 중… ${failed ? `(사진으로 대체된 컷 ${failed}개)` : ""}`);
       return storyScene(clips);
+    }).then(async () => {
+      if (!motion) return;
+      const after = await loadBalance();
+      if (balBefore != null && after != null) { const used = balBefore - after; $("#a-job").insertAdjacentHTML("beforeend", `<p class="msg">이번 생성에 사용한 muapi 비용: <b>$${used.toFixed(2)}</b> (약 ${Math.round((used * KRW) / 10) * 10}원) · 남은 잔액 $${after.toFixed(2)}</p>`); }
     });
   };
 
+  $("#a-balrefresh").onclick = () => loadBalance();
+  $("#a-quality").onchange = () => costText();
   aHealth();
 
   reelPv.refresh(false);

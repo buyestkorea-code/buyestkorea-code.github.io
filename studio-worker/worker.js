@@ -25,7 +25,7 @@ import { z } from "zod";
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const MUAPI_BASE = "https://api.muapi.ai/api/v1";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "2.0.0";
+const VERSION = "2.1.0";
 
 // ── 공통 ─────────────────────────────────────────────
 const cors = () => ({
@@ -244,6 +244,14 @@ export default {
         const media = [];
         for (const u of urls) media.push(`${url.origin}/api/media?u=${encodeURIComponent(u)}&s=${await hmac(env.MUAPI_API_KEY || "none", u)}`);
         return json({ ...data, media }, r.ok ? 200 : r.status);
+      }
+
+      // muapi 잔액 (이메일 등은 빼고 금액만)
+      if (url.pathname === "/api/balance" && request.method === "GET") {
+        const r = await fetch(`${MUAPI_BASE}/account/balance`, { headers: { "x-api-key": env.MUAPI_API_KEY || "" } });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new HttpError(502, "muapi 잔액을 가져오지 못했습니다");
+        return json({ balance: Number(d.balance) || 0, currency: String(d.currency || "USD").toUpperCase() });
       }
 
       if (request.method !== "POST") throw new HttpError(405, "지원하지 않는 메서드입니다");
