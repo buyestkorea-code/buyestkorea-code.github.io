@@ -48,7 +48,7 @@
     <input type="date" id="day"> <button class="btn sec" onclick="load()">조회</button>
     <button class="btn danger" id="runBtn" onclick="runNow()">수동 실행 (이카운트 재고 새로 받아 반영)</button>
     <button class="btn sec" id="reconBtn" onclick="reconcile()">누락 점검 (전체 대조)</button>
-    <button class="btn sec" id="mapBtn" onclick="downloadMapping()">매핑현황 엑셀 다운로드 (전체)</button>
+    <button class="btn sec" id="mapBtn" onclick="downloadMapping()">매핑현황 엑셀 다운로드 (미매칭·문제만)</button>
   </div>
   <div id="meta"></div>
   <div id="msg"></div>
@@ -168,16 +168,17 @@ async function downloadMapping() {
     const st = d.stat, e = st.ec, sc = st.site;
     const now = new Date(), stamp = now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '_' + p2(now.getHours()) + p2(now.getMinutes());
     const sum = [
-      ['이카운트 ↔ 사이트 매핑 현황 (전체)'], ['작성', now.toLocaleString('ko-KR') + ' / 이카운트 재고 기준 ' + fmt(d.asof)], [],
+      ['이카운트 ↔ 사이트 매핑 현황 (미매칭·문제만)'], ['작성', now.toLocaleString('ko-KR') + ' / 이카운트 재고 기준 ' + fmt(d.asof)], [],
       ['사용법'],
-      ['1', '"이카운트 기준" 시트: 이카운트 코드 한 줄마다 연결된 사이트 상품·옵션과 상태가 있어요. 연결 상태가 "연결 없음/사이트 상품 삭제됨/옵션 못 찾음"인 줄의 노란 칸(입력_사이트상품코드, 입력_사이트옵션)에 값을 적어 주세요.'],
-      ['2', '"사이트 기준(판매중)" 시트: 판매중 상품의 옵션 한 줄마다 연결된 이카운트 코드가 있어요. "연결 없음"인 줄의 노란 칸(입력_이카운트코드)에 이카운트 코드를 적어 주세요(여러 개면 쉼표).'],
+      ['1', '"이카운트 기준" 시트: 이카운트 코드 중 사이트와 연결이 없거나(연결 없음) 연결된 사이트 상품이 삭제된(재고 있는 것만) 줄이에요. 노란 칸(입력_사이트상품코드, 입력_사이트옵션)에 값을 적어 주세요.'],
+      ['2', '"사이트 기준" 시트: 판매중인데 이카운트 코드 연결이 없는 상품·옵션이에요(이 상태면 재고가 0이 돼도 사이트가 품절 처리되지 않아요). 노란 칸(입력_이카운트코드)에 이카운트 코드를 적어 주세요(여러 개면 쉼표).'],
       ['3', '코드(0000021974처럼 0으로 시작)는 반드시 "텍스트"로 두세요. 숫자로 바뀌면 앞의 0이 사라져요. 이 파일을 저장해서 그대로 전달해 주시면 서버 매핑에 반영해요.'],
       ['4', '이 파일에서 서버 데이터는 바뀌지 않아요(읽기 전용 내려받기). 입력한 값은 전달 후 제가 확인용 목록을 보여드리고, 승인해 주신 뒤에만 반영해요.'],
       [],
-      ['이카운트 기준 줄 수', st.ec_total, '(사용중단이고 재고가 0인 코드, 옵션 못 찾음 코드는 제외)'],
-      ['  연결됨', e['연결됨']], ['  연결 없음', e['연결 없음']], ['  사이트 상품 삭제됨', e['사이트 상품 삭제됨']], ['  콜라보(여러 상품)', e['콜라보(여러 상품)']],
-      ['사이트 기준 줄 수(판매중 상품의 옵션)', st.site_total], ['  연결됨', sc['연결됨']], ['  연결 없음', sc['연결 없음']], ['  매칭 제외(바이스트로)', sc['매칭 제외(바이스트로)'] || 0],
+      ['이카운트 기준 전체(사용중단·재고0, 옵션 못 찾음 제외)', st.ec_total, '이 중 엑셀 시트에 담은 문제 줄: ' + st.ec_listed],
+      ['  연결됨(시트 제외)', e['연결됨']], ['  연결 없음', e['연결 없음']], ['  사이트 상품 삭제됨(재고 있는 것만 시트에)', e['사이트 상품 삭제됨']], ['  콜라보(직원 확정, 시트 제외)', e['콜라보(여러 상품)']],
+      ['사이트 기준 전체(판매중 상품의 옵션)', st.site_total, '이 중 시트에 담은 줄(판매중인데 연결 없음): ' + st.site_listed],
+      ['  연결됨(시트 제외)', sc['연결됨']], ['  연결 없음', sc['연결 없음']], ['  매칭 제외(바이스트로)', sc['매칭 제외(바이스트로)'] || 0],
     ];
     const w0 = XLSX.utils.aoa_to_sheet(sum); w0['!cols'] = [{ wch: 34 }, { wch: 120 }, { wch: 40 }];
     XLSX.utils.book_append_sheet(wb, w0, '요약');
@@ -186,15 +187,15 @@ async function downloadMapping() {
     const w1 = XLSX.utils.aoa_to_sheet([eh].concat(er));
     w1['!cols'] = [13, 50, 10, 7, 9, 22, 16, 9, 14, 46, 18, 9, 10, 9, 9, 18, 16, 24].map(x => ({ wch: x }));
     w1['!autofilter'] = { ref: 'A1:R' + (er.length + 1) };
-    XLSX.utils.book_append_sheet(wb, w1, '이카운트 기준(전체)');
+    XLSX.utils.book_append_sheet(wb, w1, '이카운트 기준(문제만)');
     const sh = ['PID', '사이트 상품코드', '사이트 상품명', '키즈', '사이트 옵션', '사이트 현재', '연결 상태', '연결된 이카운트 코드', '이카운트 재고 합계', '재고 기준 예상', '입력_이카운트코드', '메모'];
     const sr = d.site_rows.map(r => [Number(r[0]), T(r[1]), T(r[2]), T(r[3]), T(r[4]), T(r[5]), T(r[6]), T(r[7]), r[8] === '' ? '' : Number(r[8]), T(r[9]), '', '']);
     const w2 = XLSX.utils.aoa_to_sheet([sh].concat(sr));
     w2['!cols'] = [8, 14, 50, 9, 12, 9, 12, 34, 10, 10, 26, 24].map(x => ({ wch: x }));
     w2['!autofilter'] = { ref: 'A1:L' + (sr.length + 1) };
-    XLSX.utils.book_append_sheet(wb, w2, '사이트 기준(판매중)');
+    XLSX.utils.book_append_sheet(wb, w2, '사이트 기준(문제만)');
     XLSX.writeFile(wb, '매핑현황_' + stamp + '.xlsx');
-    setMsg('<b>매핑현황 엑셀 다운로드 완료</b> — 이카운트 기준 ' + st.ec_total.toLocaleString() + '줄 · 사이트 기준 ' + st.site_total.toLocaleString() + '줄. 파일 이름: 매핑현황_' + stamp + '.xlsx', 'okbox');
+    setMsg('<b>매핑현황 엑셀 다운로드 완료</b> — 이카운트 기준 ' + st.ec_listed.toLocaleString() + '줄 · 사이트 기준 ' + st.site_listed.toLocaleString() + '줄(문제 있는 줄만). 파일 이름: 매핑현황_' + stamp + '.xlsx', 'okbox');
   } catch (err) { setMsg(esc(err.message), 'err'); }
   document.querySelectorAll('.btn').forEach(b => b.disabled = false);
 }
