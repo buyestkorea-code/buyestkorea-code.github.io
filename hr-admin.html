@@ -104,7 +104,9 @@
   </div>
   <div class="tabs"><button data-tab="staff" class="on">직원 현황</button><button data-tab="upcoming">다가오는 일정</button><button data-tab="pay">급여명세서</button><button data-tab="contract">근로계약서</button><button data-tab="guide">기준 · 설명</button></div>
 
-  <div id="stats" class="stats"></div>
+  <div id="staffTop"><div id="stats" class="stats"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:-4px 0 14px"><button class="btn" id="bulkTpl">엑셀 양식 받기</button><label class="btn pri" style="cursor:pointer">엑셀로 일괄 등록<input type="file" id="bulkFile" accept=".xlsx,.xls" hidden></label><span class="note" style="margin:0">입사일·소속·생일·만료일·재직을 한 번에 올려요. 양식에 현재 값이 채워져 나와요.</span></div>
+  <div id="bulkPrev" hidden></div></div>
   <div id="tab-staff" class="layout">
     <div class="card"><div class="tw"><table>
       <thead><tr><th rowspan="2">이름</th><th rowspan="2">입사일 · 근속</th><th rowspan="2">다음 추가연차</th><th class="grp" colspan="3">올해 부여 (일)</th><th class="n" rowspan="2">복지포인트<span class="sub">올해 잔여</span></th><th class="n" rowspan="2">벌점<span class="sub">올해</span></th></tr><tr><th class="n">월차</th><th class="n">연차</th><th class="n">휴가</th></tr></thead>
@@ -167,7 +169,7 @@
   if(!AUTH || !AUTH.id){ gate.hidden = false; gate.textContent = '로그인 후에 열 수 있어요. 툴킷에 로그인한 뒤 새로고침해 주세요.'; return; }
 
   var $ = function(id){ return document.getElementById(id); };
-  var ptab = 'info', year = new Date().getFullYear(), users = [], sel = null, COMPANIES = ['바이스트', '에스엘에스 글로벌'];
+  var IS_SUPER = false, ptab = 'info', year = new Date().getFullYear(), users = [], sel = null, COMPANIES = ['바이스트', '에스엘에스 글로벌'];
   var TYPES = {leave_month:'월차', leave_year:'연차', leave_extra:'휴가', welfare:'복지포인트'};
   var CATS = [['지각',1],['조퇴',1],['결근',3],['무단결근',5],['업무 실수',1],['면담',0],['교육·자격',0],['경조사',0],['포상·칭찬',-1],['기타',0]];
 
@@ -210,7 +212,7 @@
     api('hr_list').then(function(r){
       if(!r || !r.ok){ gate.hidden = false; app.hidden = true; gate.textContent = (r && r.error) || '불러오지 못했어요'; return; }
       gate.hidden = true; app.hidden = false;
-      users = r.users || []; if(r.companies) COMPANIES = r.companies;
+      users = r.users || []; if(r.companies) COMPANIES = r.companies; IS_SUPER = !!r.is_super;
       renderRows(); renderUpcoming();
       if(sel){ var u = find(sel); if(u) openPanel(sel); }
     }).catch(function(){ gate.hidden = false; gate.textContent = '서버에 연결하지 못했어요.'; });
@@ -325,6 +327,109 @@
     });
   }
 
+  /* ===================== 입사일·소속 엑셀 일괄 등록 ===================== */
+  var bulkRows = [];
+  function shortCo(c){ return c === '에스엘에스 글로벌' ? 'SLS글로벌' : c; }
+  function normCo(v){
+    v = String(v == null ? '' : v).trim();
+    if(!v) return '';
+    if(/SLS|에스엘에스/i.test(v)) return '에스엘에스 글로벌';
+    if(/바이스트|BUYEST/i.test(v)) return '바이스트';
+    return v;   // 알 수 없는 값은 그대로 두어 미리보기에서 오류로 표시
+  }
+  function normDate(v){
+    if(v == null || v === '') return {v:''};
+    if(v instanceof Date && !isNaN(v)) return {v:ymd(new Date(v.getTime() + 12 * 3600 * 1000 - v.getTimezoneOffset() * 0))};
+    if(typeof v === 'number' && v > 20000 && v < 80000){ var d = new Date(Math.round((v - 25569) * 86400000)); return {v:d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth()+1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2)}; }
+    var m = /^(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/.exec(String(v).trim());
+    if(!m) return {err:'날짜 형식(예: 2024-10-21)'};
+    var y = +m[1], mo = +m[2], da = +m[3], t = new Date(y, mo - 1, da);
+    if(t.getFullYear() !== y || t.getMonth() !== mo - 1 || t.getDate() !== da) return {err:'없는 날짜'};
+    return {v:y + '-' + ('0' + mo).slice(-2) + '-' + ('0' + da).slice(-2)};
+  }
+  function normActive(v){
+    v = String(v == null ? '' : v).trim();
+    if(!v) return {v:null};
+    if(/^(재직|y|yes|1|o)$/i.test(v)) return {v:1};
+    if(/(퇴사|휴직|n|no|0|x)/i.test(v)) return {v:0};
+    return {err:'재직 칸은 "재직" 또는 "퇴사·휴직"'};
+  }
+  $('bulkTpl').addEventListener('click', function(){
+    var head = ['이름(아이디)', '소속', '입사일', '생일', '계약·수습 만료일', '재직', '메모'];
+    var aoa = [head].concat(users.map(function(u){ return [u.username, u.company || COMPANIES[0], u.join_date || '', u.birthday || '', u.contract_end || '', u.active ? '재직' : '퇴사·휴직', u.memo || '']; }));
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:16}, {wch:18}, {wch:13}, {wch:13}, {wch:17}, {wch:10}, {wch:40}];
+    var guide = [['직원 정보 일괄 등록 안내'], [''],
+      ['1. 이름(아이디)은 툴킷 계정과 똑같아야 해요. 수정하지 마세요.'],
+      ['2. 소속: 바이스트 / 에스엘에스 글로벌 (SLS글로벌도 인식)'],
+      ['3. 날짜: 2024-10-21 또는 2024.10.21 처럼 연-월-일'],
+      ['4. 재직: 재직 / 퇴사·휴직'],
+      ['5. 빈 칸은 "기존 값 그대로 둠"이에요. 값을 지우려면 직원관리 화면에서 직접 지우세요.'],
+      ['6. 아직 계정이 없는 사람은 올려도 등록되지 않아요 (가입 승인 후 다시 올려 주세요).']];
+    var wsG = XLSX.utils.aoa_to_sheet(guide); wsG['!cols'] = [{wch:80}];
+    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '직원'); XLSX.utils.book_append_sheet(wb, wsG, '안내');
+    XLSX.writeFile(wb, '직원정보_양식_' + ymd(new Date()) + '.xlsx');
+  });
+  $('bulkFile').addEventListener('change', function(){
+    var f = this.files[0]; if(!f) return;
+    var inp = this, rd = new FileReader();
+    rd.onload = function(){
+      try{
+        var wb = XLSX.read(new Uint8Array(rd.result), {type:'array', cellDates:true});
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:'', raw:true});
+        var hi = -1, col = {};
+        for(var i = 0; i < Math.min(rows.length, 10) && hi < 0; i++){
+          rows[i].forEach(function(c, j){ var t = String(c).replace(/\s/g, ''); if(/^(이름|아이디|이름\(아이디\))$/.test(t)) col.name = j; });
+          if(col.name != null) hi = i;
+        }
+        if(hi < 0){ toast('"이름(아이디)" 머리글이 있는 양식이 아니에요. 양식을 다시 받아 주세요', true); return; }
+        rows[hi].forEach(function(c, j){
+          var t = String(c).replace(/\s/g, '');
+          if(t === '소속') col.company = j; else if(t === '입사일') col.join_date = j; else if(t === '생일') col.birthday = j;
+          else if(/^계약/.test(t) || /만료/.test(t)) col.contract_end = j; else if(t === '재직') col.active = j; else if(t === '메모') col.memo = j;
+        });
+        bulkRows = [];
+        rows.slice(hi + 1).forEach(function(r){
+          var name = String(r[col.name] == null ? '' : r[col.name]).trim();
+          if(!name) return;
+          var item = {name:name, errs:[]}, u = find(name);
+          if(!u) item.errs.push('승인된 계정이 없어요');
+          var co = col.company != null ? normCo(r[col.company]) : '';
+          if(co && COMPANIES.indexOf(co) < 0) item.errs.push('소속은 ' + COMPANIES.join(' / '));
+          item.company = co;
+          ['join_date', 'birthday', 'contract_end'].forEach(function(k){
+            if(col[k] == null){ item[k] = ''; return; }
+            var d = normDate(r[col[k]]); if(d.err) item.errs.push(k === 'join_date' ? '입사일: ' + d.err : k === 'birthday' ? '생일: ' + d.err : '만료일: ' + d.err); item[k] = d.v || '';
+          });
+          var a = col.active != null ? normActive(r[col.active]) : {v:null}; if(a.err) item.errs.push(a.err); item.active = a.v;
+          item.memo = col.memo != null ? String(r[col.memo] || '').trim() : '';
+          bulkRows.push(item);
+        });
+        renderBulk();
+      }catch(e){ toast('엑셀을 읽지 못했어요: ' + (e && e.message || e), true); }
+      inp.value = '';
+    };
+    rd.readAsArrayBuffer(f);
+  });
+  function renderBulk(){
+    var box = $('bulkPrev');
+    if(!bulkRows.length){ box.hidden = true; return; }
+    var ok = bulkRows.filter(function(r){ return !r.errs.length; });
+    box.hidden = false;
+    box.innerHTML = '<div class="card" style="margin-bottom:14px"><h2>일괄 등록 미리보기 <span class="sub" style="display:inline">· 올릴 수 있는 ' + ok.length + '명 / 문제 ' + (bulkRows.length - ok.length) + '명 (빈 칸은 기존 값 유지)</span></h2><div class="tw"><table><thead><tr><th>이름</th><th>소속</th><th>입사일</th><th>생일</th><th>만료일</th><th>재직</th><th>상태</th></tr></thead><tbody>' +
+      bulkRows.map(function(r){
+        return '<tr><td class="nm">' + h(r.name) + '</td><td>' + h(r.company ? shortCo(r.company) : '–') + '</td><td>' + h(r.join_date || '–') + '</td><td>' + h(r.birthday || '–') + '</td><td>' + h(r.contract_end || '–') + '</td><td>' + (r.active == null ? '–' : r.active ? '재직' : '퇴사·휴직') + '</td><td>' + (r.errs.length ? '<span class="pill bad">' + h(r.errs.join(', ')) + '</span>' : '<span class="pill ok">등록 가능</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn pri" id="bulkGo"' + (ok.length ? '' : ' disabled') + '>' + ok.length + '명 등록하기</button><button class="btn" id="bulkCancel">취소</button></div></div>';
+    $('bulkCancel').addEventListener('click', function(){ bulkRows = []; renderBulk(); });
+    $('bulkGo').addEventListener('click', function(){
+      if(!confirm(ok.length + '명의 정보를 등록할까요? (빈 칸은 기존 값이 유지돼요)')) return;
+      api('hr_profile_bulk', {rows:ok.map(function(r){ return {name:r.name, company:r.company, join_date:r.join_date, birthday:r.birthday, contract_end:r.contract_end, active:r.active, memo:r.memo}; })}).then(function(r){
+        if(r && r.ok){ toast(r.updated + '명 등록했어요' + (r.errors && r.errors.length ? ' · 실패 ' + r.errors.length + '명: ' + r.errors.map(function(e){ return e.name + '(' + e.error + ')'; }).join(', ') : ''), !!(r.errors && r.errors.length)); bulkRows = []; renderBulk(); load(); }
+        else toast((r && r.error) || '등록하지 못했어요', true);
+      }).catch(function(){ toast('서버에 연결하지 못했어요', true); });
+    });
+  }
+
   /* ===================== 급여명세서 올리기 ===================== */
   var parsed = null;
   function won(v){ return v == null ? '–' : Math.round(v).toLocaleString('ko-KR'); }
@@ -388,7 +493,7 @@
     api('payroll_months').then(function(r){
       var it = (r && r.items) || [];
       $('payList').innerHTML = it.length ? it.map(function(x){
-        return '<tr><td class="nm">' + h(x.ym) + '</td><td>' + h(x.company) + '</td><td class="n" title="' + h(x.names.join(', ')) + '">' + x.count + '명</td><td>' + h(x.uploaded_at) + '</td><td><button class="btn sm" data-ym="' + h(x.ym) + '" data-co="' + h(x.company) + '">삭제</button></td></tr>';
+        return '<tr><td class="nm">' + h(x.ym) + '</td><td>' + h(x.company) + '</td><td class="n" title="' + h(x.names.join(', ')) + '">' + x.count + '명</td><td>' + h(x.uploaded_at) + '</td><td>' + (IS_SUPER ? '<button class="btn sm" data-ym="' + h(x.ym) + '" data-co="' + h(x.company) + '">삭제</button>' : '<span class="sub">삭제·교체: buyest</span>') + '</td></tr>';
       }).join('') : '<tr><td colspan="5" class="empty">아직 올린 급여명세서가 없어요.</td></tr>';
       [].forEach.call($('payList').querySelectorAll('button'), function(b){ b.addEventListener('click', function(){
         if(confirm(b.dataset.ym + ' · ' + b.dataset.co + ' 명세서를 삭제할까요? (엑셀을 다시 올리면 복구돼요)')) api('payroll_delete', {ym:b.dataset.ym, company:b.dataset.co}).then(loadPayList);
@@ -415,7 +520,7 @@
       $('ctSum').innerHTML = '<b>' + year + '년</b> · 서명 ' + signed + ' / 전체 ' + it.length + '명 · 미서명 ' + (it.length - signed) + '명';
       $('ctRows').innerHTML = it.length ? it.map(function(x){
         return '<tr><td class="nm">' + h(x.username) + '</td><td>' + h(x.company) + '</td><td>' + (x.status === 'signed' ? '<span class="pill ok">서명 완료</span>' : '<span class="pill warn">미서명</span>') + '</td><td>' + h(x.signed_at ? String(x.signed_at).slice(0, 16) : '–') + '</td>' +
-          '<td><button class="btn sm" data-v="' + x.id + '">보기·PDF</button> <button class="btn sm" data-d="' + x.id + '">삭제</button></td></tr>';
+          '<td><button class="btn sm" data-v="' + x.id + '">보기·PDF</button> ' + (IS_SUPER ? '<button class="btn sm" data-d="' + x.id + '">삭제</button>' : '') + '</td></tr>';
       }).join('') : '<tr><td colspan="5" class="empty">' + year + '년 계약서가 아직 없어요. 양식을 저장하고 "일괄 생성"을 눌러 주세요.</td></tr>';
       [].forEach.call($('ctRows').querySelectorAll('button[data-v]'), function(b){ b.addEventListener('click', function(){
         api('contract_get', {id:+b.dataset.v}).then(function(g){
@@ -446,7 +551,7 @@
     b.addEventListener('click', function(){
       [].forEach.call(document.querySelectorAll('.tabs button'), function(x){ x.classList.toggle('on', x === b); });
       ['staff', 'upcoming', 'pay', 'contract', 'guide'].forEach(function(t){ $('tab-' + t).hidden = (t !== b.dataset.tab); });
-      $('stats').hidden = (b.dataset.tab !== 'staff');
+      $('staffTop').hidden = (b.dataset.tab !== 'staff');
       if(b.dataset.tab === 'pay') loadPayList();
       if(b.dataset.tab === 'contract') loadContracts();
     });
