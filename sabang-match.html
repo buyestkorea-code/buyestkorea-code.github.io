@@ -53,6 +53,7 @@
   <div class="row">
     <label class="dropzone" id="drop"><input type="file" id="file" accept=".xlsx"><span id="dropText">① 사방넷 단품대량수정 전체 엑셀(.xlsx)을 끌어다 놓거나 눌러서 선택</span></label>
     <button class="btn green" id="run" disabled>② 이카운트 재고 불러와서 매칭 실행</button>
+    <button class="btn sec" id="ecRefresh" title="서버가 이카운트에서 재고를 지금 다시 받아옵니다 (이카운트 제한상 15분에 한 번만)">🔄 이카운트 재고 지금 갱신</button>
     <span class="asof" id="asof" style="display:none"></span>
   </div>
   <div class="row" style="margin-top:10px">
@@ -462,6 +463,18 @@ $('ecFile').onchange = async e => {
   e.target.value = '';
 };
 $('ecClear').onclick = () => { S.manualEc = null; $('ecDrop').classList.remove('has-file'); $('ecDropText').textContent = '(선택) 서버 실시간 재고가 안 될 때: 이카운트 재고현황/재고변동표 엑셀로 직접 읽기 — 올려두면 ②번이 서버 대신 이 파일의 재고를 씁니다'; $('ecClear').style.display = 'none'; say('서버 재고를 사용합니다.'); };
+
+/* 서버 즉시 갱신: 서버가 이카운트에서 재고를 다시 받음(약 10~20초) → 사방넷 파일이 이미 선택돼 있으면 이어서 매칭까지 다시 실행 */
+$('ecRefresh').onclick = async () => {
+  const b = $('ecRefresh'); b.disabled = true;
+  try{
+    say('서버가 이카운트에서 재고를 받아오는 중… (10~20초)');
+    const d = await ECCache.refreshNow();
+    say(`이카운트 재고를 갱신했어요 (${fmt(d.rows || 0)}품목).` + (S.file && !S.manualEc ? ' 이어서 매칭합니다…' : ''), 'ok');
+    if(S.file && !S.manualEc){ b.disabled = false; $('run').disabled = false; await $('run').onclick(); return; }
+  }catch(e){ say(e.message, 'err'); }
+  b.disabled = false;
+};
 
 $('run').onclick = async () => {
   $('run').disabled = true;

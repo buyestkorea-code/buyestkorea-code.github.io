@@ -63,6 +63,15 @@
       if(d.as_of) idbPut(kind, { key: keyOf(d), data: d });
       return d;
     },
+    /* 서버가 이카운트에서 재고를 지금 다시 받아 저장하게 한다(크론 시간 밖 수동 갱신). 이카운트 15분 간격 제한으로 거절될 수 있다 → { ok:false, wait, error } */
+    refreshNow: async function(){
+      var a = auth();
+      if(!a) throw new Error('툴킷에 로그인한 뒤 사용할 수 있어요. 로그인 후 새로고침해 주세요.');
+      var d = await post({ user: a.id, pass: a.pass, refresh_now: 1 });
+      if(!d.ok) throw new Error(d.error || '갱신 실패');
+      if(!d.refreshed) throw new Error('서버가 아직 즉시 갱신을 지원하지 않아요. (서버 업데이트 필요)');
+      return d;
+    },
     clear: function(){ return openDb().then(function(db){ return new Promise(function(res){ var tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).clear(); tx.oncomplete = function(){ res(true); }; }); }).catch(function(){ return false; }); }
   };
 })();
