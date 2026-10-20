@@ -175,7 +175,7 @@ async function downloadMapping() {
       ['3', '코드(0000021974처럼 0으로 시작)는 반드시 "텍스트"로 두세요. 숫자로 바뀌면 앞의 0이 사라져요. 이 파일을 저장해서 그대로 전달해 주시면 서버 매핑에 반영해요.'],
       ['4', '이 파일에서 서버 데이터는 바뀌지 않아요(읽기 전용 내려받기). 입력한 값은 전달 후 제가 확인용 목록을 보여드리고, 승인해 주신 뒤에만 반영해요.'],
       [],
-      ['이카운트 기준 줄 수', st.ec_total, '(사용중단이고 재고가 0인 코드는 제외)'],
+      ['이카운트 기준 줄 수', st.ec_total, '(사용중단이고 재고가 0인 코드, 사이트에 없는 사이즈이고 재고 0인 코드는 제외)'],
       ['  연결됨', e['연결됨']], ['  연결 없음', e['연결 없음']], ['  사이트 상품 삭제됨', e['사이트 상품 삭제됨']], ['  옵션 못 찾음', e['옵션 못 찾음']], ['  콜라보(여러 상품)', e['콜라보(여러 상품)']],
       ['사이트 기준 줄 수(판매중 상품의 옵션)', st.site_total], ['  연결됨', sc['연결됨']], ['  연결 없음', sc['연결 없음']], ['  매칭 제외(바이스트로)', sc['매칭 제외(바이스트로)'] || 0],
     ];
@@ -264,6 +264,7 @@ function render() {
       const diff = i.new_qty - i.old_qty;
       const why = i.reasons.length ? `<div><small>${i.reasons.map(r => REASON[r] || r).join(' · ')}</small></div>` : (i.queue && i.queue.reason === 'apply_error' ? `<div><small>반영 오류: ${esc(i.queue.note)}</small></div>` : '');
       const sites = i.sites.length ? i.sites.map(x => {
+        if (x.state === 'no_option_zero') return `<div>${esc(x.product_name)} <small>(사이트에 없는 사이즈 ${esc(x.size)} · 재고 0 — 정상)</small></div>`;
         if (x.state === 'option_not_found') return `<div>${esc(x.product_name)} <small>(${esc(x.size)} 옵션 못 찾음)</small></div>`;
         const mark = x.state === 'change' ? `<span class="chip c-review">${esc(x.now_label)} → ${esc(x.to_label)}</span>` : `<span class="chip c-ok">${esc(x.now_label)} 유지</span>`;
         return `<div>${esc(x.product_name)} <small>[${esc(x.size)} · 합계재고 ${x.total_qty}${x.group_n > 1 ? ' · 코드 ' + x.group_n + '개 합산' : ''}]</small> ${mark}</div>`;
