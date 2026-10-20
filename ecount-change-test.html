@@ -34,6 +34,7 @@
   small { color: #6b7280; }
   details { margin-top: 14px; font-size: 12.5px; } details table { font-size: 12px; }
 </style>
+<script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
 </head>
 <body>
   <h1>TEST 이카운트 오늘 변동 자동확인 <span class="badge">시험판</span> <span class="badge off" id="autoBadge">자동반영 확인중</span></h1>
@@ -47,6 +48,7 @@
     <input type="date" id="day"> <button class="btn sec" onclick="load()">조회</button>
     <button class="btn danger" id="runBtn" onclick="runNow()">수동 실행 (이카운트 재고 새로 받아 반영)</button>
     <button class="btn sec" id="reconBtn" onclick="reconcile()">누락 점검 (전체 대조)</button>
+    <button class="btn sec" id="mapBtn" onclick="downloadMapping()">매핑현황 엑셀 다운로드 (전체)</button>
   </div>
   <div id="meta"></div>
   <div id="msg"></div>
@@ -150,6 +152,51 @@ function showRun(d, title) {
   if (d.exec_error) h += `<br>⚠ ${esc(d.exec_error)}`;
   if (d.pending_total > 0) h += `<br>확인필요 ${d.pending_total}건이 남아 있어요. 직원이 확인해 처리해 주세요.`;
   setMsg(h, d.errors || d.exec_error ? 'err' : 'okbox');
+}
+
+async function downloadMapping() {
+  setMsg('매핑 현황 전체를 불러오는 중... (4만~8만 줄이라 10~30초 걸려요)');
+  document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+  try {
+    if (typeof XLSX === 'undefined') throw new Error('엑셀 라이브러리를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.');
+    const d = await call({ action: 'mapping_export' });
+    if (!d.ok) throw new Error(d.error || '불러오기 실패');
+    setMsg('엑셀 파일 만드는 중...');
+    await new Promise(r => setTimeout(r, 30));
+    const T = v => (v == null ? '' : String(v));
+    const wb = XLSX.utils.book_new();
+    const st = d.stat, e = st.ec, sc = st.site;
+    const now = new Date(), stamp = now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '_' + p2(now.getHours()) + p2(now.getMinutes());
+    const sum = [
+      ['이카운트 ↔ 사이트 매핑 현황 (전체)'], ['작성', now.toLocaleString('ko-KR') + ' / 이카운트 재고 기준 ' + fmt(d.asof)], [],
+      ['사용법'],
+      ['1', '"이카운트 기준" 시트: 이카운트 코드 한 줄마다 연결된 사이트 상품·옵션과 상태가 있어요. 연결 상태가 "연결 없음/사이트 상품 삭제됨/옵션 못 찾음"인 줄의 노란 칸(입력_사이트상품코드, 입력_사이트옵션)에 값을 적어 주세요.'],
+      ['2', '"사이트 기준(판매중)" 시트: 판매중 상품의 옵션 한 줄마다 연결된 이카운트 코드가 있어요. "연결 없음"인 줄의 노란 칸(입력_이카운트코드)에 이카운트 코드를 적어 주세요(여러 개면 쉼표).'],
+      ['3', '코드(0000021974처럼 0으로 시작)는 반드시 "텍스트"로 두세요. 숫자로 바뀌면 앞의 0이 사라져요. 이 파일을 저장해서 그대로 전달해 주시면 서버 매핑에 반영해요.'],
+      ['4', '이 파일에서 서버 데이터는 바뀌지 않아요(읽기 전용 내려받기). 입력한 값은 전달 후 제가 확인용 목록을 보여드리고, 승인해 주신 뒤에만 반영해요.'],
+      [],
+      ['이카운트 기준 줄 수', st.ec_total, '(사용중단이면서 연결·재고 모두 없는 코드는 제외)'],
+      ['  연결됨', e['연결됨']], ['  연결 없음', e['연결 없음']], ['  사이트 상품 삭제됨', e['사이트 상품 삭제됨']], ['  옵션 못 찾음', e['옵션 못 찾음']], ['  콜라보(여러 상품)', e['콜라보(여러 상품)']],
+      ['사이트 기준 줄 수(판매중 상품의 옵션)', st.site_total], ['  연결됨', sc['연결됨']], ['  연결 없음', sc['연결 없음']],
+    ];
+    const w0 = XLSX.utils.aoa_to_sheet(sum); w0['!cols'] = [{ wch: 34 }, { wch: 120 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, w0, '요약');
+    const eh = ['이카운트 코드', '품목명', '사이즈', '재고', '사용중단', '품번', '연결 상태', '사이트 PID', '사이트 상품코드', '사이트 상품명', '사이트 옵션', '사이트 현재', '재고 기준 예상', '키즈', '같은 사이즈 코드 수', '입력_사이트상품코드', '입력_사이트옵션', '메모'];
+    const er = d.ec_rows.map(r => [T(r[0]), T(r[1]), T(r[2]), Number(r[3]), T(r[4]), T(r[5]), T(r[6]), T(r[7]), T(r[8]), T(r[9]), T(r[10]), T(r[11]), T(r[12]), T(r[13]), r[14] === '' ? '' : Number(r[14]), '', '', '']);
+    const w1 = XLSX.utils.aoa_to_sheet([eh].concat(er));
+    w1['!cols'] = [13, 50, 10, 7, 9, 22, 16, 9, 14, 46, 18, 9, 10, 9, 9, 18, 16, 24].map(x => ({ wch: x }));
+    w1['!autofilter'] = { ref: 'A1:R' + (er.length + 1) };
+    XLSX.utils.book_append_sheet(wb, w1, '이카운트 기준(전체)');
+    const sh = ['PID', '사이트 상품코드', '사이트 상품명', '키즈', '사이트 옵션', '사이트 현재', '연결 상태', '연결된 이카운트 코드', '이카운트 재고 합계', '재고 기준 예상', '입력_이카운트코드', '메모'];
+    const sr = d.site_rows.map(r => [Number(r[0]), T(r[1]), T(r[2]), T(r[3]), T(r[4]), T(r[5]), T(r[6]), T(r[7]), r[8] === '' ? '' : Number(r[8]), T(r[9]), '', '']);
+    const w2 = XLSX.utils.aoa_to_sheet([sh].concat(sr));
+    w2['!cols'] = [8, 14, 50, 9, 12, 9, 12, 34, 10, 10, 26, 24].map(x => ({ wch: x }));
+    w2['!autofilter'] = { ref: 'A1:L' + (sr.length + 1) };
+    XLSX.utils.book_append_sheet(wb, w2, '사이트 기준(판매중)');
+    XLSX.writeFile(wb, '매핑현황_' + stamp + '.xlsx');
+    setMsg('<b>매핑현황 엑셀 다운로드 완료</b> — 이카운트 기준 ' + st.ec_total.toLocaleString() + '줄 · 사이트 기준 ' + st.site_total.toLocaleString() + '줄. 파일 이름: 매핑현황_' + stamp + '.xlsx', 'okbox');
+  } catch (err) { setMsg(esc(err.message), 'err'); }
+  document.querySelectorAll('.btn').forEach(b => b.disabled = false);
 }
 
 let SEL = new Set();
