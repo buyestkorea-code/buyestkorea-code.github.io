@@ -66,6 +66,8 @@
     <label>품번 열</label><input type="text" id="colCode" class="mini" value="D">
     <label>컬러 열(선택)</label><input type="text" id="colColor" class="mini" value="" placeholder="없음">
     <label>시작 행</label><input type="text" id="rowStart" class="mini" value="1">
+    <label>시즌 열</label><input type="text" id="colSeason" class="mini" value="Z" title="비우면 시즌 구분 없이 전부 읽음">
+    <label>시즌 값</label><input type="text" id="seasonVal" class="mini" style="width:70px" value="신상" title="이 값인 행만 읽음. 비우면 전부">
   </div>
   <div class="row">
     <textarea id="paste" class="grow" placeholder="엑셀 대신 품번을 한 줄에 하나씩 붙여넣어도 됩니다 (컬러가 있으면 '품번[탭]컬러')"></textarea>
@@ -120,6 +122,8 @@
     if(f){
       const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
       const ci=colIdx($('colCode').value), co=colIdx($('colColor').value);
+      const cs=colIdx($('colSeason').value), sv=$('seasonVal').value.trim();
+      const seasonOn=cs>=0&&!!sv;   // 시즌 열과 값이 둘 다 있을 때만 걸러냄 (예: Z열이 '신상'인 행만)
       const rs=Math.max(1,parseInt($('rowStart').value)||2)-1;
       if(ci<0){alert('품번 열을 알파벳으로 입력하세요 (예: D)');return;}
       // 모든 시트를 읽는다. 재고추가 엑셀은 칸마다 'MODEL' 머리글이 반복되므로 머리글 단어는 품번에서 뺀다
@@ -130,18 +134,20 @@
         sheets.forEach(({sn,rows})=>{
           for(let r=rs;r<rows.length;r++){
             const code=String((rows[r]||[])[col]==null?'':rows[r][col]).trim();
+            if(seasonOn&&String((rows[r]||[])[cs]==null?'':rows[r][cs]).trim()!==sv) continue;
             if(code&&!HEAD.test(code)) out.push({code,color:co>=0?String(rows[r][co]||'').trim():'',sheet:wb.SheetNames.length>1?sn:''});
           }
         });
         return out;
       };
       let got=readCol(ci);
-      if(!got.length){
+      if(!got.length&&!seasonOn){
         // 지정한 열에 품번이 없으면(예: 품번만 붙여넣은 새 엑셀) 값이 가장 많은 열을 품번 열로 자동 선택한다
         let bestN=0,bestC=-1;
         for(let c=0;c<12;c++){const n=readCol(c).length;if(n>bestN){bestN=n;bestC=c;}}
         if(bestC>=0){got=readCol(bestC);$('colCode').value=String.fromCharCode(65+bestC);}
       }
+      if(seasonOn&&!got.length){alert('시즌 열('+$('colSeason').value+')에 "'+sv+'" 인 행이 없습니다. 시즌 열/값을 확인하세요.');return;}
       got.forEach(x=>list.push(x));
     }
     $('paste').value.split(/\r?\n/).forEach(l=>{
