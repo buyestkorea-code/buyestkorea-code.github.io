@@ -241,14 +241,14 @@ function mapTpl(sizes){
   let best = null, bj = -1; TPL.forEach(t => { const j = jac(set, t.set) + (TPL.length - t.n) * 0.0001; if (j > bj) { bj = j; best = t; } });
   return bj >= 0.4 ? { t: best, j: bj } : null;
 }
-const WEV = { ec: 6, key: 4, stem: 3, f2: 2.5, vf: 2, f: 1.5, ecs: 2.5, ecf2: 2, v: 0.6 };   // 근거별 무게: 이카운트 등록 사이즈 > 같은 품번 이력 > 같은 스타일 앞부분 … > 업체 최근 이력
-const EVNAME = { ec: '이카운트에 등록된 사이즈', key: '같은 품번 이력', stem: '같은 스타일(컬러만 다름) 이력', f2: '품번 앞부분 이력', vf: '같은 업체·품번 앞부분 이력', f: '품번 앞부분 이력', ecs: '이카운트의 같은 스타일 다른 컬러', ecf2: '이카운트의 비슷한 품번', v: '업체의 최근 입고 이력' };
+const WEV = { dp: 8, ec: 6, key: 4, stem: 3, f2: 2.5, vf: 2, f: 1.5, ecs: 2.5, ecf2: 2, v: 0.6 };   // 근거별 무게: 이카운트 등록 사이즈 > 같은 품번 이력 > 같은 스타일 앞부분 … > 업체 최근 이력
+const EVNAME = { dp: '같은 날짜 완성본의 같은 단가·수량 줄', ec: '이카운트에 등록된 사이즈', key: '같은 품번 이력', stem: '같은 스타일(컬러만 다름) 이력', f2: '품번 앞부분 이력', vf: '같은 업체·품번 앞부분 이력', f: '품번 앞부분 이력', ecs: '이카운트의 같은 스타일 다른 컬러', ecf2: '이카운트의 비슷한 품번', v: '업체의 최근 입고 이력' };
 function layoutFor(h, ev){
   if (!ev || !h.total) return null;
   const votes = new Map();
   const add = (t, w, lv) => { const v = votes.get(t) || { w: 0, best: 0, lv: '' }; v.w += w; if (w > v.best) { v.best = w; v.lv = lv; } votes.set(t, v); };
   if (ev.ec && ev.ec.length) { const m = mapTpl(ev.ec); if (m) add(m.t, WEV.ec * m.j, 'ec'); }
-  ['key', 'stem', 'f2', 'vf', 'f', 'v'].forEach(lv => { const arr = ev[lv] || [], sum = arr.reduce((a, x) => a + x[1], 0); if (!sum) return; arr.forEach(([sc, w]) => { const m = mapTpl(sc.split(',')); if (m) add(m.t, WEV[lv] * (w / sum) * m.j, lv); }); });
+  ['dp', 'key', 'stem', 'f2', 'vf', 'f', 'v'].forEach(lv => { const arr = ev[lv] || [], sum = arr.reduce((a, x) => a + x[1], 0); if (!sum) return; arr.forEach(([sc, w]) => { const m = mapTpl(sc.split(',')); if (m) add(m.t, WEV[lv] * (w / sum) * m.j, lv); }); });
   ['ecs', 'ecf2'].forEach(lv => { const arr = ev[lv] || []; arr.forEach(sizes => { const m = mapTpl(sizes); if (m) add(m.t, WEV[lv] / arr.length * m.j, lv); }); });
   const e = [...votes.entries()].sort((a, b) => b[1].w - a[1].w); if (!e.length) return null;
   // 업체 최근 이력만이 근거일 때는 그 업체가 거의 한 가지 모양만 쓸 때(70% 이상)만 인정한다 (섞여 있으면 지어내는 셈이라 비워 둠)
@@ -312,7 +312,7 @@ $('runBtn').addEventListener('click', async () => {
     setMsg('옵션값(사이즈 이름)을 DB에서 찾는 중…');
     const evMap = {}; let predWarn = '';
     try {
-      const pr = await post(API_SC, { user: auth.id, pass: auth.pass, action: 'predict', date, lines: scan.items.map((it, n) => ({ i: n, model: it.main, vendor: it.batch, qty: it.qty })) });
+      const pr = await post(API_SC, { user: auth.id, pass: auth.pass, action: 'predict', date, lines: scan.items.map((it, n) => ({ i: n, model: it.main, vendor: it.batch, qty: it.qty, price: it.price })) });
       (pr.evs || []).forEach(p => { evMap[p.i] = p.ev; });
     } catch (e) { if (/로그인/.test(e.message)) throw e; predWarn = '옵션값 예측을 불러오지 못했어요 (시즌 확인은 계속 진행). ' + e.message; }
     const plan = planOptions(scan, evMap);
