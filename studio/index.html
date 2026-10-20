@@ -67,7 +67,7 @@
   .pv .pvrow { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:8px; font-size:12px; color:var(--muted); }
   .job { margin-top:20px; border:1px solid var(--line); border-radius:10px; padding:14px; display:none; }
   .job video { max-width:320px; width:100%; border-radius:10px; margin-top:10px; display:block; }
-  .job .msg { font-size:13px; color:var(--muted); }
+  .msg { font-size:13px; color:var(--muted); }
   .tslot { display:grid; grid-template-columns:130px 1fr; gap:10px; align-items:center; margin-bottom:8px; }
   .titem { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
   .titem .tr { display:grid; grid-template-columns:1fr 90px 90px; gap:8px; align-items:end; }
@@ -98,7 +98,8 @@
 </header>
 
 <nav id="tabs">
-  <button data-tab="plan" class="on">⓪ 기획·대본</button>
+  <button data-tab="ai" class="on">★ AI 자동 릴스</button>
+  <button data-tab="plan">⓪ 기획·대본</button>
   <button data-tab="reel">① 상품 릴스</button>
   <button data-tab="tpl">② 템플릿 영상 (자막·콜라주)</button>
   <button data-tab="montage">③ 기획 영상 요청서</button>
@@ -107,7 +108,75 @@
 
 <main>
   <!-- ⓪ 기획·대본 -->
-  <section class="tab on" id="tab-plan">
+  <!-- ★ AI 자동 릴스 -->
+  <section class="tab on" id="tab-ai">
+    <p class="note" id="a-status">AI 서버 확인 중…</p>
+    <div class="studio-split">
+      <div>
+        <div class="step">
+          <h3>1. 사진과 기획서</h3>
+          <p class="desc">상품 사진을 올리고 원하는 내용을 적으면 AI가 <b>사진을 보고 컷 순서·훅·자막·움직임</b>까지 콘티를 짭니다. 마음에 안 드는 부분은 아래에서 고친 뒤 영상으로 만드세요.</p>
+          <div class="drop" id="a-drop">여기를 눌러 상품 사진 선택 (최대 8장, ◀ ▶ 로 순서 바꾸기)
+            <input type="file" id="a-files" accept="image/*" multiple hidden />
+            <div class="thumbs" id="a-thumbs"></div>
+          </div>
+          <label>기획서 · 프롬프트 (원하는 분위기, 강조할 점, 꼭 넣을 말 — 자유롭게)</label>
+          <textarea id="a-brief" style="font-family:inherit;font-size:14px;min-height:110px" placeholder="예) 몽클레르 키즈 패딩 신상 입고. 백화점가보다 저렴하다는 점과 이탈리아 직수입을 강조. 차분하고 고급스럽게, 마지막은 댓글로 사이즈 문의 유도."></textarea>
+          <div class="grid" style="margin-top:12px">
+            <div><label>브랜드명</label><input id="a-brand" placeholder="MONCLER" /></div>
+            <div><label>상품명</label><input id="a-product" placeholder="키즈 마야 패딩" /></div>
+            <div><label>바이스트 가격</label><input id="a-price" placeholder="₩890,000" /></div>
+            <div><label>백화점가 (있으면)</label><input id="a-dept" placeholder="₩1,290,000" /></div>
+            <div><label>사이즈 (있으면)</label><input id="a-size" placeholder="4A~10A" /></div>
+          </div>
+          <div class="grid" style="margin-top:12px">
+            <div><label>영상 스타일</label><select id="a-style"></select></div>
+            <div><label>목표 길이</label><select id="a-len"><option value="15">15초</option><option value="20" selected>20초</option><option value="30">30초</option><option value="40">40초</option></select></div>
+            <div><label>컷 수 (최대)</label><select id="a-maxshots"><option value="4">4컷</option><option value="6" selected>6컷</option><option value="8">8컷</option></select></div>
+            <div><label>자막 모양</label><select id="a-cap"></select></div>
+          </div>
+          <div class="row"><button class="mini" id="a-fromplan">⓪ 기획·대본에서 정보 가져오기</button></div>
+          <div class="row"><button class="go" id="a-plan">AI 기획하기</button><span id="a-planmsg" class="msg"></span></div>
+          <details style="margin-top:14px">
+            <summary style="cursor:pointer;font-size:14px">AI 서버를 못 쓰거나 Claude 채팅에서 직접 받고 싶을 때</summary>
+            <p class="desc" style="margin-top:10px">① <b>요청 복사</b>를 누르고 Claude 채팅에 붙여 넣으면서 같은 사진을 첨부하세요. ② Claude가 준 JSON을 아래 칸에 붙여 넣고 <b>적용</b>을 누르면 같은 콘티 화면이 열립니다.</p>
+            <div class="row"><button class="mini" id="a-copyprompt">요청 복사</button></div>
+            <textarea id="a-paste" style="min-height:120px" placeholder="Claude가 준 JSON 붙여넣기"></textarea>
+            <div class="row"><button class="mini" id="a-applypaste">붙여넣은 콘티 적용</button></div>
+          </details>
+        </div>
+
+        <div class="step" id="a-board" style="display:none">
+          <h3>2. 콘티 확인·수정</h3>
+          <p class="desc" id="a-notes"></p>
+          <div id="a-warn"></div>
+          <label>훅 (첫 2초, 화면 글자)</label>
+          <input id="a-hook" />
+          <div id="a-shots" style="margin-top:14px"></div>
+          <div class="row"><button class="mini" id="a-addshot">+ 컷 추가</button></div>
+          <div class="grid" style="margin-top:14px">
+            <div><label>마지막 화면 가격</label><input id="a-pline" /></div>
+            <div><label>마지막 요청 (CTA)</label><input id="a-cta" /></div>
+          </div>
+          <label style="margin-top:14px">인스타 캡션 (영상과 함께 올릴 글)</label>
+          <textarea id="a-igcap" style="font-family:inherit;font-size:14px;min-height:140px"></textarea>
+          <div class="row"><button class="mini" id="a-copycap">캡션 복사</button></div>
+        </div>
+
+        <div class="step" id="a-make" style="display:none">
+          <h3>3. 영상 만들기</h3>
+          <label class="hook" style="margin-bottom:8px"><input type="radio" name="a-mode" value="motion" id="a-motion" checked /><div><b>AI 움직임 영상으로 만들기</b> <span class="pc warn">유료</span><div class="when">컷마다 사진을 AI가 움직이는 영상 클립으로 만들어 이어 붙입니다. 클립 한 개씩 요금이 나가고, 보통 몇 분 걸립니다. 실패한 컷은 사진 연출로 대신합니다.</div><div id="a-cost" class="when"></div></div></label>
+          <label class="hook"><input type="radio" name="a-mode" value="photo" id="a-photo" /><div><b>사진만으로 자동 편집</b> <span class="pc ok">무료</span><div class="when">AI가 정한 순서·자막·타이밍으로 사진을 팬/줌 연출해 바로 만듭니다 (몇 초).</div></div></label>
+          <div class="grid" style="margin-top:12px"><div><label>움직임 품질</label><select id="a-quality"><option value="std">표준 (더 저렴)</option><option value="pro">프로 (더 자연스러움)</option></select></div></div>
+          <div class="row"><button class="go" id="a-go">영상 만들기 (MP4)</button></div>
+          <div class="job" id="a-job"></div>
+        </div>
+      </div>
+      <div class="pv" id="a-pv"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-plan">
     <p class="desc">상품 정보를 넣으면 <b>훅 → 대본 → 캡션</b>까지 잡아 줍니다. 인터넷·AI 없이 이 브라우저 안에서만 돌아요. 다 되면 <b>① 상품 릴스로 보내기</b>를 눌러 바로 영상을 만들거나, 프롬프트를 복사해 Claude·미르에 붙여 넣으세요.</p>
 
     <div class="step">
@@ -352,7 +421,7 @@
     box.querySelector("[data-cancel]").onclick = () => ac.abort();
     const bar = box.querySelector(".bar div"), msg = box.querySelector(".msg");
     try {
-      const scene = await makeScene();
+      const scene = await makeScene((t) => { msg.textContent = t; });
       const blob = await SE.renderToMp4(scene, {
         signal: ac.signal,
         onProgress: (p, ms) => {
@@ -518,7 +587,7 @@
   tplSel.onchange = loadTemplate;
   $("#t-cap").onchange = () => tplPv.refresh(true);
   document.addEventListener("brandchange", () => tplPv.refresh(true));
-  document.addEventListener("tabopen", (e) => { if (e.detail === "tpl") tplPv.refresh(true); if (e.detail === "reel") reelPv.refresh(true); });
+  document.addEventListener("tabopen", (e) => { if (e.detail === "tpl") tplPv.refresh(true); if (e.detail === "ai") aPv.refresh(true); if (e.detail === "reel") reelPv.refresh(true); });
   $("#t-go").onclick = () => {
     const miss = TS.tpl.slots.filter((s) => !s.optional && !TS.media[s.id]);
     if (miss.length) return alert(`${miss.map((s) => s.label).join(", ")}을(를) 올려주세요`);
@@ -547,6 +616,235 @@
   };
   $("#m-copy").onclick = async (e) => { try { await navigator.clipboard.writeText($("#m-out").value); } catch (_) { $("#m-out").select(); document.execCommand("copy"); } const o = e.target.textContent; e.target.textContent = "복사됨 ✓"; setTimeout(() => (e.target.textContent = o), 1400); };
   $("#m-dl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([$("#m-out").value], { type: "text/markdown;charset=utf-8" })); a.download = "brief.md"; a.click(); };
+
+  // ═══ ★ AI 자동 릴스 ═══
+  // 기획(Claude)과 영상 생성(muapi)은 키가 필요해서 Cloudflare Worker 가 대신 호출한다 (키는 화면 코드에 없다).
+  const WORKER = (window.STUDIO_WORKER || (() => { try { return localStorage.getItem("buyest.studio.worker"); } catch (_) { return null; } })() || "https://buyest-studio.buyest.workers.dev").replace(/\/$/, "");
+  async function wapi(path, opts = {}) {
+    const r = await fetch(WORKER + path, {
+      method: opts.method || "GET",
+      headers: { "Content-Type": "application/json", "X-Studio-User": AUTH.id, "X-Studio-Pass": AUTH.pass },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+    let data = null; try { data = await r.json(); } catch (_) {}
+    if (!r.ok) { const e = new Error((data && data.error) || `AI 서버 오류 (${r.status})`); e.status = r.status; throw e; }
+    return data;
+  }
+  const aFiles = $("#a-files");
+  let PL = null; // 지금 콘티
+  const AI = { health: null };
+
+  function aSetFiles(arr) {
+    const dt = new DataTransfer(); arr.slice(0, 8).forEach((f) => dt.items.add(f)); aFiles.files = dt.files;
+    const box = $("#a-thumbs"); box.innerHTML = "";
+    [...aFiles.files].forEach((f, i) => {
+      const d = document.createElement("div"); d.className = "thumb";
+      const img = new Image(); img.src = URL.createObjectURL(f); d.append(img);
+      const tb = document.createElement("div"); tb.className = "tb"; tb.innerHTML = `<button data-m="-1">◀</button><button data-x="1">✕</button><button data-m="1">▶</button>`;
+      tb.onclick = (e) => {
+        e.stopPropagation(); const a = [...aFiles.files];
+        if (e.target.dataset.x) a.splice(i, 1); else if (e.target.dataset.m) { const j = i + Number(e.target.dataset.m); if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; } else return;
+        aSetFiles(a); if (PL) { PL.shots.forEach((s) => { s.photo = Math.min(s.photo, Math.max(0, aFiles.files.length - 1)); }); renderBoard(); }
+      };
+      d.append(tb); box.append(d);
+    });
+    aPv.refresh(true);
+  }
+  $("#a-drop").onclick = (e) => { if (e.target.closest(".thumb")) return; aFiles.click(); };
+  aFiles.onchange = () => aSetFiles([...aFiles.files]);
+
+  async function toDataUrl(file, max, q) {
+    const bmp = await bitmapOf(file);
+    const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", q);
+  }
+
+  // 모델·붙여넣기 어느 쪽에서 온 콘티든 같은 모양으로 정리
+  function normPlan(p, nPhotos) {
+    const n = Math.max(1, nPhotos), s = (v, k) => String(v == null ? "" : v).trim().slice(0, k);
+    const shots = (Array.isArray(p.shots) ? p.shots : []).slice(0, 10).map((x) => ({
+      photo: Math.min(n - 1, Math.max(0, Math.round(Number(x.photo) || 1) - 1)),
+      seconds: Math.min(5, Math.max(2, Math.round((Number(x.seconds) || 3) * 2) / 2)),
+      caption: s(x.caption, 30), motion: s(x.motion, 400), why: s(x.why, 120),
+    }));
+    if (!shots.length) shots.push({ photo: 0, seconds: 3, caption: "", motion: "slow gentle push-in, soft natural light", why: "" });
+    return { title: s(p.title, 60), hook: s(p.hook, 40), shots, price_line: s(p.price_line, 30), cta: s(p.cta, 40), caption: String(p.caption || "").trim().slice(0, 1500), hashtags: (p.hashtags || []).slice(0, 5), notes: s(p.notes, 400), warnings: Array.isArray(p.warnings) ? p.warnings : [] };
+  }
+
+  function renderBoard() {
+    if (!PL) return;
+    $("#a-board").style.display = "block"; $("#a-make").style.display = "block";
+    $("#a-notes").textContent = PL.notes ? "AI 메모: " + PL.notes : "";
+    $("#a-warn").innerHTML = PL.warnings.map((w) => `<span class="pc bad">✗ ${esc(w)}</span>`).join("");
+    $("#a-hook").value = PL.hook; $("#a-pline").value = PL.price_line; $("#a-cta").value = PL.cta;
+    $("#a-igcap").value = (PL.caption + (PL.hashtags.length ? "\n\n" + PL.hashtags.join(" ") : "")).trim();
+    const n = aFiles.files.length || 1;
+    $("#a-shots").innerHTML = PL.shots.map((s, i) => `<div class="beat"><div class="br"><b>컷 ${i + 1}</b><span class="bt">${esc(s.why)}</span>
+      <button class="mini" data-up="${i}">▲</button><button class="mini" data-dn="${i}">▼</button><button class="mini" data-del="${i}">✕</button></div>
+      <div class="grid" style="margin-bottom:8px"><div><label>사진</label><select data-i="${i}" data-k="photo">${Array.from({ length: n }, (_, k) => `<option value="${k}" ${k === s.photo ? "selected" : ""}>사진 ${k + 1}</option>`).join("")}</select></div>
+      <div><label>길이(초, 2~5)</label><input type="number" min="2" max="5" step="0.5" data-i="${i}" data-k="seconds" value="${s.seconds}" /></div></div>
+      <div class="bg"><div><label>화면 글자 (16자 이하)</label><textarea data-i="${i}" data-k="caption" rows="2">${esc(s.caption)}</textarea></div>
+      <div><label>움직임 지시 (영어, AI 영상용)</label><textarea data-i="${i}" data-k="motion" rows="2">${esc(s.motion)}</textarea></div></div></div>`).join("");
+    $("#a-shots").querySelectorAll("[data-k]").forEach((el) => (el.oninput = el.onchange = () => {
+      const sh = PL.shots[el.dataset.i], k = el.dataset.k; sh[k] = k === "photo" ? Number(el.value) : k === "seconds" ? Number(el.value) || 3 : el.value;
+      aRefreshSoon();
+    }));
+    $("#a-shots").querySelectorAll("[data-up],[data-dn],[data-del]").forEach((b) => (b.onclick = () => {
+      const i = Number(b.dataset.up ?? b.dataset.dn ?? b.dataset.del);
+      if (b.dataset.del !== undefined) { if (PL.shots.length > 1) PL.shots.splice(i, 1); }
+      else { const j = b.dataset.up !== undefined ? i - 1 : i + 1; if (j >= 0 && j < PL.shots.length) [PL.shots[i], PL.shots[j]] = [PL.shots[j], PL.shots[i]]; }
+      renderBoard();
+    }));
+    costText(); aPv.refresh(false);
+  }
+  let aTimer; const aRefreshSoon = () => { clearTimeout(aTimer); aTimer = setTimeout(() => aPv.refresh(true), 250); };
+  function costText() {
+    if (!PL) return; const n = PL.shots.length;
+    $("#a-cost").textContent = `이번 영상: 클립 ${n}건 생성 요청 (muapi 요금, 하루 한도가 있을 수 있음)`;
+  }
+  $("#a-hook").oninput = () => { PL.hook = $("#a-hook").value; aRefreshSoon(); };
+  $("#a-pline").oninput = () => { PL.price_line = $("#a-pline").value; aRefreshSoon(); };
+  $("#a-cta").oninput = () => { PL.cta = $("#a-cta").value; aRefreshSoon(); };
+  $("#a-addshot").onclick = () => { if (!PL) return; PL.shots.push({ photo: 0, seconds: 3, caption: "", motion: "slow gentle push-in, soft natural light", why: "" }); renderBoard(); };
+  $("#a-copycap").onclick = async (e) => { try { await navigator.clipboard.writeText($("#a-igcap").value); } catch (_) { $("#a-igcap").select(); document.execCommand("copy"); } const o = e.target.textContent; e.target.textContent = "복사됨 ✓"; setTimeout(() => (e.target.textContent = o), 1400); };
+
+  // 상태: 서버가 새 버전인지, 키가 들어 있는지
+  async function aHealth() {
+    try {
+      const h = await wapi("/api/health"); AI.health = h;
+      const ok = (b) => (b ? "✓" : "✗ (아직 연결 안 됨)");
+      $("#a-status").innerHTML = `AI 서버 v${esc(h.version)} · 기획(Claude) ${ok(h.claude)} · 영상 생성(muapi) ${ok(h.muapi)}${h.limits ? "" : " · 하루 사용 한도 없음"}`;
+      if (!h.muapi) { $("#a-photo").checked = true; $("#a-motion").disabled = true; }
+    } catch (e) {
+      AI.health = null;
+      $("#a-status").innerHTML = `AI 서버가 아직 새 버전이 아니거나 연결되지 않습니다 (${esc(e.message)}). 담당자가 Worker 를 배포하면 AI 기획·영상 생성이 켜집니다. 그 전에는 아래 <b>직접 붙여넣기</b> 방식과 ⓪~③ 탭을 쓰세요.`;
+    }
+  }
+
+  document.addEventListener("brandchange", () => aPv.refresh(true));
+  $("#a-style").addEventListener("change", () => { const st = (window.STYLES || []).find((x) => x.id === $("#a-style").value); if (st && st.id) { $("#a-cap").value = st.cap; aPv.refresh(true); } });
+  $("#a-cap").innerHTML = SE.CAPTION_THEMES.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
+  $("#a-cap").onchange = () => aPv.refresh(true);
+  ["#a-brand", "#a-product", "#a-price"].forEach((id) => $(id).addEventListener("input", aRefreshSoon));
+  $("#a-fromplan").onclick = () => {
+    const v = (id) => ($(id) ? $(id).value : "");
+    $("#a-brand").value = v("#p-brand"); $("#a-product").value = v("#p-product"); $("#a-price").value = v("#p-price"); $("#a-dept").value = v("#p-dept"); $("#a-size").value = v("#p-size");
+    if (!$("#a-brief").value.trim()) $("#a-brief").value = [v("#p-story"), v("#p-points")].filter(Boolean).join("\n");
+  };
+
+  const styleText = () => { const st = (window.STYLES || []).find((x) => x.id === $("#a-style").value); return st && st.id ? `${st.name} — ${st.prompt}` : ""; };
+  function planRequest(photos) {
+    return { brand, brief: $("#a-brief").value.trim(), seconds: Number($("#a-len").value), maxShots: Number($("#a-maxshots").value), style: styleText(), brandName: $("#a-brand").value.trim(), productName: $("#a-product").value.trim(), price: $("#a-price").value.trim(), deptPrice: $("#a-dept").value.trim(), size: $("#a-size").value.trim(), photos };
+  }
+  $("#a-plan").onclick = async () => {
+    if (!aFiles.files.length) return alert("사진을 먼저 선택해주세요");
+    const btn = $("#a-plan"), msg = $("#a-planmsg"); btn.disabled = true; msg.textContent = "사진을 보고 콘티를 짜는 중… (20~60초)"; msg.className = "msg";
+    try {
+      const photos = await Promise.all([...aFiles.files].map(async (f) => ({ dataUrl: await toDataUrl(f, 768, 0.8) })));
+      const res = await wapi("/api/plan", { method: "POST", body: planRequest(photos) });
+      PL = normPlan(res.plan, aFiles.files.length);
+      msg.textContent = "콘티가 나왔어요. 아래에서 확인하고 고쳐 주세요."; renderBoard();
+      $("#a-board").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (e) { msg.textContent = e.message; msg.className = "msg err"; }
+    btn.disabled = false;
+  };
+
+  // Claude 채팅에 직접 붙여넣는 방식
+  $("#a-copyprompt").onclick = async (e) => {
+    const r = planRequest([]);
+    const text = [
+      "인스타 릴스(9:16) 콘티를 짜 주세요. 첨부한 상품 사진을 보고, 사진에 실제로 보이는 것만 말하고 숫자(가격 등)는 아래에 준 것만 쓰세요.",
+      `브랜드: ${brand === "kids" ? "BUYEST Kids (디자이너 키즈 편집숍)" : "BUYEST (명품 병행수입 편집숍)"} — 대구, 18년째 이탈리아 부티크와 직거래. 톤은 ${brand === "kids" ? "따뜻하고 가볍게" : "차분하고 신뢰감 있게, 과장 없이"}.`,
+      "쓰지 말 것: 역대급, 미쳤다, 대박, 꿀템, 무조건, 강추, 인생템, 최저가, 공식 수입, 정식 수입 같은 과장어·병행수입 주의 표현.",
+      `목표 길이 약 ${r.seconds}초, 컷은 최대 ${r.maxShots}개 (컷 길이 2~5초, 컷마다 화면 글자 16자 이하, 훅은 24자 이하로 첫 2초).`,
+      r.style && `영상 스타일: ${r.style}`,
+      [r.brandName && `브랜드명: ${r.brandName}`, r.productName && `상품명: ${r.productName}`, r.price && `가격: ${r.price}`, r.deptPrice && `백화점가: ${r.deptPrice}`, r.size && `사이즈: ${r.size}`].filter(Boolean).join(" / "),
+      `기획서: ${r.brief || "(없음 — 사진을 보고 가장 좋은 방향으로)"}`,
+      "",
+      "아래 JSON 한 덩어리만 답해 주세요 (설명 없이). photo 는 첨부한 사진 순서 번호(1부터), motion 은 사진을 5초 영상으로 움직일 때의 영어 지시(카메라 움직임과 아주 작은 자연스러운 움직임만, 상품·로고·글자·얼굴이 바뀌면 안 됨).",
+      '{"title":"","hook":"","shots":[{"photo":1,"seconds":3,"caption":"","motion":"","why":""}],"price_line":"","cta":"","caption":"","hashtags":["#"],"notes":""}',
+    ].filter((x) => x).join("\n");
+    try { await navigator.clipboard.writeText(text); } catch (_) { const ta = document.createElement("textarea"); ta.value = text; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+    const o = e.target.textContent; e.target.textContent = "복사됨 ✓ — Claude 채팅에 붙여 넣고 사진을 첨부하세요"; setTimeout(() => (e.target.textContent = o), 3000);
+  };
+  $("#a-applypaste").onclick = () => {
+    let t = $("#a-paste").value.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const a = t.indexOf("{"), b = t.lastIndexOf("}"); if (a >= 0 && b > a) t = t.slice(a, b + 1);
+    try { PL = normPlan(JSON.parse(t), aFiles.files.length || 1); renderBoard(); $("#a-board").scrollIntoView({ behavior: "smooth", block: "start" }); }
+    catch (_) { alert("JSON 을 읽지 못했습니다. Claude 가 준 { 로 시작하는 JSON 전체를 붙여 넣어 주세요."); }
+  };
+
+  // 미리보기 = 사진만으로 만든 같은 콘티 (움직임 영상은 생성 후 최종본에서 확인)
+  function storyParams() {
+    return { brand, brandName: $("#a-brand").value.trim(), productName: $("#a-product").value.trim(), hook: PL ? PL.hook : "", price: PL ? PL.price_line : "", cta: PL ? PL.cta : "", capTheme: $("#a-cap").value };
+  }
+  async function storyScene(mediaOverride) {
+    if (!PL || !aFiles.files.length) return null;
+    await SE.ensureFonts([storyParams().brandName, storyParams().productName, PL.hook, PL.price_line, PL.cta, ...PL.shots.map((s) => s.caption)].join(" "));
+    const bmps = await Promise.all([...aFiles.files].map(bitmapOf));
+    return SE.buildStoryScene(storyParams(), PL.shots.map((s, i) => ({ media: (mediaOverride && mediaOverride[i]) || { el: bmps[Math.min(s.photo, bmps.length - 1)], isVideo: false, duration: 0 }, seconds: s.seconds, caption: s.caption })));
+  }
+  const aPv = Preview($("#a-pv"), () => storyScene(null));
+
+  // 컷마다 AI 움직임 클립 만들기
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function genClips(note) {
+    const quality = $("#a-quality").value, shots = PL.shots, uploaded = {};
+    const clips = new Array(shots.length).fill(null), state = new Array(shots.length).fill("대기");
+    const report = () => note(`AI 영상 생성 중 — ${state.filter((x) => x === "완료" || x === "받는중").length}/${shots.length} 완료${state.some((x) => x === "실패") ? ` (실패 ${state.filter((x) => x === "실패").length}컷은 사진으로 대체)` : ""}`);
+    note("사진 올리는 중…");
+    for (const idx of [...new Set(shots.map((s) => s.photo))]) {
+      const file = aFiles.files[Math.min(idx, aFiles.files.length - 1)];
+      uploaded[idx] = (await wapi("/api/upload", { method: "POST", body: { dataUrl: await toDataUrl(file, 1280, 0.85) } })).url;
+    }
+    const ids = [];
+    for (let i = 0; i < shots.length; i++) {
+      try { const r = await wapi("/api/motion", { method: "POST", body: { imageUrl: uploaded[shots[i].photo], prompt: shots[i].motion, seconds: shots[i].seconds > 5 ? 10 : 5, quality } }); ids[i] = r.request_id || r.id; state[i] = "진행"; }
+      catch (e) { state[i] = "실패"; if (e.status === 429 || e.status === 401) throw e; console.error(e); }
+      report(); await sleep(600);
+    }
+    const t0 = Date.now(), media = new Array(shots.length).fill(null);
+    while (state.some((x) => x === "진행") && Date.now() - t0 < 12 * 60 * 1000) {
+      await sleep(5000);
+      for (let i = 0; i < shots.length; i++) {
+        if (state[i] !== "진행") continue;
+        try {
+          const r = await wapi("/api/result?id=" + encodeURIComponent(ids[i]));
+          const st = String(r.status || "").toLowerCase();
+          if (r.media && r.media.length && (!st || /complete|succe|done|ready/.test(st))) { media[i] = r.media[0]; state[i] = "받는중"; }
+          else if (/fail|error|cancel|reject/.test(st)) state[i] = "실패";
+        } catch (e) { console.error(e); }
+      }
+      report();
+    }
+    for (let i = 0; i < shots.length; i++) {
+      if (state[i] === "진행") state[i] = "실패";
+      if (state[i] !== "받는중") continue;
+      try {
+        const blob = await (await fetch(media[i])).blob();
+        clips[i] = await SE.loadMedia(new File([blob], `clip${i}.mp4`, { type: "video/mp4" })); state[i] = "완료";
+      } catch (e) { console.error(e); state[i] = "실패"; }
+      report();
+    }
+    return { clips, failed: state.filter((x) => x === "실패").length };
+  }
+
+  $("#a-go").onclick = () => {
+    if (!PL) return;
+    const motion = $("#a-motion").checked && !$("#a-motion").disabled;
+    if (motion && !confirm(`AI 움직임 영상 ${PL.shots.length}건을 생성합니다.\nmuapi 요금이 부과되고 몇 분 걸립니다. 계속할까요?`)) return;
+    runJob($("#a-job"), $("#a-go"), motion ? "AI 자동 릴스(움직임)" : "AI 자동 릴스(사진)", ["AI", $("#a-brand").value, $("#a-product").value], async (note) => {
+      if (!motion) return storyScene(null);
+      const { clips, failed } = await genClips(note);
+      if (failed === PL.shots.length) throw new Error("AI 영상이 하나도 만들어지지 않았습니다. 잠시 뒤 다시 시도하거나 '사진만으로 자동 편집'을 쓰세요.");
+      note(`영상을 합치는 중… ${failed ? `(사진으로 대체된 컷 ${failed}개)` : ""}`);
+      return storyScene(clips);
+    });
+  };
+
+  aHealth();
 
   reelPv.refresh(false);
 })();

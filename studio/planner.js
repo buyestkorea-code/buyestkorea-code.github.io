@@ -271,10 +271,10 @@
     const fillStyles = () => {
       const b = brandNow(); const cur = ($("#p-style") || {}).value || "";
       const opts = STYLES.filter((x) => x.fit === "both" || x.fit === b).map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("");
-      ["#p-style", "#m-style"].forEach((id) => { const el = $(id); if (el) { el.innerHTML = opts; el.value = STYLES.some((x) => x.id === cur && (x.fit === "both" || x.fit === b)) ? cur : ""; } });
+      ["#p-style", "#m-style", "#a-style"].forEach((id) => { const el = $(id); if (el) { el.innerHTML = opts; el.value = STYLES.some((x) => x.id === cur && (x.fit === "both" || x.fit === b)) ? cur : ""; } });
     };
-    const syncStyle = (e) => { ["#p-style", "#m-style"].forEach((id) => { const el = $(id); if (el && el !== e.target) el.value = e.target.value; }); };
-    ["#p-style", "#m-style"].forEach((id) => { if ($(id)) $(id).onchange = syncStyle; });
+    const syncStyle = (e) => { ["#p-style", "#m-style", "#a-style"].forEach((id) => { const el = $(id); if (el && el !== e.target) el.value = e.target.value; }); };
+    ["#p-style", "#m-style", "#a-style"].forEach((id) => { if ($(id)) $(id).onchange = syncStyle; });
     document.addEventListener("brandchange", fillStyles);
     fillStyles();
     renderHooks(); onHookEdit(); drafts(); caption();

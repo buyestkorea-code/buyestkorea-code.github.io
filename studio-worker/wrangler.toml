@@ -1,0 +1,17 @@
+# BUYEST 영상 스튜디오 — AI 중계 Worker
+# 이름을 기존 Worker(buyest-studio)와 같게 두어, 이미 저장된 MUAPI_API_KEY 비밀값을 그대로 쓴다.
+name = "buyest-studio"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# (선택) 하루 사용 횟수 제한을 쓰려면:  npx wrangler kv namespace create STUDIO_KV  → 나온 id 를 아래에 넣고 주석 해제
+# [[kv_namespaces]]
+# binding = "STUDIO_KV"
+# id = "여기에_KV_id"
+
+[vars]
+# 직원 1명이 하루에 쓸 수 있는 횟수 (KV 를 연결했을 때만 적용됨)
+LIMIT_PLAN_PER_DAY = "60"
+LIMIT_MOTION_PER_DAY = "40"
+# 기획용 Claude 모델 (바꾸려면 여기만)
+PLAN_MODEL = "claude-opus-5-5"

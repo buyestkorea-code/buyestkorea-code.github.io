@@ -166,6 +166,64 @@
     ctx.restore();
   }
 
+  // 0~2초 훅 화면 (상품 릴스·AI 릴스 공용)
+  function drawHook(ctx, T, hook, theme) {
+    const g = ctx.createLinearGradient(0, H * 0.3, 0, H);
+    g.addColorStop(0, hexA(T.bg, 0)); g.addColorStop(1, hexA(T.bg, 0.6));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const cy = SAFE_BOX.y + SAFE_BOX.h / 2;
+    ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    font(ctx, 34, 400, T.font); setLS(ctx, 10); ctx.fillStyle = T.accent;
+    // 훅 글자 높이를 먼저 재서 라벨+훅을 세로 가운데에 놓는다
+    font(ctx, 84, 800, T.sans); setLS(ctx, 0);
+    const hl = wrap(ctx, hook, SAFE_BOX.w - (theme === "box" && !T.dark ? 56 : 0));
+    const blockH = 34 + 24 + hl.length * 105;
+    const top = cy - blockH / 2;
+    font(ctx, 34, 400, T.font); setLS(ctx, 10); ctx.fillStyle = T.accent; ctx.fillText(T.label, SAFE.left, top + 34);
+    ctx.restore();
+    if (theme === "box" || theme === "minimal") {
+      ctx.save(); font(ctx, 84, 800, T.sans); setLS(ctx, 0);
+      const kidsBox = !T.dark;
+      hl.forEach((l, k) => {
+        const ty = top + 34 + 24 + 74 + k * 105; // 라벨(34) + 간격(24) 아래에서 첫 줄 기준선
+        const w = ctx.measureText(l).width;
+        if (kidsBox) { ctx.fillStyle = hexA(T.bg, 0.87); roundRect(ctx, SAFE.left, ty - 62, w + 56, 100, 8); ctx.fill(); }
+        ctx.fillStyle = T.fg; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+        if (!kidsBox) { ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4; }
+        ctx.fillText(l, SAFE.left + (kidsBox ? 28 : 0), ty);
+      });
+      ctx.restore();
+    } else {
+      drawCaption(ctx, { text: hook, x: SAFE.left, y: top + 34 + 24, anchor: "top", maxW: SAFE_BOX.w, size: 78, weight: 800, T, theme, p: 1 });
+    }
+  }
+  // 마지막 화면: 브랜드·상품명·가격·요청 (a(s) 는 s프레임 뒤에 나타나는 정도 0~1)
+  function drawOutro(ctx, T, P, brandName, a) {
+    ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
+    const cx = SAFE.left + SAFE_BOX.w / 2;
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    let y = SAFE_BOX.y + SAFE_BOX.h / 2 - 230;
+    
+    ctx.save(); ctx.globalAlpha = a(0);
+    font(ctx, 44, 400, T.font); setLS(ctx, 10); ctx.fillStyle = T.accent; ctx.fillText(brandName, cx + 5, y + 20 + (1 - a(0)) * 20); ctx.restore();
+    font(ctx, 64, 500, T.sans); setLS(ctx, 0);
+    const pl = wrap(ctx, P.productName || "", SAFE_BOX.w).slice(0, 3);
+    ctx.save(); ctx.globalAlpha = a(4); ctx.fillStyle = T.fg;
+    pl.forEach((l, k) => ctx.fillText(l, cx, y + 100 + k * 80)); ctx.restore();
+    y += 100 + pl.length * 80;
+    if (P.price) {
+      ctx.save(); ctx.globalAlpha = a(10); font(ctx, 100, 600, T.font); setLS(ctx, 0); ctx.fillStyle = T.fg; ctx.fillText(P.price, cx, y + 90); ctx.restore(); y += 130;
+    }
+    if (P.cta) {
+      ctx.save(); ctx.globalAlpha = a(18); font(ctx, 42, 500, T.sans); setLS(ctx, 0);
+      const cl = wrap(ctx, P.cta, SAFE_BOX.w - 130).slice(0, 2);
+      const cw = Math.max(...cl.map((l) => ctx.measureText(l).width)) + 88, chh = cl.length * 56 + 40;
+      ctx.strokeStyle = T.accent; ctx.lineWidth = 2; roundRect(ctx, cx - cw / 2, y + 36, cw, chh, Math.min(chh / 2, 60)); ctx.stroke();
+      ctx.fillStyle = T.fg; cl.forEach((l, k) => ctx.fillText(l, cx, y + 36 + 20 + 40 + k * 56 - 8)); ctx.restore(); y += 36 + chh;
+    }
+    ctx.save(); ctx.globalAlpha = 0.7; font(ctx, 32, 400, T.font); setLS(ctx, 12); ctx.fillStyle = T.fg; ctx.fillText(T.label, cx + 6, y + 110); ctx.restore();
+  }
+
   // ── ① 상품 릴스 ────────────────────────────────────
   // P: { brand, brandName, productName, price, cta, secondsPerPhoto, hook, lines[], capTheme }  imgs: ImageBitmap[]
   function buildReelScene(P, imgs) {
@@ -225,62 +283,9 @@
         }
       });
 
-      if (withHook && frame < hookFrames) { // 0~2초 훅: 첫 프레임부터 보인다
-        const g = ctx.createLinearGradient(0, H * 0.3, 0, H);
-        g.addColorStop(0, hexA(T.bg, 0)); g.addColorStop(1, hexA(T.bg, 0.6));
-        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-        const cy = SAFE_BOX.y + SAFE_BOX.h / 2;
-        ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-        font(ctx, 34, 400, T.font); setLS(ctx, 10); ctx.fillStyle = T.accent;
-        // 훅 글자 높이를 먼저 재서 라벨+훅을 세로 가운데에 놓는다
-        font(ctx, 84, 800, T.sans); setLS(ctx, 0);
-        const hl = wrap(ctx, hook, SAFE_BOX.w - (theme === "box" && !T.dark ? 56 : 0));
-        const blockH = 34 + 24 + hl.length * 105;
-        const top = cy - blockH / 2;
-        font(ctx, 34, 400, T.font); setLS(ctx, 10); ctx.fillStyle = T.accent; ctx.fillText(T.label, SAFE.left, top + 34);
-        ctx.restore();
-        if (theme === "box" || theme === "minimal") {
-          ctx.save(); font(ctx, 84, 800, T.sans); setLS(ctx, 0);
-          const kidsBox = !T.dark;
-          hl.forEach((l, k) => {
-            const ty = top + 34 + 24 + 74 + k * 105; // 라벨(34) + 간격(24) 아래에서 첫 줄 기준선
-            const w = ctx.measureText(l).width;
-            if (kidsBox) { ctx.fillStyle = hexA(T.bg, 0.87); roundRect(ctx, SAFE.left, ty - 62, w + 56, 100, 8); ctx.fill(); }
-            ctx.fillStyle = T.fg; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-            if (!kidsBox) { ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4; }
-            ctx.fillText(l, SAFE.left + (kidsBox ? 28 : 0), ty);
-          });
-          ctx.restore();
-        } else {
-          drawCaption(ctx, { text: hook, x: SAFE.left, y: top + 34 + 24, anchor: "top", maxW: SAFE_BOX.w, size: 78, weight: 800, T, theme, p: 1 });
-        }
-      }
+      if (withHook && frame < hookFrames) drawHook(ctx, T, hook, theme); // 0~2초 훅: 첫 프레임부터 보인다
 
-      if (frame >= outroStart) { // 아웃트로: 가격 + CTA
-        ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
-        const cx = SAFE.left + SAFE_BOX.w / 2;
-        ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-        let y = SAFE_BOX.y + SAFE_BOX.h / 2 - 230;
-        const a = (s) => pop(outroStart + s);
-        ctx.save(); ctx.globalAlpha = a(0);
-        font(ctx, 44, 400, T.font); setLS(ctx, 10); ctx.fillStyle = T.accent; ctx.fillText(brandName, cx + 5, y + 20 + (1 - a(0)) * 20); ctx.restore();
-        font(ctx, 64, 500, T.sans); setLS(ctx, 0);
-        const pl = wrap(ctx, P.productName || "", SAFE_BOX.w).slice(0, 3);
-        ctx.save(); ctx.globalAlpha = a(4); ctx.fillStyle = T.fg;
-        pl.forEach((l, k) => ctx.fillText(l, cx, y + 100 + k * 80)); ctx.restore();
-        y += 100 + pl.length * 80;
-        if (P.price) {
-          ctx.save(); ctx.globalAlpha = a(10); font(ctx, 100, 600, T.font); setLS(ctx, 0); ctx.fillStyle = T.fg; ctx.fillText(P.price, cx, y + 90); ctx.restore(); y += 130;
-        }
-        if (P.cta) {
-          ctx.save(); ctx.globalAlpha = a(18); font(ctx, 42, 500, T.sans); setLS(ctx, 0);
-          const cl = wrap(ctx, P.cta, SAFE_BOX.w - 130).slice(0, 2);
-          const cw = Math.max(...cl.map((l) => ctx.measureText(l).width)) + 88, chh = cl.length * 56 + 40;
-          ctx.strokeStyle = T.accent; ctx.lineWidth = 2; roundRect(ctx, cx - cw / 2, y + 36, cw, chh, Math.min(chh / 2, 60)); ctx.stroke();
-          ctx.fillStyle = T.fg; cl.forEach((l, k) => ctx.fillText(l, cx, y + 36 + 20 + 40 + k * 56 - 8)); ctx.restore(); y += 36 + chh;
-        }
-        ctx.save(); ctx.globalAlpha = 0.7; font(ctx, 32, 400, T.font); setLS(ctx, 12); ctx.fillStyle = T.fg; ctx.fillText(T.label, cx + 6, y + 110); ctx.restore();
-      }
+      if (frame >= outroStart) drawOutro(ctx, T, P, brandName, (s) => pop(outroStart + s)); // 아웃트로: 가격 + CTA
     }
     return { frames: total, fps: FPS, draw, prepare: null };
   }
@@ -537,5 +542,53 @@
     return new Blob([muxer.target.buffer], { type: "video/mp4" });
   }
 
-  window.SE = { W, H, FPS, SAFE, THEMES, themeOf, CAPTION_THEMES, TEMPLATES, buildReelScene, buildTemplateScene, loadMedia, loadImage, ensureFonts, renderToMp4, supported, wrap };
+  // ── AI 자동 릴스 장면 ───────────────────────────────
+  // 컷마다 (AI 움직임 영상 또는 사진) + 화면 글자. 처음 1.8초는 훅, 끝에는 가격·요청 화면.
+  // P: { brand, brandName, productName, hook, price, cta, capTheme }
+  // shots: [{ media: { el, isVideo, duration }, seconds, caption }]
+  function buildStoryScene(P, shots) {
+    const T = themeOf(P.brand), theme = P.capTheme || "box";
+    const hook = String(P.hook || "").trim();
+    const FADE = 8, hookFrames = hook ? Math.round(1.8 * FPS) : 0;
+    let at = 0;
+    const tl = shots.map((s, i) => { const fr = Math.max(1, Math.round(clamp(Number(s.seconds) || 3, 1, 10) * FPS)); const o = { ...s, i, start: at, fr }; at += fr; return o; });
+    const outroStart = at, total = outroStart + Math.round(2.5 * FPS);
+    const brandName = String(P.brandName || "").toUpperCase();
+    const which = (frame) => tl.findIndex((s) => frame >= s.start && frame < s.start + s.fr);
+    const clipTime = (sh, local) => { const m = sh.media; return Math.min(local / FPS, Math.max(0, (m.duration || 1) - 0.05)); };
+
+    function drawShot(ctx, sh, local) {
+      const m = sh.media; if (!m) return;
+      if (m.isVideo) { drawCover(ctx, m.el, 0, 0, W, H, 1, 0, 0); return; }
+      // 사진만 쓴 컷은 천천히 팬/줌
+      const zoom = interp(local, [0, sh.fr], sh.i % 2 === 0 ? [1.0, 1.12] : [1.12, 1.0]);
+      const dx = interp(local, [0, sh.fr], sh.i % 3 === 0 ? [-20, 20] : [20, -20]);
+      drawCover(ctx, m.el, 0, 0, W, H, zoom, dx, 0);
+    }
+    return {
+      frames: total, fps: FPS,
+      async prepare(frame) {
+        const i = which(frame); if (i < 0) return;
+        const sh = tl[i], local = frame - sh.start;
+        if (sh.media && sh.media.isVideo) await seekVideo(sh.media.el, clipTime(sh, local));
+        if (i > 0 && local < FADE) { const pv = tl[i - 1]; if (pv.media && pv.media.isVideo && pv.media !== sh.media) await seekVideo(pv.media.el, clipTime(pv, pv.fr - 1)); }
+      },
+      draw(ctx, frame) {
+        ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
+        ctx.textBaseline = "alphabetic";
+        if (frame >= outroStart) { drawOutro(ctx, T, { productName: P.productName, price: P.price, cta: P.cta }, brandName, (s) => easeOut((frame - outroStart - s) / 20 + 0)); return; }
+        const i = which(frame), sh = tl[i], local = frame - sh.start;
+        if (i > 0 && local < FADE) drawShot(ctx, tl[i - 1], tl[i - 1].fr - 1); // 앞 컷 위로 부드럽게 겹친다
+        ctx.save(); ctx.globalAlpha = i > 0 ? interp(local, [0, FADE], [0, 1]) : 1; drawShot(ctx, sh, local); ctx.restore();
+        if (hook && i === 0 && frame < hookFrames) { drawHook(ctx, T, hook, theme); return; }
+        if (sh.caption) {
+          const from = i === 0 && hook ? hookFrames : 4;
+          const out = interp(local, [sh.fr - 6, sh.fr], [1, 0]);
+          drawCaption(ctx, { text: sh.caption, x: SAFE.left, y: SAFE_BOX.y + SAFE_BOX.h, anchor: "bottom", maxW: SAFE_BOX.w, size: 68, T, theme, p: Math.min(easeOut((local - from) / 20), out) });
+        }
+      },
+    };
+  }
+
+  window.SE = { W, H, FPS, SAFE, THEMES, themeOf, CAPTION_THEMES, TEMPLATES, buildReelScene, buildStoryScene, buildTemplateScene, loadMedia, loadImage, ensureFonts, renderToMp4, supported, wrap };
 })();
