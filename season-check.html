@@ -324,10 +324,8 @@ $('runBtn').addEventListener('click', async () => {
       hs.sort((x, y) => y.date.localeCompare(x.date));
       return { ...i, key: d.key, entryKey: (d.exact && d.key) || normKey(i.main), seasonText: fmtSeason(o), o, hist: fmtHist(hs), hasHist: hs.length > 0, labels: plan.labels[n] || null, optText: plan.labels[n] ? plan.labels[n].labels.filter(x => x !== 'TU' && x !== '_').join(' ') + '  (' + plan.labels[n].why + ')' : '' };
     });
-    // 한 화면에 보이도록 비어 있는 원산지·소재·비고 칸은 숨긴다 (삭제 아님)
-    const hide = [], hdrRows = new Set(scan.headers.map(x => x.row)), used = new Set(), first = scan.headers[0].row;
-    ws.eachRow({ includeEmpty: false }, (row, r) => { if (r <= first || hdrRows.has(r)) return; row.eachCell({ includeEmpty: false }, (c, n) => { if (cellText(c) !== '') used.add(n); }); });
-    scan.headers.forEach(h => ws.getRow(h.row).eachCell({ includeEmpty: false }, (c, n) => { if (['원산지', '소재', '비고'].includes(cellText(c)) && !used.has(n) && !hide.includes(n)) hide.push(n); }));
+    // 원산지·소재·비고 칸은 비어 있어도 숨기지 않고 원본 그대로 보여 준다 (숨기면 없어진 것처럼 보임)
+    const hide = [];
     Object.assign(S, { buf0, scan, results, hide, plan, date, label, asOf: A.asOf, saved: false });
     renderResult(); setMsg(predWarn, !!predWarn);
   } catch (e) { setMsg('실패: ' + (e && e.message ? e.message : e), true); }
@@ -472,7 +470,7 @@ async function buildXlsx(buf, scan, results, hide, plan){
   sx = sx.replace(/<dimension ref="([A-Z]+\d+):[A-Z]+(\d+)"/, `<dimension ref="$1:${colLetter(cHist)}$2"`);
   sx = insertRows(sx, inserts);
 
-  // 열 폭 + 빈 원산지·소재·비고 열 숨기기 (삭제가 아니라 숨김)
+  // 열 폭 (hide 가 비어 있으면 숨기는 열 없음)
   const hideSet = new Set(hide), defs = {}; let tail = ' style="4"';
   const colsM = sx.match(/<cols>([\s\S]*?)<\/cols>/);
   (colsM ? colsM[1].match(/<col\b[^>]*\/>/g) || [] : []).forEach(t => {
