@@ -47,7 +47,7 @@
   <div>
     <input type="date" id="day"> <button class="btn sec" onclick="load()">조회</button>
     <button class="btn danger" id="runBtn" onclick="runNow()">수동 실행 (이카운트 재고 새로 받아 반영)</button>
-    <button class="btn sec" id="reconBtn" onclick="reconcile()">누락 점검 (전체 대조)</button>
+    <button class="btn sec" id="reconBtn" onclick="reconcile()">재고·사이트 상태 불일치 점검</button>
     <button class="btn sec" id="mapBtn" onclick="downloadMapping()">연결 정리 엑셀 다운로드</button>
   </div>
   <div id="meta"></div>
@@ -87,13 +87,13 @@ async function call(body) {
 function setMsg(html, cls) { document.getElementById('msg').innerHTML = html ? `<div class="${cls || ''}">${html}</div>` : ''; }
 
 async function reconcile() {
-  setMsg('전체 대조 중... (매핑된 모든 품목의 현재 재고와 사이트 상태를 비교해요. 몇 초 걸려요)');
+  setMsg('불일치 점검 중... (연결된 모든 품목의 이카운트 재고와 사이트 품절·판매 상태를 비교해요. 몇 초 걸려요)');
   document.querySelectorAll('.btn').forEach(b => b.disabled = true);
   try {
     const d = await call({ action: 'reconcile' });
     if (!d.ok) throw new Error(d.error || '대조 실패');
     RECON = true; DATA = d; FILTER = d.summary.ready ? 'ready' : 'review';
-    setMsg('<b>전체 대조 결과</b> — 검사 ' + d.checked.toLocaleString() + '개 중 사이트와 어긋난 것 <b>' + d.summary.changed_codes + '</b>건 (자동 가능 ' + d.summary.ready + ' · 합계 확인 필요 ' + d.summary.review + ').<br>' +
+    setMsg('<b>재고·사이트 상태 불일치 점검 결과</b> — 검사 ' + d.checked.toLocaleString() + '개 중 사이트와 어긋난 것 <b>' + d.summary.changed_codes + '</b>건 (자동 가능 ' + d.summary.ready + ' · 합계 확인 필요 ' + d.summary.review + ').<br>' +
       '제외한 과거 데이터 문제: 사이트에서 사라진 상품에 연결 ' + d.noise.no_product_row.toLocaleString() + '건 · 사이즈 옵션 못 찾음 ' + d.noise.option_not_found.toLocaleString() + '건 · 이카운트 사용중단 코드뿐 ' + (d.noise.discontinued_only || 0).toLocaleString() + '건(재고 확인 불가라 자동 변경 안 함).<br>' +
       '이 시점 이카운트 재고(' + fmt(d.qty_as_of) + ') 기준이에요. 아래 목록을 확인하고 행마다 <b>반영</b>하거나, <b>자동 가능 건 전체 반영</b>을 눌러 주세요.' +
       (d.summary.ready ? ' <button class="btn sm" onclick="reconApply()">자동 가능 ' + d.summary.ready + '건 전체 반영</button>' : '') + ' <button class="btn sm sec" onclick="load()">오늘 변동 화면으로</button>', 'okbox');
@@ -102,10 +102,10 @@ async function reconcile() {
   document.querySelectorAll('.btn').forEach(b => b.disabled = false);
 }
 async function reconApply() {
-  if (!confirm('전체 대조에서 자동 가능한 ' + DATA.summary.ready + '건을 사이트(키즈 포함)에 반영할까요?')) return;
+  if (!confirm('불일치 점검에서 자동 가능한 ' + DATA.summary.ready + '건을 사이트(키즈 포함)에 반영할까요?')) return;
   const d = await act({ action: 'reconcile_apply' }, '반영 중... (잠시 걸릴 수 있어요)'); if (!d) return;
   if (!d.ok) { setMsg(esc(d.error || '실패'), 'err'); return; }
-  const msg = '<b>전체 대조 반영 완료</b> — 반영 ' + d.applied + '건 · 오류 ' + d.errors + '건 · 남은 확인필요 ' + d.left + '건' + (d.kids_error ? '<br>⚠ 키즈: ' + esc(d.kids_error) : '') + (d.exec_error ? '<br>⚠ ' + esc(d.exec_error) : '');
+  const msg = '<b>불일치 점검 반영 완료</b> — 반영 ' + d.applied + '건 · 오류 ' + d.errors + '건 · 남은 확인필요 ' + d.left + '건' + (d.kids_error ? '<br>⚠ 키즈: ' + esc(d.kids_error) : '') + (d.exec_error ? '<br>⚠ ' + esc(d.exec_error) : '');
   await reconcile();
   setMsg(msg, d.errors || d.exec_error ? 'err' : 'okbox');
 }
@@ -183,7 +183,8 @@ async function downloadMapping() {
     [['이카운트 ↔ 사이트 연결 — 정리할 것만 모았어요', ''],
      ['작성', new Date().toLocaleString('ko-KR') + ' (이카운트 재고 기준 ' + fmt(d.asof) + ')'],
      ['', ''],
-     ['해야 할 일', '각 시트 맨 오른쪽 노란 칸에 적어 주세요.  ① 맞는 코드  ② 연결 안 할 거면 "사용안함"  ③ 모르겠으면 비워 두기'],
+     ['해야 할 일', '각 시트 맨 오른쪽 노란 칸에 적어 주세요.  ① 맞는 코드  ② 이카운트에 재고만 먼저 올려 둔 상품(사진 작업 전)이면 "미등록"  ③ 모르겠으면 비워 두기'],
+     ['미등록이란', '이카운트에 재고(상품코드)만 먼저 올려 두고 아직 사진 작업이 안 된 상품이에요. 사이트 상품이 아직 없으니 "미등록"이라고 적어 주세요. 이름이 바뀌고 사이트 상품이 만들어지면 자동으로 연결돼요.'],
      ['시트 1', '「이카운트 기준」 — 이카운트 코드가 사이트와 연결 안 된 줄이에요(' + st.ec_listed + '줄). 노란 칸에 맞는 "사이트 상품코드"를 적어 주세요. 사이즈는 자동으로 맞춰요.'],
      ['시트 2', '「사이트 기준」 — 판매중인데 이카운트 연결이 없는 상품·옵션이에요(' + st.site_listed + '줄). 노란 칸에 맞는 "이카운트 코드"를 적어 주세요(여러 개면 쉼표로).'],
      ['주의', '코드는 문자로 두세요(0000021974처럼 앞의 0이 사라지면 안 돼요). 다 적으셨으면 파일을 저장해서 그대로 전달해 주세요.']
@@ -191,9 +192,9 @@ async function downloadMapping() {
     sm.getColumn(1).width = 16; sm.getColumn(2).width = 120; sm.getRow(1).font = { bold: true, size: 14 };
     sm.eachRow((r, n) => { if (n > 1) { r.getCell(1).font = { bold: true }; r.getCell(2).alignment = { wrapText: true, vertical: 'top' }; } });
     const er = d.ec_rows.map(r => [T(r[0]), T(r[1]), T(r[2]), Number(r[3]), T(r[6]), r[6] === '사이트 상품 삭제됨' ? T(r[8]) : '', T(r[15]), '']);
-    mk('이카운트 기준', ['이카운트 코드', '품목명', '사이즈', '재고', '상태', '예전 연결(삭제된 상품코드)', '추천 사이트 상품코드', '직원 입력 (맞는 사이트 상품코드 / 사용안함)'], [13, 56, 10, 7, 16, 18, 26, 34], er, [1, 3]);
+    mk('이카운트 기준', ['이카운트 코드', '품목명', '사이즈', '재고', '상태', '예전 연결(삭제된 상품코드)', '추천 사이트 상품코드', '직원 입력 (맞는 사이트 상품코드 / 미등록)'], [13, 56, 10, 7, 16, 18, 26, 34], er, [1, 3]);
     const sr = d.site_rows.map(r => [Number(r[0]), T(r[1]), T(r[2]), T(r[3]), T(r[4]), T(r[10]), '']);
-    mk('사이트 기준', ['PID', '사이트 상품코드', '사이트 상품명', '키즈', '사이트 옵션', '추천 이카운트 코드', '직원 입력 (맞는 이카운트 코드 / 사용안함)'], [8, 14, 56, 9, 12, 44, 34], sr, [5]);
+    mk('사이트 기준', ['PID', '사이트 상품코드', '사이트 상품명', '키즈', '사이트 옵션', '추천 이카운트 코드', '직원 입력 (맞는 이카운트 코드 / 이카운트 없음)'], [8, 14, 56, 9, 12, 44, 34], sr, [5]);
     const now = new Date(), stamp = now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + '_' + p2(now.getHours()) + p2(now.getMinutes());
     const buf = await wb.xlsx.writeBuffer();
     const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
@@ -290,7 +291,7 @@ function render() {
     }
     document.getElementById('out').innerHTML = h + '</tbody></table>' + (d.truncated ? '<p><small>1,500건까지만 표시했어요.</small></p>' : '');
   }
-  const KIND = { auto: '자동', manual: '수동 실행', one: '개별 반영', bulk: '선택 일괄 반영', recon: '누락 점검 반영' };
+  const KIND = { auto: '자동', manual: '수동 실행', one: '개별 반영', bulk: '선택 일괄 반영', recon: '불일치 점검 반영' };
   document.getElementById('runs').innerHTML = (d.recent_runs||[]).length ? '<table><thead><tr><th>시각</th><th>종류</th><th>실행자</th><th>반영</th><th>확인필요</th><th>오류</th><th>비고</th></tr></thead><tbody>' +
     (d.recent_runs||[]).map(r => `<tr><td>${fmt(r.ts)}</td><td>${KIND[r.kind] || r.kind}</td><td>${esc(r.by_user)}</td><td>${r.applied}</td><td>${r.review}</td><td>${r.errors}</td><td>${r.dry == 1 ? '<small>자동반영 OFF — 사이트 변경 없음 (자동 가능 ' + ((r.detail && r.detail.would_apply) || 0) + '건)</small>' : ''}</td></tr>`).join('') + '</tbody></table>' : '<p><small>기록 없음</small></p>';
 }
