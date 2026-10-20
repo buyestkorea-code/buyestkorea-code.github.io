@@ -40,7 +40,7 @@
   <p>서버가 매시간 모아 두는 이카운트 재고를 직전 값과 비교해 <b>오늘 바뀐 품목</b>을 찾고, 사이트 품절/판매 상태를 맞춰요. 엑셀 업로드나 이카운트 재호출은 필요 없어요.<br>
      키즈사이트에도 올라간 상품은 기존 품절 반영과 같은 방식으로 키즈 DB·검색인덱스까지 같이 맞춰져요.</p>
   <div class="note">
-    <b>자동 처리 규칙</b> · 오전 11시~오후 7시 사이 매시 자동 확인·반영(서버가 이카운트 재고를 받는 마지막 시각이 19:07) · <b>모호함 없는 건</b>만 자동 반영 · <b>옵션 못 찾음 / 같은 사이즈에 이카운트 코드 여러 개(합산 확정 전) / 사이트 상품 없음 / 반영 오류</b>는 건드리지 않고 <b>확인필요</b>에 쌓여요. 직원이 처리할 때까지 날짜가 바뀌어도 계속 남아요 · 처리하면 서버에 저장돼 <b>다음부터는 자동</b>이에요(상품코드 연결, 합산 확정) · 퇴근이 늦어 7시 이후에 재고가 바뀌면 <b>수동 실행</b>을 눌러 주세요(이카운트 재고를 새로 받아요. 직전 조회 후 15분 안에는 새로 못 받을 수 있어요).
+    <b>자동 처리 규칙</b> · 오전 11시~오후 7시 사이 매시 자동 확인·반영(서버가 이카운트 재고를 받는 마지막 시각이 19:07) · <b>모호함 없는 건</b>만 자동 반영 · <b>옵션 못 찾음 / 같은 사이즈에 이카운트 코드 여러 개(합계 확인 전) / 사이트 상품 없음 / 반영 오류</b>는 건드리지 않고 <b>확인필요</b>에 쌓여요. 직원이 처리할 때까지 날짜가 바뀌어도 계속 남아요 · 처리하면 서버에 저장돼 <b>다음부터는 자동</b>이에요(상품코드 연결, 합계로 반영) · 퇴근이 늦어 7시 이후에 재고가 바뀌면 <b>수동 실행</b>을 눌러 주세요(이카운트 재고를 새로 받아요. 직전 조회 후 15분 안에는 새로 못 받을 수 있어요).
   </div>
 
   <div>
@@ -51,6 +51,13 @@
   <div id="meta"></div>
   <div id="msg"></div>
   <div class="fbar" id="fbar"></div>
+  <div id="bulkbar" style="display:none;margin:8px 0;padding:8px 12px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;font-size:13px">
+    <label><input type="checkbox" id="selAll" onchange="selectAllRows(this.checked)"> 현재 목록 전체 선택</label>
+    <span id="selCnt" style="margin:0 10px;color:#6b7280">0건 선택</span>
+    <button class="btn sm" onclick="bulk('apply')">선택 반영</button>
+    <button class="btn sm sec" onclick="bulk('ignore')">선택 건드리지 않음</button>
+    <small>(같은 사이즈 코드 여러 개인 건은 합계 재고로 반영하고 앞으로 자동 처리돼요 · 사이즈 옵션/상품 문제 건은 건너뛰어요)</small>
+  </div>
   <div id="out"></div>
   <details><summary>최근 실행 기록</summary><div id="runs"></div></details>
 
@@ -58,7 +65,7 @@
 const API = 'https://buyest.co.kr/ecount_change_today_api.php';
 const LABEL = { review: '확인필요', ready: '자동 반영 가능', unmapped: '사이트 연결 없음', already_ok: '이미 맞음', done: '처리완료' };
 const CHIP = { review: 'c-review', ready: 'c-ready', unmapped: 'c-grey', already_ok: 'c-ok', done: 'c-ok' };
-const REASON = { option_not_found: '옵션(사이즈) 못 찾음', dup_codes: '같은 사이즈에 이카운트 코드 여러 개(합산 확정 필요)', no_product_row: '사이트 상품 없음', no_product_code: '연결된 상품코드 없음', apply_error: '반영 오류' };
+const REASON = { option_not_found: '옵션(사이즈) 못 찾음', dup_codes: '같은 사이즈에 이카운트 코드 여러 개 — 재고를 합친 합계로 판단', no_product_row: '사이트 상품 없음', no_product_code: '연결된 상품코드 없음', apply_error: '반영 오류' };
 let DATA = null, FILTER = 'review', RECON = false;
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -84,7 +91,7 @@ async function reconcile() {
     const d = await call({ action: 'reconcile' });
     if (!d.ok) throw new Error(d.error || '대조 실패');
     RECON = true; DATA = d; FILTER = d.summary.ready ? 'ready' : 'review';
-    setMsg('<b>전체 대조 결과</b> — 검사 ' + d.checked.toLocaleString() + '개 중 사이트와 어긋난 것 <b>' + d.summary.changed_codes + '</b>건 (자동 가능 ' + d.summary.ready + ' · 합산 확정 필요 ' + d.summary.review + ').<br>' +
+    setMsg('<b>전체 대조 결과</b> — 검사 ' + d.checked.toLocaleString() + '개 중 사이트와 어긋난 것 <b>' + d.summary.changed_codes + '</b>건 (자동 가능 ' + d.summary.ready + ' · 합계 확인 필요 ' + d.summary.review + ').<br>' +
       '제외한 과거 데이터 문제: 사이트에서 사라진 상품에 연결 ' + d.noise.no_product_row.toLocaleString() + '건 · 사이즈 옵션 못 찾음 ' + d.noise.option_not_found.toLocaleString() + '건.<br>' +
       '이 시점 이카운트 재고(' + fmt(d.qty_as_of) + ') 기준이에요. 아래 목록을 확인하고 행마다 <b>반영</b>하거나, <b>자동 가능 건 전체 반영</b>을 눌러 주세요.' +
       (d.summary.ready ? ' <button class="btn sm" onclick="reconApply()">자동 가능 ' + d.summary.ready + '건 전체 반영</button>' : '') + ' <button class="btn sm sec" onclick="load()">오늘 변동 화면으로</button>', 'okbox');
@@ -130,9 +137,9 @@ async function runNow() {
 async function confirmGroup(code) {
   const it = DATA.items.find(i => i.ec_code === code);
   if (!confirm(`${it.name || code}
-같은 사이즈의 이카운트 코드 ${it.group_codes.length}개를 합산(${it.group_qty})해서 반영하고, 이 상품·사이즈는 앞으로 자동 처리할까요?`)) return;
+같은 사이즈의 이카운트 코드 ${it.group_codes.length}개를 합산(${it.group_qty})한 합계 재고로 사이트 품절/판매를 정하고, 이 상품·사이즈는 앞으로 자동 처리할까요?`)) return;
   const d = await act({ action: 'confirm_group', ec_code: code, reconcile: RECON ? 1 : 0 }, '저장·반영 중...'); if (!d) return;
-  setMsg(d.ok ? `합산 확정 저장 + 반영 완료 (${esc(code)})` + (d.kids_sync_error ? `<br>⚠ 키즈: ${esc(d.kids_sync_error)}` : '') : esc(d.error || '실패'), d.ok && !d.kids_sync_error ? 'okbox' : 'err');
+  setMsg(d.ok ? `합계 기준으로 반영 완료(앞으로 자동) (${esc(code)})` + (d.kids_sync_error ? `<br>⚠ 키즈: ${esc(d.kids_sync_error)}` : '') : esc(d.error || '실패'), d.ok && !d.kids_sync_error ? 'okbox' : 'err');
   if (RECON) { const m = document.getElementById('msg').innerHTML; await reconcile(); setMsg(m, ''); } else await load(true);
 }
 function showRun(d, title) {
@@ -143,6 +150,28 @@ function showRun(d, title) {
   if (d.exec_error) h += `<br>⚠ ${esc(d.exec_error)}`;
   if (d.pending_total > 0) h += `<br>확인필요 ${d.pending_total}건이 남아 있어요. 직원이 확인해 처리해 주세요.`;
   setMsg(h, d.errors || d.exec_error ? 'err' : 'okbox');
+}
+
+let SEL = new Set();
+function toggleSel(code, on) { if (on) SEL.add(code); else SEL.delete(code); updSel(); }
+function updSel() { const el = document.getElementById('selCnt'); if (el) el.textContent = SEL.size + '건 선택'; }
+function selectAllRows(on) {
+  document.querySelectorAll('input.rowsel').forEach(cb => { cb.checked = on; toggleSel(cb.dataset.code, on); });
+}
+async function bulk(mode) {
+  if (!SEL.size) { setMsg('먼저 항목을 선택해 주세요.', 'err'); return; }
+  const n = SEL.size;
+  if (!confirm(mode === 'apply' ? n + '건을 사이트(키즈 포함)에 반영할까요?\n(같은 사이즈 코드 여러 개인 건은 합계 재고로 반영하고 앞으로 자동 처리돼요)' : n + '건을 \'건드리지 않음\'으로 처리할까요? (재고가 다시 바뀌면 다시 나타나요)')) return;
+  const d = await act({ action: 'apply_many', mode, ec_codes: Array.from(SEL), reconcile: RECON ? 1 : 0 }, '처리 중... (잠시 걸릴 수 있어요)'); if (!d) return;
+  if (!d.ok) { setMsg(esc(d.error || '실패'), 'err'); return; }
+  let h = '<b>일괄 처리 완료</b> — 선택 ' + d.selected + '건 · ' + (mode === 'apply' ? '반영 ' + d.applied + '건' : '처리 ' + d.handled + '건') + (d.confirmed_groups ? ' · 합계 기준 확정 ' + d.confirmed_groups + '건' : '') + ' · 건너뜀 ' + d.skipped.length + '건 · 오류 ' + d.errors.length + '건';
+  if (d.skipped.length) h += '<br><small>건너뜀: ' + d.skipped.slice(0, 8).map(x => esc(x[0]) + ' (' + esc(x[1]) + ')').join(', ') + (d.skipped.length > 8 ? ' 외 ' + (d.skipped.length - 8) + '건' : '') + '</small>';
+  if (d.errors.length) h += '<br>⚠ ' + d.errors.slice(0, 3).map(esc).join('<br>⚠ ');
+  if (d.kids_error) h += '<br>⚠ 키즈: ' + esc(d.kids_error);
+  if (d.exec_error) h += '<br>⚠ ' + esc(d.exec_error);
+  SEL = new Set();
+  if (RECON) { await reconcile(); } else { await load(true); }
+  setMsg(h, d.errors.length || d.exec_error ? 'err' : 'okbox');
 }
 
 async function applyOne(code, idx) {
@@ -171,13 +200,19 @@ function render() {
     `조회일 <b>${esc(d.day)}</b> · 이카운트 재고 기준 <b>${fmt(d.qty_as_of)}</b> · 오늘 비교 <b>${d.runs_today}</b>회` +
     (d.runs_today ? ` (첫 감지 ${fmt(d.first_detected)} ~ 마지막 ${fmt(d.last_detected)})` : '') + ` · 바뀐 코드 <b>${s.changed_codes}</b>건${warn}` +
     (d.runs_today === 0 ? '<br>이 날짜에는 아직 비교 기록이 없어요.' : '');
-  const chips = [['all', '전체', s.changed_codes], ['review', LABEL.review, s.review], ['ready', LABEL.ready, s.ready], ['unmapped', LABEL.unmapped, s.unmapped], ['already_ok', LABEL.already_ok, s.already_ok], ['done', LABEL.done, s.done]];
+  // 같은 상품·사이즈 묶음(코드 여러 개)은 한 줄로 합쳐서 보여준다
+  const seenG = new Set(), uniq = [];
+  d.items.forEach((i, idx) => { const k = i.status + '|' + (i.sites.length > 1 || i.group_codes.length > 1 ? i.group_codes.slice().sort().join(',') + '|' + i.sites.map(x => x.pid).join(',') : i.ec_code); if (seenG.has(k)) return; seenG.add(k); uniq.push([i, idx]); });
+  const cnt = st => uniq.filter(([i]) => i.status === st).length;
+  const s2 = { changed_codes: uniq.length, review: cnt('review'), ready: cnt('ready'), unmapped: cnt('unmapped'), already_ok: cnt('already_ok'), done: cnt('done') };
+  const chips = [['all', '전체', s2.changed_codes], ['review', LABEL.review, s2.review], ['ready', LABEL.ready, s2.ready], ['unmapped', LABEL.unmapped, s2.unmapped], ['already_ok', LABEL.already_ok, s2.already_ok], ['done', LABEL.done, s2.done]];
   document.getElementById('fbar').innerHTML = chips.map(c => `<button class="fchip${FILTER === c[0] ? ' on' : ''}" onclick="FILTER='${c[0]}';DATA.__f=1;render()">${c[1]}<b>${c[2]}</b></button>`).join('');
   const canAct = d.day === d.today;
-  const rows = d.items.map((i, idx) => [i, idx]).filter(([i]) => FILTER === 'all' || i.status === FILTER);
+  const rows = uniq.filter(([i]) => FILTER === 'all' || i.status === FILTER);
+  const bb = document.getElementById('bulkbar'); bb.style.display = canAct && rows.some(([i]) => ['review', 'ready'].includes(i.status)) ? 'block' : 'none'; document.getElementById('selAll').checked = false; SEL = new Set(); updSel();
   if (!rows.length) document.getElementById('out').innerHTML = '<p><small>표시할 항목이 없어요.</small></p>';
   else {
-    let h = '<table><thead><tr><th>상태</th><th>이카운트 품목</th><th>변동</th><th>사이트 상품 / 예상 변경</th><th>처리</th></tr></thead><tbody>';
+    let h = '<table><thead><tr><th style="width:28px"></th><th>상태</th><th>이카운트 품목</th><th>변동</th><th>사이트 상품 / 예상 변경</th><th>처리</th></tr></thead><tbody>';
     for (const [i, idx] of rows) {
       const diff = i.new_qty - i.old_qty;
       const why = i.reasons.length ? `<div><small>${i.reasons.map(r => REASON[r] || r).join(' · ')}</small></div>` : (i.queue && i.queue.reason === 'apply_error' ? `<div><small>반영 오류: ${esc(i.queue.note)}</small></div>` : '');
@@ -190,12 +225,14 @@ function render() {
       if (canAct && (i.status === 'review' || i.status === 'unmapped' || i.status === 'ready')) {
         act += `<input class="pc" id="pc${idx}" type="text" placeholder="${i.product_codes.length ? '상품코드(바꿀 때만)' : 'BUYEST 상품코드 입력'}" value="">`;
         act += `<button class="btn sm" onclick="applyOne('${esc(i.ec_code)}',${idx})">반영</button>`;
-        if (i.reasons.includes('dup_codes')) act += `<button class="btn sm" onclick="confirmGroup('${esc(i.ec_code)}')">합산 확정</button>`;
+        if (i.reasons.includes('dup_codes')) act += `<button class="btn sm" title="이 사이즈의 이카운트 코드 재고를 모두 더한 합계로 사이트 품절/판매를 정하고, 이 상품·사이즈는 앞으로 자동 처리해요" onclick="confirmGroup('${esc(i.ec_code)}')">합계로 반영</button>`;
         act += `<button class="btn sm sec" onclick="markIt('${esc(i.ec_code)}','ignored')">건드리지 않음</button>`;
       } else if (canAct && i.status === 'done') act += `<button class="btn sm sec" onclick="markIt('${esc(i.ec_code)}','pending')">다시 확인필요로</button>`;
       if (i.queue && (i.status === 'done')) act += `<div><small>${esc(i.queue.by)} · ${fmt(i.queue.at)}${i.queue.note ? ' · ' + esc(i.queue.note) : ''}${i.queue.reason === 'auto_applied' ? ' · 자동반영' : ''}</small></div>`;
-      h += `<tr><td><span class="chip ${CHIP[i.status]}">${LABEL[i.status]}</span>${why}</td>
-        <td>${esc(i.name || '(이름 없음)')}<br><small>${esc(i.ec_code)} · ${esc(i.size)}</small></td>
+      const cbx = canAct && ['review', 'ready'].includes(i.status) ? `<input type="checkbox" class="rowsel" data-code="${esc(i.ec_code)}" onchange="toggleSel(this.dataset.code,this.checked)">` : '';
+      const codesTxt = i.group_codes.length > 1 ? `<br><small>묶인 코드: ${i.group_codes.map(esc).join(', ')} (재고 합계 ${i.group_qty})</small>` : '';
+      h += `<tr><td>${cbx}</td><td><span class="chip ${CHIP[i.status]}">${LABEL[i.status]}</span>${why}</td>
+        <td>${esc(i.name || '(이름 없음)')}<br><small>${esc(i.ec_code)} · ${esc(i.size)}</small>${codesTxt}</td>
         <td>${i.old_qty} → <b>${i.new_qty}</b> <span class="${diff > 0 ? 'up' : 'down'}">(${diff > 0 ? '+' : ''}${diff})</span><br><small>${i.carried ? '<span class="chip c-warn">' + esc(i.carried) + '부터 이월</span> ' : fmt(i.last_at) + (i.times > 1 ? ' · ' + i.times + '회' : '')}</small></td>
         <td>${sites}</td><td>${act}</td></tr>`;
     }
