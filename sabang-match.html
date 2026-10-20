@@ -54,6 +54,7 @@
     <label class="dropzone" id="drop"><input type="file" id="file" accept=".xlsx"><span id="dropText">① 사방넷 단품대량수정 전체 엑셀(.xlsx)을 끌어다 놓거나 눌러서 선택</span></label>
     <button class="btn green" id="run" disabled>② 이카운트 재고 불러와서 매칭 실행</button>
     <button class="btn sec" id="ecRefresh" title="서버가 이카운트에서 재고를 지금 다시 받아옵니다 (이카운트 제한상 15분에 한 번만)">🔄 이카운트 재고 지금 갱신</button>
+    <button class="btn sec" id="ecNames" style="display:none">신규 품목 이름 받아오기</button>
     <span class="asof" id="asof" style="display:none"></span>
   </div>
   <div class="row" style="margin-top:10px">
@@ -337,7 +338,7 @@ function openEditor(i){
 }
 function candHtml(it, r){
   const on = EDIT.sel.has(it.code), sm = specsMatch(it.spec, r.spec);
-  return `<div class="cand ${on ? 'on' : ''}" data-c="${esc(it.code)}"><input type="checkbox" ${on ? 'checked' : ''} tabindex="-1"><div class="nm">${esc(it.code)} · ${esc(it.name)} <b>[${esc(it.spec)}]</b> ${sm ? '<span class="chip c-auto">규격 일치</span>' : ''} <small class="dim">유사도 ${nameScore(r.name, it.name).toFixed(2)}</small></div><div class="q">재고 ${it.qty}</div></div>`;
+  return `<div class="cand ${on ? 'on' : ''}" data-c="${esc(it.code)}"><input type="checkbox" ${on ? 'checked' : ''} tabindex="-1"><div class="nm">${esc(it.code)} · ${it.name ? esc(it.name) + ' <b>[' + esc(it.spec) + ']</b>' : '<i class="dim">(신규 품목 — 이름 아직 미수집, 이카운트 재고현황에서 코드로 확인)</i>'} ${sm ? '<span class="chip c-auto">규격 일치</span>' : ''} <small class="dim">유사도 ${nameScore(r.name, it.name).toFixed(2)}</small></div><div class="q">재고 ${it.qty}</div></div>`;
 }
 function drawEditor(){
   const x = S.rows[EDIT.i], r = x.row, res = x.res, mn = S.manual[r.code];
@@ -465,16 +466,20 @@ $('ecFile').onchange = async e => {
 $('ecClear').onclick = () => { S.manualEc = null; $('ecDrop').classList.remove('has-file'); $('ecDropText').textContent = '(선택) 이카운트 재고현황/재고변동표 엑셀을 올리면 그 품목들의 재고만 서버 재고 위에 덮어씁니다 (일부 품목만 든 엑셀도 OK)'; $('ecClear').style.display = 'none'; say('서버 재고만 사용합니다.'); };
 
 /* 서버 즉시 갱신: 서버가 이카운트에서 재고를 다시 받음(약 10~20초) → 사방넷 파일이 이미 선택돼 있으면 이어서 매칭까지 다시 실행 */
-$('ecRefresh').onclick = async () => {
-  const b = $('ecRefresh'); b.disabled = true;
+$('ecRefresh').onclick = () => doRefresh(false);
+$('ecNames').onclick = () => doRefresh(true);
+async function doRefresh(names){
+  const b1 = $('ecRefresh'), b2 = $('ecNames'); b1.disabled = b2.disabled = true;
   try{
-    say('서버가 이카운트에서 재고를 받아오는 중… (10~20초)');
-    const d = await ECCache.refreshNow();
-    say(`이카운트 재고를 갱신했어요 (${fmt(d.rows || 0)}품목).` + (S.file && !S.manualEc ? ' 이어서 매칭합니다…' : ''), 'ok');
-    if(S.file && !S.manualEc){ b.disabled = false; $('run').disabled = false; await $('run').onclick(); return; }
+    say(names ? '신규 품목 이름을 이카운트에서 받아오는 중…' : '서버가 이카운트에서 재고를 받아오는 중… (10~20초)');
+    const d = await ECCache.refreshNow(names);
+    b2.style.display = d.missing_names > 0 ? '' : 'none';
+    b2.textContent = `신규 품목 이름 받아오기 (${fmt(d.missing_names || 0)}개 이름 없음)`;
+    say((names ? '신규 품목 이름을 받아왔어요.' : `이카운트 재고를 갱신했어요 (${fmt(d.rows || 0)}품목).`) + (d.missing_names > 0 ? ` 이름이 아직 없는 신규 품목 ${fmt(d.missing_names)}개는 코드로만 보여요 — 15분 뒤 "신규 품목 이름 받아오기"를 누르면 채워집니다.` : '') + (S.file ? ' 이어서 매칭합니다…' : ''), 'ok');
+    if(S.file){ b1.disabled = b2.disabled = false; $('run').disabled = false; await $('run').onclick(); return; }
   }catch(e){ say(e.message, 'err'); }
-  b.disabled = false;
-};
+  b1.disabled = b2.disabled = false;
+}
 
 $('run').onclick = async () => {
   $('run').disabled = true;
@@ -487,7 +492,7 @@ $('run').onclick = async () => {
       /* 올린 엑셀은 서버 품목 목록을 "대체"하지 않고 그 위에 재고만 덮어쓴다(일부 품목만 든 엑셀이어도 나머지 품목이 사라지지 않게).
          서버를 못 쓸 때만 엑셀만으로 진행한다. */
       let base = null;
-      try{ base = await ECCache.load('master'); }catch(e){ base = null; }
+      try{ base = await ECCache.load('master', { extra:{ include_unnamed:1 }, tag:'_u' }); }catch(e){ base = null; }
       if(base && base.rows && base.rows.length){
         const items = base.rows.map(r => ({ code:r[0], name:r[1], spec:r[2], qty:r[3] })), by = {};
         items.forEach(it => { by[it.code] = it; });
@@ -500,7 +505,7 @@ $('run').onclick = async () => {
         $('asof').style.display = ''; $('asof').textContent = `⚠ 서버 재고 없이 수동 엑셀만 사용 · ${S.manualEc.name} · ${fmt(S.manualEc.items.length)}품목`;
       }
     } else {
-      const d = await ECCache.load('master');
+      const d = await ECCache.load('master', { extra:{ include_unnamed:1 }, tag:'_u' });
       buildEcIndex(d.rows.map(r => ({ code:r[0], name:r[1], spec:r[2], qty:r[3] })));
       const t = new Date(d.as_of * 1000), p = n => String(n).padStart(2,'0');
       $('asof').style.display = ''; $('asof').textContent = `이카운트 기준 ${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}` + (d.fromCache ? ' (저장본)' : '');
