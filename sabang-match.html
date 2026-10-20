@@ -538,14 +538,16 @@ $('dlListBtn').onclick = () => {
   if(!vis.length){ $('tmsg').textContent = '내려받을 줄이 없어요.'; return; }
   vis.sort((a, b) => (ORDER[a.res.status] - ORDER[b.res.status]));
   const FL = { all:'전체', change:'재고변경예정', auto:'자동확정', manual:'수동매칭', review:'확인필요', un:'미매칭_재고있음', un0:'이카운트미등록_재고0', recheck:'수동매칭재확인', none:'대응없음확정' };
-  const aoa = [['사방넷 코드','사방넷 상품명','옵션','사방넷 현재고','상태','이카운트 코드','이카운트 상품명','이카운트 재고(반영값)','사유','메모','등록자','등록일시']];
+  const aoa = [['사방넷 코드','사방넷 상품명','옵션','사방넷 현재고','상태','이카운트 코드','이카운트 상품명','이카운트 옵션','이카운트 재고(반영값)','재고 차이(이카운트-사방넷)','사유','메모','등록자','등록일시']];
   vis.forEach(x => {
     const r = x.row, res = x.res, mn = S.manual[r.code];
-    aoa.push([r.code, r.name, r.spec, r.cur, STATUS[res.status][0], res.items.map(i => i.code).join(', '), res.items.map(i => i.name + ' [' + i.spec + ']').join(' / '),
-      res.newVal == null ? '' : res.newVal, res.reasons.join(' · '), mn ? mn.memo : '', mn ? mn.u : '', mn ? new Date(mn.t*1000).toLocaleString('ko-KR') : '']);
+    const names = [...new Set(res.items.map(i => i.name))].join(' / '), specs = res.items.map(i => i.spec).join(' / ');
+    const diff = (res.newVal == null || isNaN(Number(r.cur))) ? '' : Number(res.newVal) - Number(r.cur);
+    aoa.push([r.code, r.name, r.spec, r.cur, STATUS[res.status][0], res.items.map(i => i.code).join(', '), names, specs,
+      res.newVal == null ? '' : res.newVal, diff, res.reasons.join(' · '), mn ? mn.memo : '', mn ? mn.u : '', mn ? new Date(mn.t*1000).toLocaleString('ko-KR') : '']);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:14},{wch:46},{wch:10},{wch:10},{wch:16},{wch:22},{wch:50},{wch:12},{wch:40},{wch:30},{wch:12},{wch:20}];
+  ws['!cols'] = [{wch:14},{wch:46},{wch:10},{wch:10},{wch:16},{wch:22},{wch:46},{wch:12},{wch:12},{wch:14},{wch:40},{wch:30},{wch:12},{wch:20}];
   // 사방넷 코드·이카운트 코드는 앞자리 0/하이픈이 유지되도록 텍스트로 저장
   for(let i = 1; i < aoa.length; i++){ [0, 5].forEach(c => { const ref = XLSX.utils.encode_cell({ r:i, c }); if(ws[ref]){ ws[ref].t = 's'; ws[ref].z = '@'; } }); }
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, (FL[S.filter] || '목록').slice(0, 30));
