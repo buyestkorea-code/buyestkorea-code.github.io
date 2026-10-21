@@ -224,230 +224,6 @@
     ctx.save(); ctx.globalAlpha = 0.7; font(ctx, 32, 400, T.font); setLS(ctx, 12); ctx.fillStyle = T.fg; ctx.fillText(T.label, cx + 6, y + 110); ctx.restore();
   }
 
-  // ── ① 상품 릴스 ────────────────────────────────────
-  // P: { brand, brandName, productName, price, cta, secondsPerPhoto, hook, lines[], capTheme }  imgs: ImageBitmap[]
-  function buildReelScene(P, imgs) {
-    const T = themeOf(P.brand);
-    const hook = String(P.hook || "").trim();
-    const withHook = !!hook;
-    const per = Math.round(clamp(Number(P.secondsPerPhoto) || 2.5, 1, 6) * FPS);
-    const intro = withHook ? 0 : Math.round(1.2 * FPS);
-    const n = Math.max(imgs.length, 1);
-    const outroStart = intro + per * imgs.length;
-    const total = intro + per * n + Math.round(2.5 * FPS);
-    const hookFrames = Math.min(Math.round(1.8 * FPS), per);
-    const lines = (P.lines || []).map((s) => String(s).trim());
-    const theme = P.capTheme || "box";
-    const brandName = String(P.brandName || "").toUpperCase();
-
-    function draw(ctx, frame) {
-      const pop = (start) => easeOut((frame - start) / 20);
-      ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
-      ctx.textBaseline = "alphabetic";
-
-      if (!withHook && frame < intro) { // 로고 인트로
-        const p = pop(0);
-        ctx.save(); ctx.globalAlpha = p;
-        font(ctx, 96, 400, T.font); setLS(ctx, 18); ctx.textAlign = "center"; ctx.fillStyle = T.fg;
-        ctx.fillText(T.label, W / 2 + 9, H / 2 + (1 - p) * 40);
-        ctx.restore();
-        ctx.fillStyle = T.accent; const lw = 160 * pop(6); ctx.fillRect(W / 2 - lw / 2, H / 2 + 28, lw, 3);
-      }
-
-      imgs.forEach((img, i) => { // 사진 슬라이드 (팬/줌)
-        const f = frame - (intro + i * per);
-        if (f < 0 || f >= per) return;
-        const zoom = interp(f, [0, per], i % 2 === 0 ? [1.0, 1.12] : [1.12, 1.0]);
-        const dx = interp(f, [0, per], i % 3 === 0 ? [-20, 20] : [20, -20]);
-        const op = interp(f, [0, 8, per - 8, per], [i === 0 ? 1 : 0, 1, 1, 0]);
-        ctx.save(); ctx.globalAlpha = op; drawCover(ctx, img, 0, 0, W, H, zoom, dx, 0); ctx.restore();
-      });
-
-      imgs.forEach((_, i) => { // 사진마다 화면 글자
-        if (withHook && i === 0) return;
-        const f = frame - (intro + i * per);
-        if (f < 0 || f >= per) return;
-        const line = withHook ? lines[i - 1] : lines[i];
-        if (line) {
-          drawCaption(ctx, { text: line, x: SAFE.left, y: SAFE_BOX.y + SAFE_BOX.h, anchor: "bottom", maxW: SAFE_BOX.w, size: 68, T, theme, p: easeOut((f - 4) / 20) });
-        } else {
-          const gy = SAFE_BOX.y + SAFE_BOX.h - 250;
-          const g = ctx.createLinearGradient(0, gy, 0, gy + 250);
-          g.addColorStop(0, hexA(T.bg, 0)); g.addColorStop(1, hexA(T.bg, 0.87));
-          ctx.fillStyle = g; ctx.fillRect(SAFE.left - 28, gy, SAFE_BOX.w + 56, 250);
-          ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-          font(ctx, 40, 400, T.font); setLS(ctx, 8); ctx.fillStyle = T.accent; ctx.fillText(brandName, SAFE.left, SAFE_BOX.y + SAFE_BOX.h - 110);
-          font(ctx, 60, 500, T.sans); setLS(ctx, 0); ctx.fillStyle = T.fg;
-          const pl = wrap(ctx, P.productName || "", SAFE_BOX.w).slice(0, 2);
-          pl.forEach((l, k) => ctx.fillText(l, SAFE.left, SAFE_BOX.y + SAFE_BOX.h - 40 - (pl.length - 1 - k) * 76));
-        }
-      });
-
-      if (withHook && frame < hookFrames) drawHook(ctx, T, hook, theme); // 0~2초 훅: 첫 프레임부터 보인다
-
-      if (frame >= outroStart) drawOutro(ctx, T, P, brandName, (s) => pop(outroStart + s)); // 아웃트로: 가격 + CTA
-    }
-    return { frames: total, fps: FPS, draw, prepare: null };
-  }
-
-  // ── ② 템플릿 ──────────────────────────────────────
-  // 템플릿 한 개 = 미디어 칸(slots) + 글자 줄(texts, 시작·길이 수정 가능) + 그리는 함수
-  const TEMPLATES = [
-    {
-      id: "overlay", name: "촬영본 + 자막 오버레이", brandLock: null, duration: 12, durationFromVideo: true,
-      desc: "촬영한 영상(또는 사진) 위에 브랜드 로고, 자막 두 줄, 마지막 문구를 얹습니다. 영상 길이에 맞춰 최대 60초.",
-      slots: [{ id: "clip", label: "촬영본 (영상 또는 사진)", accept: "video/*,image/*" }],
-      texts: [
-        { id: "l1", label: "자막 1", text: "밀라노에서\n직접 바잉한", start: 1, dur: 4 },
-        { id: "l2", label: "자막 2", text: "이번 시즌\n신상 입고", start: 5, dur: 4 },
-        { id: "cta", label: "마지막 문구", text: "DM으로 문의주세요", start: 9, dur: 3, cta: true },
-      ],
-      draw(ctx, t, S) {
-        const { T, theme } = S;
-        ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
-        if (S.media.clip) drawMedia(ctx, S.media.clip, t, S.dur, 0, 0, W, H, 1 + 0.06 * (t / S.dur));
-        const g = ctx.createLinearGradient(0, 0, 0, H);
-        g.addColorStop(0, "rgba(0,0,0,.35)"); g.addColorStop(0.3, "rgba(0,0,0,0)"); g.addColorStop(0.6, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.75)");
-        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-        ctx.save(); font(ctx, 44, 400, T.font); setLS(ctx, 16); ctx.fillStyle = "#f5f1ea"; ctx.textAlign = "center";
-        ctx.globalAlpha = easeOut((t - 0.3) / 0.6); ctx.fillText(T.label, W / 2 + 8, SAFE.top + 20); ctx.restore();
-        S.texts.forEach((x) => {
-          if (t < x.start || t >= x.start + x.dur) return;
-          const p = Math.min(easeOut((t - x.start) / 0.5), easeOut((x.start + x.dur - t) / 0.35));
-          if (x.cta) {
-            drawCaption(ctx, { text: x.text, x: SAFE.left, y: SAFE_BOX.y + SAFE_BOX.h - 20, anchor: "bottom", maxW: SAFE_BOX.w, size: 46, T: { ...T, bg: "#000", fg: "#f5f1ea", accent: T.accent }, theme, p, color: T.accent === "#e8a0a0" ? "#ffffff" : T.accent });
-          } else {
-            drawCaption(ctx, { text: x.text, x: SAFE.left, y: SAFE_BOX.y + SAFE_BOX.h - 190, anchor: "bottom", maxW: SAFE_BOX.w, size: 78, weight: 800, T: { ...T, bg: "#000", fg: "#f5f1ea" }, theme, p });
-          }
-        });
-      },
-    },
-    {
-      id: "kidsnew", name: "키즈 신상 타이틀", brandLock: "kids", duration: 8,
-      desc: "사진 2장을 둥근 카드에 한 장씩 보여 주고 NEW ARRIVAL 문구를 올립니다. (BUYEST Kids 톤)",
-      slots: [{ id: "p1", label: "사진 1", accept: "image/*" }, { id: "p2", label: "사진 2", accept: "image/*" }],
-      texts: [
-        { id: "title", label: "윗줄", text: "NEW ARRIVAL", start: 0.5, dur: 7.5, big: true },
-        { id: "name", label: "브랜드명 · 상품명", text: "브랜드명 · 상품명", start: 1, dur: 7 },
-      ],
-      draw(ctx, t, S) {
-        const T = themeOf("kids");
-        ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
-        ctx.save(); font(ctx, 40, 400, T.font); setLS(ctx, 14); ctx.fillStyle = T.fg; ctx.textAlign = "center"; ctx.fillText(T.label, W / 2 + 7, SAFE.top + 10); ctx.restore();
-        [["p1", 0, 4], ["p2", 4, 8]].forEach(([id, a, b]) => {
-          if (t < a || t >= b) return;
-          const img = S.media[id]; if (!img) return;
-          const p = easeOut((t - a) / 0.6), out = easeOut((b - t) / 0.4);
-          ctx.save(); ctx.globalAlpha = Math.min(p, out);
-          ctx.translate((1 - p) * 120, 0);
-          ctx.shadowColor = "rgba(43,43,43,.18)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 18;
-          roundRect(ctx, 90, 380, 900, 1000, 40); ctx.fillStyle = "#fff"; ctx.fill(); ctx.shadowColor = "transparent";
-          ctx.clip(); drawCover(ctx, img.el, 90, 380, 900, 1000, 1 + 0.06 * ((t - a) / (b - a)), 0, 0);
-          ctx.restore();
-        });
-        S.texts.forEach((x) => {
-          if (t < x.start || t >= x.start + x.dur) return;
-          const p = Math.min(easeOut((t - x.start) / 0.5), 1);
-          ctx.save(); ctx.globalAlpha = p; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-          if (x.big) { font(ctx, 64, 800, T.sans); setLS(ctx, 2); ctx.fillStyle = T.accent; ctx.fillText(x.text, W / 2, SAFE.top + 110 + (1 - p) * 20); }
-          else { font(ctx, 48, 500, T.sans); setLS(ctx, 0); ctx.fillStyle = T.fg; const ls = wrap(ctx, x.text, 900).slice(0, 2); ls.forEach((l, k) => ctx.fillText(l, W / 2, 1480 + k * 62 + (1 - p) * 20)); }
-          ctx.restore();
-        });
-      },
-    },
-    {
-      id: "collage", name: "정보형 콜라주 (가격·소재·사이즈)", brandLock: null, duration: 10,
-      desc: "사진 1~4장을 폴라로이드처럼 겹쳐 붙이고, 아래에 가격·소재·사이즈 같은 정보를 한 줄씩 띄웁니다. 정보형 릴스용.",
-      slots: [
-        { id: "c1", label: "사진 1", accept: "image/*" }, { id: "c2", label: "사진 2 (선택)", accept: "image/*", optional: true },
-        { id: "c3", label: "사진 3 (선택)", accept: "image/*", optional: true }, { id: "c4", label: "사진 4 (선택)", accept: "image/*", optional: true },
-      ],
-      texts: [
-        { id: "title", label: "제목", text: "상품명", start: 0.3, dur: 9.7, title: true },
-        { id: "i1", label: "정보 1", key: "가격", text: "₩890,000", start: 3.0, dur: 7 },
-        { id: "i2", label: "정보 2", key: "소재", text: "광택 나일론", start: 4.2, dur: 5.8 },
-        { id: "i3", label: "정보 3", key: "사이즈", text: "4A~10A", start: 5.4, dur: 4.6 },
-        { id: "i4", label: "정보 4", key: "원산지", text: "이탈리아", start: 6.6, dur: 3.4 },
-        { id: "cta", label: "마지막 문구", text: "댓글에 '사이즈' 남겨 주세요", start: 8, dur: 2, cta: true },
-      ],
-      draw(ctx, t, S) {
-        const { T } = S;
-        ctx.fillStyle = T.dark ? "#161513" : T.bg; ctx.fillRect(0, 0, W, H);
-        // 종이 질감 점
-        const rr = rnd(7); ctx.fillStyle = T.dark ? "rgba(255,255,255,.035)" : "rgba(0,0,0,.035)";
-        for (let i = 0; i < 260; i++) ctx.fillRect(rr() * W, rr() * H, 3, 3);
-        const ids = ["c1", "c2", "c3", "c4"].filter((id) => S.media[id]);
-        const spots = [[-5, 90, 330, 380, 310], [4, 470, 345, 380, 310], [4, 90, 670, 380, 310], [-4, 470, 680, 380, 310]];
-        // 사진 장수에 따라 배치를 키운다
-        const layoutOne = [[-3, 150, 340, 600, 630]];
-        const layoutTwo = [[-5, 100, 330, 520, 330], [5, 320, 655, 520, 330]];
-        const L = ids.length === 1 ? layoutOne : ids.length === 2 ? layoutTwo : spots;
-        ids.forEach((id, i) => {
-          const [rot, x, y, w, h] = L[i]; const p = easeOut((t - 0.6 - i * 0.35) / 0.55);
-          if (p <= 0) return;
-          const s = 0.7 + 0.3 * p;
-          ctx.save(); ctx.globalAlpha = clamp(p * 1.5, 0, 1);
-          ctx.translate(x + w / 2, y + h / 2); ctx.rotate((rot * Math.PI) / 180); ctx.scale(s, s); ctx.translate(-w / 2, -h / 2);
-          ctx.shadowColor = "rgba(0,0,0,.4)"; ctx.shadowBlur = 28; ctx.shadowOffsetY = 12;
-          ctx.fillStyle = "#faf7f0"; ctx.fillRect(0, 0, w, h); ctx.shadowColor = "transparent";
-          drawCover(ctx, S.media[id].el, 18, 18, w - 36, h - 90, 1 + 0.05 * clamp((t - 1) / 8, 0, 1), 0, 0);
-          // 테이프
-          ctx.fillStyle = "rgba(230,215,160,.8)"; ctx.save(); ctx.translate(w / 2 - 60, -14); ctx.rotate(-0.04); ctx.fillRect(0, 0, 120, 38); ctx.restore();
-          ctx.restore();
-        });
-        const tx = S.texts.find((x) => x.title);
-        if (tx) drawText(ctx, tx.text, SAFE.left, SAFE.top + 4, { size: 56, weight: 800, color: T.fg, p: easeOut((t - tx.start) / 0.5), family: T.sans, maxW: SAFE_BOX.w, maxLines: 1 });
-        const infos = S.texts.filter((x) => x.key !== undefined);
-        const baseY = 1000;
-        infos.forEach((x, i) => {
-          if (t < x.start || t >= x.start + x.dur + 0.01) return;
-          const p = easeOut((t - x.start) / 0.45);
-          const y = baseY + i * 76;
-          ctx.save(); ctx.globalAlpha = p; ctx.translate((1 - p) * -80, 0);
-          roundRect(ctx, SAFE.left, y, SAFE_BOX.w, 64, 32); ctx.fillStyle = hexA(T.dark ? "#f5f1ea" : "#2b2b2b", 0.10); ctx.fill();
-          font(ctx, 28, 700, T.sans); setLS(ctx, 4); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = T.accent; ctx.fillText(String(x.key || ""), SAFE.left + 30, y + 33);
-          font(ctx, 36, 600, T.sans); setLS(ctx, 0); ctx.fillStyle = T.fg; ctx.textAlign = "right"; ctx.fillText(x.text, SAFE.left + SAFE_BOX.w - 30, y + 33);
-          ctx.restore();
-        });
-        const cta = S.texts.find((x) => x.cta);
-        if (cta && t >= cta.start && t < cta.start + cta.dur + 0.01) {
-          drawCaption(ctx, { text: cta.text, x: SAFE.left + SAFE_BOX.w / 2, y: SAFE_BOX.y + SAFE_BOX.h - 10, anchor: "bottom", align: "center", maxW: SAFE_BOX.w, size: 44, T, theme: S.theme === "box" ? "paper" : S.theme, p: easeOut((t - cta.start) / 0.45) });
-        }
-      },
-    },
-  ];
-
-  function drawText(ctx, text, x, y, o) {
-    ctx.save(); ctx.globalAlpha = clamp(o.p, 0, 1);
-    font(ctx, o.size, o.weight, o.family); setLS(ctx, 0); ctx.fillStyle = o.color; ctx.textAlign = "left"; ctx.textBaseline = "top";
-    wrap(ctx, text, o.maxW || 900).slice(0, o.maxLines || 2).forEach((l, i) => ctx.fillText(l, x, y + i * o.size * 1.25 + (1 - clamp(o.p, 0, 1)) * 24));
-    ctx.restore();
-  }
-
-  // 미디어(영상/사진)를 시간 t 에 맞춰 그린다. 영상은 이미 해당 시각으로 이동(seek)되어 있어야 한다
-  function drawMedia(ctx, m, t, dur, x, y, w, h, zoom) {
-    if (!m) return;
-    drawCover(ctx, m.el, x, y, w, h, zoom, 0, 0);
-  }
-
-  // 템플릿 장면. S = { T, theme, media:{slot: {el, isVideo, duration}}, texts:[...], dur }
-  function buildTemplateScene(tpl, S) {
-    let dur = tpl.duration;
-    const clip = S.media && S.media[tpl.slots[0] && tpl.slots[0].id];
-    if (tpl.durationFromVideo && clip && clip.isVideo && clip.duration) dur = clamp(Math.round(clip.duration * 10) / 10, 3, 60);
-    S.dur = dur;
-    const frames = Math.round(dur * FPS);
-    return {
-      frames, fps: FPS,
-      async prepare(frame) {
-        for (const id in S.media) {
-          const m = S.media[id];
-          if (m && m.isVideo) await seekVideo(m.el, m.duration ? (frame / FPS) % m.duration : frame / FPS);
-        }
-      },
-      draw(ctx, frame) { tpl.draw(ctx, frame / FPS, S); },
-    };
-  }
   function seekVideo(v, time) {
     return new Promise((res) => {
       if (Math.abs(v.currentTime - time) < 0.001) return res();
@@ -510,19 +286,57 @@
   }
 
   // scene → MP4 Blob.  opts: { onProgress(0~1), signal }
+
+  // ── 오디오: AI 영상의 소리를 그대로 이어 붙이기 ───────────────
+  // MP4(소리 포함)를 디코딩해서 AAC 로 다시 인코딩한다. 소리가 없거나 이 브라우저가 못 하면 null (영상만 만든다)
+  async function decodeAudio(blob) {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC || typeof AudioEncoder === "undefined" || typeof AudioData === "undefined") return null;
+      const ctx = new AC();
+      try { return await ctx.decodeAudioData(await blob.arrayBuffer()); } finally { try { ctx.close(); } catch (_) {} }
+    } catch (_) { return null; }
+  }
+  async function audioConfig(buf) {
+    const base = { codec: "mp4a.40.2", sampleRate: buf.sampleRate, numberOfChannels: Math.min(2, buf.numberOfChannels), bitrate: 128000 };
+    try { const r = await AudioEncoder.isConfigSupported(base); return r && r.supported ? base : null; } catch (_) { return null; }
+  }
+  async function encodeAudio(buf, cfg, muxer, totalSec) {
+    let err = null;
+    const enc = new AudioEncoder({ output: (chunk, meta) => muxer.addAudioChunk(chunk, meta), error: (e) => { err = e; } });
+    enc.configure(cfg);
+    const ch = cfg.numberOfChannels, sr = buf.sampleRate, total = Math.min(buf.length, Math.round(totalSec * sr)), step = 4096;
+    const data = []; for (let c = 0; c < ch; c++) data.push(buf.getChannelData(Math.min(c, buf.numberOfChannels - 1)));
+    for (let off = 0; off < total; off += step) {
+      const n = Math.min(step, total - off), planar = new Float32Array(n * ch);
+      for (let c = 0; c < ch; c++) planar.set(data[c].subarray(off, off + n), c * n);
+      const ad = new AudioData({ format: "f32-planar", sampleRate: sr, numberOfFrames: n, numberOfChannels: ch, timestamp: Math.round((off / sr) * 1e6), data: planar });
+      enc.encode(ad); ad.close();
+      while (enc.encodeQueueSize > 16) await yieldNow();
+      if (err) throw err;
+    }
+    await enc.flush(); enc.close();
+    if (err) throw err;
+  }
+
+  // scene → MP4 Blob.  opts: { onProgress(0~1, ms), signal, audio: AudioBuffer|null }
   async function renderToMp4(scene, opts) {
     opts = opts || {};
     if (!supported()) throw new Error("이 브라우저는 영상 만들기를 지원하지 않습니다. 최신 Chrome 또는 Edge, 최신 iPhone Safari 로 열어 주세요.");
     const cfg = await pickConfig();
     if (!cfg) throw new Error("이 기기에서 MP4(H.264) 인코더를 찾지 못했습니다. Chrome 최신 버전 PC에서 열어 주세요.");
+    const aCfg = opts.audio ? await audioConfig(opts.audio) : null;
     const canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d", { alpha: false });
-    const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: "avc", width: W, height: H }, fastStart: "in-memory" });
+    const muxer = new Mp4Muxer.Muxer({
+      target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: "avc", width: W, height: H }, fastStart: "in-memory",
+      ...(aCfg ? { audio: { codec: "aac", numberOfChannels: aCfg.numberOfChannels, sampleRate: aCfg.sampleRate } } : {}),
+    });
     let encErr = null;
     const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => { encErr = e; } });
     enc.configure(cfg);
     const t0 = performance.now();
     try {
+      if (aCfg) await encodeAudio(opts.audio, aCfg, muxer, scene.frames / FPS);
       for (let i = 0; i < scene.frames; i++) {
         if (opts.signal && opts.signal.aborted) throw new Error("취소했습니다");
         if (encErr) throw encErr;
@@ -542,53 +356,36 @@
     return new Blob([muxer.target.buffer], { type: "video/mp4" });
   }
 
-  // ── AI 자동 릴스 장면 ───────────────────────────────
-  // 컷마다 (AI 움직임 영상 또는 사진) + 화면 글자. 처음 1.8초는 훅, 끝에는 가격·요청 화면.
-  // P: { brand, brandName, productName, hook, price, cta, capTheme }
-  // shots: [{ media: { el, isVideo, duration }, seconds, caption }]
-  function buildStoryScene(P, shots) {
+  // ── 릴스 장면: AI 영상(또는 미리보기용 사진) 위에 훅·자막을 얹고, 끝에 가격·요청 화면을 붙인다 ──
+  // P: { brand, brandName, productName, hook, captions[], price, cta, capTheme, outro }
+  // clip: { el, isVideo, duration }  (미리보기에서는 사진, duration 은 길이(초))
+  function buildClipScene(P, clip, durationSec) {
     const T = themeOf(P.brand), theme = P.capTheme || "box";
     const hook = String(P.hook || "").trim();
-    const FADE = 8, hookFrames = hook ? Math.round(1.8 * FPS) : 0;
-    let at = 0;
-    const tl = shots.map((s, i) => { const fr = Math.max(1, Math.round(clamp(Number(s.seconds) || 3, 1, 10) * FPS)); const o = { ...s, i, start: at, fr }; at += fr; return o; });
-    const outroStart = at, total = outroStart + Math.round(2.5 * FPS);
+    const dur = Math.max(1, clip && clip.isVideo && clip.duration ? clip.duration : durationSec || 10);
+    const clipFrames = Math.round(dur * FPS);
+    const outroOn = !!P.outro && !!(P.price || P.cta || P.productName);
+    const total = clipFrames + (outroOn ? Math.round(2.5 * FPS) : 0);
+    const hookFrames = hook ? Math.min(Math.round(1.8 * FPS), clipFrames) : 0;
+    const caps = (P.captions || []).map((s) => String(s).trim()).filter(Boolean);
     const brandName = String(P.brandName || "").toUpperCase();
-    const which = (frame) => tl.findIndex((s) => frame >= s.start && frame < s.start + s.fr);
-    const clipTime = (sh, local) => { const m = sh.media; return Math.min(local / FPS, Math.max(0, (m.duration || 1) - 0.05)); };
-
-    function drawShot(ctx, sh, local) {
-      const m = sh.media; if (!m) return;
-      if (m.isVideo) { drawCover(ctx, m.el, 0, 0, W, H, 1, 0, 0); return; }
-      // 사진만 쓴 컷은 천천히 팬/줌
-      const zoom = interp(local, [0, sh.fr], sh.i % 2 === 0 ? [1.0, 1.12] : [1.12, 1.0]);
-      const dx = interp(local, [0, sh.fr], sh.i % 3 === 0 ? [-20, 20] : [20, -20]);
-      drawCover(ctx, m.el, 0, 0, W, H, zoom, dx, 0);
-    }
+    const slot = caps.length ? Math.max(1, Math.floor((clipFrames - hookFrames) / caps.length)) : 0;
     return {
-      frames: total, fps: FPS,
-      async prepare(frame) {
-        const i = which(frame); if (i < 0) return;
-        const sh = tl[i], local = frame - sh.start;
-        if (sh.media && sh.media.isVideo) await seekVideo(sh.media.el, clipTime(sh, local));
-        if (i > 0 && local < FADE) { const pv = tl[i - 1]; if (pv.media && pv.media.isVideo && pv.media !== sh.media) await seekVideo(pv.media.el, clipTime(pv, pv.fr - 1)); }
-      },
+      frames: total, fps: FPS, clipFrames,
+      async prepare(frame) { if (clip && clip.isVideo && frame < clipFrames) await seekVideo(clip.el, Math.min(frame / FPS, Math.max(0, clip.duration - 0.05))); },
       draw(ctx, frame) {
-        ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H);
-        ctx.textBaseline = "alphabetic";
-        if (frame >= outroStart) { drawOutro(ctx, T, { productName: P.productName, price: P.price, cta: P.cta }, brandName, (s) => easeOut((frame - outroStart - s) / 20 + 0)); return; }
-        const i = which(frame), sh = tl[i], local = frame - sh.start;
-        if (i > 0 && local < FADE) drawShot(ctx, tl[i - 1], tl[i - 1].fr - 1); // 앞 컷 위로 부드럽게 겹친다
-        ctx.save(); ctx.globalAlpha = i > 0 ? interp(local, [0, FADE], [0, 1]) : 1; drawShot(ctx, sh, local); ctx.restore();
-        if (hook && i === 0 && frame < hookFrames) { drawHook(ctx, T, hook, theme); return; }
-        if (sh.caption) {
-          const from = i === 0 && hook ? hookFrames : 4;
-          const out = interp(local, [sh.fr - 6, sh.fr], [1, 0]);
-          drawCaption(ctx, { text: sh.caption, x: SAFE.left, y: SAFE_BOX.y + SAFE_BOX.h, anchor: "bottom", maxW: SAFE_BOX.w, size: 68, T, theme, p: Math.min(easeOut((local - from) / 20), out) });
+        ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H); ctx.textBaseline = "alphabetic";
+        if (frame >= clipFrames) { drawOutro(ctx, T, { productName: P.productName, price: P.price, cta: P.cta }, brandName, (s) => easeOut((frame - clipFrames - s) / 20)); return; }
+        if (clip && clip.el) drawCover(ctx, clip.el, 0, 0, W, H, clip.isVideo ? 1 : interp(frame, [0, clipFrames], [1, 1.08]), 0, 0);
+        if (hook && frame < hookFrames) { drawHook(ctx, T, hook, theme); return; }
+        if (caps.length) {
+          const k = Math.min(caps.length - 1, Math.floor((frame - hookFrames) / slot)), local = frame - hookFrames - k * slot;
+          const fadeOut = interp(local, [slot - 6, slot], [1, 0]);
+          drawCaption(ctx, { text: caps[k], x: SAFE.left, y: SAFE_BOX.y + SAFE_BOX.h, anchor: "bottom", maxW: SAFE_BOX.w, size: 68, T, theme, p: Math.min(easeOut(local / 20), fadeOut) });
         }
       },
     };
   }
 
-  window.SE = { W, H, FPS, SAFE, THEMES, themeOf, CAPTION_THEMES, TEMPLATES, buildReelScene, buildStoryScene, buildTemplateScene, loadMedia, loadImage, ensureFonts, renderToMp4, supported, wrap };
+  window.SE = { W, H, FPS, SAFE, THEMES, themeOf, CAPTION_THEMES, buildClipScene, decodeAudio, loadMedia, loadImage, ensureFonts, renderToMp4, supported, wrap };
 })();
