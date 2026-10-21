@@ -183,6 +183,7 @@
   @media (max-width:1100px){ .me-herorow{ flex-wrap:wrap; } .me-hrcard{ flex:1 1 100%; } }
   .navst{ margin-left:auto; flex:none; width:16px; height:16px; display:inline-flex; }
   .navst svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .navbadge{ margin-left:6px; background:#dc2626; color:#fff; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:999px; }
   .navst-ok{ color:#84C98A; } .navst-test{ color:#E0A83A; } .navst-lock{ color:var(--side-mut); }
   .nav-item.active .navst{ color:#fff; }
   .sidebar{ gap:12px; padding:16px 12px 20px; }
@@ -990,10 +991,6 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 15a4 4 0 0 1 0-6h2"/><path d="M15 9a4 4 0 0 1 0 6h-2"/><path d="M9 12h6"/></svg></span>
         사방넷-이카운트 매칭<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
-      <button class="nav-item" data-nav="icmTest">
-        <span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg></span>
-        사방넷-이카운트매칭 TEST<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
-      </button>
       <button class="nav-item" data-nav="sabangMatchTest">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 15a4 4 0 0 1 0-6h2"/><path d="M15 9a4 4 0 0 1 0 6h-2"/><path d="M9 12h6"/><path d="M4 4v4M2 6h4"/></svg></span>
         TEST 사방넷-이카운트 매칭 관리<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
@@ -1001,10 +998,6 @@
       <button class="nav-item" data-nav="sabangBaseregi">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/><path d="m14.5 15.5 2 2 3.5-3.5"/></svg></span>
         사방넷 기초등록<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
-      </button>
-      <button class="nav-item" data-nav="stockMove">
-        <span class="ic"><svg viewBox="0 0 24 24"><path d="M12.6 3H20a1 1 0 0 1 1 1v7.4a1 1 0 0 1-.29.7l-8.3 8.3a1 1 0 0 1-1.42 0l-7.4-7.4a1 1 0 0 1 0-1.42l8.3-8.3a1 1 0 0 1 .71-.28Z"/><circle cx="16" cy="8" r="1.3"/></svg></span>
-        MD 품절<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="icm">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg></span>
@@ -1050,17 +1043,25 @@
         <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10.5" r="1.6"/><path d="m21 16-5-5-8 8"/></svg></span>
         TEST 사진 자동 찾기<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
+      <button class="nav-item" data-nav="kidsDm">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.500h8M8 12.500h5"/></svg></span>
+        키즈 인스타 DM 자동화<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+      </button>
     </nav>
 
     <nav class="nav-group">
       <span class="nav-group-label">사이트 품절</span>
-      <button class="nav-item" data-nav="buyestSoldOut">
+      <button class="nav-item" data-nav="buyestSoldOut" style="display:none" hidden>
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
         바이스트사이트 품절<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
       <button class="nav-item" data-nav="buyestSoldOutTest">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
         TEST 바이스트사이트 품절<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+      </button>
+      <button class="nav-item" data-nav="ecountChangeTest">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 10 5 4h14l1 6"/><path d="M4 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
+        TEST 오늘 변동 자동확인<span class="navbadge" id="chgBadge" style="display:none"></span><span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
       <button class="nav-item" data-nav="seasonSoldOut">
         <span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8 3v4M16 3v4"/></svg></span>
@@ -1389,12 +1390,7 @@
             <h3>사방넷 기초등록</h3>
             <p>자사몰 등록 엑셀을 사방넷 업로드 양식으로 자동 변환합니다. 브랜드·카테고리·색상 미매칭은 화면에서 바로 입력/저장하면 다음부터 자동 반영됩니다.</p>
           </button>
-          <button class="tool-card" data-nav="stockMove">
-            <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
-            <h3>MD 품절</h3>
-            <p>이카운트 재고변동표의 잔량을 품목명·규격 기준으로 사방넷 단품대량수정 엑셀과 매칭해, 변동이 있는 품목만 현재고를 갱신한 파일로 내려받습니다.</p>
-          </button>
-          <button class="tool-card" data-nav="buyestSoldOut">
+          <button class="tool-card" data-nav="buyestSoldOut" style="display:none" hidden>
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>바이스트사이트 품절</h3>
             <p>이카운트 재고변동표를 올리면 그 품목만 이카운트 API로 최신 재고를 다시 확인해, BUYEST 사이트 DB에 직접 품절/판매 상태를 반영합니다.</p>
@@ -1911,6 +1907,10 @@
         <iframe data-src="price-check.html" title="TEST 최저가 조회" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <section data-view="kidsDm">
+        <iframe data-src="kids-dm.html" title="키즈 인스타 DM 자동화" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <section data-view="photoFinderTest">
         <iframe data-src="photo-finder.html" title="TEST 사진 자동 찾기" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
@@ -1940,6 +1940,10 @@
         <iframe data-src="ecount-sync-delta-test.html" title="TEST 바이스트사이트 품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+
+      <section data-view="ecountChangeTest">
+        <iframe data-src="ecount-change-test.html" title="TEST 오늘 변동 자동확인" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
 
       <section data-view="seasonSoldOut">
         <iframe data-src="season-soldout.html" title="바이스트사이트 시즌품절" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
@@ -2048,9 +2052,9 @@ window.__loadLib = (function(){
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', videoStudio:'영상 스튜디오', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
-    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'사방넷-이카운트매칭 TEST', sabangMatchTest:'TEST 사방넷-이카운트 매칭 관리', stocktake:'재고조사 (바코드 실사)',
+    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', ecountChangeTest:'TEST 오늘 변동 자동확인', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'사방넷-이카운트매칭 TEST', sabangMatchTest:'TEST 사방넷-이카운트 매칭 관리', stocktake:'재고조사 (바코드 실사)',
     listCheck:'품번 리스트 재고확인', costCheck:'상품가격체크', seasonCheck:'물류팀 시즌체크', barcodeStock:'바코드 재고조회', ecountQty:'이카운트재고조회', kreamSoldOut:'크림 품절 정리',
-    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', hrAdmin:'직원관리', barcodeListTest:'TEST 바코드→리스트화', priceCheckTest:'TEST 최저가 조회', photoFinderTest:'TEST 사진 자동 찾기', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', hrAdmin:'직원관리', barcodeListTest:'TEST 바코드→리스트화', priceCheckTest:'TEST 최저가 조회', photoFinderTest:'TEST 사진 자동 찾기', kidsDm:'키즈 인스타 DM 자동화', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
   };
 
   /* ---------------- 개발중메뉴 (buyest, buyest1 전용, 내부적으로는 비밀 채팅방) ----------------
@@ -8651,3 +8655,16 @@ window.__loadLib = (function(){
 })();
 </script>
 <script src="colresize.js"></script>
+<script>
+/* 사이드바 "TEST 오늘 변동 자동확인" 배지: 아직 처리 안 된 확인필요 건수(5분마다). 로그인 안 했거나 실패하면 조용히 숨김 */
+(function(){
+  function tick(){
+    var a=null; try{ a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); }catch(e){}
+    var el=document.getElementById('chgBadge'); if(!el) return;
+    if(!a||!a.id||!a.pass){ el.style.display='none'; return; }
+    fetch('https://buyest.co.kr/ecount_change_today_api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:a.id,pass:a.pass,action:'badge'})})
+      .then(function(r){return r.json();}).then(function(d){ if(d&&d.ok&&d.pending>0){ el.textContent='확인필요 '+d.pending; el.style.display='inline-block'; } else el.style.display='none'; }).catch(function(){});
+  }
+  setTimeout(tick,3000); setInterval(tick,300000);
+})();
+</script>

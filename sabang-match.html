@@ -53,7 +53,13 @@
   <div class="row">
     <label class="dropzone" id="drop"><input type="file" id="file" accept=".xlsx"><span id="dropText">① 사방넷 단품대량수정 전체 엑셀(.xlsx)을 끌어다 놓거나 눌러서 선택</span></label>
     <button class="btn green" id="run" disabled>② 이카운트 재고 불러와서 매칭 실행</button>
+    <button class="btn sec" id="ecRefresh" title="서버가 이카운트에서 재고를 지금 다시 받아옵니다 (이카운트 제한상 15분에 한 번만)">🔄 이카운트 재고 지금 갱신</button>
+    <button class="btn sec" id="ecNames" style="display:none">신규 품목 이름 받아오기</button>
     <span class="asof" id="asof" style="display:none"></span>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <label class="dropzone" id="ecDrop" style="padding:10px 12px"><input type="file" id="ecFile" accept=".xlsx,.xls"><span id="ecDropText">(선택) 이카운트 재고현황/재고변동표 엑셀을 올리면 그 품목들의 재고만 서버 재고 위에 덮어씁니다 (일부 품목만 든 엑셀도 OK)</span></label>
+    <button class="btn sec sm" id="ecClear" style="display:none">직접 올린 재고 해제(서버 재고로)</button>
   </div>
   <div class="msg" id="msg"></div>
 </div>
@@ -332,7 +338,7 @@ function openEditor(i){
 }
 function candHtml(it, r){
   const on = EDIT.sel.has(it.code), sm = specsMatch(it.spec, r.spec);
-  return `<div class="cand ${on ? 'on' : ''}" data-c="${esc(it.code)}"><input type="checkbox" ${on ? 'checked' : ''} tabindex="-1"><div class="nm">${esc(it.code)} · ${esc(it.name)} <b>[${esc(it.spec)}]</b> ${sm ? '<span class="chip c-auto">규격 일치</span>' : ''} <small class="dim">유사도 ${nameScore(r.name, it.name).toFixed(2)}</small></div><div class="q">재고 ${it.qty}</div></div>`;
+  return `<div class="cand ${on ? 'on' : ''}" data-c="${esc(it.code)}"><input type="checkbox" ${on ? 'checked' : ''} tabindex="-1"><div class="nm">${esc(it.code)} · ${it.name ? esc(it.name) + ' <b>[' + esc(it.spec) + ']</b>' : '<i class="dim">(신규 품목 — 이름 아직 미수집, 이카운트 재고현황에서 코드로 확인)</i>'} ${sm ? '<span class="chip c-auto">규격 일치</span>' : ''} <small class="dim">유사도 ${nameScore(r.name, it.name).toFixed(2)}</small></div><div class="q">재고 ${it.qty}</div></div>`;
 }
 function drawEditor(){
   const x = S.rows[EDIT.i], r = x.row, res = x.res, mn = S.manual[r.code];
@@ -417,6 +423,64 @@ $('file').onchange = e => pickFile(e.target.files[0]);
 $('drop').addEventListener('drop', e => pickFile(e.dataTransfer.files[0]));
 $('q').oninput = e => { S.q = e.target.value; S.limit = 300; clearTimeout(S.qt); S.qt = setTimeout(render, 200); };
 
+/* 이카운트 재고현황/재고변동표 엑셀 → [{code,name,spec,qty}] (헤더 행의 품목코드·품목명·규격·재고 열을 이름으로 찾음) */
+function parseEcExcel(aoa){
+  let h = -1;
+  for(let i = 0; i < Math.min(aoa.length, 15); i++){ if((aoa[i] || []).some(c => String(c == null ? '' : c).replace(/\s/g,'') === '품목코드')){ h = i; break; } }
+  const col = {};
+  if(h >= 0){
+    const hdr = [aoa[h] || [], aoa[h+1] || []];
+    hdr.forEach(r => r.forEach((c, j) => { const k = String(c == null ? '' : c).replace(/\s/g,''); if(k && !(k in col)) col[k] = j; }));
+  }
+  const qk = ['잔량','재고수량','현재고','현재재고','재고','수량'].find(k => k in col);
+  let cc, cn, cs, cq, start;
+  if(h >= 0 && qk && '품목명' in col){ cc = col['품목코드']; cn = col['품목명']; cs = ('규격' in col) ? col['규격'] : -1; cq = col[qk]; start = h + 1; }
+  else { cc = 0; cn = 1; cs = -1; cq = 2; start = 2; }   // 기본 재고현황 양식: A=품목코드, B=품목명[규격], C=재고
+  const by = {}, items = [];
+  for(let r = start; r < aoa.length; r++){
+    const row = aoa[r]; if(!row) continue;
+    const code = String(row[cc] == null ? '' : row[cc]).trim(), nm = String(row[cn] == null ? '' : row[cn]).trim();
+    if(!code || !nm || !/^[0-9A-Za-z-]+$/.test(code)) continue;
+    let name = nm, spec = cs >= 0 ? String(row[cs] == null ? '' : row[cs]).trim() : '';
+    if(cs < 0){ const m = /^(.*?)\s*\[([^\[\]]*)\]\s*$/.exec(nm); if(m){ name = m[1].trim(); spec = m[2].trim(); } }
+    const q = Number(String(row[cq] == null ? 0 : row[cq]).replace(/,/g,'')) || 0;
+    if(by[code]){ by[code].qty += q; } else { by[code] = { code, name, spec, qty:q }; items.push(by[code]); }
+  }
+  return items;
+}
+$('ecFile').onchange = async e => {
+  const f = e.target.files[0]; if(!f) return;
+  try{
+    say('이카운트 재고 엑셀을 읽는 중…');
+    const wb = XLSX.read(await f.arrayBuffer(), { type:'array' });
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'' });
+    const items = parseEcExcel(aoa);
+    if(items.length < 1) throw new Error('인식된 품목이 없어요. 품목코드·품목명·재고(잔량) 열이 있는 이카운트 엑셀인지 확인해 주세요.');
+    S.manualEc = { name:f.name, items };
+    $('ecDrop').classList.add('has-file'); $('ecDropText').textContent = '✓ ' + f.name + ' · ' + fmt(items.length) + '품목 인식 (②번 실행 시 서버 재고 위에 덮어씀)';
+    $('ecClear').style.display = '';
+    say('이카운트 재고 ' + fmt(items.length) + '품목을 읽었어요.' + ' 서버 재고 위에 이 품목들의 재고만 덮어써요(나머지 품목은 서버 값 유지). ' + (S.file ? ' ②번을 눌러 주세요.' : ''), 'ok');
+  }catch(err){ S.manualEc = null; say(err.message, 'err'); }
+  e.target.value = '';
+};
+$('ecClear').onclick = () => { S.manualEc = null; $('ecDrop').classList.remove('has-file'); $('ecDropText').textContent = '(선택) 이카운트 재고현황/재고변동표 엑셀을 올리면 그 품목들의 재고만 서버 재고 위에 덮어씁니다 (일부 품목만 든 엑셀도 OK)'; $('ecClear').style.display = 'none'; say('서버 재고만 사용합니다.'); };
+
+/* 서버 즉시 갱신: 서버가 이카운트에서 재고를 다시 받음(약 10~20초) → 사방넷 파일이 이미 선택돼 있으면 이어서 매칭까지 다시 실행 */
+$('ecRefresh').onclick = () => doRefresh(false);
+$('ecNames').onclick = () => doRefresh(true);
+async function doRefresh(names){
+  const b1 = $('ecRefresh'), b2 = $('ecNames'); b1.disabled = b2.disabled = true;
+  try{
+    say(names ? '신규 품목 이름을 이카운트에서 받아오는 중…' : '서버가 이카운트에서 재고를 받아오는 중… (10~20초)');
+    const d = await ECCache.refreshNow(names);
+    b2.style.display = d.missing_names > 0 ? '' : 'none';
+    b2.textContent = `신규 품목 이름 받아오기 (${fmt(d.missing_names || 0)}개 이름 없음)`;
+    say((names ? '신규 품목 이름을 받아왔어요.' : `이카운트 재고를 갱신했어요 (${fmt(d.rows || 0)}품목).`) + (d.missing_names > 0 ? ` 이름이 아직 없는 신규 품목 ${fmt(d.missing_names)}개는 코드로만 보여요 — 15분 뒤 "신규 품목 이름 받아오기"를 누르면 채워집니다.` : '') + (S.file ? ' 이어서 매칭합니다…' : ''), 'ok');
+    if(S.file){ b1.disabled = b2.disabled = false; $('run').disabled = false; await $('run').onclick(); return; }
+  }catch(e){ say(e.message, 'err'); }
+  b1.disabled = b2.disabled = false;
+}
+
 $('run').onclick = async () => {
   $('run').disabled = true;
   try{
@@ -424,10 +488,28 @@ $('run').onclick = async () => {
     say('사방넷 파일을 읽는 중… (큰 파일은 몇 초 걸려요)');
     const aoa = await readSabangFile(S.file); parseSabang(aoa);
     say(`사방넷 옵션 ${fmt(S.sb.length)}줄을 읽었어요. 이카운트 재고를 불러오는 중…`);
-    const d = await ECCache.load('master');
-    buildEcIndex(d.rows.map(r => ({ code:r[0], name:r[1], spec:r[2], qty:r[3] })));
-    const t = new Date(d.as_of * 1000), p = n => String(n).padStart(2,'0');
-    $('asof').style.display = ''; $('asof').textContent = `이카운트 기준 ${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}` + (d.fromCache ? ' (저장본)' : '');
+    if(S.manualEc){
+      /* 올린 엑셀은 서버 품목 목록을 "대체"하지 않고 그 위에 재고만 덮어쓴다(일부 품목만 든 엑셀이어도 나머지 품목이 사라지지 않게).
+         서버를 못 쓸 때만 엑셀만으로 진행한다. */
+      let base = null;
+      try{ base = await ECCache.load('master', { extra:{ include_unnamed:1 }, tag:'_u' }); }catch(e){ base = null; }
+      if(base && base.rows && base.rows.length){
+        const items = base.rows.map(r => ({ code:r[0], name:r[1], spec:r[2], qty:r[3] })), by = {};
+        items.forEach(it => { by[it.code] = it; });
+        let upd = 0, add = 0;
+        S.manualEc.items.forEach(m => { const it = by[m.code]; if(it){ if(it.qty !== m.qty) upd++; it.qty = m.qty; } else { items.push({ code:m.code, name:m.name, spec:m.spec, qty:m.qty }); add++; } });
+        buildEcIndex(items);
+        $('asof').style.display = ''; $('asof').textContent = `서버 품목 + 수동 엑셀 ${fmt(S.manualEc.items.length)}품목 덮어씀 (재고 변경 ${fmt(upd)} · 신규 ${fmt(add)}) · ${S.manualEc.name}`;
+      } else {
+        buildEcIndex(S.manualEc.items);
+        $('asof').style.display = ''; $('asof').textContent = `⚠ 서버 재고 없이 수동 엑셀만 사용 · ${S.manualEc.name} · ${fmt(S.manualEc.items.length)}품목`;
+      }
+    } else {
+      const d = await ECCache.load('master', { extra:{ include_unnamed:1 }, tag:'_u' });
+      buildEcIndex(d.rows.map(r => ({ code:r[0], name:r[1], spec:r[2], qty:r[3] })));
+      const t = new Date(d.as_of * 1000), p = n => String(n).padStart(2,'0');
+      $('asof').style.display = ''; $('asof').textContent = `이카운트 기준 ${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}` + (d.fromCache ? ' (저장본)' : '');
+    }
     say('저장된 수동매칭을 불러오는 중…');
     const ml = await api({ action:'list' });
     S.manual = {}; ml.rows.forEach(r => { S.manual[r.c] = r; });
@@ -456,14 +538,16 @@ $('dlListBtn').onclick = () => {
   if(!vis.length){ $('tmsg').textContent = '내려받을 줄이 없어요.'; return; }
   vis.sort((a, b) => (ORDER[a.res.status] - ORDER[b.res.status]));
   const FL = { all:'전체', change:'재고변경예정', auto:'자동확정', manual:'수동매칭', review:'확인필요', un:'미매칭_재고있음', un0:'이카운트미등록_재고0', recheck:'수동매칭재확인', none:'대응없음확정' };
-  const aoa = [['사방넷 코드','사방넷 상품명','옵션','사방넷 현재고','상태','이카운트 코드','이카운트 상품명','이카운트 재고(반영값)','사유','메모','등록자','등록일시']];
+  const aoa = [['사방넷 코드','사방넷 상품명','옵션','사방넷 현재고','상태','이카운트 코드','이카운트 상품명','이카운트 옵션','이카운트 재고(반영값)','재고 차이(이카운트-사방넷)','사유','메모','등록자','등록일시']];
   vis.forEach(x => {
     const r = x.row, res = x.res, mn = S.manual[r.code];
-    aoa.push([r.code, r.name, r.spec, r.cur, STATUS[res.status][0], res.items.map(i => i.code).join(', '), res.items.map(i => i.name + ' [' + i.spec + ']').join(' / '),
-      res.newVal == null ? '' : res.newVal, res.reasons.join(' · '), mn ? mn.memo : '', mn ? mn.u : '', mn ? new Date(mn.t*1000).toLocaleString('ko-KR') : '']);
+    const names = [...new Set(res.items.map(i => i.name))].join(' / '), specs = res.items.map(i => i.spec).join(' / ');
+    const diff = (res.newVal == null || isNaN(Number(r.cur))) ? '' : Number(res.newVal) - Number(r.cur);
+    aoa.push([r.code, r.name, r.spec, r.cur, STATUS[res.status][0], res.items.map(i => i.code).join(', '), names, specs,
+      res.newVal == null ? '' : res.newVal, diff, res.reasons.join(' · '), mn ? mn.memo : '', mn ? mn.u : '', mn ? new Date(mn.t*1000).toLocaleString('ko-KR') : '']);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:14},{wch:46},{wch:10},{wch:10},{wch:16},{wch:22},{wch:50},{wch:12},{wch:40},{wch:30},{wch:12},{wch:20}];
+  ws['!cols'] = [{wch:14},{wch:46},{wch:10},{wch:10},{wch:16},{wch:22},{wch:46},{wch:12},{wch:12},{wch:14},{wch:40},{wch:30},{wch:12},{wch:20}];
   // 사방넷 코드·이카운트 코드는 앞자리 0/하이픈이 유지되도록 텍스트로 저장
   for(let i = 1; i < aoa.length; i++){ [0, 5].forEach(c => { const ref = XLSX.utils.encode_cell({ r:i, c }); if(ws[ref]){ ws[ref].t = 's'; ws[ref].z = '@'; } }); }
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, (FL[S.filter] || '목록').slice(0, 30));
