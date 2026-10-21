@@ -1,0 +1,10 @@
+{
+  "name": "buyest-reels-worker",
+  "private": true,
+  "type": "module",
+  "version": "3.0.0",
+  "description": "BUYEST 릴스 — Higgsfield 중계 Worker. 키는 Cloudflare 비밀값에만 둔다.",
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
