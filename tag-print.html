@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>택 출력</title>
+<style>
+  @import url("assets/fonts/pretendard/pretendard.css");
+  :root{
+    --bg:#f6f6f4; --card:#fff; --ink:#15171a; --sub:#6a6f76; --line:#e4e4e0;
+    --pri:#15171a; --ok:#0f766e; --bad:#b42318; --warn:#a15c07; --blue:#1d4ed8;
+    --font:"Pretendard Variable","Pretendard",-apple-system,"Malgun Gothic",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);margin:0;padding:16px;font-size:14px;}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:-.02em;}
+  .lead{color:var(--sub);font-size:13px;margin:0 0 14px;line-height:1.55;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;}
+  .card h2{font-size:14px;margin:0 0 8px;}
+  .btn{font:600 14px var(--font);padding:9px 15px;border:1px solid transparent;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .btn-pri{background:var(--pri);color:#fff;} .btn-out{background:#fff;color:var(--ink);border-color:var(--line);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  input[type=text],input[type=number],select{font:14px var(--font);padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);}
+  label.f{display:block;font-size:12px;font-weight:700;color:var(--sub);margin-bottom:3px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  .grid input{width:100%;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .msg{font-size:13px;color:var(--sub);margin-top:8px;line-height:1.6;} .msg.bad{color:var(--bad);font-weight:600;} .msg.ok{color:var(--ok);font-weight:600;}
+  table{border-collapse:collapse;width:100%;font-size:13px;} th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:middle;}
+  th{font-size:12px;color:var(--sub);background:#fafaf8;position:sticky;top:0;} td input[type=number]{width:64px;}
+  .scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;}
+  .x{border:0;background:none;color:var(--bad);cursor:pointer;font-size:16px;}
+
+  /* 택 (실제 택 사진 기준: 위 칸 = 품질표시+항목+바코드, 아래 칸 = 바코드+모델명·사이즈·판매가) */
+  #sheet{display:flex;flex-wrap:wrap;gap:12px;}
+  .tag{background:#fff;color:#000;border:1px dashed #bbb;display:flex;flex-direction:column;overflow:hidden;font-family:"Malgun Gothic","Pretendard",sans-serif;}
+  .tag .top{flex:68 1 0;min-height:0;padding:3mm 4mm 1mm;display:flex;flex-direction:column;}
+  .tag .bot{flex:32 1 0;min-height:0;padding:1.2mm 4mm 2mm;border-top:1px dashed #999;display:flex;flex-direction:column;}
+  .tag .ttl{text-align:center;font-weight:800;font-size:4.6mm;letter-spacing:-.1mm;line-height:1.1;}
+  .tag .sub{text-align:center;font-size:1.9mm;margin:.6mm 0 1.6mm;}
+  .tag .kv{display:flex;font-size:2.8mm;line-height:1;margin:.9mm 0;}
+  .tag .kv b{flex:0 0 12mm;font-weight:700;}
+  .tag .kv b::after{content:" :";}
+  .tag .kv span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;}
+  .tag .note{text-align:center;font-size:2mm;margin:1.2mm 0 .8mm;}
+  .tag svg{display:block;width:100%;height:8.5mm;flex:none;}
+  .tag .num{text-align:center;font-size:2.8mm;letter-spacing:.15mm;margin-top:.3mm;flex:none;}
+  .tag .bot .kv{font-size:2.6mm;margin:.5mm 0;} .tag .bot .kv b{flex-basis:11mm;}
+
+  @page{margin:0;}
+  @media print{
+    body{background:#fff;padding:0;}
+    .noprint{display:none !important;}
+    #sheet{display:block;}
+    .tag{border:0;break-after:page;page-break-after:always;}
+  }
+</style>
+</head>
+<body>
+<div class="noprint">
+  <h1>택 출력 <span style="font-size:12px;color:var(--warn);font-weight:700;">시험판</span></h1>
+  <p class="lead">상품명과 사이즈 두 열이 있는 엑셀을 올리면, 이카운트 품목 정보(품목코드·출고단가·바코드)와 사이트 상품 정보(브랜드·원산지)를 찾아 택으로 만듭니다.</p>
+
+  <div class="card">
+    <h2>1. 엑셀 올리기</h2>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv">
+    <div class="msg" id="fileMsg">첫 번째 열은 상품명, 두 번째 열은 사이즈여야 합니다. (제목 줄이 있어도 됩니다)</div>
+  </div>
+
+  <div class="card" id="listCard" style="display:none;">
+    <h2>2. 확인하고 수량 정하기</h2>
+    <div class="row" style="margin-bottom:8px;">
+      <button class="btn btn-out" id="btnAll1">전부 1장</button>
+      <span class="msg" style="margin:0;" id="sumMsg"></span>
+    </div>
+    <div class="scroll"><table><thead><tr><th>상태</th><th>상품명 / 사이즈</th><th>브랜드</th><th>모델명</th><th>원산지</th><th>판매가</th><th>바코드</th><th>수량</th><th></th></tr></thead><tbody id="tbody"></tbody></table></div>
+  </div>
+
+  <div class="card" id="setCard" style="display:none;">
+    <h2>3. 택 설정</h2>
+    <div class="grid">
+      <div><label class="f">가로 (mm)</label><input type="number" id="wMm" value="50" min="20" max="200"></div>
+      <div><label class="f">세로 (mm)</label><input type="number" id="hMm" value="90" min="20" max="300"></div>
+      <div><label class="f">수입원</label><input type="text" id="fixText" value="바이스트"></div>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn btn-pri" id="btnPrint">인쇄</button>
+      <span class="msg" style="margin:0;">인쇄 창에서 용지 크기를 위 크기로, 여백은 "없음"으로 맞추세요.</span>
+    </div>
+  </div>
+  <h2 id="pvTitle" style="font-size:14px;margin:6px 0 8px;display:none;">미리보기</h2>
+</div>
+<div id="sheet"></div>
+
+<script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script>
+'use strict';
+/* 택 출력 (TEST) — 상품명+사이즈 엑셀 → 서버(tag_info_api.php)가 이카운트 품목 캐시·사이트 상품에서 정보를 채움 → 택 양식 대량 인쇄.
+   서버는 읽기만 하고 이카운트를 호출하지 않는다. 툴킷 로그인(localStorage buyest.dash.auth)이 필요하다. */
+const API = 'https://buyest.co.kr/tag_info_api.php';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let items = [];   // {src:{name,size}, status, style, brand, origin, price, barcode, code, cands, qty}
+const STATUS = { ok:['찾음','#0f766e'], multi:['후보 여러 개','#a15c07'], nosize:['사이즈 없음','#b42318'], nostyle:['품번 못 찾음','#b42318'] };
+
+function auth() { try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); return a && a.id && a.pass ? a : null; } catch (e) { return null; } }
+function readSheet(file) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onerror = () => rej(new Error('파일을 읽지 못했어요.'));
+    fr.onload = () => { try { const wb = XLSX.read(fr.result, {type:'array'}); res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:false, defval:''})); } catch (e) { rej(e); } };
+    fr.readAsArrayBuffer(file);
+  });
+}
+function msg(t, cls) { $('fileMsg').className = 'msg ' + (cls || ''); $('fileMsg').textContent = t; }
+
+$('file').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const a = auth();
+  if (!a) { msg('툴킷에 로그인한 뒤 사용할 수 있어요. 로그인 후 새로고침해 주세요.', 'bad'); return; }
+  try {
+    const aoa = await readSheet(f);
+    let rows = aoa.map(r => ({ name: String(r[0] || '').trim(), size: String(r[1] || '').trim() })).filter(r => r.name);
+    if (rows.length && /^(상품명|품목명)/.test(rows[0].name)) rows = rows.slice(1);
+    if (!rows.length) { msg('상품명이 있는 줄을 못 찾았어요. 첫 번째 열에 상품명을 넣어주세요.', 'bad'); return; }
+    if (rows.length > 500) { msg('한 번에 500줄까지 조회할 수 있어요. 나눠서 올려주세요.', 'bad'); return; }
+    msg(rows.length + '줄을 조회하는 중이에요…');
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user: a.id, pass: a.pass, rows: rows }) });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || '조회에 실패했어요.');
+    items = d.rows.map(x => Object.assign({ src: rows[x.i], qty: 1 }, x));
+    const c = k => items.filter(x => x.status === k).length;
+    const miss = c('nosize') + c('nostyle');
+    msg(items.length + '줄 중 ' + c('ok') + '줄을 찾았어요.' + (c('multi') ? ' 후보가 여러 개인 ' + c('multi') + '줄은 직접 골라주세요.' : '') + (miss ? ' 못 찾은 ' + miss + '줄은 칸을 직접 채우거나 ×로 빼세요.' : ''), c('ok') === items.length ? 'ok' : '');
+    drawList();
+  } catch (err) { msg(err.message, 'bad'); }
+});
+
+function drawList() {
+  $('listCard').style.display = items.length ? 'block' : 'none';
+  $('setCard').style.display = items.length ? 'block' : 'none';
+  $('tbody').innerHTML = items.map((it, i) => {
+    const st = STATUS[it.status] || ['', '#000'];
+    const cand = it.status === 'multi' ? '<select data-c="' + i + '"><option value="">후보 고르기</option>' + it.cands.map((c, k) => '<option value="' + k + '">' + esc(c.ec_name) + ' / ' + esc(c.size) + ' / ' + esc(c.code) + '</option>').join('') + '</select>' : '';
+    const inp = k => '<td><input type="text" data-i="' + i + '" data-k="' + k + '" value="' + esc(it[k]) + '" style="width:' + (k === 'style' ? 150 : k === 'barcode' ? 100 : 90) + 'px"></td>';
+    return '<tr><td style="color:' + st[1] + ';font-weight:700;white-space:nowrap;">' + st[0] + '</td>' +
+      '<td style="min-width:220px;">' + esc(it.src.name) + '<br><span style="color:var(--sub)">' + esc(it.src.size) + (it.code ? ' → ' + esc(it.size) : '') + '</span>' + cand + '</td>' +
+      ['brand', 'style', 'origin', 'price', 'barcode'].map(inp).join('') +
+      '<td><input type="number" min="0" max="999" value="' + it.qty + '" data-q="' + i + '"></td><td><button class="x" data-d="' + i + '" title="빼기" aria-label="빼기">×</button></td></tr>';
+  }).join('');
+  $('tbody').querySelectorAll('input[data-k]').forEach(n => n.addEventListener('input', () => { items[+n.dataset.i][n.dataset.k] = n.value; drawPreview(); }));
+  $('tbody').querySelectorAll('input[data-q]').forEach(n => n.addEventListener('input', () => { items[+n.dataset.q].qty = Math.max(0, +n.value || 0); drawPreview(); }));
+  $('tbody').querySelectorAll('select[data-c]').forEach(s => s.addEventListener('change', () => {
+    if (s.value === '') return;
+    const it = items[+s.dataset.c], c = it.cands[+s.value];
+    Object.assign(it, { status:'ok', code:c.code, ec_name:c.ec_name, size:c.size, price:c.price, barcode:c.barcode });
+    drawList();
+  }));
+  $('tbody').querySelectorAll('.x').forEach(b => b.addEventListener('click', () => { items.splice(+b.dataset.d, 1); drawList(); }));
+  drawPreview();
+}
+$('btnAll1').addEventListener('click', () => { items.forEach(it => it.qty = 1); drawList(); });
+
+/* Code128-B 바코드를 SVG 막대로 그린다 */
+const C128 = ['212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132','221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313','231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111','314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111','111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141','114131','311141','411131','211412','211214','211232','2331112'];
+function code128(text) {
+  const vals = [104];
+  for (const ch of String(text)) { const c = ch.charCodeAt(0) - 32; vals.push(c >= 0 && c < 95 ? c : 0); }
+  let sum = vals[0]; for (let i = 1; i < vals.length; i++) sum += vals[i] * i;
+  vals.push(sum % 103, 106);
+  let x = 0, bars = '';
+  for (const v of vals) for (let j = 0; j < C128[v].length; j++) {
+    const w = +C128[v][j];
+    if (j % 2 === 0) bars += '<rect x="' + x + '" y="0" width="' + w + '" height="40"/>';
+    x += w;
+  }
+  return '<svg viewBox="0 0 ' + x + ' 40" preserveAspectRatio="none" fill="#000" shape-rendering="crispEdges">' + bars + '</svg>';
+}
+function fmtPrice(p) { const n = parseFloat(String(p).replace(/[^\d.]/g, '')); return isFinite(n) ? Math.round(n).toLocaleString('ko-KR') : String(p); }
+
+function tagHtml(it) {
+  const price = esc(fmtPrice(it.price)), bc = esc(it.barcode);
+  const kv = (k, v) => '<div class="kv"><b>' + k + '</b><span>' + v + '</span></div>';
+  return '<div class="tag" style="width:' + (+$('wMm').value) + 'mm;height:' + (+$('hMm').value) + 'mm">' +
+    '<div class="top"><div class="ttl">BUYEST</div><div class="sub">품질경영 및 공산품 안전관리법에 의한 품질표시</div>' +
+    kv('브랜드', esc(it.brand)) + kv('모델명', esc(it.style)) + kv('사이즈', esc(it.size)) + kv('수입원', esc($('fixText').value)) + kv('원산지', esc(it.origin)) + kv('판매가', price) +
+    '<div class="note">※ 택 제거시 교환 및 반품 불가합니다.</div>' + code128(it.barcode) + '<div class="num">' + bc + '</div></div>' +
+    '<div class="bot">' + code128(it.barcode) + '<div class="num">' + bc + '</div>' + kv('모델명', esc(it.style)) + kv('사이즈', esc(it.size)) + kv('판매가', price) + '</div></div>';
+}
+function expanded() { const a = []; for (const it of items) if (it.barcode) for (let i = 0; i < it.qty; i++) a.push(it); return a; }
+function drawPreview() {
+  const all = expanded();
+  const nobc = items.filter(it => !it.barcode && it.qty > 0).length;
+  $('sumMsg').textContent = '총 ' + all.length + '장' + (nobc ? ' · 바코드가 비어 인쇄에서 빠지는 ' + nobc + '줄' : '');
+  $('pvTitle').style.display = all.length ? 'block' : 'none';
+  $('sheet').innerHTML = all.slice(0, 60).map(tagHtml).join('') + (all.length > 60 ? '<div class="msg noprint">미리보기는 60장까지만 보여요. 인쇄는 ' + all.length + '장 전부 나갑니다.</div>' : '');
+}
+['wMm', 'hMm', 'fixText'].forEach(id => $(id).addEventListener('input', drawPreview));
+$('btnPrint').addEventListener('click', () => {
+  const all = expanded(); if (!all.length) return;
+  const st = document.createElement('style'); st.id = 'pgSize'; st.textContent = '@page{size:' + (+$('wMm').value) + 'mm ' + (+$('hMm').value) + 'mm;margin:0}';
+  document.head.appendChild(st);
+  $('sheet').innerHTML = all.map(tagHtml).join('');
+  setTimeout(() => { window.print(); setTimeout(() => { st.remove(); drawPreview(); }, 500); }, 100);
+});
+</script>
+</body>
+</html>
