@@ -149,14 +149,6 @@ const DEF_LAYOUT = {
     { id:'price2', name:'판매가(아래)',     k:'price',   a:'l', x:13.6, y:85.0, fs:2.6, on:true },
   ]
 };
-/* 용지에 이미 인쇄된 양식 흉내(안내선 전용, 인쇄 안 됨) */
-const GUIDE = [
-  { t:'BUYEST', a:'c', x:25, y:10.8, fs:4.0, b:1 }, { t:'품질경영 및 공산품 안전관리법에 의한 품질표시', a:'c', x:25, y:14.6, fs:1.7 },
-  { t:'브랜드 :', x:5.5, y:19.0 }, { t:'모델명 :', x:5.5, y:24.7 }, { t:'사이즈 :', x:5.5, y:30.4 }, { t:'수입원 :', x:5.5, y:35.9 }, { t:'원산지 :', x:5.5, y:41.3 }, { t:'판매가 :', x:5.5, y:46.8 },
-  { t:'※ 택 제거시 교환 및 반품 불가합니다.', a:'c', x:25, y:50.4, fs:1.9 },
-  { t:'모델명 :', x:4.4, y:76.3, fs:2.3 }, { t:'사이즈 :', x:4.4, y:80.8, fs:2.3 }, { t:'판매가 :', x:4.4, y:85.0, fs:2.3 },
-];
-const GUIDE_CUT_Y = 62.7;
 let L = loadLayout(), sel = 'brand';
 
 function loadLayout() {
@@ -251,6 +243,19 @@ function code128(text) {
 }
 function fmtPrice(p) { const n = parseFloat(String(p).replace(/[^\d.]/g, '')); return isFinite(n) ? Math.round(n).toLocaleString('ko-KR') : String(p); }
 
+/* 안내선(회색 양식)은 줄 위치 설정을 따라간다 — 값이 있는 줄 = 항목 이름이 있는 줄. 전체 이동값도 같이 반영해 미리보기가 인쇄된 모양과 같다. */
+function guideList() {
+  const Y = id => { const e = L.els.find(x => x.id === id); return e.y + L.offY; };
+  const X = id => { const e = L.els.find(x => x.id === id); return e.x + L.offX; };
+  const g = [];
+  g.push({ t: 'BUYEST', a: 'c', x: L.w / 2 + L.offX, y: Y('brand') - 8.2, fs: 4.0, b: 1 });
+  g.push({ t: '품질경영 및 공산품 안전관리법에 의한 품질표시', a: 'c', x: L.w / 2 + L.offX, y: Y('brand') - 4.4, fs: 1.7 });
+  [['brand', '브랜드 :'], ['style', '모델명 :'], ['size', '사이즈 :'], ['fix', '수입원 :'], ['origin', '원산지 :'], ['price', '판매가 :']].forEach(r => g.push({ t: r[1], x: 5.5 + L.offX, y: Y(r[0]), fs: 2.6 }));
+  g.push({ t: '※ 택 제거시 교환 및 반품 불가합니다.', a: 'c', x: L.w / 2 + L.offX, y: Y('price') + 3.6, fs: 1.9 });
+  [['style2', '모델명 :'], ['size2', '사이즈 :'], ['price2', '판매가 :']].forEach(r => g.push({ t: r[1], x: 4.4 + L.offX, y: Y(r[0]), fs: 2.3 }));
+  return { items: g, cut: (Y('bc1n') + Y('bc2')) / 2 };
+}
+
 /* 눈금 테스트 보정: 용지에 실제로 찍힌 위치(ya,yb / xa,xb)로 프린터가 늘리거나 민 정도를 구해 반대로 적용한다. 인쇄할 때만 쓴다. */
 function calc() {
   const c = L.cal, sy = (c.yb - c.ya) / 70 || 1, sx = (c.xb - c.xa) / 30 || 1;
@@ -265,8 +270,9 @@ function tagHtml(it, opt) {
   const K = opt.print ? calc() : { sx: 1, sy: 1, dx: 0, dy: 0 }, kf = (K.sx + K.sy) / 2;
   let h = '<div class="tag' + (opt.edit ? ' edit-on' : '') + '" style="width:' + L.w + 'mm;height:' + L.h + 'mm">';
   if (opt.guide) {
-    h += '<div class="cut" style="top:' + GUIDE_CUT_Y + 'mm"></div>';
-    GUIDE.forEach(g => { h += '<div class="g ' + (g.a === 'c' ? 'c' : '') + '" style="left:' + g.x + 'mm;top:' + g.y + 'mm;font-size:' + (g.fs || 2.6) + 'mm;' + (g.b ? 'font-weight:800;' : '') + '">' + esc(g.t) + '</div>'; });
+    const GL = guideList();
+    h += '<div class="cut" style="top:' + GL.cut.toFixed(2) + 'mm"></div>';
+    GL.items.forEach(g => { h += '<div class="g ' + (g.a === 'c' ? 'c' : '') + '" style="left:' + g.x.toFixed(2) + 'mm;top:' + g.y.toFixed(2) + 'mm;font-size:' + (g.fs || 2.6) + 'mm;' + (g.b ? 'font-weight:800;' : '') + '">' + esc(g.t) + '</div>'; });
   }
   L.els.forEach(e => {
     if (!e.on) return;
@@ -280,9 +286,11 @@ function tagHtml(it, opt) {
 /* 오른쪽 끝을 넘는 글자는 그 줄만 글자 크기를 줄여 택 안에 맞춘다 */
 function fit(root) {
   root.querySelectorAll('.tag').forEach(t => {
+    const tr = t.getBoundingClientRect(); if (!tr.width) return;
+    const pxMm = tr.width / (parseFloat(t.style.width) || L.w);          // 화면에 그려진 1mm 의 픽셀 수(확대 포함)
     t.querySelectorAll('.el.l:not(.bar)').forEach(e => {
-      const avail = t.clientWidth - e.offsetLeft - 1.2 * 3.7795;
-      if (avail > 0 && e.offsetWidth > avail) e.style.fontSize = (parseFloat(e.style.fontSize) * avail / e.offsetWidth).toFixed(2) + 'mm';
+      const er = e.getBoundingClientRect(), avail = tr.right - er.left - 1.2 * pxMm;
+      if (avail > 0 && er.width > avail) e.style.fontSize = Math.max(1.6, parseFloat(e.style.fontSize) * avail / er.width).toFixed(2) + 'mm';
     });
   });
 }
