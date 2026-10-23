@@ -1,0 +1,11 @@
+{
+  "name": "buyest-auto-studio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:coverage": "node --experimental-test-coverage --test test/*.test.mjs"
+  },
+  "dependencies": { "sharp": "^0.34.5" }
+}
