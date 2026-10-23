@@ -8,11 +8,11 @@ export async function editorialCard(image,card,brand,index,count,demo){
  const cover=index===0,accent='#d74932',ink='#171b19';
  const text=(s,x,y,size=30,color=ink,weight=400)=>`<text x="${x}" y="${y}" font-family="Malgun Gothic, sans-serif" font-size="${size}" font-weight="${weight}" fill="${color}">${esc(s)}</text>`;
  const title=lines(card.title,cover?12:18).slice(0,3),points=(card.points||[]).slice(0,3);
- let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350"><rect width="1080" height="1350" fill="#fff"/><image x="64" y="46" width="200" height="45" href="data:image/png;base64,${logo.toString('base64')}"/>${text('MONCLER / 26FW',660,78,23)}${text(`${String(index+1).padStart(2,'0')} / ${String(count).padStart(2,'0')}`,945,78,22)}<line x1="64" y1="118" x2="1016" y2="118" stroke="#252a26"/>`;
+ let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350"><rect width="1080" height="1350" fill="#fff"/><image x="64" y="46" width="200" height="45" href="data:image/png;base64,${logo.toString('base64')}"/>${text(card.collection||'STYLE GUIDE',660,78,23)}${text(`${String(index+1).padStart(2,'0')} / ${String(count).padStart(2,'0')}`,945,78,22)}<line x1="64" y1="118" x2="1016" y2="118" stroke="#252a26"/>`;
  if(cover){
   svg+=text(card.kicker||'이번 시즌, 무엇을 고를까?',64,178,25,accent,700);
   title.forEach((l,i)=>svg+=text(l,59,285+i*105,94,ink,700));
-  svg+=`<image x="255" y="485" width="760" height="670" href="data:image/png;base64,${picture.toString('base64')}"/><rect x="64" y="520" width="165" height="165" rx="82" fill="${accent}"/>${text('6',111,625,91,'#fff',700)}${text('가지 셀렉션',75,735,23,ink,700)}`;
+  svg+=`<image x="255" y="485" width="760" height="670" href="data:image/png;base64,${picture.toString('base64')}"/><rect x="64" y="520" width="165" height="165" rx="82" fill="${accent}"/>${text(String(Math.max(1,count-1)),111,625,91,'#fff',700)}${text('가지 셀렉션',75,735,23,ink,700)}`;
   lines(card.body,29).slice(0,3).forEach((l,i)=>svg+=text(l,64,1120+i*40,29));
  }else{
   svg+=text(card.kicker||'MONCLER SELECT',64,172,24,accent,700);
