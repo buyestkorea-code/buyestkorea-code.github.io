@@ -53,7 +53,7 @@ function fixture(output='both') {
 test('릴스와 카드뉴스를 한 기획으로 생성하고 완료한다', async () => {
   const {job,services,calls}=fixture(); await produce(job,services);
   assert.equal(job.status,'completed'); assert.equal(job.result.reel.file,'reel.mp4'); assert.equal(job.result.cards.length,1);
-  assert.deepEqual(calls,['voice','clips','reel','cards','completed']);
+  assert.deepEqual(calls,['cards','voice','clips','reel','completed']);
 });
 test('카드뉴스만 선택하면 음성과 유료 영상을 호출하지 않는다', async () => {
   const {job,services,calls}=fixture('cards'); services.voice=services.clip=services.reel=()=>{throw Error('불필요한 유료 호출');};
@@ -70,4 +70,8 @@ test('실패한 단계를 재시도할 때 이미 만든 음성과 장면은 재
 });
 test('동시에 같은 프로젝트를 실행하지 않는다', async () => {
   const {job,services}=fixture(); job.running=true; await assert.rejects(produce(job,services),/진행/);
+});
+test('영상 생성이 실패해도 완성된 카드뉴스를 결과로 제공한다',async()=>{
+  const {job,services}=fixture();services.clip=async()=>{throw Error('영상 잔액 부족');};
+  await assert.rejects(produce(job,services),/잔액/);assert.equal(job.result.cards[0].file,'card1.png');assert.equal(job.status,'failed');
 });

@@ -26,7 +26,7 @@ function json(res,data,status=200){res.writeHead(status,{'Content-Type':'applica
 async function body(req){let size=0;const chunks=[];for await(const c of req){size+=c.length;if(size>68_000_000)throw Error('사진 총 용량이 너무 큽니다.');chunks.push(c);}try{return JSON.parse(Buffer.concat(chunks).toString()||'{}');}catch{throw Error('요청 형식을 확인해 주세요.');}}
 const providers=job=>createProviders(process.env,jobDir(job),save);
 async function create(input,demo=false){
-  const clean=validateInput(input),job={id:randomUUID(),brand:clean.brand,output:clean.output,brief:clean.brief,facts:clean.facts,images:[],status:'draft',stage:'draft',createdAt:new Date().toISOString(),demo,completed:{}};
+  const clean=validateInput(input),job={id:randomUUID(),brand:clean.brand,output:clean.output,resolution:clean.resolution,brief:clean.brief,facts:clean.facts,images:[],status:'draft',stage:'draft',createdAt:new Date().toISOString(),demo,completed:{}};
   await mkdir(jobDir(job),{recursive:true});
   for(let i=0;i<clean.images.length;i++){
     const raw=Buffer.from(clean.images[i].data.split(',')[1],'base64'),file=`photo-${i}.jpg`;
@@ -63,7 +63,7 @@ const server=http.createServer(async(req,res)=>{
     if(route==='/api/sample'&&req.method==='POST'){
       const job=await create({brand:'buyest',output:'both',brief:'',facts:'샘플 일러스트. 실제 상품 정보가 아닙니다.',images:await sampleImages()},true);job.plan=await providers(job).plan(job);job.status='ready';job.stage='ready';await save(job);return json(res,expose(job),201);
     }
-    const fileMatch=/^\/files\/([a-f0-9-]{36})\/(photo-\d+\.jpg|card-\d+\.png|reel\.mp4|cards\.zip)$/.exec(route);
+    const fileMatch=/^\/files\/([a-f0-9-]{36})\/(photo-\d+\.jpg|card-\d+\.png|reel\.mp4|narration-preview\.mp4|cards\.zip)$/.exec(route);
     if(fileMatch&&req.method==='GET'){if(!jobs.has(fileMatch[1]))return json(res,{error:'작업을 찾지 못했습니다.'},404);return await sendFile(req,res,path.join(dataRoot,fileMatch[1],fileMatch[2]),url.searchParams.has('download'));}
     const match=/^\/api\/projects\/([a-f0-9-]{36})(?:\/(plan|quote|render))?$/.exec(route);
     if(match){const job=jobs.get(match[1]);if(!job)return json(res,{error:'작업을 찾지 못했습니다.'},404);const action=match[2];

@@ -4,9 +4,19 @@ import { planningPrompt, validatePlan, captionsFromAlignment, checkBudget } from
 import { cardPng, renderReel, sampleClip, silentWav, normalizeClip, zipFiles } from './media.mjs';
 
 const HF='https://api.higgsfield.ai';
+export function estimateCost(data,duration,resolution){
+  if(typeof data.usd==='number'&&Number.isFinite(data.usd)&&data.usd>=0)return {usd:data.usd,basis:'quote'};
+  const rates=/\$(\d+(?:\.\d+)?) per second of generated video at 480p, \$(\d+(?:\.\d+)?) at 720p, and \$(\d+(?:\.\d+)?) at 1080p/.exec(data.pricing_description||'');
+  if(data.type!=='description'||!rates||!['480p','720p','1080p'].includes(resolution))throw Error('예상 비용을 확인하지 못해 제작을 중단했습니다.');
+  // The service describes landscape rates. Reserve 10% extra for portrait token rounding.
+  return {usd:Number(rates[['480p','720p','1080p'].indexOf(resolution)+1])*duration*1.1,basis:'rate'};
+}
 export async function requestJson(url,options={},timeout=120000) {
-  const response=await fetch(url,{...options,signal:AbortSignal.timeout(timeout)});
+  let response;
+  try { response=await fetch(url,{...options,signal:AbortSignal.timeout(timeout)}); }
+  catch(error) { throw Error(error.name==='TimeoutError'?'외부 서비스 응답이 제한 시간을 넘었습니다. 잠시 뒤 다시 시도해 주세요.':'외부 서비스에 연결하지 못했습니다. 네트워크를 확인해 주세요.'); }
   const data=await response.json().catch(()=>({}));
+  if(!response.ok&&new URL(url).hostname==='api.higgsfield.ai'&&data.detail==='not_enough_credits')throw Error('Higgsfield API 크레딧이 부족합니다. API 콘솔에서 충전한 뒤 같은 작업을 이어서 실행해 주세요.');
   if(!response.ok) throw Error(`외부 서비스 요청 실패 (${new URL(url).hostname}, HTTP ${response.status}). 연결·잔액을 확인해 주세요.`);
   return data;
 }
@@ -14,7 +24,7 @@ const exists=async file=>{try{await access(file);return true;}catch{return false
 export function createProviders(env,dir,save) {
   const ffmpeg=env.FFMPEG_PATH||'ffmpeg';
   const hf=(route,body,extra={})=>requestJson(HF+'/'+route,{method:body?'POST':'GET',headers:{Authorization:`Key ${env.HF_API_KEY}`,'Content-Type':'application/json',...extra},...(body?{body:JSON.stringify(body)}:{})});
-  const videoBody=(scene,urls,duration=10)=>({image_urls:urls,prompt:`${scene.prompt}\nPreserve the photographed product, colour, shape and logos. No text, subtitles, speech or new products. Vertical cinematic product shot.`,duration,resolution:'720p',aspect_ratio:'9:16',generate_audio:false,bitrate_mode:'high'});
+  const videoBody=(scene,urls,duration=10,resolution='720p')=>({image_urls:urls,prompt:`${scene.prompt}\nPreserve the photographed product, colour, shape and logos. No text, subtitles, speech or new products. Vertical cinematic product shot.`,duration,resolution,aspect_ratio:'9:16',generate_audio:false,bitrate_mode:'high'});
   async function uploadArtifact(file,type){
     const u=await hf('files/generate-upload-url',{content_type:type});
     if(!u.upload_url?.startsWith('https://')||!u.public_url?.startsWith('https://'))throw Error('합성용 업로드 주소가 올바르지 않습니다.');
@@ -26,10 +36,12 @@ export function createProviders(env,dir,save) {
     async plan(job) {
       if(job.demo) return validatePlan({title:'가볍게 만나는 새로운 계절',description:'사진 속 디테일부터 오늘의 스타일 제안까지. BUYEST에서 만나보세요. #BUYEST #스타일',scenes:job.images.slice(0,3).map((_,i)=>({imageIds:[i],title:['새로운 시선','가까이 보는 디테일','당신의 일상에'][i],narration:['새로운 계절, 나만의 스타일을 만나보세요.','가까이 볼수록 눈길이 가는 디테일.','BUYEST에서 당신의 취향을 찾아보세요.'][i],prompt:'Slow cinematic push-in on the product, soft daylight, preserve shape and colour.'})),cards:Array.from({length:5},(_,i)=>({imageId:i%job.images.length,title:['가볍게 만나는 새로운 계절','시선을 사로잡는 실루엣','가까이 보는 디테일','일상에 더하는 포인트','취향을 발견하는 곳'][i],body:['사진 속 상품으로 구성한 샘플 카드뉴스입니다.','원본 사진의 형태와 색을 그대로 보여줍니다.','상품 정보는 확인된 내용만 사용합니다.','한 장의 사진에서 시작되는 새로운 스타일.','BUYEST에서 더 많은 상품을 만나보세요.'][i]}))},job.images.length);
       if(!env.GEMINI_API_KEY)throw Error('사진 분석용 Gemini 연결이 필요합니다. 서버 .env를 설정해 주세요.');
-      const parts=[{text:planningPrompt(job)},...await Promise.all(job.images.map(async image=>({inlineData:{mimeType:'image/jpeg',data:(await readFile(path.join(dir,image.file))).toString('base64')}})))];
+      const parts=[{type:'text',text:planningPrompt(job)},...await Promise.all(job.images.map(async image=>({type:'image',mime_type:'image/jpeg',data:(await readFile(path.join(dir,image.file))).toString('base64')})))];
       const schema={type:'OBJECT',properties:{title:{type:'STRING'},description:{type:'STRING'},scenes:{type:'ARRAY',items:{type:'OBJECT',properties:{imageIds:{type:'ARRAY',items:{type:'INTEGER'}},title:{type:'STRING'},narration:{type:'STRING'},prompt:{type:'STRING'}},required:['imageIds','title','narration','prompt']}},cards:{type:'ARRAY',items:{type:'OBJECT',properties:{imageId:{type:'INTEGER'},title:{type:'STRING'},body:{type:'STRING'}},required:['imageId','title','body']}}},required:['title','description','scenes','cards']};
-      const data=await requestJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.GEMINI_MODEL||'gemini-3.8-flash')}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{responseMimeType:'application/json',responseSchema:schema,maxOutputTokens:5000}})});
-      const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('');
+      const model=env.GEMINI_MODEL||'gemini-3.8-flash';
+      const responseSchema=JSON.parse(JSON.stringify(schema).replace(/"type":"(\w+)"/g,(_,type)=>`"type":"${type.toLowerCase()}"`));
+      const data=await requestJson('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},body:JSON.stringify({model,input:parts,store:false,response_format:{type:'text',mime_type:'application/json',schema:responseSchema},generation_config:{max_output_tokens:5000,...(!model.includes('lite')?{thinking_level:'low'}:{})}})});
+      const text=(data.steps||[]).filter(s=>s.type==='model_output').flatMap(s=>s.content||[]).filter(p=>p.type==='text').map(p=>p.text||'').join('').replaceAll('바이에스트','바이스트');
       if(!text) throw Error('기획 결과가 비어 있습니다. 사진과 요청 내용을 확인해 주세요.');
       return validatePlan(JSON.parse(text),job.images.length);
     },
@@ -46,9 +58,9 @@ export function createProviders(env,dir,save) {
     async quote(job,limit) {
       if(job.demo||job.output==='cards')return {videoUsd:0,limit,at:Date.now()};
       if(!env.HF_API_KEY||!env.ELEVENLABS_API_KEY||!env.ELEVENLABS_VOICE_ID)throw Error('Higgsfield와 ElevenLabs 음성 연결이 필요합니다.');
-      const urls=await this.upload(job),costs=[];
-      for(const scene of job.plan.scenes){const d=await hf('estimate/bytedance/seedance-2.5/reference-to-video',videoBody(scene,scene.imageIds.map(i=>urls[i])));costs.push(d.usd);}
-      const total=checkBudget(costs,limit);return {videoUsd:total,limit,at:Date.now(),maxDuration:10};
+      const urls=await this.upload(job),costs=[],bases=[];const resolution=job.resolution||'720p';
+      for(const scene of job.plan.scenes){const duration=Math.min(10,Math.max(4,Math.ceil(scene.narration.length/4.5)+1));const d=await hf('estimate/bytedance/seedance-2.5/reference-to-video',videoBody(scene,scene.imageIds.map(i=>urls[i]),duration,resolution));const c=estimateCost(d,duration,resolution);costs.push(c.usd);bases.push(c.basis);}
+      const total=checkBudget(costs,limit);return {videoUsd:total,limit,at:Date.now(),resolution,basis:bases.includes('rate')?'rate':'quote'};
     },
     async voice(job) {
       const segments=[],captions=[];let offset=0;
@@ -58,7 +70,7 @@ export function createProviders(env,dir,save) {
         else if(job.demo){const duration=4,file=`voice-${i}.wav`;await silentWav(dir,file,duration,ffmpeg);result={file,duration,captions:[{start:0,end:duration,text:scene.narration}]};}
         else {
           const d=await requestJson(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(env.ELEVENLABS_VOICE_ID)}/with-timestamps?output_format=mp3_44100_128`,{method:'POST',headers:{'xi-api-key':env.ELEVENLABS_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({text:scene.narration,model_id:env.ELEVENLABS_MODEL||'eleven_multilingual_v2'})});
-          const caps=captionsFromAlignment(d.normalized_alignment||d.alignment),end=caps.at(-1).end;
+          const caps=captionsFromAlignment(d.alignment||d.normalized_alignment),end=caps.at(-1).end;
           if(end>9.5)throw Error(`${i+1}번 장면의 음성이 너무 깁니다. 기획의 내레이션을 줄여 다시 시작해 주세요.`);
           if(!d.audio_base64)throw Error('음성 파일을 받지 못했습니다.');const file=`voice-${i}.mp3`;await writeFile(path.join(dir,file),Buffer.from(d.audio_base64,'base64'));result={file,duration:Math.max(4,Math.ceil(end+.4)),captions:caps};
         }
@@ -75,10 +87,10 @@ export function createProviders(env,dir,save) {
       else {
         job.videoReservations||={};
         if(job.videoReservations[i]===undefined){
-          const estimate=await hf('estimate/bytedance/seedance-2.5/reference-to-video',videoBody(scene,scene.imageIds.map(j=>job.uploads[j]),duration));
-          checkBudget([...Object.values(job.videoReservations),estimate.usd],job.quote.limit);job.videoReservations[i]=estimate.usd;await save(job);
+          const estimate=await hf('estimate/bytedance/seedance-2.5/reference-to-video',videoBody(scene,scene.imageIds.map(j=>job.uploads[j]),duration,job.resolution||'720p'));
+          const c=estimateCost(estimate,duration,job.resolution||'720p');checkBudget([...Object.values(job.videoReservations),c.usd],job.quote.limit);job.videoReservations[i]=c.usd;await save(job);
         }
-        handle=await hf('bytedance/seedance-2.5/reference-to-video',videoBody(scene,scene.imageIds.map(j=>job.uploads[j]),duration),{'Idempotency-Key':`${job.id}-scene-${i}`});
+        handle=await hf('bytedance/seedance-2.5/reference-to-video',videoBody(scene,scene.imageIds.map(j=>job.uploads[j]),duration,job.resolution||'720p'),{'Idempotency-Key':`${job.id}-scene-${i}`});
         if(!/^[\w-]{16,64}$/.test(handle.request_id||''))throw Error('영상 생성 번호를 받지 못했습니다. 재시도 전에 외부 작업을 확인해 주세요.');
         await writeFile(stateFile,JSON.stringify(handle));
       }
