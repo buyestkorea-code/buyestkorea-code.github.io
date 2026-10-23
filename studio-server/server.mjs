@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import { validateInput,produce } from './core.mjs';
 import { createProviders } from './providers.mjs';
 import { command } from './media.mjs';
+import {searchProducts,importProducts,product} from './catalog.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url)),web=path.resolve(root,'../studio-next');
 const dataRoot=path.resolve(process.env.STUDIO_DATA_DIR||path.join(root,'.data'));
@@ -26,11 +27,11 @@ function json(res,data,status=200){res.writeHead(status,{'Content-Type':'applica
 async function body(req){let size=0;const chunks=[];for await(const c of req){size+=c.length;if(size>68_000_000)throw Error('사진 총 용량이 너무 큽니다.');chunks.push(c);}try{return JSON.parse(Buffer.concat(chunks).toString()||'{}');}catch{throw Error('요청 형식을 확인해 주세요.');}}
 const providers=job=>createProviders(process.env,jobDir(job),save);
 async function create(input,demo=false){
-  const clean=validateInput(input),job={id:randomUUID(),brand:clean.brand,output:clean.output,resolution:clean.resolution,brief:clean.brief,facts:clean.facts,images:[],status:'draft',stage:'draft',createdAt:new Date().toISOString(),demo,completed:{}};
+  const clean=validateInput(input),job={id:randomUUID(),aiBackground:clean.aiBackground,brand:clean.brand,output:clean.output,resolution:clean.resolution,brief:clean.brief,facts:clean.facts,images:[],status:'draft',stage:'draft',createdAt:new Date().toISOString(),demo,completed:{}};
   await mkdir(jobDir(job),{recursive:true});
   for(let i=0;i<clean.images.length;i++){
     const raw=Buffer.from(clean.images[i].data.split(',')[1],'base64'),file=`photo-${i}.jpg`;
-    await sharp(raw,{limitInputPixels:40_000_000}).rotate().resize(1600,1600,{fit:'inside',withoutEnlargement:true}).jpeg({quality:90}).toFile(path.join(jobDir(job),file));job.images.push({file});
+    await sharp(raw,{limitInputPixels:40_000_000}).rotate().resize(1600,1600,{fit:'inside',withoutEnlargement:true}).jpeg({quality:90}).toFile(path.join(jobDir(job),file));const source=clean.images[i].product?.pid?await product(clean.images[i].product.pid):undefined;job.images.push({file,product:source});
   }
   if(process.env.STUDIO_MUSIC_PATH)job.music=path.resolve(process.env.STUDIO_MUSIC_PATH);
   jobs.set(job.id,job);await save(job);return job;
@@ -57,7 +58,9 @@ const server=http.createServer(async(req,res)=>{
     if(req.headers.origin&&!allowedHosts.some(h=>req.headers.origin===`http://${h}`))return json(res,{error:'다른 사이트에서 요청할 수 없습니다.'},403);
     if(req.headers['sec-fetch-site']==='cross-site'&&req.method!=='GET')return json(res,{error:'외부 사이트 요청은 허용하지 않습니다.'},403);
     const url=new URL(req.url,`http://127.0.0.1:${port}`),route=url.pathname;
-    if(route==='/api/config'&&req.method==='GET')return json(res,{local:true,renderer,services:{planner:!!process.env.GEMINI_API_KEY,video:!!process.env.HF_API_KEY,voice:!!(process.env.ELEVENLABS_API_KEY&&process.env.ELEVENLABS_VOICE_ID)},cloudRenderer:!!process.env.CREATOMATE_API_KEY});
+    if(route==='/api/config'&&req.method==='GET')return json(res,{local:true,renderer,services:{image:!!process.env.OPENAI_API_KEY,planner:!!process.env.GEMINI_API_KEY,video:!!process.env.HF_API_KEY,voice:!!(process.env.ELEVENLABS_API_KEY&&process.env.ELEVENLABS_VOICE_ID)},cloudRenderer:!!process.env.CREATOMATE_API_KEY});
+    if(route==='/api/catalog/search'&&req.method==='POST')return json(res,await searchProducts((await body(req)).queries));
+    if(route==='/api/catalog/import'&&req.method==='POST')return json(res,await importProducts((await body(req)).ids));
     if(route==='/api/projects'&&req.method==='GET')return json(res,[...jobs.values()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(expose));
     if(route==='/api/projects'&&req.method==='POST')return json(res,expose(await create(await body(req))),201);
     if(route==='/api/sample'&&req.method==='POST'){

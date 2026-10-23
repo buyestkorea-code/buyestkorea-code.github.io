@@ -1,3 +1,4 @@
+import {generateBackground} from './image-background.mjs';
 import { readFile, writeFile, access, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { planningPrompt, validatePlan, captionsFromAlignment, checkBudget } from './core.mjs';
@@ -37,13 +38,15 @@ export function createProviders(env,dir,save) {
       if(job.demo) return validatePlan({title:'가볍게 만나는 새로운 계절',description:'사진 속 디테일부터 오늘의 스타일 제안까지. BUYEST에서 만나보세요. #BUYEST #스타일',scenes:job.images.slice(0,3).map((_,i)=>({imageIds:[i],title:['새로운 시선','가까이 보는 디테일','당신의 일상에'][i],narration:['새로운 계절, 나만의 스타일을 만나보세요.','가까이 볼수록 눈길이 가는 디테일.','BUYEST에서 당신의 취향을 찾아보세요.'][i],prompt:'Slow cinematic push-in on the product, soft daylight, preserve shape and colour.'})),cards:Array.from({length:5},(_,i)=>({imageId:i%job.images.length,title:['가볍게 만나는 새로운 계절','시선을 사로잡는 실루엣','가까이 보는 디테일','일상에 더하는 포인트','취향을 발견하는 곳'][i],body:['사진 속 상품으로 구성한 샘플 카드뉴스입니다.','원본 사진의 형태와 색을 그대로 보여줍니다.','상품 정보는 확인된 내용만 사용합니다.','한 장의 사진에서 시작되는 새로운 스타일.','BUYEST에서 더 많은 상품을 만나보세요.'][i]}))},job.images.length);
       if(!env.GEMINI_API_KEY)throw Error('사진 분석용 Gemini 연결이 필요합니다. 서버 .env를 설정해 주세요.');
       const parts=[{type:'text',text:planningPrompt(job)},...await Promise.all(job.images.map(async image=>({type:'image',mime_type:'image/jpeg',data:(await readFile(path.join(dir,image.file))).toString('base64')})))];
-      const schema={type:'OBJECT',properties:{title:{type:'STRING'},description:{type:'STRING'},scenes:{type:'ARRAY',items:{type:'OBJECT',properties:{imageIds:{type:'ARRAY',items:{type:'INTEGER'}},title:{type:'STRING'},narration:{type:'STRING'},prompt:{type:'STRING'}},required:['imageIds','title','narration','prompt']}},cards:{type:'ARRAY',items:{type:'OBJECT',properties:{imageId:{type:'INTEGER'},title:{type:'STRING'},body:{type:'STRING'},kicker:{type:'STRING'},tagline:{type:'STRING'},points:{type:'ARRAY',items:{type:'STRING'}},meta:{type:'STRING'},price:{type:'STRING'},collection:{type:'STRING'}},required:['imageId','title','body']}}},required:['title','description','scenes','cards']};
+      const schema={type:'OBJECT',properties:{title:{type:'STRING'},description:{type:'STRING'},scenes:{type:'ARRAY',items:{type:'OBJECT',properties:{imageIds:{type:'ARRAY',items:{type:'INTEGER',minimum:0,maximum:job.images.length-1}},title:{type:'STRING'},narration:{type:'STRING'},prompt:{type:'STRING'}},required:['imageIds','title','narration','prompt']}},cards:{type:'ARRAY',items:{type:'OBJECT',properties:{imageId:{type:'INTEGER',minimum:0,maximum:job.images.length-1},title:{type:'STRING'},body:{type:'STRING'},kicker:{type:'STRING'},tagline:{type:'STRING'},points:{type:'ARRAY',items:{type:'STRING'}},meta:{type:'STRING'},price:{type:'STRING'},collection:{type:'STRING'}},required:['imageId','title','body','kicker','tagline','points','meta','price','collection']}}},required:['title','description','scenes','cards']};
+      schema.properties.cards.maxItems=7; schema.properties.scenes.maxItems=4;
+      const limitStrings=node=>{if(node.type==='STRING')node.maxLength=2000;if(node.properties)for(const [key,value] of Object.entries(node.properties)){limitStrings(value);if(value.type==='STRING'&&['title','body','meta','price','tagline','kicker','collection'].includes(key))value.maxLength=key==='body'?180:60;}if(node.items)limitStrings(node.items);};limitStrings(schema);
       const model=env.GEMINI_MODEL||'gemini-3.8-flash';
       const responseSchema=JSON.parse(JSON.stringify(schema).replace(/"type":"(\w+)"/g,(_,type)=>`"type":"${type.toLowerCase()}"`));
       const data=await requestJson('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},body:JSON.stringify({model,input:parts,store:false,response_format:{type:'text',mime_type:'application/json',schema:responseSchema},generation_config:{max_output_tokens:5000,...(!model.includes('lite')?{thinking_level:'low'}:{})}})});
       const text=(data.steps||[]).filter(s=>s.type==='model_output').flatMap(s=>s.content||[]).filter(p=>p.type==='text').map(p=>p.text||'').join('').replaceAll('바이에스트','바이스트');
       if(!text) throw Error('기획 결과가 비어 있습니다. 사진과 요청 내용을 확인해 주세요.');
-      return validatePlan(JSON.parse(text),job.images.length);
+      let plan;try{plan=JSON.parse(text);}catch{throw Error('AI 기획 응답이 중간에 끊겼습니다. 다시 기획해 주세요.');}return validatePlan(plan,job.images.length);
     },
     async upload(job) {
       if(job.uploads?.length===job.images.length)return job.uploads;
@@ -130,8 +133,11 @@ export function createProviders(env,dir,save) {
       const response=await fetch(rendered.url,{signal:AbortSignal.timeout(120000)});if(!response.ok)throw Error('합성 영상 다운로드에 실패했습니다.');await writeFile(path.join(dir,'reel.mp4'),Buffer.from(await response.arrayBuffer()));return {file:'reel.mp4',renderer:'creatomate'};
     },
     async cards(job) {
+      let background;
+      if(job.aiBackground&&!job.demo){try{background=await readFile(path.join(dir,'cover-background.png'));}catch{background=await generateBackground(env,job.brief);await writeFile(path.join(dir,'cover-background.png'),background);}}
+
       const cards=[];
-      for(let i=0;i<job.plan.cards.length;i++) {const card=job.plan.cards[i],file=`card-${String(i+1).padStart(2,'0')}.png`;await writeFile(path.join(dir,file),await cardPng(await readFile(path.join(dir,job.images[card.imageId].file)),card,job.brand,i,job.plan.cards.length,job.demo));cards.push({file});}
+      for(let i=0;i<job.plan.cards.length;i++) {const original=job.plan.cards[i],source=job.images[original.imageId].product;const card=source?{...original,meta:source.name.match(/[A-Z0-9][A-Z0-9 ]{8,}$/i)?.[0]||source.name.slice(0,45),price:source.price?`${Number(source.price).toLocaleString('ko-KR')} ${source.currency==='KRW'?'원':source.currency}`:'',collection:source.brand}:original,file=`card-${String(i+1).padStart(2,'0')}.png`;await writeFile(path.join(dir,file),await cardPng(await readFile(path.join(dir,job.images[card.imageId].file)),card,job.brand,i,job.plan.cards.length,job.demo,background));cards.push({file});}
       await writeFile(path.join(dir,'cards.zip'),await zipFiles(await Promise.all(cards.map(async c=>({name:c.file,data:await readFile(path.join(dir,c.file))})))));
       return cards;
     }

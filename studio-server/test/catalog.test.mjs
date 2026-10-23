@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {siteUrl,parseProduct,searchProducts,importProducts} from '../catalog.mjs';
+import {generateBackground} from '../image-background.mjs';
+const html='<script type="application/ld+json">'+JSON.stringify({'@type':'Product',name:'블랙 123 ABC',image:['https://buyest.co.kr/data/a.jpg'],brand:{name:'Moncler'},offers:{price:'1000',priceCurrency:'KRW'}})+'</script>';
+test('상품 정보는 구조화된 원문 값과 출처를 보관한다',()=>{const p=parseProduct(html,'123');assert.equal(p.price,'1000');assert.equal(p.name,'블랙 123 ABC');assert.match(p.url,/pid=123$/);assert.throws(()=>parseProduct('no product','123'));});
+test('외부 URL과 인증정보가 포함된 URL은 거절한다',()=>{for(const u of ['https://evil.test/a','http://buyest.co.kr/a','https://x:y@buyest.co.kr/a'])assert.throws(()=>siteUrl(u));});
+test('검색 후보를 하나로 임의 확정하지 않고 중복 링크를 제거한다',async()=>{const f=async u=>new Response(String(u).includes('product_search')?'product_detail.php?pid=1 product_detail.php?pid=2 product_detail.php?pid=1':html);const [g]=await searchProducts('123 ABC',f);assert.equal(g.candidates.length,2);assert.deepEqual(g.candidates.map(x=>x.pid),['1','2']);});
+test('검색 실패와 입력 제한, 중복 가져오기를 처리한다',async()=>{assert.equal((await searchProducts('ZZZ',async()=>new Response('none')))[0].candidates.length,0);await assert.rejects(importProducts(['1','1']));await assert.rejects(searchProducts(Array(10).fill(0).map((_,i)=>i).join('\n')));});
+test('키 없는 이미지 생성과 공급자 오류는 비밀값 없이 명확하게 실패한다',async()=>{await assert.rejects(generateBackground({},''),/OpenAI API 키/);await assert.rejects(generateBackground({OPENAI_API_KEY:'secret'},'',async()=>new Response('secret',{status:401})),/401/);});
