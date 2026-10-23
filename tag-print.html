@@ -100,6 +100,18 @@
       <span class="msg" style="margin:0;">인쇄 창에서 용지 크기를 위 크기로, 여백은 "없음", 배율은 100%로 맞추세요.</span>
     </div>
   </div>
+  <div class="card" id="calCard" style="display:none;">
+    <h2>4. 인쇄가 어긋날 때 — 눈금 테스트</h2>
+    <div class="msg" style="margin:0 0 10px;">① 아래 버튼으로 눈금 택을 한 장 뽑으세요. ② 용지 <b>위쪽 끝</b>에서 "10"선과 "80"선까지, 용지 <b>왼쪽 끝</b>에서 "10"선과 "40"선까지 자로 재서 mm로 적어 주세요. ③ 값을 넣으면 위치와 크기가 자동으로 보정됩니다. (정확히 나왔다면 10 / 80 / 10 / 40 그대로 두면 됩니다.)</div>
+    <div class="row" style="margin-bottom:10px;"><button class="btn btn-out" id="btnCalPrint">눈금 택 인쇄</button></div>
+    <div class="grid">
+      <div><label class="f">위에서 "10"선까지 (mm)</label><input type="number" id="calYa" step="0.1"></div>
+      <div><label class="f">위에서 "80"선까지 (mm)</label><input type="number" id="calYb" step="0.1"></div>
+      <div><label class="f">왼쪽에서 "10"선까지 (mm)</label><input type="number" id="calXa" step="0.1"></div>
+      <div><label class="f">왼쪽에서 "40"선까지 (mm)</label><input type="number" id="calXb" step="0.1"></div>
+    </div>
+    <div class="msg" id="calMsg"></div>
+  </div>
   <h2 id="pvTitle" style="font-size:14px;margin:6px 0 8px;display:none;">미리보기 (회색 글자는 용지에 이미 있는 양식이라 인쇄되지 않아요)</h2>
 </div>
 <div id="sheet"></div>
@@ -120,7 +132,7 @@ const STATUS = { ok:['찾음','#0f766e'], multi:['후보 여러 개','#a15c07'],
 /* ── 줄 배치 (택 50×90mm 실제 사진을 재서 정한 기본값) ──
    k=값 종류, a=l(왼쪽 기준)/c(가운데 기준), bar=바코드(w,h mm) */
 const DEF_LAYOUT = {
-  w: 50, h: 90, fix: '바이스트', offX: 0, offY: 0,
+  w: 50, h: 90, fix: '바이스트', offX: 0, offY: 0, cal: { ya: 10, yb: 80, xa: 10, xb: 40 },
   els: [
     { id:'brand',  name:'브랜드',          k:'brand',   a:'l', x:16.5, y:19.0, fs:2.8, on:true },
     { id:'style',  name:'모델명(위)',       k:'style',   a:'l', x:16.5, y:24.7, fs:2.8, on:true },
@@ -153,13 +165,14 @@ function loadLayout() {
     const s = JSON.parse(localStorage.getItem(LS) || 'null');
     if (s) {
       ['w', 'h', 'fix', 'offX', 'offY'].forEach(k => { if (s[k] != null) d[k] = s[k]; });
+      if (s.cal) ['ya', 'yb', 'xa', 'xb'].forEach(k => { if (+s.cal[k] > 0) d.cal[k] = +s.cal[k]; });
       (s.els || []).forEach(e => { const t = d.els.find(x => x.id === e.id); if (t) ['x', 'y', 'fs', 'on'].forEach(k => { if (e[k] != null) t[k] = e[k]; }); });
     }
   } catch (e) {}
   return d;
 }
 function saveLayout() {
-  try { localStorage.setItem(LS, JSON.stringify({ w:L.w, h:L.h, fix:L.fix, offX:L.offX, offY:L.offY, els:L.els.map(e => ({ id:e.id, x:e.x, y:e.y, fs:e.fs, on:e.on })) })); } catch (e) {}
+  try { localStorage.setItem(LS, JSON.stringify({ w:L.w, h:L.h, fix:L.fix, offX:L.offX, offY:L.offY, cal:L.cal, els:L.els.map(e => ({ id:e.id, x:e.x, y:e.y, fs:e.fs, on:e.on })) })); } catch (e) {}
 }
 
 function auth() { try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); return a && a.id && a.pass ? a : null; } catch (e) { return null; } }
@@ -198,6 +211,7 @@ $('file').addEventListener('change', async e => {
 function drawList() {
   $('listCard').style.display = items.length ? 'block' : 'none';
   $('setCard').style.display = items.length ? 'block' : 'none';
+  $('calCard').style.display = items.length ? 'block' : 'none';
   $('tbody').innerHTML = items.map((it, i) => {
     const st = STATUS[it.status] || ['', '#000'];
     const cand = it.status === 'multi' ? '<select data-c="' + i + '"><option value="">후보 고르기</option>' + it.cands.map((c, k) => '<option value="' + k + '">' + esc(c.ec_name) + ' / ' + esc(c.size) + ' / ' + esc(c.code) + '</option>').join('') + '</select>' : '';
@@ -237,10 +251,18 @@ function code128(text) {
 }
 function fmtPrice(p) { const n = parseFloat(String(p).replace(/[^\d.]/g, '')); return isFinite(n) ? Math.round(n).toLocaleString('ko-KR') : String(p); }
 
-/* 택 한 장. opt.guide=안내선, opt.edit=편집(끌기) 가능 */
+/* 눈금 테스트 보정: 용지에 실제로 찍힌 위치(ya,yb / xa,xb)로 프린터가 늘리거나 민 정도를 구해 반대로 적용한다. 인쇄할 때만 쓴다. */
+function calc() {
+  const c = L.cal, sy = (c.yb - c.ya) / 70 || 1, sx = (c.xb - c.xa) / 30 || 1;
+  return { sx, sy, dx: c.xa - 10 * sx, dy: c.ya - 10 * sy };
+}
+function calText() { const k = calc(); return '세로 ×' + (1 / k.sy).toFixed(3) + ' · 가로 ×' + (1 / k.sx).toFixed(3) + ' · 이동 ' + (-k.dy / k.sy).toFixed(1) + 'mm / ' + (-k.dx / k.sx).toFixed(1) + 'mm'; }
+
+/* 택 한 장. opt.guide=안내선, opt.edit=편집(끌기) 가능, opt.print=인쇄(눈금 보정 적용) */
 function tagHtml(it, opt) {
   opt = opt || {};
   const val = { brand: it.brand, style: it.style, size: it.size, origin: it.origin, fix: L.fix, price: fmtPrice(it.price), barcode: it.barcode };
+  const K = opt.print ? calc() : { sx: 1, sy: 1, dx: 0, dy: 0 }, kf = (K.sx + K.sy) / 2;
   let h = '<div class="tag' + (opt.edit ? ' edit-on' : '') + '" style="width:' + L.w + 'mm;height:' + L.h + 'mm">';
   if (opt.guide) {
     h += '<div class="cut" style="top:' + GUIDE_CUT_Y + 'mm"></div>';
@@ -248,12 +270,21 @@ function tagHtml(it, opt) {
   }
   L.els.forEach(e => {
     if (!e.on) return;
-    const x = +(e.x + L.offX).toFixed(2), y = +(e.y + L.offY).toFixed(2);
+    const x = +((e.x + L.offX - K.dx) / K.sx).toFixed(2), y = +((e.y + L.offY - K.dy) / K.sy).toFixed(2);
     const cls = 'el ' + (e.bar ? 'bar' : e.a) + (opt.edit && e.id === sel ? ' sel' : '');
-    if (e.bar) h += '<div class="' + cls + '" data-id="' + e.id + '" style="left:' + x + 'mm;top:' + y + 'mm;width:' + e.w + 'mm;height:' + e.h + 'mm">' + code128(it.barcode) + '</div>';
-    else h += '<div class="' + cls + '" data-id="' + e.id + '" style="left:' + x + 'mm;top:' + y + 'mm;font-size:' + e.fs + 'mm">' + esc(val[e.k]) + '</div>';
+    if (e.bar) h += '<div class="' + cls + '" data-id="' + e.id + '" style="left:' + x + 'mm;top:' + y + 'mm;width:' + +(e.w / K.sx).toFixed(2) + 'mm;height:' + +(e.h / K.sy).toFixed(2) + 'mm">' + code128(it.barcode) + '</div>';
+    else h += '<div class="' + cls + '" data-id="' + e.id + '" style="left:' + x + 'mm;top:' + y + 'mm;font-size:' + +(e.fs / kf).toFixed(2) + 'mm">' + esc(val[e.k]) + '</div>';
   });
   return h + '</div>';
+}
+/* 오른쪽 끝을 넘는 글자는 그 줄만 글자 크기를 줄여 택 안에 맞춘다 */
+function fit(root) {
+  root.querySelectorAll('.tag').forEach(t => {
+    t.querySelectorAll('.el.l:not(.bar)').forEach(e => {
+      const avail = t.clientWidth - e.offsetLeft - 1.2 * 3.7795;
+      if (avail > 0 && e.offsetWidth > avail) e.style.fontSize = (parseFloat(e.style.fontSize) * avail / e.offsetWidth).toFixed(2) + 'mm';
+    });
+  });
 }
 function expanded() { const a = []; for (const it of items) if (it.barcode) for (let i = 0; i < it.qty; i++) a.push(it); return a; }
 function sampleItem() { return items.find(it => it.barcode) || items[0] || { brand:'', style:'', size:'', origin:'', price:'', barcode:'0000000000' }; }
@@ -264,6 +295,7 @@ function refresh() {
   $('sumMsg').textContent = '총 ' + all.length + '장' + (nobc ? ' · 바코드가 비어 인쇄에서 빠지는 ' + nobc + '줄' : '');
   $('pvTitle').style.display = all.length ? 'block' : 'none';
   $('sheet').innerHTML = all.slice(0, 40).map(it => tagHtml(it, { guide: $('showGuide').checked })).join('') + (all.length > 40 ? '<div class="msg noprint">미리보기는 40장까지만 보여요. 인쇄는 ' + all.length + '장 전부 나갑니다.</div>' : '');
+  fit($('sheet'));
   drawCanvas();
 }
 
@@ -274,6 +306,7 @@ function drawCanvas() {
   c.style.zoom = ZOOM;
   c.style.width = L.w + 'mm'; c.style.height = L.h + 'mm';
   c.innerHTML = tagHtml(sampleItem(), { guide: $('showGuide').checked, edit: true });
+  fit(c);
   drawLayoutTable();
 }
 function drawLayoutTable() {
@@ -293,6 +326,7 @@ $('ltbody').addEventListener('click', ev => { const tr = ev.target.closest('tr')
 function redrawKeepTable(withTable) {   // 표 입력 중에는 표를 다시 그리지 않아 커서가 안 튄다
   const c = $('canvas'); c.innerHTML = tagHtml(sampleItem(), { guide: $('showGuide').checked, edit: true });
   $('sheet').innerHTML = expanded().slice(0, 40).map(it => tagHtml(it, { guide: $('showGuide').checked })).join('');
+  fit(c); fit($('sheet'));
   if (withTable) drawLayoutTable();
 }
 /* 끌기 */
@@ -331,16 +365,42 @@ function syncSettings() { $('wMm').value = L.w; $('hMm').value = L.h; $('fixText
 [['wMm','w'],['hMm','h'],['offX','offX'],['offY','offY']].forEach(([id, k]) => $(id).addEventListener('input', () => { L[k] = parseFloat($(id).value) || 0; if (k === 'w' || k === 'h') L[k] = Math.max(20, L[k]); saveLayout(); refresh(); }));
 $('fixText').addEventListener('input', () => { L.fix = $('fixText').value; saveLayout(); refresh(); });
 $('showGuide').addEventListener('change', refresh);
-$('btnReset').addEventListener('click', () => { if (!confirm('줄 위치를 처음 기본값으로 되돌릴까요?')) return; L = JSON.parse(JSON.stringify(DEF_LAYOUT)); saveLayout(); syncSettings(); refresh(); });
+$('btnReset').addEventListener('click', () => { if (!confirm('줄 위치를 처음 기본값으로 되돌릴까요?')) return; const keep = L.cal; L = JSON.parse(JSON.stringify(DEF_LAYOUT)); L.cal = keep; saveLayout(); syncSettings(); refresh(); });
 
 $('btnPrint').addEventListener('click', () => {
   const all = expanded(); if (!all.length) return;
   const st = document.createElement('style'); st.id = 'pgSize'; st.textContent = '@page{size:' + L.w + 'mm ' + L.h + 'mm;margin:0}';
   document.head.appendChild(st);
-  $('sheet').innerHTML = all.map(it => tagHtml(it, { guide: false })).join('');      // 인쇄용: 안내선 없이 값만
+  $('sheet').innerHTML = all.map(it => tagHtml(it, { guide: false, print: true })).join('');      // 인쇄용: 안내선 없이 값만, 눈금 보정 적용
+  fit($('sheet'));
   setTimeout(() => { window.print(); setTimeout(() => { st.remove(); refresh(); }, 500); }, 100);
 });
-syncSettings();
+/* 눈금 테스트: 5mm마다 가는 선, 10mm마다 숫자, 10·80(세로)·10·40(가로)은 굵게 */
+function calSheetHtml() {
+  let s = '<div class="tag" style="width:' + L.w + 'mm;height:' + L.h + 'mm;font-size:2.2mm">';
+  for (let y = 5; y < L.h; y += 5) { const big = (y === 10 || y === 80), t = y % 10 === 0;
+    s += '<div style="position:absolute;left:0;right:0;top:' + y + 'mm;border-top:' + (big ? '0.5mm solid #000' : (t ? '0.2mm solid #666' : '0.15mm dotted #888')) + '"></div>';
+    if (t) s += '<div style="position:absolute;left:' + (L.w / 2 - 3) + 'mm;top:' + (y + 0.4) + 'mm;line-height:1;font-weight:' + (big ? 800 : 400) + '">' + y + '</div>'; }
+  for (let x = 5; x < L.w; x += 5) { const big = (x === 10 || x === 40), t = x % 10 === 0;
+    s += '<div style="position:absolute;top:0;bottom:0;left:' + x + 'mm;border-left:' + (big ? '0.5mm solid #000' : (t ? '0.2mm solid #666' : '0.15mm dotted #888')) + '"></div>';
+    if (t) s += '<div style="position:absolute;left:' + (x + 0.4) + 'mm;top:' + (L.h / 2 - 8) + 'mm;line-height:1;font-weight:' + (big ? 800 : 400) + '">' + x + '</div>'; }
+  return s + '<div style="position:absolute;left:12mm;top:1mm;font-size:2.2mm">▲ 위</div></div>';
+}
+function printHtml(html) {
+  const st = document.createElement('style'); st.id = 'pgSize'; st.textContent = '@page{size:' + L.w + 'mm ' + L.h + 'mm;margin:0}';
+  document.head.appendChild(st);
+  $('sheet').innerHTML = html;
+  setTimeout(() => { window.print(); setTimeout(() => { st.remove(); refresh(); }, 500); }, 100);
+}
+$('btnCalPrint').addEventListener('click', () => printHtml(calSheetHtml()));
+function syncCal() { $('calYa').value = L.cal.ya; $('calYb').value = L.cal.yb; $('calXa').value = L.cal.xa; $('calXb').value = L.cal.xb; calInfo(); }
+function calInfo() {
+  const c = L.cal, same = c.ya === 10 && c.yb === 80 && c.xa === 10 && c.xb === 40;
+  $('calMsg').className = 'msg ' + (same ? '' : 'ok');
+  $('calMsg').textContent = same ? '보정 없음' : '보정 적용 중: ' + calText() + ' (이 컴퓨터에 저장돼요. 값을 10 / 80 / 10 / 40 으로 되돌리면 해제)';
+}
+[['calYa', 'ya'], ['calYb', 'yb'], ['calXa', 'xa'], ['calXb', 'xb']].forEach(([id, k]) => $(id).addEventListener('input', () => { const v = parseFloat($(id).value); if (v > 0) { L.cal[k] = v; saveLayout(); calInfo(); } }));
+syncSettings(); syncCal();
 </script>
 </body>
 </html>
