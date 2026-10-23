@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { validateInput,produce } from './core.mjs';
 import { createProviders } from './providers.mjs';
+import {templates} from './templates.mjs';
+import {editorialCard} from './card-layout.mjs';
 import { command } from './media.mjs';
 import {searchProducts,importProducts,product} from './catalog.mjs';
 
@@ -27,7 +29,7 @@ function json(res,data,status=200){res.writeHead(status,{'Content-Type':'applica
 async function body(req){let size=0;const chunks=[];for await(const c of req){size+=c.length;if(size>68_000_000)throw Error('사진 총 용량이 너무 큽니다.');chunks.push(c);}try{return JSON.parse(Buffer.concat(chunks).toString()||'{}');}catch{throw Error('요청 형식을 확인해 주세요.');}}
 const providers=job=>createProviders(process.env,jobDir(job),save);
 async function create(input,demo=false){
-  const clean=validateInput(input),job={id:randomUUID(),aiBackground:clean.aiBackground,brand:clean.brand,output:clean.output,resolution:clean.resolution,brief:clean.brief,facts:clean.facts,images:[],status:'draft',stage:'draft',createdAt:new Date().toISOString(),demo,completed:{}};
+  const clean=validateInput(input),job={id:randomUUID(),template:clean.template,aiBackground:clean.aiBackground,brand:clean.brand,output:clean.output,resolution:clean.resolution,brief:clean.brief,facts:clean.facts,images:[],status:'draft',stage:'draft',createdAt:new Date().toISOString(),demo,completed:{}};
   await mkdir(jobDir(job),{recursive:true});
   for(let i=0;i<clean.images.length;i++){
     const raw=Buffer.from(clean.images[i].data.split(',')[1],'base64'),file=`photo-${i}.jpg`;
@@ -58,13 +60,16 @@ const server=http.createServer(async(req,res)=>{
     if(req.headers.origin&&!allowedHosts.some(h=>req.headers.origin===`http://${h}`))return json(res,{error:'다른 사이트에서 요청할 수 없습니다.'},403);
     if(req.headers['sec-fetch-site']==='cross-site'&&req.method!=='GET')return json(res,{error:'외부 사이트 요청은 허용하지 않습니다.'},403);
     const url=new URL(req.url,`http://127.0.0.1:${port}`),route=url.pathname;
+    if(route==='/api/templates'&&req.method==='GET')return json(res,templates);
+    const previewMatch=/^\/api\/templates\/([a-z]+)\/preview$/.exec(route);
+    if(previewMatch&&req.method==='GET'){if(!templates.some(t=>t.id===previewMatch[1]))throw Error('템플릿을 찾지 못했습니다.');const sample=(await sampleImages())[0];const png=await editorialCard(Buffer.from(sample.data.split(',')[1],'base64'),{title:'오늘의 취향을 고르는 방법',body:'상품의 특징과 스타일링을 한눈에 비교하세요.',tagline:'사진과 정보로 완성하는 나의 셀렉션',meta:'예시 이미지 · 실제 상품 정보 아님',collection:'BUYEST'},'buyest',0,5,true,null,previewMatch[1]);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=300'});return res.end(png);}
     if(route==='/api/config'&&req.method==='GET')return json(res,{local:true,renderer,services:{image:!!process.env.OPENAI_API_KEY,planner:!!process.env.GEMINI_API_KEY,video:!!process.env.HF_API_KEY,voice:!!(process.env.ELEVENLABS_API_KEY&&process.env.ELEVENLABS_VOICE_ID)},cloudRenderer:!!process.env.CREATOMATE_API_KEY});
     if(route==='/api/catalog/search'&&req.method==='POST')return json(res,await searchProducts((await body(req)).queries));
     if(route==='/api/catalog/import'&&req.method==='POST')return json(res,await importProducts((await body(req)).ids));
     if(route==='/api/projects'&&req.method==='GET')return json(res,[...jobs.values()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(expose));
     if(route==='/api/projects'&&req.method==='POST')return json(res,expose(await create(await body(req))),201);
     if(route==='/api/sample'&&req.method==='POST'){
-      const job=await create({brand:'buyest',output:'both',brief:'',facts:'샘플 일러스트. 실제 상품 정보가 아닙니다.',images:await sampleImages()},true);job.plan=await providers(job).plan(job);job.status='ready';job.stage='ready';await save(job);return json(res,expose(job),201);
+      const sampleInput=await body(req);const job=await create({template:sampleInput.template||'editorial',brand:'buyest',output:'both',brief:'',facts:'샘플 일러스트. 실제 상품 정보가 아닙니다.',images:await sampleImages()},true);job.plan=await providers(job).plan(job);job.status='ready';job.stage='ready';await save(job);return json(res,expose(job),201);
     }
     const fileMatch=/^\/files\/([a-f0-9-]{36})\/(photo-\d+\.jpg|card-\d+\.png|reel\.mp4|narration-preview\.mp4|cards\.zip)$/.exec(route);
     if(fileMatch&&req.method==='GET'){if(!jobs.has(fileMatch[1]))return json(res,{error:'작업을 찾지 못했습니다.'},404);return await sendFile(req,res,path.join(dataRoot,fileMatch[1],fileMatch[2]),url.searchParams.has('download'));}

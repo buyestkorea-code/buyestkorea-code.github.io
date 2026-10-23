@@ -80,3 +80,6 @@ npm run test:coverage
 ## 상품 가져오기 및 AI 표지 배경
 품번이나 buyest.co.kr 상품 상세 링크를 한 줄씩 입력합니다(최대 8개). 사이트 검색 결과가 여러 개이면 색상/시즌을 선택합니다. 선택한 상품은 사진과 구조화 상품 정보(상품명, 브랜드, 판매가, 출처 URL, 조회 시각)를 함께 가져옵니다. 사진 삭제 후에도 사진 번호와 상품 정보는 다시 연결됩니다. 사이트에서 제공하지 않는 소재/사이즈는 추측하지 않습니다.
 AI 표지 배경 옵션은 OPENAI_API_KEY 및 선택적 OPENAI_IMAGE_MODEL 설정이 필요합니다(기본 gpt-image-2). OpenAI Images API로 장식 배경 한 장만 생성하고 실제 상품 사진과 한글 문구는 기존 렌더러로 합성합니다. 별도 과금이며 생성된 배경은 재시도 때 재사용합니다. 실제 OpenAI 호출은 키가 없어 검증하지 않았습니다.
+
+## 카드뉴스 템플릿
+일반 10종(editorial, split, gallery, bold, catalog, note, spotlight, stripe, minimal, poster), 키즈 1종(kids)을 /api/templates에서 제공합니다. 실제 렌더러 기반 미리보기를 선택하면 프로젝트에 template이 저장되어 모든 카드에 적용됩니다. Gemini는 creativeBrief(독자, 기획 방향, 후킹 문구, 배경 지시문)를 자동 작성합니다. 키즈는 레이아웃 선택이며 상품의 실제 대상 연령을 변경하지 않습니다.
