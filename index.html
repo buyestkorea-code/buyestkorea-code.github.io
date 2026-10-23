@@ -8663,7 +8663,7 @@ window.__loadLib = (function(){
     var el=document.getElementById('chgBadge'); if(!el) return;
     if(!a||!a.id||!a.pass){ el.style.display='none'; return; }
     fetch('https://buyest.co.kr/ecount_change_today_api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:a.id,pass:a.pass,action:'badge'})})
-      .then(function(r){return r.json();}).then(function(d){ if(d&&d.ok&&d.pending>0){ el.textContent='확인필요 '+d.pending; el.style.display='inline-block'; } else el.style.display='none'; }).catch(function(){});
+      .then(function(r){return r.json();}).then(function(d){ if(!(d&&d.ok)){ el.style.display='none'; return; } var parts=[]; if(d.pending>0) parts.push('확인필요 '+d.pending); if(d.map_todo&&d.map_todo.total>0) parts.push('연결정리 '+d.map_todo.total); if(parts.length){ el.textContent=parts.join(' · '); el.style.display='inline-block'; } else el.style.display='none'; }).catch(function(){});
   }
   setTimeout(tick,3000); setInterval(tick,300000);
 })();
