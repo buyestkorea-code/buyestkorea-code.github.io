@@ -1,0 +1,56 @@
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const state={images:[],brand:'buyest',output:'both',config:null,job:null,busy:false,timer:null,approval:null};
+const labels={draft:'사진 업로드 완료',planning:'AI 기획 중',ready:'기획 완료',running:'제작 중',completed:'완료',failed:'확인 필요'};
+const stages={voice:'한국어 음성을 만드는 중',clips:'장면별 AI 영상을 만드는 중',reel:'음성과 자막을 합성하는 중',cards:'카드뉴스를 디자인하는 중',completed:'모두 완성됐어요'};
+async function api(route,body){const r=await fetch('/api'+route,{...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const d=await r.json();if(!r.ok)throw Error(d.error||'요청을 완료하지 못했습니다.');return d;}
+const media=(job,file,download=false)=>`/files/${job.id}/${encodeURIComponent(file)}${download?'?download=1':''}`;
+function setBusy(value,label='사진으로 자동 만들기'){state.busy=value;$('#create').disabled=value;$('#sample').disabled=value;$('#create').textContent=value?label:'✦  사진으로 자동 만들기';}
+function nav(library=false){$('#editor').hidden=library;$('#current').hidden=true;$('#library').hidden=!library;$('#newProject').classList.toggle('active',!library);$('#libraryToggle').classList.toggle('active',library);clearTimeout(state.timer);}
+$('#newProject').onclick=()=>{if(state.busy)return;state.job=null;nav();};
+$('#libraryToggle').onclick=async()=>{nav(true);try{await loadLibrary();}catch(e){$('#jobList').textContent=e.message;}};
+document.querySelectorAll('[data-output]').forEach(b=>b.onclick=()=>{state.output=b.dataset.output;document.querySelectorAll('[data-output]').forEach(x=>{x.classList.toggle('selected',x===b);x.setAttribute('aria-checked',String(x===b));});});
+document.querySelectorAll('[data-brand]').forEach(b=>b.onclick=()=>{state.brand=b.dataset.brand;document.querySelectorAll('[data-brand]').forEach(x=>{x.classList.toggle('selected',x===b);x.setAttribute('aria-checked',String(x===b));});});
+async function addFiles(files){
+  $('#formError').textContent='';
+  try{if(state.images.length+files.length>8)throw Error('사진은 최대 8장까지 올려 주세요.');
+    const next=[];for(const file of files){if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>6_000_000)throw Error('사진은 6MB 이하 JPG, PNG, WebP 파일로 선택해 주세요.');const data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('사진을 읽지 못했습니다.'));r.readAsDataURL(file);});next.push({data,name:file.name});}state.images.push(...next);renderThumbs();
+  }catch(e){$('#formError').textContent=e.message;}finally{$('#photos').value='';}
+}
+function renderThumbs(){$('#thumbs').innerHTML=state.images.map((img,i)=>`<div class="thumb"><img src="${img.data}" alt="선택한 사진 ${i+1}"><button type="button" data-remove="${i}" aria-label="${i+1}번 사진 제거">×</button></div>`).join('');}
+$('#photos').onchange=e=>addFiles([...e.target.files]);$('#thumbs').onclick=e=>{const b=e.target.closest('[data-remove]');if(b){e.preventDefault();state.images.splice(Number(b.dataset.remove),1);renderThumbs();}};
+$('#drop').ondragover=e=>{e.preventDefault();$('#drop').classList.add('dragover');};$('#drop').ondragleave=()=>$('#drop').classList.remove('dragover');$('#drop').ondrop=e=>{e.preventDefault();$('#drop').classList.remove('dragover');addFiles([...e.dataTransfer.files]);};
+async function config(){state.config=await api('/config');const s=state.config.services,ready=s.planner&&s.voice&&s.video;$('#connectionDot').style.color=ready?'#3c8258':'#b58a4b';$('#services').innerHTML=[['사진 분석·기획 (Gemini)',s.planner],['AI 영상 (Higgsfield)',s.video],['한국어 음성 (ElevenLabs)',s.voice],['로컬 합성 (FFmpeg)',state.config.renderer],['클라우드 합성 (Creatomate · 선택)',state.config.cloudRenderer]].map(([label,on])=>`<div class="service-row"><span>${label}</span><b class="${on?'connected':'pending'}">${on?'연결됨':'연결 필요'}</b></div>`).join('');if(!ready)$('#createHint').textContent='실제 AI 제작은 서비스 연결 후 사용할 수 있어요. 샘플 테스트는 바로 가능합니다.';}
+$('#settings').onclick=()=>$('#connections').showModal();
+$('#create').onclick=async()=>{
+  $('#formError').textContent='';
+  if(!state.images.length){$('#formError').textContent='먼저 상품 사진을 선택해 주세요.';return;}
+  if(!state.config?.services.planner || (state.output!=='cards'&&(!state.config.services.video||!state.config.services.voice))){$('#connections').showModal();return;}
+  if(!state.config.renderer){$('#formError').textContent='최종 합성용 FFmpeg 연결이 필요합니다.';return;}
+  setBusy(true,'사진을 올리는 중…');
+  try{
+    let job=await api('/projects',{images:state.images,brand:state.brand,output:state.output,facts:$('#facts').value,brief:$('#brief').value});state.job=job;showJob(job);$('#current').insertAdjacentHTML('beforeend','<p class="job-note"><span class="spinner"></span> 사진을 분석하고 기획·대본·프롬프트를 자동으로 만드는 중입니다.</p>');
+    job=await api(`/projects/${job.id}/plan`,{});state.job=job;showJob(job);await requestApproval(job);
+  }catch(e){$('#formError').textContent=e.message;if(state.job){state.job=await api(`/projects/${state.job.id}`).catch(()=>state.job);showJob(state.job);}}finally{setBusy(false);loadLibrary().catch(()=>{});}
+};
+$('#sample').onclick=async()=>{setBusy(true);try{const job=await api('/sample',{});state.job=job;showJob(job);await api(`/projects/${job.id}/render`,{});await poll(job.id);}catch(e){$('#formError').textContent=e.message;}finally{setBusy(false);loadLibrary().catch(()=>{});}};
+async function requestApproval(job){const limit=Number($('#budget').value);const quote=await api(`/projects/${job.id}/quote`,{limit});state.approval={id:job.id,limit};$('#approvalText').innerHTML=`<p><b>${esc(job.plan.title)}</b></p><p class="job-note">${job.output==='cards'?`${job.plan.cards.length}장 카드뉴스`:`AI 영상 ${job.plan.scenes.length}개 장면 · 한국어 음성 · 동기화 자막`}${job.output==='both'?`<br>카드뉴스 ${job.plan.cards.length}장`:''}</p><p>AI 영상 예상 비용 <b>$${quote.videoUsd.toFixed(2)}</b><br><small>영상 생성 승인 한도 $${limit.toFixed(2)}</small></p>`;$('#approval').showModal();}
+$('#cancelApproval').onclick=()=>{$('#approval').close();state.approval=null;};
+$('#approve').onclick=async()=>{if(!state.approval)return;const a=state.approval;state.approval=null;$('#approval').close();setBusy(true);try{await api(`/projects/${a.id}/render`,{approved:true,limit:a.limit});await poll(a.id);}catch(e){$('#formError').textContent=e.message;alert(e.message);}finally{setBusy(false);}};
+function showJob(job){
+  state.job=job;$('#editor').hidden=true;$('#library').hidden=true;$('#current').hidden=false;
+  const plan=job.plan;const stageIndex=['voice','clips','reel','cards','completed'].indexOf(job.stage);
+  $('#current').innerHTML=`<div class="job-header"><div><p class="overline">YOUR CONTENT PROJECT</p><h2>${esc(plan?.title||'사진으로 새로운 기획을 만들고 있어요')}</h2><span class="badge">${esc(labels[job.status]||job.status)}</span>${job.demo?'<span class="badge demo-badge">샘플 · AI 생성 아님 · 음성 없음</span>':''}</div><button class="quiet" id="backNew">새로 만들기 ＋</button></div>
+  ${['running','failed'].includes(job.status)?`<div class="stage-list">${['음성','영상','편집','카드','완료'].map((s,i)=>`<div class="stage ${i<=stageIndex?'on':''}">${i+1}. ${s}</div>`).join('')}</div><p class="job-note" role="status">${job.status==='running'?'<span class="spinner"></span> ':''}${esc(job.error||stages[job.stage]||'제작 준비 중')}<br>이 화면을 닫아도 로컬 서버가 켜져 있으면 제작은 계속됩니다.</p>`:''}
+  ${plan?`<div class="section-heading" style="margin-top:28px"><h2>${job.demo?'샘플 기획':'AI가 구성한 이야기'}</h2><span>STORYBOARD</span></div><div class="story-grid">${plan.scenes.map((s,i)=>`<article class="story"><img src="${media(job,job.images[s.imageIds[0]].file)}" alt="${i+1}번 장면"><div><b>${String(i+1).padStart(2,'0')} / ${esc(s.title)}</b><p>${esc(s.narration)}</p></div></article>`).join('')}</div>`:''}
+  ${job.status==='ready'||job.status==='failed'?`<button class="create" id="continueJob">${job.status==='failed'?'저장된 결과부터 다시 시도':'이 기획으로 제작하기'} →</button>`:''}
+  ${job.result?.reel?`<div class="section-heading"><h2>${job.demo?'샘플 릴스':'완성된 릴스'}</h2><span>REEL / MP4</span></div><div class="result-reel"><video src="${media(job,job.result.reel.file)}" controls playsinline></video><div><p class="job-note">${job.demo?'이 영상은 샘플 사진에 모션과 자막을 합성한 기능 테스트입니다. 실제 AI 영상·음성을 생성하지 않았습니다.':'AI 장면과 한국어 음성을 합성하고 실제 발음 타이밍에 자막을 맞췄습니다.'}</p><a class="download" href="${media(job,'reel.mp4',true)}">MP4 다운로드 ↓</a></div></div>`:''}
+  ${job.result?.cards?.length?`<div class="section-heading" style="margin-top:25px"><h2>${job.demo?'샘플 카드뉴스':'완성된 카드뉴스'}</h2><span>CAROUSEL / PNG</span></div><div class="result-cards">${job.result.cards.map((c,i)=>`<a href="${media(job,c.file,true)}"><img src="${media(job,c.file)}" alt="카드뉴스 ${i+1}장 다운로드"></a>`).join('')}</div><a class="download" href="${media(job,'cards.zip',true)}">카드뉴스 전체 ZIP ↓</a>`:''}
+  ${plan?`<details style="margin-top:25px"><summary>게시글 초안</summary><p class="postcopy">${esc(plan.description)}</p><button class="quiet" id="copyPost">문구 복사</button></details>`:''}`;
+  $('#backNew').onclick=()=>{if(state.busy)return;nav();};
+  if($('#continueJob'))$('#continueJob').onclick=async()=>{try{if(!job.plan){const fresh=await api(`/projects/${job.id}/plan`,{});showJob(fresh);return;}if(job.demo){await api(`/projects/${job.id}/render`,{});poll(job.id);}else await requestApproval(job);}catch(e){alert(e.message);}};
+  if($('#copyPost'))$('#copyPost').onclick=async()=>{try{await navigator.clipboard.writeText(plan.description);$('#copyPost').textContent='복사됐어요';}catch{$('#copyPost').textContent='문구를 선택해 복사해 주세요';}};
+}
+async function poll(id){clearTimeout(state.timer);const job=await api(`/projects/${id}`);if(state.job?.id!==id)return;showJob(job);if(job.status==='running')state.timer=setTimeout(()=>poll(id).catch(e=>{$('#current').insertAdjacentHTML('beforeend',`<p class="error">${esc(e.message)} · 내 작업에서 다시 열어 주세요.</p>`);}),1500);else loadLibrary().catch(()=>{});}
+async function loadLibrary(){const jobs=await api('/projects');$('#jobCount').textContent=jobs.length;$('#jobList').innerHTML=jobs.length?jobs.map(job=>`<button class="library-item" data-job="${job.id}"><img src="${media(job,job.images[0].file)}" alt=""><div><b>${esc(job.plan?.title||'새 기획')}</b><p>${new Date(job.createdAt).toLocaleString('ko-KR')} · ${esc(labels[job.status])}${job.demo?' · 샘플':''}</p></div><span>↗</span></button>`).join(''):'<p class="job-note">아직 만든 콘텐츠가 없어요. 사진을 올리거나 샘플로 먼저 테스트해 보세요.</p>';$('#jobList').onclick=async e=>{const b=e.target.closest('[data-job]');if(b){const job=await api(`/projects/${b.dataset.job}`);showJob(job);if(job.status==='running')poll(job.id);}};}
+await config().catch(e=>{$('#formError').textContent=`로컬 제작 서버에 연결하지 못했습니다. ${e.message}`;});
+await loadLibrary().catch(()=>{});
