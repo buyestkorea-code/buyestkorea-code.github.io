@@ -259,7 +259,7 @@ function previewHTML() {
   const sample = d.match_mode === 'any' ? '예뻐요!' : (d.keywords.split(',')[0] || '').trim() || '댓글';
   const msg = apiMsg(d.message);
   const dm = d.message.trim()
-    ? esc(uiMsg(msg)).replace(/\{링크\}/g, `<a>buyestkids-dm…/go/a1b2c3</a>`)
+    ? esc(uiMsg(msg)).replace(/\{링크\}/g, d.link_url.trim() ? `<a>${esc(d.link_url.trim().replace(/^https?:\/\//, '').slice(0, 40))}</a>` : `<a>(아래 '글 속 링크 주소'를 적어 주세요)</a>`)
     : '<span class="bub ph" style="background:none;box-shadow:none;padding:0">보낼 DM 내용을 적으면 여기에 보여요</span>';
   return `<div class="phone"><div class="cap">고객이 보게 될 화면</div>
     <div class="scene"><h4>① 게시물 댓글</h4>
