@@ -17,13 +17,7 @@ export function wrap(text,length) {
   for(const c of String(text)) {if(c==='\n'||line.length>=length){lines.push(line);line='';if(c==='\n')continue;}line+=c;}
   if(line)lines.push(line);return lines;
 }
-export async function cardPng(image,card,brand,index,count,demo=false) {
-  const bg=brand==='kids'?'#e8edf5':'#edf1eb', ink=brand==='kids'?'#314d6b':'#214b40';
-  const img=await sharp(image).resize(960,860,{fit:'contain',background:bg}).png().toBuffer();
-  const title=wrap(card.title,17).slice(0,2), body=wrap(card.body,29).slice(0,3);
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350"><rect width="1080" height="1350" fill="${bg}"/><text x="60" y="70" fill="${ink}" font-size="25" font-family="Malgun Gothic, sans-serif" letter-spacing="4">${brand==='kids'?'BUYEST KIDS':'BUYEST'} / STUDIO</text><text x="1020" y="70" text-anchor="end" fill="${ink}" font-size="24">${String(index+1).padStart(2,'0')} / ${String(count).padStart(2,'0')}</text><image x="60" y="108" width="960" height="860" href="data:image/png;base64,${img.toString('base64')}"/><rect x="60" y="990" width="50" height="5" fill="${ink}"/>${title.map((t,i)=>`<text x="60" y="${1060+i*62}" font-family="Malgun Gothic, sans-serif" font-weight="bold" font-size="50" fill="${ink}">${xml(t)}</text>`).join('')}${body.map((t,i)=>`<text x="60" y="${1193+i*35}" font-family="Malgun Gothic, sans-serif" font-size="28" fill="#4e605a">${xml(t)}</text>`).join('')}<text x="60" y="1320" font-family="Malgun Gothic, sans-serif" fill="${ink}" font-size="18">${demo?'샘플 미리보기 · AI 생성 아님':'SELECTED BY BUYEST'}</text></svg>`;
-  return sharp(Buffer.from(svg)).png().toBuffer();
-}
+export { editorialCard as cardPng } from './card-layout.mjs';
 function assTime(sec){const cs=Math.round(sec*100);return `${Math.floor(cs/360000)}:${String(Math.floor(cs/6000)%60).padStart(2,'0')}:${String(Math.floor(cs/100)%60).padStart(2,'0')}.${String(cs%100).padStart(2,'0')}`;}
 function assText(s){return String(s).replace(/[{}\\]/g,'').replace(/\r?\n/g,'\\N');}
 export function assDocument(captions,demo=false,preview=false) {
