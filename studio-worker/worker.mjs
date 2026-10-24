@@ -1,4 +1,4 @@
-import {searchProducts,importProducts} from '../studio-server/catalog.mjs';
+import {searchProducts,importProducts} from './catalog.mjs';
 import {planningPrompt,validateInput,validatePlan} from '../studio-server/core.mjs';
 const ORIGIN='https://buyestkorea-code.github.io';
 const headers={'Content-Type':'application/json','Access-Control-Allow-Origin':ORIGIN,'Access-Control-Allow-Headers':'Content-Type,X-Studio-User,X-Studio-Pass','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Vary':'Origin','Cache-Control':'no-store'};
@@ -15,3 +15,4 @@ const str={type:'string',maxLength:600},id={type:'integer',minimum:0,maximum:inp
 const inputParts=[{type:'text',text:planningPrompt(input)+'\n이번 요청은 카드뉴스만 제작합니다. scenes는 호환용 1개만 짧게 작성하세요. 카드뉴스는 3~7장, 가격은 제공 정보만 사용하세요.'},...input.images.map(i=>({type:'image',mime_type:i.data.slice(5,i.data.indexOf(';')),data:i.data.split(',')[1]}))];
 const r=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},body:JSON.stringify({model:env.GEMINI_MODEL,input:inputParts,store:false,response_format:{type:'text',mime_type:'application/json',schema},generation_config:{max_output_tokens:5000}}),signal:AbortSignal.timeout(120000)});if(!r.ok)throw Error(`AI 기획 서비스 오류 (${r.status}). 잠시 뒤 다시 시도해 주세요.`);const d=await r.json();const text=(d.steps||[]).filter(s=>s.type==='model_output').flatMap(s=>s.content||[]).filter(s=>s.type==='text').map(s=>s.text||'').join('');let plan;try{plan=JSON.parse(text);}catch{throw Error('AI 응답이 중간에 끊겼습니다. 다시 시도해 주세요.');}return json(validatePlan(plan,input.images.length));
 }catch(e){const message=String(e.message);return json({error:message.includes('로그인')?message:message.slice(0,220)},message.includes('로그인')?401:400);}}};
+

@@ -1,6 +1,6 @@
 const origin='https://buyest.co.kr';
 export function siteUrl(value){const u=new URL(value,origin);if(u.origin!==origin||u.username||u.password)throw Error('바이스트 상품 링크만 사용할 수 있습니다.');return u;}
-async function download(url,fetcher=fetch,max=8_000_000){const r=await fetcher(siteUrl(url),{redirect:'error',signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('상품 정보를 불러오지 못했습니다.');let size=0;const chunks=[];for await(const c of r.body){size+=c.length;if(size>max)throw Error('상품 파일이 너무 큽니다.');chunks.push(c);}return Buffer.concat(chunks);}
+async function download(url,fetcher=fetch,max=8_000_000){const r=await fetcher(siteUrl(url),{headers:{'User-Agent':'Mozilla/5.0 (compatible; BUYESTStudio/1.0)'},redirect:'manual',signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error(`상품 정보를 불러오지 못했습니다 (HTTP ${r.status}).`);let size=0;const chunks=[];for await(const c of r.body){size+=c.length;if(size>max)throw Error('상품 파일이 너무 큽니다.');chunks.push(c);}return Buffer.concat(chunks);}
 export function parseProduct(html,pid){
  const nodes=[];const visit=x=>{if(Array.isArray(x))x.forEach(visit);else if(x&&typeof x==='object'){nodes.push(x);if(x['@graph'])visit(x['@graph']);}};
  for(const m of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi))try{visit(JSON.parse(m[1]));}catch{}
@@ -15,8 +15,8 @@ export async function searchProducts(input,fetcher=fetch){
  const results=[];for(const query of lines){try{
   let ids=[];if(/^https?:/i.test(query)){const u=siteUrl(query);if(u.pathname!=='/product_detail.php'||!/^\d+$/.test(u.searchParams.get('pid')||''))throw Error('상품 상세페이지 링크를 입력해 주세요.');ids=[u.searchParams.get('pid')];}
   else {const html=(await download(`${origin}/product_search.php?max_search_key=${encodeURIComponent(query)}`,fetcher)).toString();ids=[...new Set([...html.matchAll(/product_detail\.php\?pid=(\d+)/g)].map(m=>m[1]))];}
-  const truncated=ids.length>12;const candidates=[];for(const id of ids.slice(0,12)){try{candidates.push(await product(id,fetcher));}catch{}}
-  results.push({query,candidates,truncated,error:candidates.length?'':'일치하는 상품을 찾지 못했습니다. 상세페이지 링크로 시도해 주세요.'});
+  const truncated=ids.length>12;const candidates=[];const errors=[];for(const id of ids.slice(0,12)){try{candidates.push(await product(id,fetcher));}catch(e){errors.push(e.message);}}
+  results.push({query,candidates,truncated,error:candidates.length?'':errors[0]||'일치하는 상품을 찾지 못했습니다. 상세페이지 링크로 시도해 주세요.'});
  }catch(e){results.push({query,candidates:[],error:e.message});}}
  return results;
 }
