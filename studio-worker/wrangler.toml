@@ -1,0 +1,10 @@
+name = "buyest-cards"
+main = "worker.mjs"
+compatibility_date = "2026-10-24"
+compatibility_flags = ["nodejs_compat"]
+[vars]
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+
+[[kv_namespaces]]
+binding = "STUDIO_LIMITS"
+id = "dedb6d3e320c48cb9c862915b1eade15"
