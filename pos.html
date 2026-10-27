@@ -136,7 +136,7 @@ function fmtYMDHM(ts){ return fmtYMD(ts) + ' ' + fmtTime(ts); }
 function money(n){ return N(n).toLocaleString('ko-KR'); }
 const TYPE_LABEL_KO = {sale:'판매', return:'반품', manual_sale:'수기판매', courier:'주문택배', recall:'회수'};
 const TYPE_LABEL_CHIP = {sale:['판매','c-sale'], return:['반품','c-return'], manual_sale:['수기판매','c-manual'], courier:['주문택배','c-courier'], recall:['회수','c-recall']};
-/* 주문택배/회수는 재고만 줄이고 매출(판매금액)로는 안 잡는 이동 거래 — 금액 표시는 생략 */
+/* 주문택배(본사 출고, 행사 재고 변동 없음)/회수(재고만 줄음) 이동 거래 */
 const isMoveType = type => type === 'courier' || type === 'recall';
 /* 거래 한 건의 표시용 품명/사이즈 — 등록품목이면 재고파일에서 온 브랜드+품명/사이즈,
    수기판매(미등록바코드)면 그때 입력한 manual_name/manual_size */
@@ -719,7 +719,7 @@ function updateModeHint(){
   if (!hint) return;
   if (state.mode==='sale') hint.textContent = '판매할 상품의 바코드를 스캔하세요.';
   if (state.mode==='return') hint.textContent = '반품할 상품의 바코드를 스캔하세요.';
-  if (state.mode==='courier') hint.textContent = '온라인 주문으로 택배 발송할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액(매출)으로 잡혀요)';
+  if (state.mode==='courier') hint.textContent = '온라인 주문으로 택배 발송할 상품의 바코드를 스캔하세요. (본사에서 출고되므로 행사 재고는 줄지 않고, 판매금액(매출)으로만 잡혀요)';
   if (state.mode==='recall') hint.textContent = '본사 등으로 회수할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액으로는 안 잡혀요)';
   if (state.mode==='manual_return') hint.textContent = '바코드가 없거나 재고파일에 없는 상품의 반품을 직접 입력해서 기록해요. (바코드를 스캔하면 일반 반품처럼 처리돼요)';
   if (state.mode==='bulk') hint.textContent = '택을 붙인 종이를 사진으로 찍어 올리면 사진 속 바코드가 모두 판매 목록으로 나와요. (바코드를 직접 스캔하면 목록에 더해져요)';
@@ -1197,7 +1197,7 @@ function xlPanelHtml(){
         const nm = it ? `<b>${esc(it.brand)}</b> ${esc(it.item_name)}${it.size ? ' (' + esc(it.size) + ')' : ''}`
           : (r.brand || r.name ? `<b>${esc(r.brand)}</b> ${esc(r.name)}${r.size ? ' (' + esc(r.size) + ')' : ''} <span style="color:var(--amber);">수기</span>` : '-');
         const price = noMoney(r.type) ? '-' : (r.price != null ? money(r.price) : (r.type === '교환' ? (ni ? money(ni.price) : '-') : (it ? money(it.price) : '0')));
-        const over = it && r.qty > it.cur_qty && r.type !== '반품' && r.type !== '수기반품' && r.type !== '교환';
+        const over = it && r.qty > it.cur_qty && r.type !== '반품' && r.type !== '수기반품' && r.type !== '교환' && r.type !== '주문택배';
         return `<tr style="${c.err ? 'background:#fef2f2;' : ''}">
           <td><select onchange="xlSetType(${i}, this.value)" style="padding:4px;font-size:12px;">${XL_TYPES.map(t => `<option ${t === r.type ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
           <td>${nm}<br><span style="color:var(--sub);font-size:11px;">${esc(r.barcode) || '(바코드 없음)'}${r.type === '교환' ? ' → ' + esc(r.newBarcode) + (ni ? ' ' + esc(ni.brand) + ' ' + esc(ni.item_name) + (ni.size ? '(' + esc(ni.size) + ')' : '') : '') : ''}</span></td>
@@ -1510,7 +1510,7 @@ async function submitReturn(barcode){
   toast('반품 처리됐어요', 'ok');
   await afterTxn();
 }
-/* 주문택배 = 매출(판매가/할인 기록, 판매금액에 합산) / 회수 = 재고만 줄이고 금액 0 */
+/* 주문택배 = 매출(판매가/할인 기록, 판매금액에 합산, 행사 재고는 안 줄음 — 본사 출고) / 회수 = 재고만 줄이고 금액 0 */
 async function submitMove(barcode, moveType){
   const note = S(document.getElementById('scanNote').value);
   const body = {corner_id: state.corner.id, actor: state.actor, barcode, move_type: moveType, note};
@@ -2146,7 +2146,7 @@ function reportDownload(){
    "실제로 확인된 수량"을 품목별로 대조한다. 판매/반품 원장(pos_txn)과는 별개인 pos_count 원장을 써서
    스캔해도 재고 수량 자체는 안 바뀌고 "실물로 확인했다"는 기록만 쌓인다.
 
-   예상수량 = 행사 남은 재고(cur_qty)  — 기본값. 판매/주문택배는 고객에게 나간 것이라 제외, 반품은 이미 cur_qty에 반영됨.
+   예상수량 = 행사 남은 재고(cur_qty)  — 기본값. 판매는 고객에게 나간 것이라 제외, 반품은 이미 cur_qty에 반영됨. 주문택배는 본사 출고라 행사 재고에 원래 영향 없음.
      · 회수(recall)분은 행사 중간에 이미 본사로 보낸 물량이라 최종 검수 때는 행사 재고에 없다 → 기본 제외
        (사용자 확정 2026-10-03; 처음엔 포함이 기본이었다가 정정됨). 화면 체크박스로 포함도 가능.
    스캔하면 바로 1개 확인으로 기록된다(버튼 한 번 더 누르는 단계 없음) — 잘못 찍으면 결과 카드의
@@ -2202,7 +2202,7 @@ async function renderStocktakeScreen(){
   const brands = [...new Set(state.items.map(i => i.brand).filter(Boolean))];
   app.innerHTML = topNav('stocktake') + `
     <p class="lead">행사 끝나고 본사로 돌아온 실물을 바코드로 하나씩 스캔하세요. <b>스캔하면 바로 1개 확인으로 기록</b>되고, 잘못 찍었으면 결과 카드의 "방금 확인 취소"로 되돌릴 수 있어요.<br>
-    예상수량 = 행사 남은 재고 (판매·주문택배로 나간 것과, 중간에 이미 본사로 회수한 것은 제외)</p>
+    예상수량 = 행사 남은 재고 (판매로 나간 것과, 중간에 이미 본사로 회수한 것은 제외. 주문택배는 본사 출고라 행사 재고와 무관)</p>
 
     <div class="card">
       <div id="stProgress"></div>
@@ -2471,7 +2471,7 @@ async function downloadStocktake(){
 
   const rowOf = it => {
     const e = stExpected(it);
-    const returned = it.cur_qty - it.init_qty + it.sold_qty + (it.courier_qty||0) + (it.recall_qty||0); // 반품수량(원장에서 역산)
+    const returned = it.cur_qty - it.init_qty + it.sold_qty + (it.recall_qty||0); // 반품수량(원장에서 역산)
     return {
       '브랜드': it.brand, '품목명': it.item_name, '사이즈': it.size, '바코드': it.barcode,
       '초기재고': it.init_qty, '판매': it.sold_qty, '반품': returned, '주문택배': it.courier_qty||0, '회수': it.recall_qty||0,
@@ -2553,7 +2553,7 @@ async function downloadExport(){
     const list = (txnByItem[it.id] || []).slice().sort((a,b)=>a.created_at-b.created_at);
     const history = list.map(t => {
       const lbl = TYPE_LABEL_KO[t.type] || t.type;
-      const qty = Math.abs(t.qty_delta);
+      const qty = Math.abs(t.qty_delta) || 1;   // 주문택배는 재고 변동이 0이라 1건으로 표기
       const flag = t.voided ? '[취소]' : '';
       return `${lbl}${qty}(${fmtMD(t.created_at)})${flag}`;
     }).join(', ');
