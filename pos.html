@@ -719,7 +719,7 @@ function updateModeHint(){
   if (!hint) return;
   if (state.mode==='sale') hint.textContent = '판매할 상품의 바코드를 스캔하세요.';
   if (state.mode==='return') hint.textContent = '반품할 상품의 바코드를 스캔하세요.';
-  if (state.mode==='courier') hint.textContent = '온라인 주문으로 택배 발송할 상품의 바코드를 스캔하세요. (본사에서 출고되므로 행사 재고는 줄지 않고, 판매금액(매출)으로만 잡혀요)';
+  if (state.mode==='courier') hint.textContent = '온라인 주문으로 택배 발송할 상품의 바코드를 스캔하세요. (' + (courierKeepsStock() ? '본사에서 출고되므로 행사 재고는 줄지 않고, 판매금액(매출)으로만 잡혀요' : '행사 재고에서 빠지고, 판매금액(매출)으로 잡혀요') + ')';
   if (state.mode==='recall') hint.textContent = '본사 등으로 회수할 상품의 바코드를 스캔하세요. (행사 재고에서 빠지고, 판매금액으로는 안 잡혀요)';
   if (state.mode==='manual_return') hint.textContent = '바코드가 없거나 재고파일에 없는 상품의 반품을 직접 입력해서 기록해요. (바코드를 스캔하면 일반 반품처럼 처리돼요)';
   if (state.mode==='bulk') hint.textContent = '택을 붙인 종이를 사진으로 찍어 올리면 사진 속 바코드가 모두 판매 목록으로 나와요. (바코드를 직접 스캔하면 목록에 더해져요)';
@@ -792,6 +792,11 @@ function autoCartPrevious(intent){
    구분은 판매(기본) / 주문택배 / 회수 중에서 고른다. */
 const NB_INTENT_LABEL = {sale:'판매', courier:'주문택배', recall:'회수'};
 state.nbIntent = 'sale';
+state.nbAffect = true;   // 수기판매 '재고 반영' 체크 (건별로 서버에 같이 저장됨)
+const courierKeepsStock = () => !!(state.event && Number(state.event.courier_keeps_stock) === 1);
+const nbDefaultAffect = k => !(k === 'courier' && courierKeepsStock());
+/* 수기판매 모드에서 재고파일 상품을 처리할 때만 '재고 반영' 값을 서버에 보낸다(다른 모드는 서버 기본값) */
+const affectExtra = () => state.mode === 'manual' ? {affect_stock: state.nbAffect ? 1 : 0} : {};
 const curCartMode = () => state.mode === 'manual' ? state.nbIntent : state.mode;
 function nbOpen(){
   state.scannedItem = null;
@@ -799,7 +804,9 @@ function nbOpen(){
   document.getElementById('scanResult').innerHTML = `
     <div class="item-card hit">
       <div class="name">수기판매 — 바코드 없는 상품</div>
-      <div class="meta">재고파일에 있는 상품이면 검색해서 고르세요(재고도 정상적으로 줄어요). 없는 상품이면 아래에 직접 입력하세요.</div>
+      <div class="meta">재고파일에 있는 상품이면 검색해서 고르세요(기본은 재고가 줄어요 — 아래 체크로 바꿀 수 있어요). 없는 상품이면 아래에 직접 입력하세요.</div>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:700;"><input type="checkbox" id="nbAffect" ${state.nbAffect ? 'checked' : ''} onchange="state.nbAffect = this.checked" style="width:auto;"> 재고 반영</label>
+      <div class="hint" style="margin:2px 0 0;">체크를 끄면 재고파일 상품을 골라도 재고는 그대로 두고 판매(금액)만 기록해요. 판매·주문택배·회수에 적용돼요.</div>
       <div class="scan-actions" id="nbIntentRow" style="margin-top:10px;">
         ${Object.keys(NB_INTENT_LABEL).map(k => `<button class="btn ${it===k?'btn-primary':'btn-outline'}" data-nb="${k}" onclick="nbSetIntent('${k}')">${NB_INTENT_LABEL[k]}</button>`).join('')}
       </div>
@@ -811,6 +818,8 @@ function nbOpen(){
 }
 function nbSetIntent(k){
   state.nbIntent = k;
+  state.nbAffect = nbDefaultAffect(k);
+  const ck = document.getElementById('nbAffect'); if (ck) ck.checked = state.nbAffect;
   document.querySelectorAll('#nbIntentRow [data-nb]').forEach(btn => {
     const on = btn.dataset.nb === k;
     btn.classList.toggle('btn-primary', on); btn.classList.toggle('btn-outline', !on);
@@ -1311,6 +1320,7 @@ function readCardFields(){
     discount_type: type,
     discount_value: type === 'none' ? 0 : N(document.getElementById('scanDiscVal').value),
     note: S(document.getElementById('scanNote').value),
+    ...affectExtra(),
   };
 }
 /* 판매 장바구니와 주문택배 장바구니는 섞지 않는다 */
@@ -1373,7 +1383,8 @@ async function submitCart(withCurrent){
   let done = 0, failMsg = '';
   for (const c of list){
     const base = {corner_id: state.corner.id, actor: state.actor, barcode: c.item.barcode, price: c.price,
-                  discount_type: c.discount_type, discount_value: c.discount_value, note: c.note};
+                  discount_type: c.discount_type, discount_value: c.discount_value, note: c.note,
+                  ...(c.affect_stock !== undefined ? {affect_stock: c.affect_stock} : {})};
     const res = c.mode === 'courier'
       ? await apiPost('scan_move', Object.assign(base, {move_type: 'courier'}))
       : await apiPost('scan_sale', base);
@@ -1498,7 +1509,7 @@ async function submitSale(itemId, barcode){
   const discType = document.getElementById('scanDiscType').value;
   const discVal = N(document.getElementById('scanDiscVal').value);
   const note = S(document.getElementById('scanNote').value);
-  const res = await apiPost('scan_sale', {corner_id: state.corner.id, actor: state.actor, barcode, price, discount_type: discType, discount_value: discVal, note});
+  const res = await apiPost('scan_sale', {corner_id: state.corner.id, actor: state.actor, barcode, price, discount_type: discType, discount_value: discVal, note, ...affectExtra()});
   if (!res.ok){ toast(res.error||'처리 실패','err'); return; }
   toast('판매 처리됐어요', 'ok');
   await afterTxn();
@@ -1513,7 +1524,7 @@ async function submitReturn(barcode){
 /* 주문택배 = 매출(판매가/할인 기록, 판매금액에 합산, 행사 재고는 안 줄음 — 본사 출고) / 회수 = 재고만 줄이고 금액 0 */
 async function submitMove(barcode, moveType){
   const note = S(document.getElementById('scanNote').value);
-  const body = {corner_id: state.corner.id, actor: state.actor, barcode, move_type: moveType, note};
+  const body = {corner_id: state.corner.id, actor: state.actor, barcode, move_type: moveType, note, ...affectExtra()};
   if (moveType === 'courier'){
     body.price = N(document.getElementById('scanPrice').value);
     body.discount_type = document.getElementById('scanDiscType').value;
@@ -2471,7 +2482,7 @@ async function downloadStocktake(){
 
   const rowOf = it => {
     const e = stExpected(it);
-    const returned = it.cur_qty - it.init_qty + it.sold_qty + (it.recall_qty||0); // 반품수량(원장에서 역산)
+    const returned = it.returned_qty != null ? it.returned_qty : it.cur_qty - it.init_qty + it.sold_qty + (it.courier_qty||0) + (it.recall_qty||0); // 반품수량(원장에서 역산)
     return {
       '브랜드': it.brand, '품목명': it.item_name, '사이즈': it.size, '바코드': it.barcode,
       '초기재고': it.init_qty, '판매': it.sold_qty, '반품': returned, '주문택배': it.courier_qty||0, '회수': it.recall_qty||0,
