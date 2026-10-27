@@ -671,7 +671,7 @@ function renderScanScreen(){
         <button class="btn ${state.mode==='recall'?'btn-primary':'btn-outline'}" data-mode="recall" onclick="setMode('recall')">회수</button>
         <button class="btn ${state.mode==='manual'?'btn-primary':'btn-outline'}" data-mode="manual" onclick="setMode('manual')">수기판매</button>
         <button class="btn ${state.mode==='manual_return'?'btn-primary':'btn-outline'}" data-mode="manual_return" onclick="setMode('manual_return')">수기반품</button>
-        <button class="btn ${state.mode==='bulk'?'btn-primary':'btn-outline'}" data-mode="bulk" onclick="setMode('bulk')">대량판매(스캔)</button>
+        <button class="btn ${state.mode==='bulk'?'btn-primary':'btn-outline'}" data-mode="bulk" onclick="setMode('bulk')">대량판매(스캔·엑셀)</button>
       </div>
       <div id="modeHint" class="hint"></div>
       <input id="barcodeInput" placeholder="바코드 스캔 또는 입력 후 Enter" autocomplete="off">
@@ -1040,12 +1040,17 @@ function bulkRender(){
   const lr = bulkState.lastRead;
   box.innerHTML = `
     <div class="item-card hit">
-      <div class="name">대량판매 — 사진으로 한꺼번에 스캔</div>
-      <div class="meta">택(바코드 스티커)을 종이에 붙여 사진을 찍어 올리면, 사진 속 바코드가 모두 판매 목록으로 나와요. 확정하면 같은 시각으로 한번에 기록됩니다.</div>
+      <div class="name">대량판매 — 사진 또는 엑셀로 한꺼번에</div>
+      <div class="meta">택(바코드 스티커)을 종이에 붙여 사진을 찍어 올리면, 사진 속 바코드가 모두 판매 목록으로 나와요. 엑셀 양식(바코드·수량·판매가)을 올려도 같은 목록이 만들어져요. 확정하면 오늘(지금 시각) 판매로 한번에 기록됩니다.</div>
       <div class="scan-actions" style="margin-top:10px;">
         <button class="btn btn-primary" ${bulkState.reading ? 'disabled' : ''} onclick="document.getElementById('bulkCam').click()">📷 사진 찍기</button>
         <button class="btn btn-outline" ${bulkState.reading ? 'disabled' : ''} onclick="document.getElementById('bulkPick').click()">🖼 사진 선택 (여러 장 가능)</button>
       </div>
+      <div class="scan-actions" style="margin-top:6px;">
+        <button class="btn btn-outline" onclick="bulkDownloadTemplate()">📄 엑셀 양식 다운로드</button>
+        <button class="btn btn-primary" ${bulkState.reading ? 'disabled' : ''} onclick="document.getElementById('bulkXlsx').click()">📊 엑셀로 대량 업로드</button>
+      </div>
+      <input type="file" id="bulkXlsx" accept=".xlsx,.xls,.csv" style="display:none;" onchange="bulkHandleExcel(this.files[0]); this.value='';">
       <input type="file" id="bulkCam" accept="image/*" capture="environment" style="display:none;" onchange="bulkHandleFiles(this.files); this.value='';">
       <input type="file" id="bulkPick" accept="image/*" multiple style="display:none;" onchange="bulkHandleFiles(this.files); this.value='';">
       <div id="bulkStatus" class="hint" style="min-height:18px;color:${bulkState.reading ? 'var(--blue)' : 'var(--amber)'};">${esc(bulkState.status)}</div>
@@ -1053,8 +1058,8 @@ function bulkRender(){
     </div>
     ${lines.length || unregList.length ? `
     <div class="item-card" style="border-color:#6366f1;background:#eef2ff;">
-      <div class="name">${lr ? `사진 ${lr.photos}장에서 읽힌 바코드 ${lr.total}개` : '판매 목록'} <span style="font-weight:400;font-size:12px;">→ 판매 ${cnt}개 · 합계 ${money(total)}원</span></div>
-      <div class="hint" style="margin:2px 0 8px;">실제 택 개수와 맞는지 확인하세요. 빠졌으면 바코드를 스캔해서 더하고, 잘못 읽힌 건 "빼기"로 지우세요.</div>
+      <div class="name">${lr ? (lr.excel ? `엑셀(${esc(lr.excel)})에서 읽은 ${lr.total}개` : `사진 ${lr.photos}장에서 읽힌 바코드 ${lr.total}개`) : '판매 목록'} <span style="font-weight:400;font-size:12px;">→ 판매 ${cnt}개 · 합계 ${money(total)}원</span></div>
+      <div class="hint" style="margin:2px 0 8px;">실제 판매 개수와 맞는지 확인하세요. 빠졌으면 바코드를 스캔해서 더하고, 잘못 읽힌 건 "빼기"로 지우세요.</div>
       <div class="tbl-wrap" style="max-height:340px;background:#fff;">
         <table><thead><tr><th>상품</th><th>수량</th><th>판매가</th><th>재고</th><th></th></tr></thead>
         <tbody>${lines.map((l, i) => `<tr>
@@ -1079,6 +1084,75 @@ function bulkRender(){
       <button class="btn btn-primary btn-big" style="width:100%;margin-top:8px;" ${bulkState.busy ? 'disabled' : ''} onclick="bulkSubmit()">${cnt}개 한번에 판매 확정 (${money(total)}원)</button>
       <button class="btn btn-outline" style="width:100%;margin-top:6px;" onclick="bulkClearAll()">목록 모두 비우기</button>` : ''}
     </div>` : ''}`;
+}
+/* 엑셀 대량 업로드 (2026-10-27): 양식(바코드/수량/판매가)을 올리면 사진 판독과 같은 목록(bulkState.lines)에 더해진다.
+   확정은 기존 bulkSubmit → 서버 bulk_sale (지금 시각 = 오늘 판매, 재고파일에 없는 바코드는 목록에서 제외 표시). */
+function bulkDownloadTemplate(){
+  const samples = (state.items || []).slice(0, 3);
+  const rows = [['바코드', '수량', '판매가(비우면 재고파일 단가)', '참고: 상품명(입력 안 해도 됨)']];
+  if (samples.length) samples.forEach(it => rows.push([S(it.barcode), 1, '', S(it.brand) + ' ' + S(it.item_name) + (it.size ? ' (' + S(it.size) + ')' : '')]));
+  else rows.push(['12345678', 1, '', '']);
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch: 18}, {wch: 8}, {wch: 26}, {wch: 40}];
+  // 바코드가 숫자로 바뀌어 앞자리 0이 사라지지 않도록 텍스트 서식
+  for (let r = 1; r < rows.length; r++){ const c = ws[XLSX.utils.encode_cell({r, c: 0})]; if (c) { c.t = 's'; c.z = '@'; } }
+  const guide = XLSX.utils.aoa_to_sheet([
+    ['대량 판매 엑셀 사용법'],
+    ['1. "판매" 시트의 예시 줄을 지우고, 팔린 상품을 한 줄씩 적으세요. (같은 바코드를 여러 줄 적어도 수량이 합쳐져요)'],
+    ['2. 바코드(필수): 행사 재고파일에 있는 바코드. 재고파일에 없으면 판매 목록에서 제외돼요.'],
+    ['3. 수량(필수): 1 이상의 숫자. 비우면 1개로 봐요.'],
+    ['4. 판매가(선택): 실제 판매한 개당 금액. 비우면 재고파일 단가로 들어가요.'],
+    ['5. 네 번째 열(상품명)은 보기용이라 비워도 되고, 읽지 않아요.'],
+    ['6. 올리면 판매 목록이 만들어지고, 확인 후 "판매 확정"을 눌러야 오늘(누른 시각) 판매로 기록돼요.']
+  ]);
+  guide['!cols'] = [{wch: 110}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '판매');
+  XLSX.utils.book_append_sheet(wb, guide, '사용법');
+  XLSX.writeFile(wb, '행사POS_대량판매_양식.xlsx');
+}
+async function bulkHandleExcel(file){
+  if (!file || bulkState.reading) return;
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), {type: 'array'});
+    const ws = wb.Sheets['판매'] || wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header: 1, raw: true, defval: ''});
+    let hi = aoa.findIndex(r => r.some(c => S(c).replace(/\s/g, '') === '바코드'));
+    if (hi < 0) hi = 0;   // 헤더가 없으면 첫 줄부터 데이터로 보고, 열 순서는 바코드/수량/판매가
+    const head = (aoa[hi] || []).map(c => S(c).replace(/\s/g, ''));
+    const find = (re, dflt) => { const i = head.findIndex(h => re.test(h)); return i >= 0 ? i : dflt; };
+    const cB = find(/^바코드/, 0), cQ = find(/^수량/, 1), cP = find(/^판매가|^단가|^가격/, 2);
+    const start = head.some(h => /^바코드/.test(h)) ? hi + 1 : hi;
+    const sums = {};   // 바코드별 합산 (같은 바코드 여러 줄)
+    let rowsRead = 0, skipped = 0;
+    for (let i = start; i < aoa.length; i++){
+      const r = aoa[i]; const bc = S(r[cB]).trim();
+      if (!bc) continue;
+      rowsRead++;
+      let q = r[cQ] === '' || r[cQ] == null ? 1 : Math.floor(N(r[cQ]));
+      if (!(q >= 1)) { skipped++; continue; }
+      const priceRaw = r[cP];
+      const e = sums[bc] || (sums[bc] = {qty: 0, price: null});
+      e.qty += q;
+      if (priceRaw !== '' && priceRaw != null && N(priceRaw) >= 0) e.price = Math.floor(N(priceRaw));
+    }
+    const codes = Object.keys(sums);
+    if (!codes.length){ toast('엑셀에서 읽을 줄이 없어요. 양식의 "바코드"·"수량" 열을 확인하세요', 'err'); return; }
+    let unregCnt = 0;
+    codes.forEach(bc => {
+      const had = !!state.items.find(i => S(i.barcode) === bc);
+      bulkAddBarcode(bc, sums[bc].qty);
+      if (!had) unregCnt += sums[bc].qty;
+      else if (sums[bc].price != null){ const l = bulkLineFor(bc); if (l) l.price = sums[bc].price; }
+    });
+    const tot = codes.reduce((a, bc) => a + sums[bc].qty, 0);
+    bulkState.lastRead = {photos: 0, total: tot, perPhoto: [], excel: file.name};
+    bulkState.status = skipped ? `수량이 잘못된 ${skipped}줄은 건너뛰었어요.` : '';
+    toast(`엑셀 ${rowsRead}줄 → ${codes.length}종 ${tot}개 읽음` + (unregCnt ? ` (재고파일에 없는 ${unregCnt}개 제외)` : ''), unregCnt ? 'err' : 'ok');
+  } catch (e) {
+    bulkState.status = '엑셀을 읽는 중 문제가 생겼어요: ' + (e && e.message ? e.message : e);
+  }
+  bulkRender();
 }
 function bulkQty(i, d){ const l = bulkState.lines[i]; if (!l) return; l.qty += d; if (l.qty < 1) bulkState.lines.splice(i, 1); bulkState.batchId = ''; bulkRender(); }
 function bulkPrice(i, v){ const l = bulkState.lines[i]; if (!l) return; l.price = Math.max(0, Math.floor(N(v))); bulkRender(); }
