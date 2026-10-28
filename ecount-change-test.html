@@ -212,14 +212,21 @@ async function downloadMapping() {
 }
 
 let MAP = null, MAPTAB = 'ec';
-function showMain(on) { ['meta', 'fbar', 'bulkbar', 'out'].forEach(id => { const el = document.getElementById(id); if (el && id !== 'bulkbar') el.style.display = on ? '' : 'none'; }); if (!on) document.getElementById('bulkbar').style.display = 'none'; document.getElementById('mapPanel').style.display = on ? 'none' : 'block'; }
+let MAPMODE = false;
+function showMain(on) { MAPMODE = !on; ['meta', 'out'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; }); if (!on) document.getElementById('bulkbar').style.display = 'none'; document.getElementById('mapPanel').style.display = on ? 'none' : 'block'; if (window.__chips) drawChips(); }
+function mapCount() { return MAP ? MAP.ec_rows.length + MAP.site_rows.length : ((DATA && DATA.map_todo) ? DATA.map_todo.total : 0); }
+function drawChips() {
+  const chips = window.__chips || [];
+  document.getElementById('fbar').innerHTML = chips.map(c => `<button class="fchip${(!MAPMODE && FILTER === c[0]) ? ' on' : ''}" onclick="MAPMODE=false;showMain(true);FILTER='${c[0]}';DATA.__f=1;render()">${c[1]}<b>${c[2]}</b></button>`).join('') +
+    `<button class="fchip${MAPMODE ? ' on' : ''}" style="border-color:#e0b400" onclick="openMapPanel()" title="이카운트와 사이트 연결이 안 된 것 — 여기서 바로 입력해 저장">연결 정리<b>${mapCount()}</b></button>`;
+}
 async function openMapPanel() {
   setMsg('연결 정리 목록을 불러오는 중... (10~30초 걸려요)');
   document.querySelectorAll('.btn').forEach(b => b.disabled = true);
   try {
     const d = await call({ action: 'mapping_export' });
     if (!d.ok) throw new Error(d.error || '불러오기 실패');
-    MAP = d; setMsg(''); showMain(false); renderMap();
+    MAP = d; setMsg(''); showMain(false); renderMap(); drawChips();
   } catch (e) { setMsg(esc(e.message), 'err'); }
   document.querySelectorAll('.btn').forEach(b => b.disabled = false);
 }
@@ -274,6 +281,7 @@ async function doMapSave(pairs) {
     // 성공한 줄은 목록에서 제거, 실패한 줄은 남겨 둠
     const okKeys = new Set(d.results.filter(r => r.ok).map(r => String(r.key)));
     pairs.forEach(([tr]) => { const k = tr.dataset.kind === 'ec' ? tr.dataset.key : tr.dataset.pid + ' ' + tr.dataset.opt; if (okKeys.has(k)) tr.remove(); });
+    if (MAP) { MAP.ec_rows = MAP.ec_rows.filter(r => !okKeys.has(String(r[0]))); MAP.site_rows = MAP.site_rows.filter(r => !okKeys.has(r[0] + ' ' + r[4])); drawChips(); }
   } catch (e) { document.getElementById('mapRes').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
   document.querySelectorAll('.btn').forEach(b => b.disabled = false);
 }
@@ -332,7 +340,7 @@ function render() {
   const cnt = st => uniq.filter(([i]) => i.status === st).length;
   const s2 = { changed_codes: uniq.length, review: cnt('review'), ready: cnt('ready'), unmapped: cnt('unmapped'), already_ok: cnt('already_ok'), done: cnt('done') };
   const chips = [['all', '전체', s2.changed_codes], ['review', LABEL.review, s2.review], ['ready', LABEL.ready, s2.ready], ['unmapped', LABEL.unmapped, s2.unmapped], ['already_ok', LABEL.already_ok, s2.already_ok], ['done', LABEL.done, s2.done]];
-  document.getElementById('fbar').innerHTML = chips.map(c => `<button class="fchip${FILTER === c[0] ? ' on' : ''}" onclick="FILTER='${c[0]}';DATA.__f=1;render()">${c[1]}<b>${c[2]}</b></button>`).join('');
+  window.__chips = chips; drawChips();
   const canAct = d.day === d.today;
   const rows = uniq.filter(([i]) => FILTER === 'all' || i.status === FILTER);
   const bb = document.getElementById('bulkbar'); bb.style.display = canAct && rows.some(([i]) => ['review', 'ready'].includes(i.status)) ? 'block' : 'none'; document.getElementById('selAll').checked = false; SEL = new Set(); updSel();

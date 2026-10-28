@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BUYEST Studio · 자동 제작</title><link rel="stylesheet" href="/studio-next/style.css"></head>
+<body>
+<header class="top"><a class="logo" href="/studio-next/"><span class="monogram">B</span><span>BUYEST <b>STUDIO</b></span></a><span class="local">CODEX PREVIEW <i></i> 로컬 테스트</span><button class="quiet" id="settings">연결 상태 <span id="connectionDot">●</span></button></header>
+<div class="workspace">
+  <aside class="sidebar"><p class="overline">CONTENT WORKSPACE</p><button class="nav active" id="newProject">✦ &nbsp; 새로 만들기</button><button class="nav" id="libraryToggle">▤ &nbsp; 내 작업 <span id="jobCount">0</span></button><div class="sidebar-bottom"><span class="monogram small">B</span><p>사진에서 시작해<br>하나의 이야기로.</p><small>BUYEST</small></div></aside>
+  <main>
+    <section class="intro"><div><p class="overline">YOUR PHOTOS. A NEW STORY.</p><h1>상품을 고르면,<br><span>콘텐츠가 완성됩니다.</span></h1><p class="lede">기획부터 영상, 목소리와 자막까지.<br>릴스와 카드뉴스를 한곳에서 만드세요.</p></div><button class="sample" id="sample">샘플로 테스트 <span>↗</span><small>과금 없이 제작 흐름 확인</small></button></section>
+    <section id="editor" class="editor">
+      <div class="inputs">
+        <div class="section-heading"><h2>어떤 콘텐츠를 만들까요?</h2><span>01 / FORMAT</span></div>
+        <div class="formats" role="radiogroup" aria-label="만들 콘텐츠">
+          <button role="radio" aria-checked="false" data-output="reel"><span class="format-icon">▯</span><b>AI 릴스</b><small>영상 · 음성 · 자막</small></button>
+          <button role="radio" aria-checked="true" class="selected" data-output="cards"><span class="format-icon">▧</span><b>카드뉴스</b><small>사진 · 카피 · 디자인</small></button>
+          <button role="radio" aria-checked="false" data-output="both"><span class="format-icon">▯ ▧</span><b>둘 다 만들기</b><small>하나의 기획, 두 콘텐츠</small><em>추천</em></button>
+        </div>
+        <div class="section-heading"><h2>카드뉴스 디자인을 고르세요</h2><span>11 TEMPLATES</span></div><p class="job-note">일반 10종 + 키즈 1종 · 사진 배치와 정보 구성이 달라집니다.</p><div id="templateGrid" class="template-grid" role="radiogroup" aria-label="카드뉴스 템플릿"></div><div class="section-heading"><h2>품번으로 상품을 가져오세요</h2><span>02 / PRODUCTS</span></div>
+<label class="field">품번 또는 바이스트 상품 링크<textarea id="productQueries" maxlength="2000" placeholder="한 줄에 하나씩 최대 8개&#10;1A001 41 5963V 999&#10;https://buyest.co.kr/product_detail.php?pid=85868"></textarea></label>
+<button class="quiet" id="searchProducts">상품 찾기 →</button><p id="catalogStatus" role="status" class="job-note"></p><div id="catalogResults"></div><button class="quiet" id="importProducts" hidden>선택한 상품 사진·정보 가져오기</button>
+<div class="section-heading"><h2>선택한 상품 · 추가 사진</h2><span>PHOTOS</span></div>
+        <label class="drop" id="drop"><span class="upload-icon">＋</span><b>여기에 사진을 끌어다 놓으세요</b><span>또는 눌러서 선택 · JPG, PNG, WebP · 최대 8장</span><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple><div id="thumbs" class="thumbs"></div></label>
+        <div class="section-heading"><h2>추가 정보와 제작 방향</h2><span>03 / DIRECTION</span></div>
+        <label class="field">알려진 상품 정보 <span>선택</span><textarea id="facts" maxlength="4000" placeholder="상품명, 가격, 소재 등 확인된 정보를 적어 주세요. 비워 두면 사진에서 확인되는 내용만 사용해요."></textarea></label>
+        <label class="field">AI에게 전할 추가 요청 <span>선택</span><input id="brief" maxlength="4000" placeholder="비워 두어도 AI가 독자·주제·제목·문구·디자인 지시문을 기획합니다."></label>
+        <label class="field"><span><input type="checkbox" id="aiBackground"> AI 이미지로 표지 배경 만들기</span><small id="imageHint">실제 상품 사진은 유지하고 분위기 배경을 생성합니다. OpenAI API 사용료 별도.</small></label><details class="options"><summary>제작 설정 <span>⌄</span></summary><label>AI 영상 원본 해상도<select id="resolution"><option value="480p">480p · 비용 테스트</option><option value="720p" selected>720p · 기본</option><option value="1080p">1080p · 고화질</option></select></label><label>AI 영상 생성 한도 (USD)<input id="budget" type="number" min="0.1" max="20" step="0.1" value="5"></label><p>영상은 생성 전 예상 비용을 확인합니다. 숫자 견적이 없으면 공개 요율에 여유분을 더한 추산을 표시합니다. 기획·음성 사용료는 별도이며, 로컬 합성은 추가 API 비용이 없습니다. 음악은 서버에 등록한 음원을 사용합니다.</p></details>
+        <p class="error" id="formError" role="alert"></p><button class="create" id="create">✦ &nbsp; 상품으로 자동 만들기 <span>→</span></button><p class="footnote" id="createHint">프롬프트와 자막을 직접 작성하지 않아도 됩니다.</p>
+      </div>
+      <aside class="preview"><div class="preview-top"><span>THE CREATIVE PROCESS</span><span>✦</span></div><div class="poster"><div class="poster-brand">BUYEST<br><span>SELECTED MOMENTS</span></div><div class="garment"><div class="jacket"></div></div><p>한 장의 사진,<br>새로운 가능성.</p><span class="poster-label">완성본이 아닌 화면 예시입니다</span></div><ol class="process"><li><b>기획</b><span>사진을 읽고 이야기를 만듭니다</span></li><li><b>제작</b><span>장면과 목소리를 만듭니다</span></li><li><b>완성</b><span>자막과 편집을 더합니다</span></li></ol><p class="preview-note">사진에 없는 상품 정보는 추측하지 않아요.<br>로고·색상은 완성본에서 한 번 더 확인해 주세요.</p></aside>
+    </section>
+    <section id="current" hidden></section>
+    <section id="library" hidden><div class="section-heading"><h2>내 작업</h2><span>PROJECTS</span></div><div id="jobList" class="job-list"></div></section>
+    <footer>BUYEST STUDIO <span>생각은 AI에게. 선택은 당신에게.</span></footer>
+  </main>
+</div>
+<dialog id="connections"><form method="dialog"><button class="close" aria-label="닫기">×</button><p class="overline">STUDIO CONNECTIONS</p><h2>제작 서비스 연결</h2><div id="services"></div><p class="dialog-note">키는 서버의 <code>studio-server/.env</code>에만 저장하세요. 채팅이나 브라우저에 입력하지 않습니다. 설정 후 로컬 서버를 다시 시작하면 적용됩니다.</p><button class="create">확인</button></form></dialog>
+<dialog id="approval"><p class="overline">READY TO CREATE</p><h2>이 내용으로 제작합니다</h2><div id="approvalText"></div><p class="dialog-note">영상 예상액은 견적이며 실제 청구와 차이가 있을 수 있습니다. 기획·음성 서비스 사용료는 별도입니다.</p><div class="dialog-actions"><button class="quiet" id="cancelApproval">취소</button><button class="create" id="approve">제작 시작</button></div></dialog>
+<script type="module" src="/studio-next/app.js"></script></body></html>

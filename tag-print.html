@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>택 출력</title>
+<style>
+  @import url("assets/fonts/pretendard/pretendard.css");
+  :root{
+    --bg:#f6f6f4; --card:#fff; --ink:#15171a; --sub:#6a6f76; --line:#e4e4e0;
+    --pri:#15171a; --ok:#0f766e; --bad:#b42318; --warn:#a15c07; --blue:#1d4ed8;
+    --font:"Pretendard Variable","Pretendard",-apple-system,"Malgun Gothic",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);margin:0;padding:16px;font-size:14px;}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:-.02em;}
+  .lead{color:var(--sub);font-size:13px;margin:0 0 14px;line-height:1.55;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;}
+  .card h2{font-size:14px;margin:0 0 8px;}
+  .btn{font:600 14px var(--font);padding:9px 15px;border:1px solid transparent;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .btn-pri{background:var(--pri);color:#fff;} .btn-out{background:#fff;color:var(--ink);border-color:var(--line);}
+  input[type=text],input[type=number],select{font:14px var(--font);padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);}
+  label.f{display:block;font-size:12px;font-weight:700;color:var(--sub);margin-bottom:3px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;}
+  .grid input{width:100%;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .msg{font-size:13px;color:var(--sub);margin-top:8px;line-height:1.6;} .msg.bad{color:var(--bad);font-weight:600;} .msg.ok{color:var(--ok);font-weight:600;}
+  table{border-collapse:collapse;width:100%;font-size:13px;} th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:middle;}
+  th{font-size:12px;color:var(--sub);background:#fafaf8;position:sticky;top:0;} td input[type=number]{width:64px;}
+  .scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;}
+  .x{border:0;background:none;color:var(--bad);cursor:pointer;font-size:16px;}
+
+  /* 위치 편집 */
+  .edit{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;}
+  #canvasWrap{flex:none;}
+  #canvas{box-shadow:0 0 0 1px #aaa;background:#fff;touch-action:none;}
+  #layoutTbl{flex:1;min-width:360px;}
+  #layoutTbl td input[type=number]{width:70px;}
+  #layoutTbl tr.sel td{background:#eef3ff;}
+
+  /* 택 — 값만 인쇄(로고·항목명은 용지에 이미 인쇄돼 있음). 모든 줄은 mm 좌표로 절대배치 */
+  #sheet{display:flex;flex-wrap:wrap;gap:12px;}
+  .tag{position:relative;background:#fff;color:#000;overflow:hidden;font-family:"Malgun Gothic","Pretendard",sans-serif;box-shadow:0 0 0 1px #bbb;}
+  .tag .el{position:absolute;white-space:nowrap;line-height:1;}
+  .tag .el.c{transform:translate(-50%,-50%);} .tag .el.l{transform:translate(0,-50%);}
+  .tag .el.bar{transform:none;line-height:0;} .tag .el.bar svg{display:block;width:100%;height:100%;}
+  .tag .g{position:absolute;white-space:nowrap;color:#b9b9b9;line-height:1;transform:translate(0,-50%);pointer-events:none;}
+  .tag .g.c{transform:translate(-50%,-50%);}
+  .tag .cut{position:absolute;left:0;right:0;border-top:1px dashed #cfcfcf;pointer-events:none;}
+  .tag.edit-on .el{cursor:move;outline:1px dashed transparent;} .tag.edit-on .el:hover{outline-color:#1d4ed8;} .tag.edit-on .el.sel{outline:1.5px solid #1d4ed8;background:rgba(29,78,216,.07);}
+
+  @page{margin:0;}
+  @media print{
+    body{background:#fff;padding:0;}
+    .noprint{display:none !important;}
+    #sheet{display:block;}
+    .tag{box-shadow:none;break-after:page;page-break-after:always;}
+    .tag .g,.tag .cut{display:none !important;}
+  }
+</style>
+</head>
+<body>
+<div class="noprint">
+  <h1>택 출력 <span style="font-size:12px;color:var(--warn);font-weight:700;">시험판</span></h1>
+  <p class="lead">상품명과 사이즈 두 열이 있는 엑셀을 올리면, 이카운트 품목 정보(품목코드·출고단가·바코드)와 사이트 상품 정보(브랜드·원산지)를 찾아 택에 들어갈 <b>값만</b> 인쇄합니다. 로고와 항목 이름(브랜드, 모델명…)은 택 용지에 이미 인쇄되어 있으니 나오지 않습니다.</p>
+
+  <div class="card">
+    <h2>1. 엑셀 올리기</h2>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv">
+    <div class="msg" id="fileMsg">첫 번째 열은 상품명, 두 번째 열은 사이즈여야 합니다. (제목 줄이 있어도 됩니다)</div>
+  </div>
+
+  <div class="card" id="listCard" style="display:none;">
+    <h2>2. 확인하고 수량 정하기</h2>
+    <div class="row" style="margin-bottom:8px;">
+      <button class="btn btn-out" id="btnAll1">전부 1장</button>
+      <span class="msg" style="margin:0;" id="sumMsg"></span>
+    </div>
+    <div class="scroll"><table><thead><tr><th>상태</th><th>상품명 / 사이즈</th><th>브랜드</th><th>모델명</th><th>원산지</th><th>판매가</th><th>바코드</th><th>수량</th><th></th></tr></thead><tbody id="tbody"></tbody></table></div>
+  </div>
+
+  <div class="card" id="setCard" style="display:none;">
+    <h2>3. 줄 위치 맞추기</h2>
+    <div class="msg" style="margin:0 0 10px;">택 위의 글자를 마우스로 끌어 옮기거나, 오른쪽 표에서 숫자로 조정하세요. 회색 글자는 용지에 이미 인쇄된 양식을 흉내 낸 안내선이고 인쇄되지 않습니다. 설정은 이 컴퓨터에 저장됩니다.</div>
+    <div class="grid" style="margin-bottom:12px;">
+      <div><label class="f">가로 (mm)</label><input type="number" id="wMm" step="0.5" min="20" max="200"></div>
+      <div><label class="f">세로 (mm)</label><input type="number" id="hMm" step="0.5" min="20" max="300"></div>
+      <div><label class="f">수입원 글자</label><input type="text" id="fixText"></div>
+      <div><label class="f">전체 옆으로 이동 (mm)</label><input type="number" id="offX" step="0.1"></div>
+      <div><label class="f">전체 아래로 이동 (mm)</label><input type="number" id="offY" step="0.1"></div>
+    </div>
+    <div class="edit">
+      <div id="canvasWrap"><div class="row" style="margin-bottom:6px;"><label style="font-size:13px;"><input type="checkbox" id="showGuide" checked> 양식 안내선 보기</label></div><div id="canvas"></div></div>
+      <div id="layoutTbl"><div class="scroll" style="max-height:480px;"><table><thead><tr><th>줄</th><th>보이기</th><th>옆(mm)</th><th>아래(mm)</th><th>글자(mm)</th></tr></thead><tbody id="ltbody"></tbody></table></div>
+        <div class="row" style="margin-top:8px;"><button class="btn btn-out" id="btnReset">기본 위치로</button><span class="msg" style="margin:0;">옆·아래는 택 왼쪽 위 모서리 기준이고, 글자 줄은 그 줄의 세로 가운데입니다.</span></div></div>
+    </div>
+    <div class="row" style="margin-top:14px;">
+      <button class="btn btn-pri" id="btnPrint">인쇄</button>
+      <span class="msg" style="margin:0;">인쇄 창에서 용지 크기를 위 크기로, 여백은 "없음", 배율은 100%로 맞추세요.</span>
+    </div>
+  </div>
+  <div class="card" id="calCard" style="display:none;">
+    <h2>4. 인쇄가 어긋날 때 — 눈금 테스트</h2>
+    <div class="msg" style="margin:0 0 10px;">① 아래 버튼으로 눈금 택을 한 장 뽑으세요. ② 용지 <b>위쪽 끝</b>에서 "10"선과 "80"선까지, 용지 <b>왼쪽 끝</b>에서 "10"선과 "40"선까지 자로 재서 mm로 적어 주세요. ③ 값을 넣으면 위치와 크기가 자동으로 보정됩니다. (정확히 나왔다면 10 / 80 / 10 / 40 그대로 두면 됩니다.)</div>
+    <div class="row" style="margin-bottom:10px;"><button class="btn btn-out" id="btnCalPrint">눈금 택 인쇄</button></div>
+    <div class="grid">
+      <div><label class="f">위에서 "10"선까지 (mm)</label><input type="number" id="calYa" step="0.1"></div>
+      <div><label class="f">위에서 "80"선까지 (mm)</label><input type="number" id="calYb" step="0.1"></div>
+      <div><label class="f">왼쪽에서 "10"선까지 (mm)</label><input type="number" id="calXa" step="0.1"></div>
+      <div><label class="f">왼쪽에서 "40"선까지 (mm)</label><input type="number" id="calXb" step="0.1"></div>
+    </div>
+    <div class="msg" id="calMsg"></div>
+  </div>
+  <h2 id="pvTitle" style="font-size:14px;margin:6px 0 8px;display:none;">미리보기 (회색 글자는 용지에 이미 있는 양식이라 인쇄되지 않아요)</h2>
+</div>
+<div id="sheet"></div>
+
+<script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script>
+'use strict';
+/* 택 출력 (TEST) — 상품명+사이즈 엑셀 → 서버(tag_info_api.php)가 이카운트 품목 캐시·사이트 상품에서 정보를 채움 → 택 용지에 값만 인쇄.
+   서버는 읽기만 하고 이카운트를 호출하지 않는다. 툴킷 로그인(localStorage buyest.dash.auth)이 필요하다.
+   택 용지에는 로고·항목명(브랜드:, 모델명: …)·품질표시 문구가 미리 인쇄돼 있어서, 여기서는 값만 mm 좌표로 찍는다. */
+const API = 'https://buyest.co.kr/tag_info_api.php';
+const LS = 'tagprint.layout.v1';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let items = [];
+const STATUS = { ok:['찾음','#0f766e'], multi:['후보 여러 개','#a15c07'], nosize:['사이즈 없음','#b42318'], nostyle:['품번 못 찾음','#b42318'] };
+
+/* ── 줄 배치 (택 50×90mm 실제 사진을 재서 정한 기본값) ──
+   k=값 종류, a=l(왼쪽 기준)/c(가운데 기준), bar=바코드(w,h mm) */
+const DEF_LAYOUT = {
+  w: 50, h: 90, fix: '바이스트', offX: 0, offY: 0, cal: { ya: 10, yb: 80, xa: 10, xb: 40 },
+  els: [
+    { id:'brand',  name:'브랜드',          k:'brand',   a:'l', x:16.5, y:19.0, fs:2.8, on:true },
+    { id:'style',  name:'모델명(위)',       k:'style',   a:'l', x:16.5, y:24.7, fs:2.8, on:true },
+    { id:'size',   name:'사이즈(위)',       k:'size',    a:'l', x:16.5, y:30.4, fs:2.8, on:true },
+    { id:'fix',    name:'수입원',           k:'fix',     a:'l', x:16.5, y:35.9, fs:2.8, on:true },
+    { id:'origin', name:'원산지',           k:'origin',  a:'l', x:16.5, y:41.3, fs:2.8, on:true },
+    { id:'price',  name:'판매가(위)',       k:'price',   a:'l', x:16.5, y:46.8, fs:2.8, on:true },
+    { id:'bc1',    name:'바코드(위)',       k:'bar',     a:'l', x:9.5,  y:53.0, w:32.5, h:6.0, on:true, bar:true },
+    { id:'bc1n',   name:'바코드 번호(위)',  k:'barcode', a:'c', x:25.0, y:61.3, fs:2.4, on:true },
+    { id:'bc2',    name:'바코드(아래)',     k:'bar',     a:'l', x:9.5,  y:64.3, w:32.5, h:6.0, on:true, bar:true },
+    { id:'bc2n',   name:'바코드 번호(아래)',k:'barcode', a:'c', x:25.0, y:72.3, fs:2.4, on:true },
+    { id:'style2', name:'모델명(아래)',     k:'style',   a:'l', x:13.6, y:76.3, fs:2.6, on:true },
+    { id:'size2',  name:'사이즈(아래)',     k:'size',    a:'l', x:13.6, y:80.8, fs:2.6, on:true },
+    { id:'price2', name:'판매가(아래)',     k:'price',   a:'l', x:13.6, y:85.0, fs:2.6, on:true },
+  ]
+};
+let L = loadLayout(), sel = 'brand';
+
+function loadLayout() {
+  const d = JSON.parse(JSON.stringify(DEF_LAYOUT));
+  try {
+    const s = JSON.parse(localStorage.getItem(LS) || 'null');
+    if (s) {
+      ['w', 'h', 'fix', 'offX', 'offY'].forEach(k => { if (s[k] != null) d[k] = s[k]; });
+      if (s.cal) ['ya', 'yb', 'xa', 'xb'].forEach(k => { if (+s.cal[k] > 0) d.cal[k] = +s.cal[k]; });
+      (s.els || []).forEach(e => { const t = d.els.find(x => x.id === e.id); if (t) ['x', 'y', 'fs', 'on'].forEach(k => { if (e[k] != null) t[k] = e[k]; }); });
+    }
+  } catch (e) {}
+  return d;
+}
+function saveLayout() {
+  try { localStorage.setItem(LS, JSON.stringify({ w:L.w, h:L.h, fix:L.fix, offX:L.offX, offY:L.offY, cal:L.cal, els:L.els.map(e => ({ id:e.id, x:e.x, y:e.y, fs:e.fs, on:e.on })) })); } catch (e) {}
+}
+
+function auth() { try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); return a && a.id && a.pass ? a : null; } catch (e) { return null; } }
+function readSheet(file) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onerror = () => rej(new Error('파일을 읽지 못했어요.'));
+    fr.onload = () => { try { const wb = XLSX.read(fr.result, {type:'array'}); res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:false, defval:''})); } catch (e) { rej(e); } };
+    fr.readAsArrayBuffer(file);
+  });
+}
+function msg(t, cls) { $('fileMsg').className = 'msg ' + (cls || ''); $('fileMsg').textContent = t; }
+
+$('file').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const a = auth();
+  if (!a) { msg('툴킷에 로그인한 뒤 사용할 수 있어요. 로그인 후 새로고침해 주세요.', 'bad'); return; }
+  try {
+    const aoa = await readSheet(f);
+    let rows = aoa.map(r => ({ name: String(r[0] || '').trim(), size: String(r[1] || '').trim() })).filter(r => r.name);
+    if (rows.length && /^(상품명|품목명)/.test(rows[0].name)) rows = rows.slice(1);
+    if (!rows.length) { msg('상품명이 있는 줄을 못 찾았어요. 첫 번째 열에 상품명을 넣어주세요.', 'bad'); return; }
+    if (rows.length > 500) { msg('한 번에 500줄까지 조회할 수 있어요. 나눠서 올려주세요.', 'bad'); return; }
+    msg(rows.length + '줄을 조회하는 중이에요…');
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user: a.id, pass: a.pass, rows: rows }) });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || '조회에 실패했어요.');
+    items = d.rows.map(x => Object.assign({ src: rows[x.i], qty: 1 }, x));
+    const c = k => items.filter(x => x.status === k).length;
+    const miss = c('nosize') + c('nostyle');
+    msg(items.length + '줄 중 ' + c('ok') + '줄을 찾았어요.' + (c('multi') ? ' 후보가 여러 개인 ' + c('multi') + '줄은 직접 골라주세요.' : '') + (miss ? ' 못 찾은 ' + miss + '줄은 칸을 직접 채우거나 ×로 빼세요.' : ''), c('ok') === items.length ? 'ok' : '');
+    drawList();
+  } catch (err) { msg(err.message, 'bad'); }
+});
+
+function drawList() {
+  $('listCard').style.display = items.length ? 'block' : 'none';
+  $('setCard').style.display = items.length ? 'block' : 'none';
+  $('calCard').style.display = items.length ? 'block' : 'none';
+  $('tbody').innerHTML = items.map((it, i) => {
+    const st = STATUS[it.status] || ['', '#000'];
+    const cand = it.status === 'multi' ? '<select data-c="' + i + '"><option value="">후보 고르기</option>' + it.cands.map((c, k) => '<option value="' + k + '">' + esc(c.ec_name) + ' / ' + esc(c.size) + ' / ' + esc(c.code) + '</option>').join('') + '</select>' : '';
+    const inp = k => '<td><input type="text" data-i="' + i + '" data-k="' + k + '" value="' + esc(it[k]) + '" style="width:' + (k === 'style' ? 150 : k === 'barcode' ? 100 : 90) + 'px"></td>';
+    return '<tr><td style="color:' + st[1] + ';font-weight:700;white-space:nowrap;">' + st[0] + '</td>' +
+      '<td style="min-width:220px;">' + esc(it.src.name) + '<br><span style="color:var(--sub)">' + esc(it.src.size) + (it.code ? ' → ' + esc(it.size) : '') + '</span>' + cand + '</td>' +
+      ['brand', 'style', 'origin', 'price', 'barcode'].map(inp).join('') +
+      '<td><input type="number" min="0" max="999" value="' + it.qty + '" data-q="' + i + '"></td><td><button class="x" data-d="' + i + '" title="빼기" aria-label="빼기">×</button></td></tr>';
+  }).join('');
+  $('tbody').querySelectorAll('input[data-k]').forEach(n => n.addEventListener('input', () => { items[+n.dataset.i][n.dataset.k] = n.value; refresh(); }));
+  $('tbody').querySelectorAll('input[data-q]').forEach(n => n.addEventListener('input', () => { items[+n.dataset.q].qty = Math.max(0, +n.value || 0); refresh(); }));
+  $('tbody').querySelectorAll('select[data-c]').forEach(s => s.addEventListener('change', () => {
+    if (s.value === '') return;
+    const it = items[+s.dataset.c], c = it.cands[+s.value];
+    Object.assign(it, { status:'ok', code:c.code, ec_name:c.ec_name, size:c.size, price:c.price, barcode:c.barcode });
+    drawList();
+  }));
+  $('tbody').querySelectorAll('.x').forEach(b => b.addEventListener('click', () => { items.splice(+b.dataset.d, 1); drawList(); }));
+  refresh();
+}
+$('btnAll1').addEventListener('click', () => { items.forEach(it => it.qty = 1); drawList(); });
+
+/* Code128-B 바코드를 SVG 막대로 그린다 */
+const C128 = ['212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132','221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313','231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111','314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111','111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141','114131','311141','411131','211412','211214','211232','2331112'];
+function code128(text) {
+  const vals = [104];
+  for (const ch of String(text)) { const c = ch.charCodeAt(0) - 32; vals.push(c >= 0 && c < 95 ? c : 0); }
+  let sum = vals[0]; for (let i = 1; i < vals.length; i++) sum += vals[i] * i;
+  vals.push(sum % 103, 106);
+  let x = 0, bars = '';
+  for (const v of vals) for (let j = 0; j < C128[v].length; j++) {
+    const w = +C128[v][j];
+    if (j % 2 === 0) bars += '<rect x="' + x + '" y="0" width="' + w + '" height="40"/>';
+    x += w;
+  }
+  return '<svg viewBox="0 0 ' + x + ' 40" preserveAspectRatio="none" fill="#000" shape-rendering="crispEdges">' + bars + '</svg>';
+}
+function fmtPrice(p) { const n = parseFloat(String(p).replace(/[^\d.]/g, '')); return isFinite(n) ? Math.round(n).toLocaleString('ko-KR') : String(p); }
+
+/* 안내선(회색 양식)은 줄 위치 설정을 따라간다 — 값이 있는 줄 = 항목 이름이 있는 줄. 전체 이동값도 같이 반영해 미리보기가 인쇄된 모양과 같다. */
+function guideList() {
+  const Y = id => { const e = L.els.find(x => x.id === id); return e.y + L.offY; };
+  const X = id => { const e = L.els.find(x => x.id === id); return e.x + L.offX; };
+  const g = [];
+  g.push({ t: 'BUYEST', a: 'c', x: L.w / 2 + L.offX, y: Y('brand') - 8.2, fs: 4.0, b: 1 });
+  g.push({ t: '품질경영 및 공산품 안전관리법에 의한 품질표시', a: 'c', x: L.w / 2 + L.offX, y: Y('brand') - 4.4, fs: 1.7 });
+  [['brand', '브랜드 :'], ['style', '모델명 :'], ['size', '사이즈 :'], ['fix', '수입원 :'], ['origin', '원산지 :'], ['price', '판매가 :']].forEach(r => g.push({ t: r[1], x: 5.5 + L.offX, y: Y(r[0]), fs: 2.6 }));
+  g.push({ t: '※ 택 제거시 교환 및 반품 불가합니다.', a: 'c', x: L.w / 2 + L.offX, y: Y('price') + 3.6, fs: 1.9 });
+  [['style2', '모델명 :'], ['size2', '사이즈 :'], ['price2', '판매가 :']].forEach(r => g.push({ t: r[1], x: 4.4 + L.offX, y: Y(r[0]), fs: 2.3 }));
+  return { items: g, cut: (Y('bc1n') + Y('bc2')) / 2 };
+}
+
+/* 눈금 테스트 보정: 용지에 실제로 찍힌 위치(ya,yb / xa,xb)로 프린터가 늘리거나 민 정도를 구해 반대로 적용한다. 인쇄할 때만 쓴다. */
+function calc() {
+  const c = L.cal, sy = (c.yb - c.ya) / 70 || 1, sx = (c.xb - c.xa) / 30 || 1;
+  return { sx, sy, dx: c.xa - 10 * sx, dy: c.ya - 10 * sy };
+}
+function calText() { const k = calc(); return '세로 ×' + (1 / k.sy).toFixed(3) + ' · 가로 ×' + (1 / k.sx).toFixed(3) + ' · 이동 ' + (-k.dy / k.sy).toFixed(1) + 'mm / ' + (-k.dx / k.sx).toFixed(1) + 'mm'; }
+
+/* 택 한 장. opt.guide=안내선, opt.edit=편집(끌기) 가능, opt.print=인쇄(눈금 보정 적용) */
+function tagHtml(it, opt) {
+  opt = opt || {};
+  const val = { brand: it.brand, style: it.style, size: it.size, origin: it.origin, fix: L.fix, price: fmtPrice(it.price), barcode: it.barcode };
+  const K = opt.print ? calc() : { sx: 1, sy: 1, dx: 0, dy: 0 }, kf = (K.sx + K.sy) / 2;
+  let h = '<div class="tag' + (opt.edit ? ' edit-on' : '') + '" style="width:' + L.w + 'mm;height:' + L.h + 'mm">';
+  if (opt.guide) {
+    const GL = guideList();
+    h += '<div class="cut" style="top:' + GL.cut.toFixed(2) + 'mm"></div>';
+    GL.items.forEach(g => { h += '<div class="g ' + (g.a === 'c' ? 'c' : '') + '" style="left:' + g.x.toFixed(2) + 'mm;top:' + g.y.toFixed(2) + 'mm;font-size:' + (g.fs || 2.6) + 'mm;' + (g.b ? 'font-weight:800;' : '') + '">' + esc(g.t) + '</div>'; });
+  }
+  L.els.forEach(e => {
+    if (!e.on) return;
+    const x = +((e.x + L.offX - K.dx) / K.sx).toFixed(2), y = +((e.y + L.offY - K.dy) / K.sy).toFixed(2);
+    const cls = 'el ' + (e.bar ? 'bar' : e.a) + (opt.edit && e.id === sel ? ' sel' : '');
+    if (e.bar) h += '<div class="' + cls + '" data-id="' + e.id + '" style="left:' + x + 'mm;top:' + y + 'mm;width:' + +(e.w / K.sx).toFixed(2) + 'mm;height:' + +(e.h / K.sy).toFixed(2) + 'mm">' + code128(it.barcode) + '</div>';
+    else h += '<div class="' + cls + '" data-id="' + e.id + '" style="left:' + x + 'mm;top:' + y + 'mm;font-size:' + +(e.fs / kf).toFixed(2) + 'mm">' + esc(val[e.k]) + '</div>';
+  });
+  return h + '</div>';
+}
+/* 오른쪽 끝을 넘는 글자는 그 줄만 글자 크기를 줄여 택 안에 맞춘다 */
+function fit(root) {
+  root.querySelectorAll('.tag').forEach(t => {
+    const tr = t.getBoundingClientRect(); if (!tr.width) return;
+    const pxMm = tr.width / (parseFloat(t.style.width) || L.w);          // 화면에 그려진 1mm 의 픽셀 수(확대 포함)
+    t.querySelectorAll('.el.l:not(.bar)').forEach(e => {
+      const er = e.getBoundingClientRect(), avail = tr.right - er.left - 1.2 * pxMm;
+      if (avail > 0 && er.width > avail) e.style.fontSize = Math.max(1.6, parseFloat(e.style.fontSize) * avail / er.width).toFixed(2) + 'mm';
+    });
+  });
+}
+function expanded() { const a = []; for (const it of items) if (it.barcode) for (let i = 0; i < it.qty; i++) a.push(it); return a; }
+function sampleItem() { return items.find(it => it.barcode) || items[0] || { brand:'', style:'', size:'', origin:'', price:'', barcode:'0000000000' }; }
+
+function refresh() {
+  const all = expanded();
+  const nobc = items.filter(it => !it.barcode && it.qty > 0).length;
+  $('sumMsg').textContent = '총 ' + all.length + '장' + (nobc ? ' · 바코드가 비어 인쇄에서 빠지는 ' + nobc + '줄' : '');
+  $('pvTitle').style.display = all.length ? 'block' : 'none';
+  $('sheet').innerHTML = all.slice(0, 40).map(it => tagHtml(it, { guide: $('showGuide').checked })).join('') + (all.length > 40 ? '<div class="msg noprint">미리보기는 40장까지만 보여요. 인쇄는 ' + all.length + '장 전부 나갑니다.</div>' : '');
+  fit($('sheet'));
+  drawCanvas();
+}
+
+/* ── 위치 편집 캔버스: 첫 번째 품목을 크게 보여주고 글자를 끌어서 옮긴다 ── */
+const ZOOM = 2.2;
+function drawCanvas() {
+  const c = $('canvas');
+  c.style.zoom = ZOOM;
+  c.style.width = L.w + 'mm'; c.style.height = L.h + 'mm';
+  c.innerHTML = tagHtml(sampleItem(), { guide: $('showGuide').checked, edit: true });
+  fit(c);
+  drawLayoutTable();
+}
+function drawLayoutTable() {
+  $('ltbody').innerHTML = L.els.map(e =>
+    '<tr data-id="' + e.id + '"' + (e.id === sel ? ' class="sel"' : '') + '><td>' + esc(e.name) + '</td>' +
+    '<td><input type="checkbox" data-f="on"' + (e.on ? ' checked' : '') + '></td>' +
+    '<td><input type="number" step="0.1" data-f="x" value="' + e.x + '"></td><td><input type="number" step="0.1" data-f="y" value="' + e.y + '"></td>' +
+    '<td>' + (e.bar ? '<span style="color:var(--sub)">폭 ' + e.w + ' · 높이 ' + e.h + '</span>' : '<input type="number" step="0.1" data-f="fs" value="' + e.fs + '">') + '</td></tr>').join('');
+}
+$('ltbody').addEventListener('input', ev => {
+  const n = ev.target, tr = n.closest('tr'); if (!tr || !n.dataset.f) return;
+  const e = L.els.find(x => x.id === tr.dataset.id);
+  e[n.dataset.f] = n.type === 'checkbox' ? n.checked : (parseFloat(n.value) || 0);
+  sel = e.id; saveLayout(); redrawKeepTable();
+});
+$('ltbody').addEventListener('click', ev => { const tr = ev.target.closest('tr'); if (tr && tr.dataset.id !== sel) { sel = tr.dataset.id; redrawKeepTable(true); } });
+function redrawKeepTable(withTable) {   // 표 입력 중에는 표를 다시 그리지 않아 커서가 안 튄다
+  const c = $('canvas'); c.innerHTML = tagHtml(sampleItem(), { guide: $('showGuide').checked, edit: true });
+  $('sheet').innerHTML = expanded().slice(0, 40).map(it => tagHtml(it, { guide: $('showGuide').checked })).join('');
+  fit(c); fit($('sheet'));
+  if (withTable) drawLayoutTable();
+}
+/* 끌기 */
+let drag = null;
+$('canvas').addEventListener('pointerdown', ev => {
+  const el = ev.target.closest('.el'); if (!el) return;
+  const e = L.els.find(x => x.id === el.dataset.id); if (!e) return;
+  sel = e.id; drag = { e, sx: ev.clientX, sy: ev.clientY, ox: e.x, oy: e.y };
+  $('canvas').setPointerCapture(ev.pointerId); drawLayoutTable(); redrawKeepTable(); ev.preventDefault();
+});
+$('canvas').addEventListener('pointermove', ev => {
+  if (!drag) return;
+  const pxPerMm = $('canvas').getBoundingClientRect().width / L.w;      // 화면에 그려진 실제 크기 기준
+  drag.e.x = Math.round((drag.ox + (ev.clientX - drag.sx) / pxPerMm) * 10) / 10;
+  drag.e.y = Math.round((drag.oy + (ev.clientY - drag.sy) / pxPerMm) * 10) / 10;
+  const el = $('canvas').querySelector('[data-id="' + drag.e.id + '"]');
+  if (el) { el.style.left = (drag.e.x + L.offX) + 'mm'; el.style.top = (drag.e.y + L.offY) + 'mm'; }
+  const r = $('ltbody').querySelector('tr[data-id="' + drag.e.id + '"]');
+  if (r) { r.querySelector('[data-f="x"]').value = drag.e.x; r.querySelector('[data-f="y"]').value = drag.e.y; }
+});
+function endDrag() { if (drag) { drag = null; saveLayout(); redrawKeepTable(); } }
+$('canvas').addEventListener('pointerup', endDrag); $('canvas').addEventListener('pointercancel', endDrag);
+/* 방향키로 0.1mm(Shift 누르면 0.5mm) 미세 이동 */
+document.addEventListener('keydown', ev => {
+  if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(ev.key)) return;
+  const t = ev.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+  const e = L.els.find(x => x.id === sel); if (!e || !$('setCard').offsetParent) return;
+  const d = ev.shiftKey ? .5 : .1;
+  if (ev.key === 'ArrowLeft') e.x = Math.round((e.x - d) * 10) / 10; if (ev.key === 'ArrowRight') e.x = Math.round((e.x + d) * 10) / 10;
+  if (ev.key === 'ArrowUp') e.y = Math.round((e.y - d) * 10) / 10; if (ev.key === 'ArrowDown') e.y = Math.round((e.y + d) * 10) / 10;
+  saveLayout(); drawLayoutTable(); redrawKeepTable(); ev.preventDefault();
+});
+
+/* 설정 칸 */
+function syncSettings() { $('wMm').value = L.w; $('hMm').value = L.h; $('fixText').value = L.fix; $('offX').value = L.offX; $('offY').value = L.offY; }
+[['wMm','w'],['hMm','h'],['offX','offX'],['offY','offY']].forEach(([id, k]) => $(id).addEventListener('input', () => { L[k] = parseFloat($(id).value) || 0; if (k === 'w' || k === 'h') L[k] = Math.max(20, L[k]); saveLayout(); refresh(); }));
+$('fixText').addEventListener('input', () => { L.fix = $('fixText').value; saveLayout(); refresh(); });
+$('showGuide').addEventListener('change', refresh);
+$('btnReset').addEventListener('click', () => { if (!confirm('줄 위치를 처음 기본값으로 되돌릴까요?')) return; const keep = L.cal; L = JSON.parse(JSON.stringify(DEF_LAYOUT)); L.cal = keep; saveLayout(); syncSettings(); refresh(); });
+
+$('btnPrint').addEventListener('click', () => {
+  const all = expanded(); if (!all.length) return;
+  const st = document.createElement('style'); st.id = 'pgSize'; st.textContent = '@page{size:' + L.w + 'mm ' + L.h + 'mm;margin:0}';
+  document.head.appendChild(st);
+  $('sheet').innerHTML = all.map(it => tagHtml(it, { guide: false, print: true })).join('');      // 인쇄용: 안내선 없이 값만, 눈금 보정 적용
+  fit($('sheet'));
+  setTimeout(() => { window.print(); setTimeout(() => { st.remove(); refresh(); }, 500); }, 100);
+});
+/* 눈금 테스트: 5mm마다 가는 선, 10mm마다 숫자, 10·80(세로)·10·40(가로)은 굵게 */
+function calSheetHtml() {
+  let s = '<div class="tag" style="width:' + L.w + 'mm;height:' + L.h + 'mm;font-size:2.2mm">';
+  for (let y = 5; y < L.h; y += 5) { const big = (y === 10 || y === 80), t = y % 10 === 0;
+    s += '<div style="position:absolute;left:0;right:0;top:' + y + 'mm;border-top:' + (big ? '0.5mm solid #000' : (t ? '0.2mm solid #666' : '0.15mm dotted #888')) + '"></div>';
+    if (t) s += '<div style="position:absolute;left:' + (L.w / 2 - 3) + 'mm;top:' + (y + 0.4) + 'mm;line-height:1;font-weight:' + (big ? 800 : 400) + '">' + y + '</div>'; }
+  for (let x = 5; x < L.w; x += 5) { const big = (x === 10 || x === 40), t = x % 10 === 0;
+    s += '<div style="position:absolute;top:0;bottom:0;left:' + x + 'mm;border-left:' + (big ? '0.5mm solid #000' : (t ? '0.2mm solid #666' : '0.15mm dotted #888')) + '"></div>';
+    if (t) s += '<div style="position:absolute;left:' + (x + 0.4) + 'mm;top:' + (L.h / 2 - 8) + 'mm;line-height:1;font-weight:' + (big ? 800 : 400) + '">' + x + '</div>'; }
+  return s + '<div style="position:absolute;left:12mm;top:1mm;font-size:2.2mm">▲ 위</div></div>';
+}
+function printHtml(html) {
+  const st = document.createElement('style'); st.id = 'pgSize'; st.textContent = '@page{size:' + L.w + 'mm ' + L.h + 'mm;margin:0}';
+  document.head.appendChild(st);
+  $('sheet').innerHTML = html;
+  setTimeout(() => { window.print(); setTimeout(() => { st.remove(); refresh(); }, 500); }, 100);
+}
+$('btnCalPrint').addEventListener('click', () => printHtml(calSheetHtml()));
+function syncCal() { $('calYa').value = L.cal.ya; $('calYb').value = L.cal.yb; $('calXa').value = L.cal.xa; $('calXb').value = L.cal.xb; calInfo(); }
+function calInfo() {
+  const c = L.cal, same = c.ya === 10 && c.yb === 80 && c.xa === 10 && c.xb === 40;
+  $('calMsg').className = 'msg ' + (same ? '' : 'ok');
+  $('calMsg').textContent = same ? '보정 없음' : '보정 적용 중: ' + calText() + ' (이 컴퓨터에 저장돼요. 값을 10 / 80 / 10 / 40 으로 되돌리면 해제)';
+}
+[['calYa', 'ya'], ['calYb', 'yb'], ['calXa', 'xa'], ['calXb', 'xb']].forEach(([id, k]) => $(id).addEventListener('input', () => { const v = parseFloat($(id).value); if (v > 0) { L.cal[k] = v; saveLayout(); calInfo(); } }));
+syncSettings(); syncCal();
+</script>
+</body>
+</html>

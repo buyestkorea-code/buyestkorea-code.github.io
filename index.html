@@ -991,6 +991,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 15a4 4 0 0 1 0-6h2"/><path d="M15 9a4 4 0 0 1 0 6h-2"/><path d="M9 12h6"/></svg></span>
         사방넷-이카운트 매칭<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
+      <button class="nav-item" data-nav="icmTest">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg></span>
+        이카운트-송장 재고매칭<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+      </button>
       <button class="nav-item" data-nav="sabangMatchTest">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M9 15a4 4 0 0 1 0-6h2"/><path d="M15 9a4 4 0 0 1 0 6h-2"/><path d="M9 12h6"/><path d="M4 4v4M2 6h4"/></svg></span>
         TEST 사방넷-이카운트 매칭 관리<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
@@ -998,10 +1002,6 @@
       <button class="nav-item" data-nav="sabangBaseregi">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/><path d="m14.5 15.5 2 2 3.5-3.5"/></svg></span>
         사방넷 기초등록<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
-      </button>
-      <button class="nav-item" data-nav="icm">
-        <span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg></span>
-        이카운트 -송장 재고매칭 (CS)<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
     </nav>
 
@@ -1086,6 +1086,10 @@
       <button class="nav-item" data-nav="barcodeListTest">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 5v14M6 5v14M9.5 5v14M12 5v14"/><path d="M15.5 8H21M15.5 12H21M15.5 16H21"/></svg></span>
         TEST 바코드→리스트화<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
+      </button>
+      <button class="nav-item" data-nav="tagPrintTest">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h8l8 8-8 8-8-8Z"/><circle cx="8.5" cy="8.5" r="1.3"/></svg></span>
+        TEST 택 출력<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
       <button class="nav-item" data-nav="orderStock">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/></svg></span>
@@ -1424,9 +1428,9 @@
             <h3>이카운트-사이트 재고 불일치 확인</h3>
             <p>매핑된 이카운트코드 전체를 실제 이카운트 재고와 대조해서, 사이트 품절/판매 상태가 어긋난 것만 찾아줍니다. 자동수정은 안 하고 목록만 뽑아요.</p>
           </button>
-          <button class="tool-card" data-nav="icm">
+          <button class="tool-card" data-nav="icmTest">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
-            <h3>이카운트 -송장 재고매칭 (CS)</h3>
+            <h3>이카운트-송장 재고매칭</h3>
             <p>송장 엑셀의 상품명·사이즈를 이카운트 재고현황과 매칭해 이카운트 품목코드를 자동으로 채워 넣습니다. 서식은 그대로 유지됩니다.</p>
           </button>
           <button class="tool-card" data-nav="stocktake">
@@ -1674,7 +1678,7 @@
       <section data-view="icmTest">
         <div class="workspace">
           <div class="panel">
-            <h2>사방넷-이카운트매칭 TEST <span class="chip chip-ready" style="vertical-align:middle;">시험판</span></h2>
+            <h2>이카운트-송장 재고매칭</h2>
             <p class="sub">송장 엑셀과 이카운트 재고현황 엑셀을 올리면, J열 헤더가 "상품명"인 시트에서 상품명·사이즈를 이카운트 재고현황과 매칭해 J열 바로 오른쪽에 "이카운트품목코드" 열을 새로 만들어 채워 넣습니다. 그 외 시트나 서식은 그대로 유지됩니다. 매칭 실패는 대부분 프로그램 오류가 아니라 해당 사이즈·색상 재고가 없거나 이카운트에 아직 등록되지 않은 상품이라서입니다.</p>
 
             <div class="dz-grid">
@@ -1907,6 +1911,10 @@
         <iframe data-src="barcode-list.html" title="TEST 바코드→리스트화" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <section data-view="tagPrintTest">
+        <iframe data-src="tag-print.html" title="TEST 택 출력" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <section data-view="priceCheckTest">
         <iframe data-src="price-check.html" title="TEST 최저가 조회" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
@@ -2060,9 +2068,9 @@ window.__loadLib = (function(){
   var topbarTitle = document.getElementById('topbarTitle');
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', videoStudio:'영상 스튜디오', videoStudio2:'영상 스튜디오 V2', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
-    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', ecountChangeTest:'TEST 오늘 변동 자동확인', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'사방넷-이카운트매칭 TEST', sabangMatchTest:'TEST 사방넷-이카운트 매칭 관리', stocktake:'재고조사 (바코드 실사)',
+    stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', ecountChangeTest:'TEST 오늘 변동 자동확인', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'이카운트-송장 재고매칭', sabangMatchTest:'TEST 사방넷-이카운트 매칭 관리', stocktake:'재고조사 (바코드 실사)',
     listCheck:'품번 리스트 재고확인', costCheck:'상품가격체크', seasonCheck:'물류팀 시즌체크', barcodeStock:'바코드 재고조회', ecountQty:'이카운트재고조회', kreamSoldOut:'크림 품절 정리',
-    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', hrAdmin:'직원관리', barcodeListTest:'TEST 바코드→리스트화', priceCheckTest:'TEST 최저가 조회', photoFinderTest:'TEST 사진 자동 찾기', kidsDm:'키즈 인스타 DM 자동화', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', hrAdmin:'직원관리', barcodeListTest:'TEST 바코드→리스트화', tagPrintTest:'TEST 택 출력', priceCheckTest:'TEST 최저가 조회', photoFinderTest:'TEST 사진 자동 찾기', kidsDm:'키즈 인스타 DM 자동화', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
   };
 
   /* ---------------- 개발중메뉴 (buyest, buyest1 전용, 내부적으로는 비밀 채팅방) ----------------
@@ -8671,7 +8679,7 @@ window.__loadLib = (function(){
     var el=document.getElementById('chgBadge'); if(!el) return;
     if(!a||!a.id||!a.pass){ el.style.display='none'; return; }
     fetch('https://buyest.co.kr/ecount_change_today_api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:a.id,pass:a.pass,action:'badge'})})
-      .then(function(r){return r.json();}).then(function(d){ if(d&&d.ok&&d.pending>0){ el.textContent='확인필요 '+d.pending; el.style.display='inline-block'; } else el.style.display='none'; }).catch(function(){});
+      .then(function(r){return r.json();}).then(function(d){ if(!(d&&d.ok)){ el.style.display='none'; return; } var parts=[]; if(d.pending>0) parts.push('확인필요 '+d.pending); if(d.map_todo&&d.map_todo.total>0) parts.push('연결정리 '+d.map_todo.total); if(parts.length){ el.textContent=parts.join(' · '); el.style.display='inline-block'; } else el.style.display='none'; }).catch(function(){});
   }
   setTimeout(tick,3000); setInterval(tick,300000);
 })();

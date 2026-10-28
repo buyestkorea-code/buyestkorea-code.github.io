@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BUYEST 릴스 만들기</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d0d0d'/%3E%3Crect x='10' y='5' width='12' height='22' rx='2' fill='none' stroke='%23c8a96a' stroke-width='2'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=Noto+Serif+KR:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg:#f6f4f0; --card:#fff; --fg:#1b1b1b; --muted:#7a756d; --line:#e4dfd6; --accent:#9c7a3c; --ok:#2f7d4f; --err:#b23a3a; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:18px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-bottom:1px solid var(--line); background:var(--card); }
+  header h1 { margin:0; font-size:20px; letter-spacing:2px; } header h1 span { color:var(--accent); }
+  .brand-toggle { display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .brand-toggle button { border:0; background:none; padding:8px 16px; cursor:pointer; font-size:14px; }
+  .brand-toggle button.on { background:var(--fg); color:#fff; }
+  main { max-width:1100px; margin:20px auto; padding:0 24px; }
+  .split { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:24px; align-items:start; }
+  .step { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin:0 0 16px; }
+  .step h3 { margin:0 0 4px; font-size:16px; } .desc { color:var(--muted); font-size:14px; margin:0 0 14px; line-height:1.6; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; }
+  label { display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+  input, select, textarea { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff; }
+  input[type=checkbox], input[type=radio] { width:auto; }
+  input[type=range] { padding:0; }
+  textarea { min-height:110px; font-size:14px; }
+  .drop { border:2px dashed var(--line); border-radius:12px; padding:20px; text-align:center; color:var(--muted); cursor:pointer; }
+  .thumbs { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; justify-content:center; }
+  .thumb { width:84px; } .thumb img { width:84px; height:112px; object-fit:cover; border-radius:6px; display:block; }
+  .thumb .tb { display:flex; justify-content:space-between; margin-top:2px; } .thumb .tb button { border:0; background:#eee; border-radius:4px; font-size:12px; cursor:pointer; padding:2px 6px; }
+  .go { margin-top:6px; background:var(--fg); color:#fff; border:0; padding:14px 26px; border-radius:10px; font-size:15px; cursor:pointer; }
+  .go:disabled { opacity:.4; cursor:default; }
+  .mini { border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+  .msg { font-size:13px; color:var(--muted); } .err { color:var(--err); } .ok { color:var(--ok); }
+  .note { background:#f3f1ec; border-radius:10px; padding:12px 14px; font-size:13px; color:#3b3832; line-height:1.6; margin:0 0 16px; }
+  .cost { font-size:15px; margin-top:12px; } .cost b { font-size:17px; }
+  .pv { position:sticky; top:12px; text-align:center; }
+  .pv canvas { width:270px; height:480px; background:#111; border-radius:12px; display:block; margin:0 auto; box-shadow:0 6px 24px rgba(0,0,0,.15); }
+  .pv input[type=range] { margin-top:10px; } .pv .pvrow { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:8px; font-size:12px; color:var(--muted); }
+  .job { margin-top:16px; border:1px solid var(--line); border-radius:10px; padding:14px; display:none; background:var(--card); }
+  .bar { height:8px; background:#eee; border-radius:4px; overflow:hidden; margin:10px 0; } .bar div { height:100%; background:var(--accent); width:0; transition:width .3s; }
+  .job video { max-width:320px; width:100%; border-radius:10px; margin-top:10px; display:block; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } td, th { text-align:left; padding:8px; border-bottom:1px solid var(--line); }
+  details > summary { cursor:pointer; font-weight:600; padding:6px 0; }
+  .gate { max-width:520px; margin:80px auto; background:#fff; border:1px solid var(--line); border-radius:12px; padding:36px 28px; text-align:center; line-height:1.7; }
+  @media (max-width:900px){ .split { grid-template-columns:1fr; } .pv { position:static; } }
+  @media (max-width:600px){ main{ padding:0 12px; } }
+</style>
+</head>
+<body>
+<div id="gate" class="gate" style="display:none">
+  <h2 style="margin:0 0 10px">BUYEST 릴스 만들기</h2>
+  <p>로그인한 직원만 사용할 수 있어요.<br>툴키트 첫 화면에서 로그인한 뒤 이 화면을 새로고침해 주세요.</p>
+  <p><button class="go" onclick="location.reload()">새로고침</button></p>
+</div>
+
+<div id="app" style="display:none">
+<header>
+  <h1>BUYEST <span>릴스 만들기</span></h1>
+  <div class="brand-toggle" id="brandToggle"><button data-brand="buyest" class="on">BUYEST</button><button data-brand="kids">BUYEST Kids</button></div>
+  <div id="me" style="font-size:13px"></div>
+</header>
+
+<main>
+  <p class="note" id="status">AI 서버 확인 중…</p>
+  <div class="split">
+    <div>
+      <div class="step">
+        <h3>1. 사진</h3>
+        <div class="drop" id="drop">여기를 눌러 상품 사진 선택 (최대 8장, ◀ ▶ 로 순서 바꾸기)
+          <input type="file" id="files" accept="image/*" multiple hidden />
+          <div class="thumbs" id="thumbs"></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <h3>2. 기획서 · 프롬프트</h3>
+        <p class="desc">어떤 릴스를 원하는지 자유롭게 적으세요. 사진 속 상품이 변하지 않게, 화면에 글자는 넣지 않도록 자동으로 덧붙입니다 (한글 자막은 아래 3번에서 따로 얹어요).</p>
+        <textarea id="brief" placeholder="예) 몽클레르 키즈 패딩 신상 입고 릴스. 천천히 줌인하며 소재 질감을 보여 주고, 마지막엔 전체 모습. 차분하고 고급스러운 분위기, 잔잔한 음악."></textarea>
+        <div class="grid" style="margin-top:12px">
+          <div><label>영상 스타일</label><select id="style"></select></div>
+          <div><label>모델</label><select id="model"></select></div>
+          <div><label>길이: <b id="durLabel">10</b>초</label><input type="range" id="dur" min="4" max="15" value="10" /></div>
+          <div><label>해상도</label><select id="res"><option value="480p">480p (가장 저렴)</option><option value="720p" selected>720p (권장)</option><option value="1080p">1080p (비쌈)</option></select></div>
+          <div><label>&nbsp;</label><label style="display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="audio" checked />AI가 소리·음악도 생성</label></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <h3>3. 한글 글자 얹기 (선택)</h3>
+        <p class="desc">AI 영상은 한글을 잘 못 쓰기 때문에, 훅·자막·가격은 완성된 영상 위에 이 화면이 직접 얹어 줍니다. 끄면 AI가 만든 영상을 그대로 받습니다.</p>
+        <label style="display:flex;gap:6px;align-items:center;color:var(--fg);margin-bottom:12px"><input type="checkbox" id="overlay" checked />글자 얹기 사용</label>
+        <div id="overlayBox">
+          <div class="grid">
+            <div><label>브랜드명</label><input id="brandName" placeholder="MONCLER" /></div>
+            <div><label>상품명</label><input id="productName" placeholder="키즈 마야 패딩" /></div>
+            <div><label>가격</label><input id="price" placeholder="₩890,000" /></div>
+            <div><label>마지막 요청 (CTA)</label><input id="cta" placeholder="댓글에 '사이즈' 남겨 주세요" /></div>
+          </div>
+          <div class="grid" style="margin-top:12px">
+            <div><label>훅 — 첫 2초에 크게</label><input id="hook" placeholder="₩890,000에 몽클레르 키즈, 정품일까요?" /></div>
+            <div><label>자막 (한 줄에 하나, 영상 길이에 맞춰 순서대로)</label><textarea id="captions" style="min-height:70px" placeholder="밀라노 부티크 직수입&#10;택·영수증 그대로&#10;사이즈 4A~10A"></textarea></div>
+          </div>
+          <div class="grid" style="margin-top:12px">
+            <div><label>자막 모양</label><select id="cap"></select></div>
+            <div><label>&nbsp;</label><label style="display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="outro" checked />끝에 가격·요청 화면(2.5초) 붙이기</label></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <h3>4. 비용 확인 후 만들기</h3>
+        <div class="row" style="margin-top:0"><button class="mini" id="estimate">예상 비용 보기</button><span id="estmsg" class="msg"></span></div>
+        <div class="cost" id="cost"></div>
+        <p class="msg" id="spent" style="margin-top:8px"></p>
+        <div class="row"><button class="go" id="go">릴스 만들기</button></div>
+        <div class="job" id="job"></div>
+      </div>
+
+      <details class="step">
+        <summary>내가 만든 영상 (이 브라우저에 7일 보관)</summary>
+        <table style="margin-top:10px"><thead><tr><th>시간</th><th>이름</th><th>크기</th><th></th></tr></thead><tbody id="hist"></tbody></table>
+      </details>
+    </div>
+    <div class="pv" id="pv"></div>
+  </div>
+</main>
+</div>
+
+<script src="vendor/mp4-muxer.js"></script>
+<script src="engine.js"></script>
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let AUTH = null;
+  try { const a = JSON.parse(localStorage.getItem("buyest.dash.auth") || "null"); if (a && a.id) AUTH = a; } catch (_) {}
+  if (!AUTH) { $("#gate").style.display = "block"; return; }
+  $("#app").style.display = "block"; $("#me").textContent = AUTH.id + " 님";
+
+  const KRW = 1400, WORKER = (window.STUDIO_WORKER || (() => { try { return localStorage.getItem("buyest.reels.worker"); } catch (_) { return null; } })() || "https://buyest-reels.buyest.workers.dev").replace(/\/$/, "");
+  const usd = (v) => `$${Number(v).toFixed(2)} (약 ${(Math.round((v * KRW) / 10) * 10).toLocaleString("ko-KR")}원)`;
+  let brand = "buyest", HEALTH = null, EST = null;
+
+  // 영상 스타일: 프롬프트 뒤에 붙는 분위기 (BUYEST 브랜드에 맞게 추린 것)
+  const STYLES = [
+    { id: "", name: "지정 안 함", cap: "box", fit: "both", p: "" },
+    { id: "editorial", name: "클린 에디토리얼 (매거진 화보)", cap: "minimal", fit: "buyest", p: "magazine editorial look, generous negative space, slow gentle push-in, few long takes, palette of black, ivory and gold" },
+    { id: "gold", name: "블랙&골드 시그니처", cap: "box", fit: "buyest", p: "dark background with gold accents, product revealed by soft light, slow transitions, luxurious and calm" },
+    { id: "film", name: "필름 그레인 (35mm)", cap: "minimal", fit: "both", p: "35mm film look, subtle grain, warm tones, soft highlight bloom, gentle handheld feel, natural light" },
+    { id: "glass", name: "광택 제품 광고", cap: "minimal", fit: "buyest", p: "premium product commercial, glossy reflections on the surface, light sweeping across the product, dark backdrop, close-up material details" },
+    { id: "collage", name: "종이 콜라주", cap: "paper", fit: "both", p: "paper collage aesthetic, photos like torn paper and polaroids with tape, playful stop-motion feel" },
+    { id: "vhs", name: "VHS 레트로", cap: "vhs", fit: "both", p: "90s camcorder look, scanlines, slight colour bleeding, playful and light" },
+    { id: "water", name: "수채화 일러스트 (키즈)", cap: "marker", fit: "kids", p: "soft watercolor wash background, pastel colours, warm and gentle, hand-painted feel" },
+    { id: "popup", name: "파스텔 팝업북 (키즈)", cap: "paper", fit: "kids", p: "pastel pop-up book style, cards unfolding, rounded shapes, bouncy cute motion" },
+  ];
+  function fillStyles() {
+    const cur = $("#style").value;
+    const list = STYLES.filter((s) => s.fit === "both" || s.fit === brand);
+    $("#style").innerHTML = list.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
+    $("#style").value = list.some((s) => s.id === cur) ? cur : "";
+  }
+  $("#cap").innerHTML = SE.CAPTION_THEMES.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
+  $("#style").onchange = () => { const s = STYLES.find((x) => x.id === $("#style").value); if (s && s.id) $("#cap").value = s.cap; pv.refresh(true); };
+  $("#brandToggle").onclick = (e) => { const b = e.target.dataset.brand; if (!b) return; brand = b; document.querySelectorAll("#brandToggle button").forEach((x) => x.classList.toggle("on", x.dataset.brand === b)); fillStyles(); pv.refresh(true); };
+  fillStyles();
+
+  async function wapi(path, opts = {}) {
+    let r;
+    try {
+      r = await fetch(WORKER + path, { method: opts.method || "GET", headers: { "Content-Type": "application/json", "X-Studio-User": AUTH.id, "X-Studio-Pass": AUTH.pass, ...(opts.headers || {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+    } catch (_) { const e = new Error("AI 서버에 연결하지 못했습니다"); e.status = 0; throw e; }
+    let data = null; try { data = await r.json(); } catch (_) {}
+    if (!r.ok) { const e = new Error((data && data.error) || `AI 서버 오류 (${r.status})`); e.status = r.status; throw e; }
+    return data;
+  }
+
+  // ── 서버 상태 + 모델 ──
+  const FALLBACK = [{ id: "seedance25", label: "Seedance 2.5 (고품질, 최대 30초)", minSec: 4, maxSec: 30 }, { id: "seedance20", label: "Seedance 2.0 (표준, 최대 15초)", minSec: 4, maxSec: 15 }];
+  function fillModels(list) {
+    $("#model").innerHTML = list.map((m) => `<option value="${m.id}">${esc(m.label)}</option>`).join("");
+    syncDur();
+  }
+  function modelNow() { return (HEALTH && HEALTH.models || FALLBACK).find((m) => m.id === $("#model").value) || FALLBACK[0]; }
+  function syncDur() { const m = modelNow(); $("#dur").min = m.minSec; $("#dur").max = m.maxSec; if (Number($("#dur").value) > m.maxSec) $("#dur").value = m.maxSec; $("#durLabel").textContent = $("#dur").value; }
+  const resetEst = () => { EST = null; $("#cost").textContent = ""; };
+  $("#model").onchange = () => { syncDur(); resetEst(); pv.refresh(true); };
+  $("#dur").oninput = () => { $("#durLabel").textContent = $("#dur").value; resetEst(); pv.refresh(true); };
+  ["#res", "#audio", "#brief"].forEach((id) => $(id).addEventListener("change", resetEst));
+  fillModels(FALLBACK);
+  (async () => {
+    try {
+      HEALTH = await wapi("/api/health");
+      fillModels(HEALTH.models);
+      $("#status").innerHTML = HEALTH.higgsfield ? `AI 서버 v${esc(HEALTH.version)} 연결됨 · Higgsfield ✓ · 영상 1건 최대 $${HEALTH.maxUsd}${HEALTH.limits ? "" : " · 하루 사용 한도 없음"}` : `AI 서버 v${esc(HEALTH.version)} 는 연결됐지만 Higgsfield 키가 아직 등록되지 않았습니다. 담당자가 키를 등록하면 켜집니다.`;
+    } catch (e) { $("#status").innerHTML = `AI 서버에 연결하지 못했습니다 (${esc(e.message)}). 담당자가 서버(Worker)를 배포하면 켜집니다.`; }
+  })();
+
+  // ── 사진 ──
+  const files = $("#files"), bmpCache = new WeakMap();
+  const bitmapOf = (f) => { if (!bmpCache.has(f)) bmpCache.set(f, SE.loadImage(f)); return bmpCache.get(f); };
+  function setFiles(arr) {
+    const dt = new DataTransfer(); arr.slice(0, 8).forEach((f) => dt.items.add(f)); files.files = dt.files;
+    const box = $("#thumbs"); box.innerHTML = "";
+    [...files.files].forEach((f, i) => {
+      const d = document.createElement("div"); d.className = "thumb"; const img = new Image(); img.src = URL.createObjectURL(f); d.append(img);
+      const tb = document.createElement("div"); tb.className = "tb"; tb.innerHTML = `<button data-m="-1">◀</button><button data-x="1">✕</button><button data-m="1">▶</button>`;
+      tb.onclick = (e) => { e.stopPropagation(); const a = [...files.files]; if (e.target.dataset.x) a.splice(i, 1); else if (e.target.dataset.m) { const j = i + Number(e.target.dataset.m); if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; } else return; setFiles(a); };
+      d.append(tb); box.append(d);
+    });
+    resetEst(); pv.refresh(false);
+  }
+  $("#drop").onclick = (e) => { if (!e.target.closest(".thumb")) files.click(); };
+  files.onchange = () => setFiles([...files.files]);
+
+  // ── 글자 얹기 설정 → 장면 ──
+  const params = () => ({
+    brand, brandName: $("#brandName").value.trim(), productName: $("#productName").value.trim(), price: $("#price").value.trim(), cta: $("#cta").value.trim(),
+    hook: $("#hook").value.trim().slice(0, 60), captions: $("#captions").value.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 12).map((x) => x.slice(0, 40)),
+    capTheme: $("#cap").value, outro: $("#outro").checked,
+  });
+  $("#overlay").onchange = () => { $("#overlayBox").style.opacity = $("#overlay").checked ? 1 : 0.4; pv.refresh(true); };
+  ["#brandName", "#productName", "#price", "#cta", "#hook", "#captions", "#cap", "#outro"].forEach((id) => $(id).addEventListener("input", () => { clearTimeout(window.__pt); window.__pt = setTimeout(() => pv.refresh(true), 250); }));
+
+  // ── 미리보기: 첫 사진 위에 글자가 어떻게 얹히는지 ──
+  function Preview(host, getScene) {
+    host.innerHTML = `<canvas width="${SE.W}" height="${SE.H}"></canvas><input type="range" min="0" max="0" value="0" /><div class="pvrow"><button class="mini" data-play>▶ 재생</button><span data-time>0.0 / 0.0초</span></div><div class="pvrow">미리보기는 첫 사진 위에 글자만 얹은 모습입니다 (AI 영상은 생성 후 최종본에서 확인)</div>`;
+    const cv = host.querySelector("canvas"), ctx = cv.getContext("2d"), rg = host.querySelector("input"), tm = host.querySelector("[data-time]"), pl = host.querySelector("[data-play]");
+    let scene = null, playing = false;
+    const show = (f) => { rg.value = f; tm.textContent = `${(f / SE.FPS).toFixed(1)} / ${(scene.frames / SE.FPS).toFixed(1)}초`; scene.draw(ctx, f); };
+    const stop = () => { playing = false; pl.textContent = "▶ 재생"; };
+    rg.oninput = () => { stop(); if (scene) show(Number(rg.value)); };
+    pl.onclick = () => { if (!scene) return; if (playing) return stop(); playing = true; pl.textContent = "■ 정지"; let f = Number(rg.value); if (f >= scene.frames - 1) f = 0; const t0 = performance.now() - (f / SE.FPS) * 1000; const tick = () => { if (!playing) return; const fr = Math.floor(((performance.now() - t0) / 1000) * SE.FPS); if (fr >= scene.frames) return stop(); show(fr); requestAnimationFrame(tick); }; tick(); };
+    return { async refresh(keep) {
+      stop(); scene = await getScene();
+      if (!scene) { ctx.fillStyle = "#111"; ctx.fillRect(0, 0, SE.W, SE.H); tm.textContent = ""; return; }
+      rg.max = scene.frames - 1; show(keep ? Math.min(Number(rg.value), scene.frames - 1) : Math.min(Math.round(SE.FPS * 0.9), scene.frames - 1));
+    } };
+  }
+  async function previewScene() {
+    const P = params(); const bmp = files.files[0] ? await bitmapOf(files.files[0]) : null;
+    const on = $("#overlay").checked;
+    await SE.ensureFonts([P.brandName, P.productName, P.price, P.cta, P.hook, ...P.captions].join(" "));
+    return SE.buildClipScene(on ? P : { brand, outro: false, captions: [], hook: "" }, bmp ? { el: bmp, isVideo: false } : null, Number($("#dur").value));
+  }
+  const pv = Preview($("#pv"), previewScene);
+  pv.refresh(false);
+
+  // ── 프롬프트 만들기 ──
+  function fullPrompt() {
+    const st = STYLES.find((x) => x.id === $("#style").value);
+    const n = files.files.length;
+    return [
+      $("#brief").value.trim(),
+      st && st.p ? `Style: ${st.p}.` : "",
+      `Use all ${n} attached product photos as references for the same product; keep the product's shape, colour, logo and details exactly as in the photos.`,
+      "Vertical 9:16 Instagram Reel, smooth cinematic camera motion. Do not render any text, captions, subtitles, logos or watermarks that are not in the photos.",
+    ].filter(Boolean).join("\n");
+  }
+  const settings = (images) => ({ model: $("#model").value, prompt: fullPrompt(), images, duration: Number($("#dur").value), resolution: $("#res").value, audio: $("#audio").checked });
+
+  // ── 사용 금액 기록 (이 브라우저에서 쓴 예상 합계) ──
+  const SPEND = "buyest.reels.spend";
+  const today = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  function spendGet() { try { return JSON.parse(localStorage.getItem(SPEND) || "{}"); } catch (_) { return {}; } }
+  function spendAdd(v) { const s = spendGet(); s[today()] = (s[today()] || 0) + v; try { localStorage.setItem(SPEND, JSON.stringify(s)); } catch (_) {} showSpent(); }
+  function showSpent() {
+    const s = spendGet(), month = today().slice(0, 7); let m = 0; for (const k in s) if (k.startsWith(month)) m += s[k];
+    $("#spent").innerHTML = `이 브라우저에서 쓴 예상 금액: 오늘 ${usd(s[today()] || 0)} · 이번 달 ${usd(m)} — 실제 잔액은 <a href="https://console.higgsfield.ai" target="_blank" rel="noopener">Higgsfield 콘솔</a>에서 확인하세요.`;
+  }
+  showSpent();
+
+  // ── 예상 비용 ──
+  async function estimate() {
+    if (!files.files.length) throw new Error("사진을 먼저 선택해주세요");
+    if (!$("#brief").value.trim()) throw new Error("기획서(프롬프트)를 입력해주세요");
+    const dummy = [...files.files].map((_, i) => `https://example.com/photo${i + 1}.jpg`);
+    const e = await wapi("/api/estimate", { method: "POST", body: settings(dummy) });
+    EST = e; $("#cost").innerHTML = `예상 비용 <b>${usd(e.usd)}</b> · ${e.duration}초 · ${esc(e.resolution)} (성공한 영상만 과금)`;
+    return e;
+  }
+  $("#estimate").onclick = async () => { $("#estmsg").textContent = "확인 중…"; $("#estmsg").className = "msg"; try { await estimate(); $("#estmsg").textContent = ""; } catch (e) { $("#estmsg").textContent = e.message; $("#estmsg").className = "msg err"; } };
+
+  // ── 만들기 ──
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function toJpeg(file) {
+    const bmp = await bitmapOf(file), s = Math.min(1, 2048 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s); c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("사진 변환 실패"))), "image/jpeg", 0.92));
+  }
+  async function uploadPhotos(note) {
+    const urls = [];
+    for (let i = 0; i < files.files.length; i++) {
+      note(`사진 올리는 중 ${i + 1}/${files.files.length}`);
+      const blob = await toJpeg(files.files[i]);
+      const u = await wapi("/api/upload-url", { method: "POST", body: { content_type: "image/jpeg" } });
+      let r; try { r = await fetch(u.upload_url, { method: "PUT", headers: u.upload_headers || { "Content-Type": "image/jpeg" }, body: blob, credentials: "omit" }); } catch (_) { throw new Error("사진 업로드에 실패했습니다 (네트워크)"); }
+      if (!r.ok) throw new Error(`사진 업로드에 실패했습니다 (${r.status})`);
+      urls.push(u.public_url);
+    }
+    return urls;
+  }
+  const STATE_KO = { queued: "대기 중", in_progress: "AI가 영상을 만드는 중", completed: "완료", failed: "실패", nsfw: "내용 검수에서 거절됨", canceled: "취소됨" };
+  async function generate(note, ac) {
+    const urls = await uploadPhotos(note);
+    const key = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+    const g = await wapi("/api/generate", { method: "POST", body: settings(urls), headers: { "Idempotency-Key": key } });
+    const t0 = Date.now(); let st = { status: g.status };
+    while (Date.now() - t0 < 20 * 60 * 1000) {
+      if (ac.signal.aborted) throw new Error("기다리기를 멈췄습니다 (이미 시작된 영상은 요금이 나갈 수 있습니다)");
+      await sleep(window.STUDIO_POLL_MS || 5000);
+      try { st = await wapi("/api/status?id=" + encodeURIComponent(g.request_id)); } catch (e) { if (e.status === 401 || e.status === 503) throw e; }
+      note(`${STATE_KO[st.status] || st.status} · ${Math.round((Date.now() - t0) / 1000)}초 경과 (보통 1~5분)`);
+      if (["completed", "failed", "nsfw", "canceled"].includes(st.status)) break;
+    }
+    if (st.status !== "completed" || !st.video_url) throw new Error(st.status === "completed" ? "영상 주소를 받지 못했습니다" : `AI 영상이 만들어지지 않았습니다: ${STATE_KO[st.status] || st.status} ${st.error || ""} (실패한 건은 과금되지 않습니다)`);
+    note("AI 영상을 받는 중…");
+    const r = await fetch(st.video_url); if (!r.ok) throw new Error("AI 영상을 내려받지 못했습니다");
+    return { blob: await r.blob(), estimate: g.estimate_usd };
+  }
+  function fileName() {
+    const d = new Date(), p = (n) => String(n).padStart(2, "0"), c = (s) => String(s || "").trim().replace(/[\\/:*?"<>|\s]+/g, "_");
+    return [brand === "kids" ? "BUYESTKids" : "BUYEST", c($("#brandName").value), c($("#productName").value), `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`].filter(Boolean).join("_") + ".mp4";
+  }
+  $("#go").onclick = async () => {
+    const btn = $("#go"), box = $("#job");
+    try {
+      if (!SE.supported()) throw new Error("이 브라우저는 영상 만들기를 지원하지 않습니다. 최신 Chrome·Edge 로 열어 주세요.");
+      const e = await estimate();
+      if (!confirm(`릴스 1편을 만듭니다.\n예상 비용 ${usd(e.usd)}\n영상은 보통 1~5분 걸리고, 실패하면 과금되지 않습니다.\n계속할까요?`)) return;
+    } catch (e) { $("#estmsg").textContent = e.message; $("#estmsg").className = "msg err"; return; }
+    btn.disabled = true; box.style.display = "block";
+    const ac = new AbortController();
+    box.innerHTML = `<b>준비 중…</b><div class="bar"><div></div></div><div class="msg"></div><button class="mini" data-cancel>기다리기 멈추기</button>`;
+    box.querySelector("[data-cancel]").onclick = () => ac.abort();
+    const bar = box.querySelector(".bar div"), msg = box.querySelector(".msg"), note = (t) => (msg.textContent = t);
+    try {
+      const { blob: raw, estimate: est } = await generate(note, ac);
+      if (est != null) spendAdd(est); else if (EST) spendAdd(EST.usd);
+      let finalBlob = raw, comp = false;
+      if ($("#overlay").checked) {
+        note("한글 글자를 얹는 중…"); bar.style.width = "0%";
+        const clip = await SE.loadMedia(new File([raw], "ai.mp4", { type: "video/mp4" }));
+        const audio = await SE.decodeAudio(raw);
+        const P = params(); await SE.ensureFonts([P.brandName, P.productName, P.price, P.cta, P.hook, ...P.captions].join(" "));
+        finalBlob = await SE.renderToMp4(SE.buildClipScene(P, clip), { audio, onProgress: (p) => { bar.style.width = Math.round(p * 100) + "%"; note(`글자 얹는 중 ${Math.round(p * 100)}%${audio ? " (소리 포함)" : " (이 영상은 소리 없이 만들어집니다)"}`); } });
+        comp = true;
+      }
+      const url = URL.createObjectURL(finalBlob), name = fileName();
+      box.innerHTML = `<b class="ok">완료</b> <span class="msg">${(finalBlob.size / 1048576).toFixed(1)}MB${comp ? " · 글자 얹음" : " · AI 원본"}</span><video src="${url}" controls playsinline></video><p><a class="mini" href="${url}" download="${esc(name)}" style="text-decoration:none;color:inherit">MP4 다운로드</a> <span class="msg">${esc(name)}</span></p>`;
+      await hist.add({ name, blob: finalBlob });
+    } catch (e) { box.innerHTML = `<b class="err">실패</b><p class="msg">${esc(e.message || e)}</p>`; console.error(e); }
+    btn.disabled = false;
+  };
+
+  // ── 보관함 (IndexedDB, 7일, 12개) ──
+  const hist = (() => {
+    const KEEP = 7 * 864e5, MAX = 12;
+    const open = () => new Promise((res, rej) => { const r = indexedDB.open("buyest-reels", 1); r.onupgradeneeded = () => r.result.createObjectStore("renders", { keyPath: "id" }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    const tx = async (mode, fn) => { const db = await open(); return new Promise((res, rej) => { const t = db.transaction("renders", mode); const out = fn(t.objectStore("renders")); t.oncomplete = () => res(out && out.result !== undefined ? out.result : out); t.onerror = () => rej(t.error); }); };
+    return {
+      async list() { try { const all = (await tx("readonly", (s) => s.getAll())) || []; const now = Date.now(); for (const o of all.filter((x) => now - x.at > KEEP)) await this.del(o.id); return all.filter((x) => now - x.at <= KEEP).sort((a, b) => b.at - a.at); } catch (_) { return []; } },
+      async add(x) { try { await tx("readwrite", (s) => s.put({ id: Date.now() + "-" + Math.random().toString(36).slice(2, 6), at: Date.now(), ...x })); const all = await this.list(); for (const o of all.slice(MAX)) await this.del(o.id); loadHist(); } catch (_) {} },
+      async del(id) { try { await tx("readwrite", (s) => s.delete(id)); } catch (_) {} },
+    };
+  })();
+  async function loadHist() {
+    const list = await hist.list(), p = (n) => String(n).padStart(2, "0");
+    $("#hist").innerHTML = list.map((j) => { const d = new Date(j.at); return `<tr><td>${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}</td><td>${esc(j.name)}</td><td>${(j.blob.size / 1048576).toFixed(1)}MB</td><td><a href="#" data-view="${j.id}">보기</a> · <a href="#" data-dl="${j.id}">다운로드</a> · <a href="#" data-del="${j.id}">삭제</a></td></tr>`; }).join("") || `<tr><td colspan="4">아직 만든 영상이 없습니다</td></tr>`;
+    $("#hist").onclick = async (e) => { const a = e.target.closest("a"); if (!a) return; e.preventDefault(); const id = a.dataset.view || a.dataset.dl || a.dataset.del, it = list.find((x) => x.id === id); if (!it) return; if (a.dataset.del) { await hist.del(id); return loadHist(); } const url = URL.createObjectURL(it.blob); if (a.dataset.view) window.open(url, "_blank"); else { const l = document.createElement("a"); l.href = url; l.download = it.name; l.click(); } };
+  }
+  loadHist();
+})();
+</script>
+</body>
+</html>

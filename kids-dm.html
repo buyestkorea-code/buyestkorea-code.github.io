@@ -107,6 +107,10 @@
   .bub { background:#fff; border-radius:16px 16px 16px 4px; padding:9px 12px; font-size:13.5px; max-width:92%; white-space:pre-wrap; word-break:break-word; box-shadow:0 1px 1px rgba(0,0,0,.05); }
   .bub a { color:#1d4ed8; text-decoration:underline; word-break:break-all; }
   .bub.ph { color:#9aa3b2; }
+  .pbtn { background:#fff; border-radius:12px; padding:9px 12px; font-size:13.5px; font-weight:700; text-align:center; margin-top:5px; max-width:92%; box-shadow:0 1px 1px rgba(0,0,0,.05); word-break:break-all; }
+  .brow { display:grid; grid-template-columns:120px 1fr 28px; gap:6px; margin-bottom:6px; align-items:center; }
+  .brow input { padding:8px 10px; font-size:13.5px; }
+  .xbtn { border:0; background:var(--paper); border-radius:6px; height:30px; cursor:pointer; color:var(--mute); font-size:15px; }
 
   /* 표 */
   .tbl { width:100%; border-collapse:collapse; font-size:13.5px; }
@@ -147,7 +151,10 @@ let AUTH = null;
 try { const a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); if (a && a.id && a.pass) AUTH = a; } catch (e) {}
 
 const S = { tab: 'home', ov: null, media: null, tpls: null, log: null, step: 1, d: blank(), loading: false, err: '' };
-function blank() { return { id: null, media_id: '', media_link: '', media_thumb: '', media_caption: '', name: '', match_mode: 'any', keywords: '', message: '', link_url: '', reply_texts: DEFAULT_REPLIES }; }
+function blank() { return { id: null, media_id: '', media_link: '', media_thumb: '', media_caption: '', name: '', match_mode: 'any', keywords: '', message: '', link_url: '', reply_texts: DEFAULT_REPLIES, buttons: [{ title: '', url: '' }] }; }
+const parseBtns = s => { try { const a = JSON.parse(s || '[]'); return a.length ? a : [{ title: '', url: '' }]; } catch (e) { return [{ title: '', url: '' }]; } };
+const cleanBtns = a => (a || []).map(b => ({ title: (b.title || '').trim(), url: (b.url || '').trim() })).filter(b => b.title || b.url);
+const textLimitInfo = d => { const n = cleanBtns(d.buttons).length ? [...apiMsg(d.message).replace('{link}', 'x'.repeat(60))].length : bytes(apiMsg(d.message).replace('{link}', 'x'.repeat(60))); const btn = cleanBtns(d.buttons).length > 0; return btn ? { n, max: 640, label: `${n} / 640자 (버튼이 있을 때)`, over: n > 640 } : { n, max: 1000, label: `${n} / 1000바이트 (한글 약 333자)`, over: n > 1000 }; };
 
 async function api(action, body = {}) {
   const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, user: AUTH.id, pass: AUTH.pass, ...body }) });
@@ -219,6 +226,7 @@ function viewHome(v) {
           <span class="chip ${r.enabled ? 'ok' : ''}">${r.enabled ? '켜져 있음' : '꺼져 있음'}</span>
           <span class="chip brand">보낸 DM ${r.sent}</span>
           <span class="chip">링크 누른 사람 ${r.clickers}</span>
+          ${parseBtns(r.buttons).some(b => b.title) ? `<span class="chip">버튼 ${parseBtns(r.buttons).filter(b => b.title).length}개</span>` : ''}
           ${r.failed ? `<span class="chip bad">실패 ${r.failed}</span>` : ''}
           ${r.tested ? `<span class="chip warn">시험 ${r.tested}</span>` : ''}
         </div>
@@ -236,7 +244,7 @@ function viewHome(v) {
   });
   box.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
     const r = o.rules.find(x => x.id === Number(b.dataset.edit));
-    S.d = { id: r.id, media_id: r.media_id, media_link: r.media_link || '', media_thumb: r.media_thumb || '', media_caption: r.media_caption || '', name: r.name || '', match_mode: r.match_mode, keywords: r.keywords === '*' ? '' : r.keywords, message: uiMsg(r.message), link_url: r.link_url || '', reply_texts: r.reply_texts || '' };
+    S.d = { id: r.id, media_id: r.media_id, media_link: r.media_link || '', media_thumb: r.media_thumb || '', media_caption: r.media_caption || '', name: r.name || '', match_mode: r.match_mode, keywords: r.keywords === '*' ? '' : r.keywords, message: uiMsg(r.message), link_url: r.link_url || '', reply_texts: r.reply_texts || '', buttons: parseBtns(r.buttons) };
     S.step = 2; go('new');
   });
   box.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
@@ -251,13 +259,13 @@ function previewHTML() {
   const sample = d.match_mode === 'any' ? '예뻐요!' : (d.keywords.split(',')[0] || '').trim() || '댓글';
   const msg = apiMsg(d.message);
   const dm = d.message.trim()
-    ? esc(uiMsg(msg)).replace(/\{링크\}/g, `<a>buyestkids-dm…/go/a1b2c3</a>`)
+    ? esc(uiMsg(msg)).replace(/\{링크\}/g, d.link_url.trim() ? `<a>${esc(d.link_url.trim().replace(/^https?:\/\//, '').slice(0, 40))}</a>` : `<a>(아래 '글 속 링크 주소'를 적어 주세요)</a>`)
     : '<span class="bub ph" style="background:none;box-shadow:none;padding:0">보낼 DM 내용을 적으면 여기에 보여요</span>';
   return `<div class="phone"><div class="cap">고객이 보게 될 화면</div>
     <div class="scene"><h4>① 게시물 댓글</h4>
       <div class="cm"><b>고객</b>${esc(sample)}</div>
       ${first ? `<div class="cm re"><b>buyest_kids</b>${esc(first)}</div>` : ''}</div>
-    <div class="scene"><h4>② 받는 DM</h4><div class="bub">${dm}</div></div></div>`;
+    <div class="scene"><h4>② 받는 DM</h4><div class="bub">${dm}</div>${cleanBtns(d.buttons).map(b => `<div class="pbtn">${esc(b.title || '버튼 이름')}</div>`).join('')}</div></div>`;
 }
 function refreshPreview() { const p = $('.phone'); if (p) p.outerHTML = previewHTML(); }
 
@@ -290,21 +298,31 @@ function viewNew(v) {
         <div id="kwBox" class="${d.match_mode === 'any' ? 'hidden' : ''}" style="margin-top:8px"><input type="text" id="kw" placeholder="예: 링크, 정보 (쉼표로 여러 개)" value="${esc(d.keywords)}" aria-label="반응할 단어"></div></div>
       <div class="field"><label for="msg">DM 내용</label><textarea id="msg" style="min-height:128px" placeholder="예: 댓글 남겨주셔서 감사해요! 자세한 안내는 여기에서 확인하실 수 있어요 👉 {링크}">${esc(d.message)}</textarea>
         <div class="row" style="margin-top:6px;justify-content:space-between"><button class="btn ghost small" id="insLink" type="button">{링크} 자리 넣기</button><div class="count" id="cnt"></div></div></div>
+      <div class="field"><label for="lnk">글 속 링크 주소 <span class="muted" style="font-weight:500">(선택 · DM 글의 {링크} 자리에 들어가요)</span></label><input type="text" id="lnk" placeholder="https://www.buyestkids.com/…" value="${esc(d.link_url)}"></div>
       </div><div>
-      <div class="field"><label for="lnk">링크 주소 <span class="muted" style="font-weight:500">(선택)</span></label><input type="text" id="lnk" placeholder="https://www.buyestkids.com/…" value="${esc(d.link_url)}"><div class="hint">DM의 {링크} 자리에 들어가요. 몇 명이 눌렀는지 자동으로 세요.</div></div>
-      <div class="field"><label for="rep">댓글에 다는 공개 답글 <span class="muted" style="font-weight:500">(선택)</span></label><textarea id="rep" rows="8" style="min-height:212px" placeholder="한 줄에 문구 하나">${esc(d.reply_texts)}</textarea><div class="hint">한 줄에 하나씩, 번갈아 달려요. 비우면 답글을 달지 않아요.</div></div>
+      <div class="field"><span class="lab">버튼<span class="muted" style="font-weight:500">(선택, 최대 3개)</span></span><div id="btns"></div><button class="btn ghost small" id="addBtn" type="button">+ 버튼 추가</button><div class="hint">DM 아래에 눌러서 이동하는 버튼이 붙어요. 몇 명이 눌렀는지 자동으로 세요.</div></div>
+      <div class="field"><label for="rep">댓글에 다는 공개 답글 <span class="muted" style="font-weight:500">(선택)</span></label><textarea id="rep" rows="5" style="min-height:104px" placeholder="한 줄에 문구 하나">${esc(d.reply_texts)}</textarea><div class="hint">한 줄에 하나씩, 번갈아 달려요. 비우면 답글을 달지 않아요.</div></div>
       </div></div>
       <div id="e2" class="err" role="alert"></div>
       <div class="nav"><button class="btn ghost" id="back">이전</button><button class="btn" id="next">다음</button></div>`;
+    const drawBtns = () => {
+      $('#btns').innerHTML = d.buttons.map((b, i) => `<div class="brow"><input type="text" maxlength="20" placeholder="버튼 이름" aria-label="버튼 ${i + 1} 이름" data-bt="${i}" value="${esc(b.title)}"><input type="text" placeholder="https://… 링크" aria-label="버튼 ${i + 1} 링크" data-bu="${i}" value="${esc(b.url)}"><button class="xbtn" type="button" aria-label="버튼 ${i + 1} 지우기" data-bx="${i}">✕</button></div>`).join('');
+      $('#addBtn').classList.toggle('hidden', d.buttons.length >= 3);
+      $('#btns').querySelectorAll('[data-bt]').forEach(e => e.oninput = () => { d.buttons[+e.dataset.bt].title = e.value; upd(); });
+      $('#btns').querySelectorAll('[data-bu]').forEach(e => e.oninput = () => { d.buttons[+e.dataset.bu].url = e.value; upd(); });
+      $('#btns').querySelectorAll('[data-bx]').forEach(e => e.onclick = () => { d.buttons.splice(+e.dataset.bx, 1); if (!d.buttons.length) d.buttons.push({ title: '', url: '' }); drawBtns(); upd(); });
+    };
     const upd = () => {
       d.message = $('#msg').value; d.link_url = $('#lnk').value; d.reply_texts = $('#rep').value; d.keywords = ($('#kw') || { value: '' }).value;
-      const n = bytes(apiMsg(d.message).replace('{link}', 'x'.repeat(60)));
-      const c = $('#cnt'); c.textContent = `${n} / 1000 바이트 (한글 약 ${Math.floor(1000 / 3)}자)`; c.className = 'count' + (n > 1000 ? ' over' : ''); refreshPreview();
+      const t = textLimitInfo(d);
+      const c = $('#cnt'); c.textContent = t.label; c.className = 'count' + (t.over ? ' over' : ''); refreshPreview();
     };
+    $('#addBtn').onclick = () => { if (d.buttons.length < 3) { d.buttons.push({ title: '', url: '' }); drawBtns(); } };
+    drawBtns();
     ['msg', 'lnk', 'rep', 'kw'].forEach(id => { const e = $('#' + id); if (e) e.oninput = upd; });
     box.querySelectorAll('input[name=mm]').forEach(r => r.onchange = () => { d.match_mode = r.value; $('#kwBox').classList.toggle('hidden', r.value === 'any'); refreshPreview(); });
     $('#insLink').onclick = () => { const t = $('#msg'), p = t.selectionStart || t.value.length; t.value = t.value.slice(0, p) + '{링크}' + t.value.slice(p); t.focus(); upd(); };
-    if ($('#tplSel')) $('#tplSel').onchange = e => { const t = S.tpls.find(x => String(x.id) === e.target.value); if (!t) return; Object.assign(d, { match_mode: t.match_mode, keywords: t.keywords === '*' ? '' : t.keywords, message: uiMsg(t.message), link_url: t.link_url || '', reply_texts: t.reply_texts || '' }); render(); };
+    if ($('#tplSel')) $('#tplSel').onchange = e => { const t = S.tpls.find(x => String(x.id) === e.target.value); if (!t) return; Object.assign(d, { match_mode: t.match_mode, keywords: t.keywords === '*' ? '' : t.keywords, message: uiMsg(t.message), link_url: t.link_url || '', reply_texts: t.reply_texts || '', buttons: parseBtns(t.buttons) }); render(); };
     $('#back').onclick = () => { S.step = 1; render(); };
     $('#next').onclick = () => {
       upd();
@@ -312,7 +330,11 @@ function viewNew(v) {
       if (!d.message.trim()) { e2.textContent = '보낼 DM 내용을 적어 주세요.'; return; }
       if (d.match_mode !== 'any' && !d.keywords.trim()) { e2.textContent = '반응할 단어를 적어 주세요.'; return; }
       if (d.message.includes('{링크}') && !d.link_url.trim()) { e2.textContent = '{링크} 자리가 있는데 링크 주소가 비어 있어요.'; return; }
-      if (bytes(apiMsg(d.message).replace('{link}', 'x'.repeat(60))) > 1000) { e2.textContent = 'DM이 너무 길어요. 조금 줄여 주세요.'; return; }
+      const bs = cleanBtns(d.buttons);
+      const bad = bs.find(b => !b.title || !b.url);
+      if (bad) { e2.textContent = bad.title ? `"${bad.title}" 버튼의 링크 주소를 적어 주세요.` : '버튼 이름을 적어 주세요.'; return; }
+      if (textLimitInfo(d).over) { e2.textContent = bs.length ? '버튼이 있을 때는 DM 글이 640자까지예요. 조금 줄여 주세요.' : 'DM이 너무 길어요. 조금 줄여 주세요.'; return; }
+      d.buttons = bs.length ? bs : [{ title: '', url: '' }];
       S.step = 3; render();
     };
     upd();
@@ -323,6 +345,7 @@ function viewNew(v) {
         <dt>조건</dt><dd>${esc(matchLabel({ match_mode: d.match_mode, keywords: d.keywords }))}</dd>
         <dt>DM 내용</dt><dd>${esc(d.message)}</dd>
         <dt>링크</dt><dd>${esc(d.link_url || '없음')}</dd>
+        <dt>버튼</dt><dd>${esc(cleanBtns(d.buttons).map(b => '[' + b.title + '] ' + b.url).join('\n') || '없음')}</dd>
         <dt>공개 답글</dt><dd>${esc(d.reply_texts.trim() ? d.reply_texts.trim().split('\n').length + '가지 문구를 번갈아 사용' : '달지 않음')}</dd></dl>
       <div class="row" style="margin-top:14px"><label style="font-size:13.5px"><input type="checkbox" id="asTpl"> 이 내용을 템플릿으로도 저장</label></div>
       <div id="e3" class="err" role="alert"></div>
@@ -332,9 +355,9 @@ function viewNew(v) {
       d.name = $('#nm').value.trim() || '이름 없는 자동화';
       $('#e3').textContent = ''; ['saveOff', 'saveOn'].forEach(i => $('#' + i).disabled = true);
       try {
-        const payload = { id: d.id, name: d.name, media_id: d.media_id, media_link: d.media_link, media_thumb: d.media_thumb, media_caption: d.media_caption, match_mode: d.match_mode, keywords: d.keywords, message: apiMsg(d.message), link_url: d.link_url, reply_texts: d.reply_texts };
+        const payload = { id: d.id, name: d.name, media_id: d.media_id, media_link: d.media_link, media_thumb: d.media_thumb, media_caption: d.media_caption, match_mode: d.match_mode, keywords: d.keywords, message: apiMsg(d.message), link_url: d.link_url, reply_texts: d.reply_texts, buttons: cleanBtns(d.buttons) };
         const r = await api('rule_save', payload);
-        if ($('#asTpl').checked) await api('tpl_save', { name: d.name, match_mode: d.match_mode, keywords: d.keywords, message: apiMsg(d.message), link_url: d.link_url, reply_texts: d.reply_texts });
+        if ($('#asTpl').checked) await api('tpl_save', { name: d.name, match_mode: d.match_mode, keywords: d.keywords, message: apiMsg(d.message), link_url: d.link_url, reply_texts: d.reply_texts, buttons: cleanBtns(d.buttons) });
         if (on) await api('rule_toggle', { id: r.id, on: true });
         toast(on ? '저장하고 켰어요' : '저장했어요 (꺼 둠)'); S.d = blank(); S.step = 1; S.tpls = null; S.media = null; go('home');
       } catch (e) { $('#e3').textContent = e.message; ['saveOff', 'saveOn'].forEach(i => $('#' + i).disabled = false); }
@@ -349,7 +372,7 @@ function viewTpl(v) {
   if (!S.tpls) { v.insertAdjacentHTML('beforeend', '<p class="muted">불러오는 중이에요…</p>'); return; }
   if (!S.tpls.length) { v.insertAdjacentHTML('beforeend', `<div class="card empty"><h3>저장한 템플릿이 없어요</h3><p class="muted">자동화를 만들 때 "템플릿으로도 저장"을 켜면 여기에 모여요. 다음부터는 골라서 쓰면 돼요.</p></div>`); return; }
   v.insertAdjacentHTML('beforeend', `<div class="autos">${S.tpls.map(t => `<div class="card"><h3 style="margin:0 0 4px">${esc(t.name)}</h3><div class="muted" style="font-size:13px;white-space:pre-wrap">${esc(uiMsg(t.message))}</div><div class="chips"><span class="chip">${esc(matchLabel(t))}</span>${t.link_url ? `<span class="chip">링크 있음</span>` : ''}${t.reply_texts ? `<span class="chip">공개 답글 ${t.reply_texts.split('\n').length}가지</span>` : ''}</div><div class="row" style="margin-top:10px"><button class="btn ghost small" data-use="${t.id}">이 템플릿으로 만들기</button><button class="btn ghost small" data-rm="${t.id}">삭제</button></div></div>`).join('')}</div>`);
-  v.querySelectorAll('[data-use]').forEach(b => b.onclick = () => { const t = S.tpls.find(x => x.id === Number(b.dataset.use)); S.d = Object.assign(blank(), { match_mode: t.match_mode, keywords: t.keywords === '*' ? '' : t.keywords, message: uiMsg(t.message), link_url: t.link_url || '', reply_texts: t.reply_texts || '' }); S.step = 1; go('new'); });
+  v.querySelectorAll('[data-use]').forEach(b => b.onclick = () => { const t = S.tpls.find(x => x.id === Number(b.dataset.use)); S.d = Object.assign(blank(), { match_mode: t.match_mode, keywords: t.keywords === '*' ? '' : t.keywords, message: uiMsg(t.message), link_url: t.link_url || '', reply_texts: t.reply_texts || '', buttons: parseBtns(t.buttons) }); S.step = 1; go('new'); });
   v.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => { if (!confirm('이 템플릿을 삭제할까요?')) return; try { await api('tpl_delete', { id: Number(b.dataset.rm) }); toast('삭제했어요'); loadTpls(); } catch (e) { S.err = e.message; render(); } });
 }
 const ST = { sent: ['보냄', 'ok'], failed: ['실패', 'bad'], dry_run: ['시험', 'warn'], blocked: ['막힘', 'bad'], pending: ['처리 중', ''] };
@@ -357,7 +380,7 @@ function viewLog(v) {
   if (!S.log) { v.insertAdjacentHTML('beforeend', '<p class="muted">불러오는 중이에요…</p>'); return; }
   if (!S.log.length) { v.insertAdjacentHTML('beforeend', `<div class="card empty"><h3>아직 기록이 없어요</h3><p class="muted">댓글이 달려 DM이 나가면 여기에 쌓여요.</p></div>`); return; }
   const fmt = ts => new Date(ts).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  v.insertAdjacentHTML('beforeend', `<div class="card" style="overflow-x:auto"><table class="tbl"><thead><tr><th>시각</th><th>자동화</th><th>DM</th><th>공개 답글</th><th>링크 클릭</th></tr></thead><tbody>${S.log.map(i => { const s = ST[i.status] || [i.status, '']; const r = i.reply_status ? (ST[i.reply_status] || [i.reply_status, '']) : null; return `<tr><td>${fmt(i.created_at)}</td><td>${esc(i.rule_name || '(삭제된 자동화)')}</td><td><span class="chip ${s[1]}">${s[0]}</span>${i.error ? `<div class="muted" style="font-size:12px">오류 ${esc(i.error)}</div>` : ''}</td><td>${r ? `<span class="chip ${r[1]}">${r[0]}</span>` : '<span class="muted">—</span>'}${i.reply_error ? `<div class="muted" style="font-size:12px">오류 ${esc(i.reply_error)}</div>` : ''}</td><td>${i.clicks || 0}회</td></tr>`; }).join('')}</tbody></table></div>`);
+  v.insertAdjacentHTML('beforeend', `<div class="card" style="overflow-x:auto"><table class="tbl"><thead><tr><th>시각</th><th>자동화</th><th>DM</th><th>공개 답글</th><th>링크 클릭</th></tr></thead><tbody>${S.log.map(i => { const s = ST[i.status] || [i.status, '']; const r = i.reply_status ? (ST[i.reply_status] || [i.reply_status, '']) : null; return `<tr><td>${fmt(i.created_at)}</td><td>${esc(i.rule_name || '(삭제된 자동화)')}</td><td><span class="chip ${s[1]}">${s[0]}</span>${i.error ? `<div class="muted" style="font-size:12px">${i.status === 'sent' ? '버튼 대신 글로 보냈어요' : '오류 ' + esc(i.error)}</div>` : ''}</td><td>${r ? `<span class="chip ${r[1]}">${r[0]}</span>` : '<span class="muted">—</span>'}${i.reply_error ? `<div class="muted" style="font-size:12px">오류 ${esc(i.reply_error)}</div>` : ''}</td><td>${i.clicks || 0}회</td></tr>`; }).join('')}</tbody></table></div>`);
 }
 
 if (AUTH) loadHome(); else render();
