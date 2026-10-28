@@ -177,6 +177,10 @@
       <div class="sets" id="sets"></div>
       <div class="tabs" style="margin-top:14px" id="modeTabs"></div>
       <div id="modeOpts"></div>
+      <div id="anchorBox" style="margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff">
+        <label class="row" style="margin:0 0 8px"><input type="checkbox" id="anchorOn" checked /><span><b>같은 모델로 통일</b> · 컷마다 얼굴이 바뀌지 않게 해요</span></label>
+        <div class="row" id="anchorRow" style="margin:0"></div>
+      </div>
       <label class="f" style="margin-top:10px" id="shotLabel">컷 고르기</label>
       <div class="chips" id="shotChips"></div>
       <div style="margin-top:12px"><label class="f">전체 색감</label><select id="tone"></select></div>
@@ -430,7 +434,7 @@
     });
   }
   async function addFiles(list) {
-    const max = (HEALTH && HEALTH.maxRefs) || 6;
+    const max = Math.min(6, (HEALTH && HEALTH.maxRefs) || 6);
     for (const f of [...list]) {
       if (!/^image\//.test(f.type)) continue;
       if (refs.length >= max) { toast(`사진은 최대 ${max}장까지 올릴 수 있어요`); break; }
@@ -452,6 +456,9 @@
   document.addEventListener("paste", (e) => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) addFiles(fs); });
 
   // ── 프롬프트 ─────────────────────────────────────
+  // 사람(모델)이 나오는 컷인지
+  const isModelShot = (s) => !s.noModel && (s.mode !== "ex" || s.id === "ex_cover" || s.id === "ex_story");
+  const ANCHOR_PREFIX = "The FIRST attached image is the model identity reference: the person in the new photo must be exactly this same person (same face, hairstyle, skin tone, age and body type). Ignore the clothes in that first image. The other attached images are the product reference. Show this same person wearing the product in the new pose and setting described below. ";
   function buildPrompt(shot, fm) {
     const m = MODES.find((x) => x.id === shot.mode);
     const kids = brand === "kids";
@@ -459,7 +466,8 @@
     const info = [$("#pBrand").value.trim(), $("#pName").value.trim()].filter(Boolean).join(" ");
     parts.push(`Use the attached reference photo(s) as the exact product${info ? ` (${info})` : ""}. Keep the product's design, colour, fabric, logo placement, proportions and details exactly as in the reference. Do not invent or change logos, prints, hardware or labels.`);
     parts.push(m.scene);
-    if (!shot.noModel && shot.mode !== "ex" || shot.id === "ex_cover" || shot.id === "ex_story") {
+    if (isModelShot(shot)) {
+      parts.push("Frame the shot with the model's entire head and hair fully inside the image and clear empty space above the head; never crop the top of the head or the face." + (/full-length|head to toe|shoes to head|from head/i.test(shot.p) ? " Show the whole body including the shoes with a little space below the feet." : ""));
       const who = { woman: "an adult woman", man: "an adult man", girl: "a young girl", boy: "a young boy" }[modelOpt.who];
       const face = { korean: "Korean", western: "Western" }[modelOpt.face];
       if (who || face) parts.push(`The model is ${face ? face + " " : ""}${who || (kids ? "a child" : "a fashion model")}.`);
@@ -485,7 +493,7 @@
   function frameHTML(it) {
     const f = fmtOf(it.fmt);
     const pic = it.status === "done" ? `<img src="${it.final || it.src}" alt="${esc(it.label)}">` : it.status === "err" ? `<div class="develop err"><b>만들지 못했어요</b><span>${esc(it.err)}</span></div>` : `<div class="develop"><b>현상 중…</b><span>${esc(it.label)}</span></div>`;
-    const acts = it.status === "done" ? `<button class="btn" data-a="edit">타이틀·로고</button><button class="btn" data-a="refine">수정 요청</button><button class="btn pickbtn" data-a="pick">${it.picked ? "표시 해제" : "표시"}</button><button class="btn" data-a="dl">받기</button><button class="btn red" data-a="del">삭제</button>`
+    const acts = it.status === "done" ? `<button class="btn" data-a="edit">타이틀·로고</button><button class="btn" data-a="refine">수정 요청</button>${it.isModel ? `<button class="btn" data-a="anchor">이 얼굴로 통일</button>` : ""}<button class="btn pickbtn" data-a="pick">${it.picked ? "표시 해제" : "표시"}</button><button class="btn" data-a="dl">받기</button><button class="btn red" data-a="del">삭제</button>`
       : it.status === "err" ? `<button class="btn" data-a="retry">다시 시도</button><button class="btn red" data-a="del">삭제</button>` : `<button class="btn red" data-a="del">취소</button>`;
     return `<div class="frame ${it.picked ? "picked" : ""}" data-id="${it.id}"><div class="pic" style="aspect-ratio:${f.w}/${f.h}" data-a="${it.status === "done" ? "edit" : ""}">${pic}${GREASE}</div><div class="edge"><span>BUYEST ▸ ${String(it.num).padStart(2, "0")}</span><span>${esc(it.label)}</span></div><div class="acts">${acts}</div></div>`;
   }
@@ -497,6 +505,22 @@
   }
   const byId = (id) => items.find((i) => i.id === id);
 
+  // 기준 모델(얼굴 통일) — 내 모델 사진을 올리거나, 첫 모델 컷에서 자동으로 정해진다
+  let anchor = null; // { data, from: "upload" | "auto" }
+  const applyAnchor = (it) => { it.refs = [anchor.data, ...it.refs].slice(0, 7); it.prompt = ANCHOR_PREFIX + it.prompt; };
+  async function shrinkData(src, max = 1024) {
+    const im = await loadImg(src), k = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement("canvas");
+    c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); return c.toDataURL("image/jpeg", 0.9);
+  }
+  function drawAnchor() {
+    $("#anchorRow").innerHTML = anchor
+      ? `<img src="${anchor.data}" alt="기준 모델" style="width:44px;height:56px;object-fit:cover;border-radius:4px;border:1px solid var(--line);flex:none"><span class="hint" style="margin:0;flex:1">기준 모델: ${anchor.from === "upload" ? "내가 올린 사진" : "첫 컷에서 자동 선택"}</span><button class="btn" id="anchorClear" style="flex:none">새로 뽑기</button>`
+      : `<span class="hint" style="margin:0;flex:1">아직 기준이 없어요. 첫 모델 컷이 기준이 됩니다.</span><button class="btn" id="anchorUp" style="flex:none">내 모델 사진 올리기</button>`;
+  }
+  $("#anchorRow").onclick = async (e) => {
+    if (e.target.id === "anchorClear") { anchor = null; drawAnchor(); }
+    else if (e.target.id === "anchorUp") { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.onchange = async () => { if (inp.files[0]) { try { anchor = { data: await shrink(inp.files[0], 1024), from: "upload" }; drawAnchor(); } catch (er) { toast(er.message); } } }; inp.click(); }
+  };
   async function runItem(it) {
     it.status = "pending"; it.err = ""; drawFrames();
     try {
@@ -515,9 +539,20 @@
     const total = sel.size * per;
     if (total > 8 && !confirm(`${total}장을 한 번에 만듭니다. 계속할까요?`)) return;
     const list = [];
-    MODES.forEach((m) => m.shots.forEach((s) => { if (!sel.has(s.id)) return; for (let k = 0; k < per; k++) { const sh = SHOT[s.id]; list.push({ id: uid(), num: ++counter, shotId: s.id, label: `${m.name} / ${s.name}`, fmt: fmt.id, prompt: buildPrompt(sh, fmt), provider: prov, refs: rd, status: "pending", picked: false, layers: [], src: "", final: null }); } }));
+    MODES.forEach((m) => m.shots.forEach((s) => { if (!sel.has(s.id)) return; for (let k = 0; k < per; k++) { const sh = SHOT[s.id]; list.push({ id: uid(), num: ++counter, shotId: s.id, label: `${m.name} / ${s.name}`, fmt: fmt.id, prompt: buildPrompt(sh, fmt), isModel: isModelShot(sh), provider: prov, refs: rd, status: "pending", picked: false, layers: [], src: "", final: null }); } }));
     items.unshift(...list); drawFrames();
-    $("#go").disabled = true; await queue(list); updateCost();
+    $("#go").disabled = true;
+    const mlist = list.filter((i) => i.isModel), rest = list.filter((i) => !i.isModel);
+    if ($("#anchorOn").checked && mlist.length) {
+      // 같은 모델로 통일: 기준 얼굴이 없으면 첫 모델 컷을 먼저 만들고, 그 얼굴을 나머지 컷의 기준으로 쓴다
+      if (!anchor) {
+        const first = mlist.shift(); await runItem(first);
+        if (first.status === "done") { anchor = { data: await shrinkData(first.src), from: "auto" }; drawAnchor(); }
+      }
+      if (anchor) mlist.forEach(applyAnchor);
+      await queue([...mlist, ...rest]);
+    } else await queue(list);
+    updateCost();
     const bad = list.filter((i) => i.status === "err").length;
     toast(bad ? `${list.length - bad}장 완성, ${bad}장은 실패했어요` : `${list.length}장 완성!`);
   };
@@ -530,6 +565,7 @@
     else if (a === "pick") { it.picked = !it.picked; drawFrames(); }
     else if (a === "del") { if (it.status === "done" && !confirm("이 컷을 지울까요?")) return; items.splice(items.indexOf(it), 1); drawFrames(); }
     else if (a === "retry") runItem(it);
+    else if (a === "anchor") { anchor = { data: await shrinkData(it.src), from: "auto" }; drawAnchor(); toast("이 얼굴을 기준으로 정했어요. 다음 촬영부터 같은 모델이 나옵니다"); }
     else if (a === "dl") downloadItem(it, "png");
     else if (a === "refine") {
       const txt = await ask("어떻게 고칠까요?", "예) 배경을 더 밝게, 모델 표정을 웃는 얼굴로, 소매를 접어 올려서");
@@ -768,7 +804,7 @@
     drawFrames(); toast(`${targets.length}개 컷에 적용했어요`);
   };
 
-  drawFmt(); drawSets(); drawModes(); drawFrames(); updateCost();
+  drawFmt(); drawSets(); drawModes(); drawFrames(); drawAnchor(); updateCost();
 })();
 </script>
 </body>

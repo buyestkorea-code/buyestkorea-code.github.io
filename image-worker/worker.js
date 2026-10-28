@@ -13,7 +13,7 @@
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
 const VERSION = "1.0.0";
-const ASPECTS = { "4:5": "1024x1536", "3:4": "1024x1536", "9:16": "1024x1536", "1:1": "1024x1024", "16:9": "1536x1024" };
+const ASPECTS = { "4:5": "1024x1280", "3:4": "960x1280", "9:16": "864x1536", "1:1": "1024x1024", "16:9": "1536x864" }; // 새 모델은 16의 배수 사이즈를 직접 받는다 → 잘림 없이 정확한 비율
 // 대략적인 1장 비용(USD) — 화면 안내용. 실제 청구는 각 회사 콘솔에서 확인.
 const COST = { gemini: 0.04, openai: 0.06 };
 
@@ -72,36 +72,52 @@ const b64ToBytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
 // ── Gemini ────────────────────────────────────────────
 async function geminiOne(env, prompt, refs, aspect) {
-  const parts = [{ text: prompt }, ...refs.map((r) => ({ inline_data: { mime_type: r.mime, data: r.b64 } }))];
-  const call = (modalities) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL || "gemini-2.5-flash-image"}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-    body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: modalities, imageConfig: { aspectRatio: aspect } } }),
-  });
-  let r;
-  try {
-    r = await call(["IMAGE"]);
-    if (r.status === 400) r = await call(["TEXT", "IMAGE"]); // 모델에 따라 TEXT 가 같이 필요한 경우
-  } catch (_) { throw new HttpError(502, "Gemini 서버에 연결하지 못했습니다."); }
-  const d = await r.json().catch(() => ({}));
-  if (r.status === 401 || r.status === 403) throw new HttpError(503, "Gemini 키가 올바르지 않거나 권한이 없습니다. 담당자에게 알려 주세요.");
-  if (r.status === 429) throw new HttpError(429, "Gemini 사용량 한도에 걸렸습니다. 잠시 뒤 다시 시도해 주세요.");
-  if (!r.ok) throw new HttpError(502, `Gemini 요청 실패 (${r.status}) ${String(d?.error?.message || "").slice(0, 160)}`);
-  if (d?.promptFeedback?.blockReason) throw new HttpError(422, "Gemini 가 이 요청을 안전 기준으로 거절했습니다. 사진이나 문구를 바꿔 보세요.");
-  for (const c of d.candidates || []) {
-    for (const p of c.content?.parts || []) {
-      const inl = p.inlineData || p.inline_data;
-      if (inl?.data) return `data:${inl.mimeType || inl.mime_type || "image/png"};base64,${inl.data}`;
-    }
-  }
-  const why = d?.candidates?.[0]?.finishReason;
-  throw new HttpError(422, why && why !== "STOP" ? `Gemini 가 이미지를 만들지 않았습니다 (${why}). 문구를 바꿔 다시 시도해 주세요.` : "Gemini 가 이미지를 돌려주지 않았습니다. 다시 시도해 주세요.");
+  const key = String(env.GEMINI_API_KEY).trim();
+  const base = "https://generativelanguage.googleapis.com/v1beta";
+  const post = async (path, body) => {
+    let r;
+    try { r = await fetch(`${base}/${path}`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) }); }
+    catch (_) { throw new HttpError(502, "Gemini 서버에 연결하지 못했습니다."); }
+    return { r, d: await r.json().catch(() => ({})) };
+  };
+  // 응답 어디에 있든 base64 이미지를 찾는다 (generateContent / Interactions 두 형식 모두)
+  const findImage = (o, depth = 0) => {
+    if (!o || typeof o !== "object" || depth > 8) return null;
+    const inl = o.inlineData || o.inline_data;
+    if (inl && inl.data) return `data:${inl.mimeType || inl.mime_type || "image/png"};base64,${inl.data}`;
+    if (o.type === "image" && typeof o.data === "string" && o.data.length > 200) return `data:${o.mime_type || "image/png"};base64,${o.data}`;
+    for (const v of Array.isArray(o) ? o : Object.values(o)) { const f = findImage(v, depth + 1); if (f) return f; }
+    return null;
+  };
+  const fail = (r, d) => {
+    if (r.status === 401 || r.status === 403) throw new HttpError(503, `Gemini 키가 올바르지 않거나 권한이 없습니다. (${String(d?.error?.message || "").slice(0, 120)})`);
+    if (r.status === 429) throw new HttpError(429, "Gemini 사용량 한도에 걸렸습니다. 잠시 뒤 다시 시도해 주세요.");
+    throw new HttpError(502, `Gemini 요청 실패 (${r.status}) ${String(d?.error?.message || "").slice(0, 200)}`);
+  };
+  const blocked = (d) => { if (d?.promptFeedback?.blockReason) throw new HttpError(422, "Gemini 가 이 요청을 안전 기준으로 거절했습니다. 사진이나 문구를 바꿔 보세요."); };
+
+  // 1) 새 방식: Interactions API (GEMINI_MODEL)
+  const model = env.GEMINI_MODEL || "gemini-nano-banana-2.1";
+  const input = [{ type: "text", text: prompt }, ...refs.map((x) => ({ type: "image", mime_type: x.mime, data: x.b64 }))];
+  let { r, d } = await post("interactions", { model, input, response_format: { type: "image", mime_type: "image/jpeg", aspect_ratio: aspect } });
+  if (r.ok) { blocked(d); const img = findImage(d); if (img) return img; throw new HttpError(422, "Gemini 가 이미지를 돌려주지 않았습니다. 문구를 바꿔 다시 시도해 주세요."); }
+  if (r.status === 401 || r.status === 403 || r.status === 429) fail(r, d);
+
+  // 2) 예전 방식: generateContent (GEMINI_MODEL_LEGACY)
+  const legacy = env.GEMINI_MODEL_LEGACY || "gemini-2.5-flash-image";
+  const parts = [{ text: prompt }, ...refs.map((x) => ({ inline_data: { mime_type: x.mime, data: x.b64 } }))];
+  const call = (modalities) => post(`models/${legacy}:generateContent`, { contents: [{ parts }], generationConfig: { responseModalities: modalities, imageConfig: { aspectRatio: aspect } } });
+  let r2 = await call(["IMAGE"]);
+  if (r2.r.status === 400) r2 = await call(["TEXT", "IMAGE"]);
+  if (r2.r.ok) { blocked(r2.d); const img = findImage(r2.d); if (img) return img; throw new HttpError(422, "Gemini 가 이미지를 돌려주지 않았습니다. 문구를 바꿔 다시 시도해 주세요."); }
+  // 둘 다 실패 — 두 방식의 오류를 함께 보여 준다
+  throw new HttpError(502, `Gemini 요청 실패 · 새 방식(${r.status}): ${String(d?.error?.message || "").slice(0, 110)} · 예전 방식(${r2.r.status}): ${String(r2.d?.error?.message || "").slice(0, 110)}`);
 }
 
 // ── OpenAI ────────────────────────────────────────────
 async function openaiMany(env, prompt, refs, aspect, n) {
   const fd = new FormData();
-  fd.append("model", env.OPENAI_MODEL || "gpt-image-1");
+  fd.append("model", env.OPENAI_MODEL || "gpt-image-2.5-sunburst");
   fd.append("prompt", prompt);
   fd.append("size", ASPECTS[aspect] || "1024x1536");
   fd.append("n", String(n));
@@ -110,7 +126,7 @@ async function openaiMany(env, prompt, refs, aspect, n) {
   fd.append("output_compression", "92");
   refs.forEach((r, i) => fd.append("image[]", new Blob([b64ToBytes(r.b64)], { type: r.mime }), `ref${i}.${r.mime.split("/")[1]}`));
   let r;
-  try { r = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: fd }); }
+  try { r = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${String(env.OPENAI_API_KEY).trim()}` }, body: fd }); }
   catch (_) { throw new HttpError(502, "OpenAI 서버에 연결하지 못했습니다."); }
   const d = await r.json().catch(() => ({}));
   if (r.status === 401) throw new HttpError(503, "OpenAI 키가 올바르지 않습니다. 담당자에게 알려 주세요.");
@@ -134,8 +150,8 @@ export default {
         return json({
           ok: true, version: VERSION, limits: !!env.STUDIO_KV, maxN: Number(env.MAX_N) || 2, maxRefs: Number(env.MAX_REFS) || 6,
           providers: [
-            { id: "gemini", label: "Gemini (구글)", ready: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || "gemini-2.5-flash-image", usd: COST.gemini },
-            { id: "openai", label: "OpenAI (GPT 이미지)", ready: !!env.OPENAI_API_KEY, model: env.OPENAI_MODEL || "gpt-image-1", usd: COST.openai },
+            { id: "gemini", label: "Gemini (구글)", ready: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || "gemini-nano-banana-2.1", usd: COST.gemini },
+            { id: "openai", label: "OpenAI (GPT 이미지)", ready: !!env.OPENAI_API_KEY, model: env.OPENAI_MODEL || "gpt-image-2.5-sunburst", usd: COST.openai },
           ],
         });
       }

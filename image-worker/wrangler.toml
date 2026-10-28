@@ -15,9 +15,10 @@ MAX_N = "2"
 # 직원 1명 하루 생성 장수 (KV 를 연결했을 때만 적용)
 LIMIT_IMAGES_PER_DAY = "120"
 # 참고 사진 최대 장수
-MAX_REFS = "6"
+MAX_REFS = "7"
 # 모델 이름 (바뀌면 여기만 고치면 됩니다)
-GEMINI_MODEL = "gemini-2.5-flash-image"
-OPENAI_MODEL = "gpt-image-1"
+GEMINI_MODEL = "gemini-nano-banana-2.1"
+GEMINI_MODEL_LEGACY = "gemini-2.5-flash-image"
+OPENAI_MODEL = "gpt-image-2.5-sunburst"
 # OpenAI 화질: low | medium | high  (high 는 비쌈)
 OPENAI_QUALITY = "medium"
