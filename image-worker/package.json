@@ -1,0 +1,10 @@
+{
+  "name": "buyest-lookbook-worker",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "BUYEST 스튜디오 V2 — Gemini / OpenAI 이미지 중계 Worker. 키는 Cloudflare 비밀값에만 둔다.",
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

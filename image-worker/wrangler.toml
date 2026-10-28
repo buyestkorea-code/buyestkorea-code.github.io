@@ -1,0 +1,23 @@
+# BUYEST 스튜디오 V2 — 이미지(Gemini / OpenAI) 중계 Worker
+# 영상용 Worker(buyest-reels)와 섞이지 않게 새 이름을 쓴다.
+name = "buyest-lookbook"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# (선택) 직원 1명당 하루 생성 장수 제한을 쓰려면:  npx wrangler kv namespace create STUDIO_KV  → 나온 id 를 넣고 주석 해제
+# [[kv_namespaces]]
+# binding = "STUDIO_KV"
+# id = "여기에_KV_id"
+
+[vars]
+# 한 번 요청에 만들 수 있는 최대 장수
+MAX_N = "2"
+# 직원 1명 하루 생성 장수 (KV 를 연결했을 때만 적용)
+LIMIT_IMAGES_PER_DAY = "120"
+# 참고 사진 최대 장수
+MAX_REFS = "6"
+# 모델 이름 (바뀌면 여기만 고치면 됩니다)
+GEMINI_MODEL = "gemini-2.5-flash-image"
+OPENAI_MODEL = "gpt-image-1"
+# OpenAI 화질: low | medium | high  (high 는 비쌈)
+OPENAI_QUALITY = "medium"

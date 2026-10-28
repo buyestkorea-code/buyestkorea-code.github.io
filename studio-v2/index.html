@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BUYEST 스튜디오 V2</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%2316161a'/%3E%3Crect x='7' y='6' width='18' height='20' fill='none' stroke='%23f8f6f1' stroke-width='2'/%3E%3Cellipse cx='16' cy='16' rx='8' ry='6' fill='none' stroke='%23d4372a' stroke-width='2'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Cormorant+Garamond:wght@500;700&family=Gowun+Batang:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@400;700&family=Noto+Sans+KR:wght@400;700;900&family=Noto+Serif+KR:wght@400;700;900&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --desk:#dcd9d2; --paper:#fbfaf7; --ink:#16161a; --muted:#77736b; --line:#cfcbc2; --soft:#efece5;
+    --mark:#d4372a; --ok:#2f7d4f; --film:#111113;
+    --serif:"Noto Serif KR","Noto Serif",serif; --sans:-apple-system,"Pretendard","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--desk); color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.55; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline:2px solid var(--mark); outline-offset:2px; }
+  input, select, textarea { font:inherit; color:inherit; width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  input[type=range] { padding:0; accent-color:var(--ink); } input[type=checkbox], input[type=radio] { width:auto; accent-color:var(--ink); } input[type=color] { padding:2px; height:34px; }
+  textarea { resize:vertical; min-height:62px; }
+  label.f { display:block; font-size:12px; color:var(--muted); margin:0 0 4px; }
+  .mono { font-family:var(--mono); }
+
+  header.top { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:12px 20px; background:var(--ink); color:var(--paper); }
+  header.top h1 { margin:0; font-family:var(--serif); font-size:20px; font-weight:700; letter-spacing:.02em; }
+  header.top h1 small { font-family:var(--mono); font-size:11px; font-weight:400; letter-spacing:.14em; opacity:.6; margin-left:10px; }
+  .brand-toggle { display:flex; border:1px solid #55555c; border-radius:999px; overflow:hidden; margin-left:auto; }
+  .brand-toggle button { border:0; background:none; padding:6px 14px; color:#cfcbc2; }
+  .brand-toggle button.on { background:var(--paper); color:var(--ink); }
+  #me { font-size:12px; opacity:.7; }
+
+  .wrap { display:grid; grid-template-columns:392px minmax(0,1fr); gap:20px; padding:20px; align-items:start; max-width:1600px; margin:0 auto; }
+  .rail { display:flex; flex-direction:column; gap:12px; }
+  .box { background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:14px 14px 16px; }
+  .box h2 { margin:0 0 2px; font-size:14px; font-weight:700; display:flex; align-items:baseline; gap:8px; }
+  .box h2 .n { font-family:var(--mono); font-size:11px; color:var(--mark); font-weight:500; }
+  .hint { margin:0 0 10px; color:var(--muted); font-size:12.5px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .status { font-size:12.5px; padding:9px 12px; border-radius:8px; background:var(--soft); color:#3b3832; }
+  .status.bad { background:#f6e1de; color:#7a241b; }
+
+  .drop { border:1.5px dashed var(--line); border-radius:8px; padding:14px; text-align:center; color:var(--muted); cursor:pointer; background:#fff; }
+  .drop:hover, .drop.over { border-color:var(--ink); color:var(--ink); }
+  .refs { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .ref { position:relative; width:58px; height:74px; } .ref img { width:100%; height:100%; object-fit:cover; border-radius:4px; display:block; border:1px solid var(--line); }
+  .ref button { position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; border:0; background:var(--ink); color:#fff; font-size:12px; line-height:20px; padding:0; }
+
+  .seg { display:grid; gap:6px; } .seg.c3 { grid-template-columns:repeat(3,1fr); }
+  .seg button { border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 6px; text-align:center; line-height:1.3; }
+  .seg button b { display:block; font-size:13px; } .seg button span { display:block; font-size:11px; color:var(--muted); font-family:var(--mono); }
+  .seg button.on { border-color:var(--ink); background:var(--ink); color:#fff; } .seg button.on span { color:#cfcbc2; }
+  .fmt-ico { display:block; margin:0 auto 4px; border:1.5px solid currentColor; border-radius:2px; }
+
+  .tabs { display:flex; border-bottom:1px solid var(--line); margin:0 -14px 12px; padding:0 14px; gap:2px; }
+  .tabs button { border:0; background:none; padding:8px 10px; border-bottom:2px solid transparent; color:var(--muted); font-weight:500; position:relative; }
+  .tabs button.on { color:var(--ink); border-bottom-color:var(--ink); font-weight:700; }
+  .tabs .cnt { font-family:var(--mono); font-size:10px; background:var(--mark); color:#fff; border-radius:9px; padding:0 5px; margin-left:4px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:5px 11px; font-size:13px; }
+  .chip.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .sets { display:flex; flex-direction:column; gap:6px; }
+  .sets button { text-align:left; border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 10px; }
+  .sets button b { font-size:13px; } .sets button span { display:block; font-size:12px; color:var(--muted); }
+  .sets button:hover { border-color:var(--ink); }
+
+  .go { width:100%; background:var(--mark); color:#fff; border:0; border-radius:10px; padding:14px; font-size:15px; font-weight:700; }
+  .go:disabled { opacity:.35; cursor:default; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:7px; padding:6px 11px; font-size:13px; }
+  .btn:hover { border-color:var(--ink); } .btn.dark { background:var(--ink); color:#fff; border-color:var(--ink); } .btn.red { color:var(--mark); }
+  .btn:disabled { opacity:.4; cursor:default; }
+  .cost { font-size:13px; margin:0 0 10px; } .cost b { font-size:15px; }
+
+  /* 콘택트 시트 */
+  .sheet { background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:16px 18px 22px; min-height:70vh; }
+  .sheet-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+  .sheet-head h2 { margin:0; font-family:var(--serif); font-size:17px; } .sheet-head .mono { font-size:11px; color:var(--muted); letter-spacing:.08em; }
+  .sheet-head .sp { margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
+  .empty { padding:70px 20px; text-align:center; color:var(--muted); }
+  .empty h3 { font-family:var(--serif); font-size:20px; color:var(--ink); margin:0 0 8px; }
+  .frames { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:18px 16px; }
+  .frame { background:var(--film); border-radius:3px; padding:7px 7px 0; color:#d9d6cf; position:relative; }
+  .frame .pic { position:relative; background:#2a2a2e; overflow:hidden; cursor:pointer; }
+  .frame .pic img { width:100%; height:100%; object-fit:cover; display:block; }
+  .frame .edge { display:flex; justify-content:space-between; gap:8px; font-family:var(--mono); font-size:10px; letter-spacing:.06em; padding:5px 2px 6px; color:#b9b5ad; white-space:nowrap; }
+  .frame .edge span:last-child { overflow:hidden; text-overflow:ellipsis; }
+  .frame .acts { display:flex; flex-wrap:wrap; gap:4px; background:var(--paper); margin:0 -7px; padding:7px; border-top:1px solid var(--line); border-radius:0 0 3px 3px; }
+  .frame .acts .btn { padding:3px 8px; font-size:12px; }
+  .frame .circle { position:absolute; inset:-1%; pointer-events:none; display:none; }
+  .frame.picked .circle { display:block; }
+  .frame.picked .pickbtn { background:var(--mark); color:#fff; border-color:var(--mark); }
+  .develop { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#cfcbc2; font-size:12.5px; text-align:center; padding:14px;
+    background:linear-gradient(110deg,#222226 30%,#303035 50%,#222226 70%); background-size:220% 100%; animation:shimmer 1.8s linear infinite; }
+  .develop.err { animation:none; background:#2a1f1e; color:#f1b9b2; }
+  @keyframes shimmer { to { background-position:-220% 0; } }
+  @media (prefers-reduced-motion:reduce) { .develop { animation:none; } }
+
+  /* 편집기 */
+  .modal { position:fixed; inset:0; background:rgba(22,22,26,.72); z-index:50; display:none; padding:16px; }
+  .modal.open { display:block; }
+  .ed { background:var(--paper); border-radius:12px; height:100%; max-width:1280px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1fr) 380px; overflow:hidden; }
+  .ed-stage { background:#bdb9b0; display:flex; align-items:center; justify-content:center; padding:18px; min-height:0; overflow:hidden; }
+  .ed-stage canvas { max-width:100%; max-height:100%; box-shadow:0 8px 30px rgba(0,0,0,.35); touch-action:none; cursor:grab; background:#222; }
+  .ed-side { border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+  .ed-body { overflow:auto; padding:14px; flex:1; }
+  .ed-foot { padding:12px 14px; border-top:1px solid var(--line); display:flex; gap:8px; flex-wrap:wrap; background:var(--paper); }
+  .ed-foot .btn { flex:1; }
+  .layer-list { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+  .layer-list button { text-align:left; border:1px solid var(--line); background:#fff; border-radius:6px; padding:6px 9px; display:flex; gap:8px; align-items:center; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .layer-list button.on { border-color:var(--mark); box-shadow:inset 3px 0 0 var(--mark); }
+  .layer-list .tag { font-family:var(--mono); font-size:10px; color:var(--muted); flex:none; }
+  .panel { border-top:1px solid var(--line); padding-top:12px; margin-top:12px; }
+  .row { display:flex; gap:8px; align-items:center; margin-bottom:8px; } .row > * { flex:1; } .row > label { flex:none; font-size:12px; color:var(--muted); min-width:54px; }
+  .logos { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .logo-card { border:1px solid var(--line); border-radius:8px; background:#fff; padding:6px; text-align:center; position:relative; }
+  .logo-card .th { height:54px; display:flex; align-items:center; justify-content:center; background:repeating-conic-gradient(#e6e3dc 0 25%,#f4f2ec 0 50%) 0 0/12px 12px; border-radius:4px; }
+  .logo-card .th img { max-width:100%; max-height:100%; object-fit:contain; }
+  .logo-card input { margin-top:5px; padding:3px 5px; font-size:12px; }
+  .logo-card .mini { display:flex; gap:4px; margin-top:5px; } .logo-card .mini .btn { flex:1; padding:3px 0; font-size:12px; }
+  .logo-card .x { position:absolute; top:-7px; right:-7px; width:20px; height:20px; border-radius:50%; border:0; background:var(--ink); color:#fff; padding:0; font-size:12px; line-height:20px; }
+
+  dialog { border:0; border-radius:12px; padding:18px; width:min(440px,92vw); background:var(--paper); color:var(--ink); }
+  dialog::backdrop { background:rgba(22,22,26,.6); }
+  dialog h3 { margin:0 0 8px; font-size:15px; } dialog .row { margin-top:12px; justify-content:flex-end; } dialog .row > * { flex:none; }
+
+  .gate { max-width:520px; margin:80px auto; background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:36px 28px; text-align:center; line-height:1.7; }
+  .toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:9px 16px; border-radius:8px; font-size:13px; z-index:99; display:none; max-width:90vw; }
+
+  @media (max-width:1000px) { .wrap { grid-template-columns:1fr; } .ed { grid-template-columns:1fr; grid-template-rows:minmax(0,45%) minmax(0,1fr); } .ed-side { border-left:0; border-top:1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div id="gate" class="gate" style="display:none">
+  <h2 style="margin:0 0 10px;font-family:var(--serif)">BUYEST 스튜디오 V2</h2>
+  <p>로그인한 직원만 사용할 수 있어요.<br>툴키트 첫 화면에서 로그인한 뒤 이 화면을 새로고침해 주세요.</p>
+  <p><button class="go" style="width:auto;padding:12px 26px" onclick="location.reload()">새로고침</button></p>
+</div>
+
+<div id="app" style="display:none">
+<header class="top">
+  <h1>BUYEST 스튜디오 V2<small>INSTAGRAM CONTACT SHEET</small></h1>
+  <div class="brand-toggle" id="brandToggle"><button data-brand="buyest" class="on">BUYEST</button><button data-brand="kids">BUYEST Kids</button></div>
+  <div id="me"></div>
+</header>
+
+<div class="wrap">
+  <div class="rail">
+    <div class="status" id="status">AI 서버 확인 중…</div>
+
+    <section class="box">
+      <h2><span class="n">01</span>상품 사진</h2>
+      <p class="hint">상품이 잘 보이는 사진 1~6장. 앞·뒤·디테일을 같이 올릴수록 상품이 덜 변해요.</p>
+      <div class="drop" id="drop" tabindex="0">여기를 누르거나 사진을 끌어다 놓기 (붙여넣기도 됩니다)
+        <input type="file" id="files" accept="image/*" multiple hidden />
+      </div>
+      <div class="refs" id="refs"></div>
+      <div class="grid2" style="margin-top:12px">
+        <div><label class="f">브랜드명</label><input id="pBrand" placeholder="MONCLER" /></div>
+        <div><label class="f">상품명</label><input id="pName" placeholder="다운 패딩 재킷" /></div>
+        <div><label class="f">가격</label><input id="pPrice" placeholder="₩890,000" /></div>
+        <div><label class="f">타이틀 문구 (글자 얹을 때 사용)</label><input id="pTitle" placeholder="NEW ARRIVAL" /></div>
+      </div>
+    </section>
+
+    <section class="box">
+      <h2><span class="n">02</span>인스타 크기</h2>
+      <p class="hint">모든 컷이 이 비율로 만들어져요. 저장은 가로 1080px.</p>
+      <div class="seg c3" id="fmtSeg"></div>
+      <p class="hint" id="fmtNote" style="margin:10px 0 0"></p>
+    </section>
+
+    <section class="box">
+      <h2><span class="n">03</span>어떤 컷을 찍을까요</h2>
+      <p class="hint">인스타 세트를 고르거나, 탭마다 원하는 컷을 직접 골라 섞을 수 있어요.</p>
+      <div class="sets" id="sets"></div>
+      <div class="tabs" style="margin-top:14px" id="modeTabs"></div>
+      <div id="modeOpts"></div>
+      <label class="f" style="margin-top:10px" id="shotLabel">컷 고르기</label>
+      <div class="chips" id="shotChips"></div>
+      <div style="margin-top:12px"><label class="f">전체 색감</label><select id="tone"></select></div>
+      <div style="margin-top:10px"><label class="f">추가로 원하는 연출 (선택, 한글 OK)</label><textarea id="extra" placeholder="예) 가을 낙엽이 있는 공원 분위기, 모델은 단발머리"></textarea></div>
+    </section>
+
+    <section class="box">
+      <h2><span class="n">04</span>AI 고르고 만들기</h2>
+      <div class="grid2"><div><label class="f">AI</label><select id="provider"></select></div><div><label class="f">컷당 장수</label><select id="perShot"><option value="1">1장</option><option value="2">2장</option></select></div></div>
+      <p class="cost" id="cost" style="margin-top:12px"></p>
+      <button class="go" id="go">촬영 시작</button>
+    </section>
+
+    <details class="box" id="logoBox">
+      <summary style="cursor:pointer;font-weight:700">내 로고 보관함 <span class="mono" style="font-size:11px;color:var(--muted)" id="logoCount"></span></summary>
+      <p class="hint" style="margin-top:8px">BUYEST · BUYEST Kids 로고를 한 번 올려두면, 어떤 컷에서든 한 번에 얹거나 바꿀 수 있어요. 이 브라우저에만 저장됩니다. 투명 배경 PNG가 가장 깔끔해요.</p>
+      <div class="logos" id="logoLib"></div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="logoAdd">+ 로고 올리기</button><input type="file" id="logoFile" accept="image/*" hidden /></div>
+    </details>
+  </div>
+
+  <main class="sheet">
+    <div class="sheet-head">
+      <h2>콘택트 시트</h2><span class="mono" id="sheetInfo">0 FRAMES</span>
+      <div class="sp"><button class="btn" id="pickAll">전부 표시</button><button class="btn dark" id="dlPicked">표시한 컷 받기</button></div>
+    </div>
+    <div id="frames" class="frames"></div>
+    <div id="empty" class="empty"><h3>아직 찍은 컷이 없어요</h3><p>왼쪽에서 사진을 올리고 컷을 고른 뒤 <b>촬영 시작</b>을 누르세요.<br>마음에 드는 컷은 빨간 펜으로 동그라미(표시) 치고, <b>글자·로고</b>로 타이틀을 얹어 마무리합니다.</p></div>
+  </main>
+</div>
+</div>
+
+<!-- 편집기 -->
+<div class="modal" id="ed" role="dialog" aria-modal="true" aria-label="타이틀·로고 편집">
+  <div class="ed">
+    <div class="ed-stage"><canvas id="edCanvas"></canvas></div>
+    <div class="ed-side">
+      <div class="ed-body">
+        <div class="tabs" style="margin-top:-2px" id="edTabs"><button data-t="layers" class="on">글자·로고</button><button data-t="logos">로고 바꾸기</button><button data-t="view">보기</button></div>
+        <div id="edLayers">
+          <div class="layer-list" id="layerList"></div>
+          <div class="row"><button class="btn" id="addText">+ 글자 추가</button><button class="btn" id="addLogo">+ 로고 얹기</button></div>
+          <div class="panel" id="presetPanel">
+            <label class="f">구성 한 번에 넣기 (현재 구성은 바뀌어요)</label>
+            <div class="chips" id="presets"></div>
+          </div>
+          <div class="panel" id="layerProps"></div>
+        </div>
+        <div id="edLogos" hidden></div>
+        <div id="edView" hidden>
+          <label class="row" style="margin:0 0 8px"><input type="checkbox" id="guideOn" checked /><span>인스타 안전영역 보기 (저장 이미지에는 안 나와요)</span></label>
+          <p class="hint" id="guideNote"></p>
+          <div class="panel"><label class="f">글자·로고 구성 복사</label>
+            <button class="btn" id="applyAll" style="width:100%">이 구성을 모든 컷에 적용</button>
+            <p class="hint" style="margin-top:6px">타이틀·로고 위치가 시리즈 전체에서 똑같이 보이게 맞춰요. 컷마다 이미 넣어둔 글자는 덮어씁니다.</p></div>
+        </div>
+      </div>
+      <div class="ed-foot"><button class="btn dark" id="edSave">적용하고 닫기</button><button class="btn" id="edDl">PNG 받기</button><button class="btn" id="edDlJpg">JPG 받기</button><button class="btn" id="edClose">닫기</button></div>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlg"><h3 id="dlgTitle"></h3><textarea id="dlgText"></textarea><div class="row"><button class="btn" id="dlgNo">취소</button><button class="btn dark" id="dlgOk">확인</button></div></dialog>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const uid = () => Math.random().toString(36).slice(2, 9);
+  let AUTH = null;
+  try { const a = JSON.parse(localStorage.getItem("buyest.dash.auth") || "null"); if (a && a.id) AUTH = a; } catch (_) {}
+  if (!AUTH) { $("#gate").style.display = "block"; return; }
+  $("#app").style.display = "block"; $("#me").textContent = AUTH.id + " 님";
+
+  const KRW = 1400;
+  const WORKER = (() => { try { return localStorage.getItem("buyest.lookbook.worker"); } catch (_) { return null; } })() || "https://buyest-lookbook.buyest.workers.dev";
+  const WK = WORKER.replace(/\/$/, "");
+  const won = (usd) => `약 ${(Math.round((usd * KRW) / 10) * 10).toLocaleString("ko-KR")}원`;
+  const toast = (m) => { const t = $("#toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => (t.style.display = "none"), 3200); };
+
+  // ── 인스타 크기 ──────────────────────────────────
+  const FORMATS = [
+    { id: "feed", name: "피드 4:5", sub: "1080×1350", ratio: "4:5", w: 1080, h: 1350, ico: [18, 22], note: "인스타 피드에서 가장 크게 보이는 세로형이에요. 프로필 격자에서는 가운데 3:4만 보여서, 중요한 건 가운데에 모읍니다." },
+    { id: "square", name: "정사각 1:1", sub: "1080×1080", ratio: "1:1", w: 1080, h: 1080, ico: [20, 20], note: "어디서나 안전한 크기예요. 프로필 격자에서는 좌우가 조금 잘립니다." },
+    { id: "story", name: "스토리·릴스 9:16", sub: "1080×1920", ratio: "9:16", w: 1080, h: 1920, ico: [14, 25], note: "스토리·릴스 커버용. 위 14%·아래 20%는 버튼과 프로필에 가려지니 글자는 그 안쪽에 두세요." },
+  ];
+  let fmt = FORMATS[0];
+  const fmtOf = (id) => FORMATS.find((f) => f.id === id) || FORMATS[0];
+  function drawFmt() {
+    $("#fmtSeg").innerHTML = FORMATS.map((f) => `<button data-f="${f.id}" class="${f.id === fmt.id ? "on" : ""}"><i class="fmt-ico" style="width:${f.ico[0]}px;height:${f.ico[1]}px"></i><b>${f.name}</b><span>${f.sub}</span></button>`).join("");
+    $("#fmtNote").textContent = fmt.note;
+  }
+  $("#fmtSeg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; fmt = fmtOf(b.dataset.f); drawFmt(); };
+
+  // ── 컷 / 스타일 데이터 ───────────────────────────
+  const MODES = [
+    { id: "lb", name: "룩북",
+      scene: "A fashion lookbook photograph for an Instagram post. A model wears the product in the reference photo.",
+      styles: [
+        { id: "studio", name: "스튜디오 (심플)", p: "Controlled seamless studio backdrop in warm light grey, professional strobe lighting, clean soft shadows, emphasis on fabric texture and silhouette, generous negative space." },
+        { id: "natural", name: "로케이션 자연광", p: "Authentic location with soft natural window light, lifestyle editorial mood, shallow depth of field, calm and refined." },
+        { id: "street", name: "도시 거리", p: "Quiet city street in the early morning, clean architecture in the background, natural light, candid editorial feel." },
+        { id: "block", name: "컬러 블록", p: "Bold solid colour-block backdrop in a muted tone that complements the product, editorial lighting, graphic and minimal." },
+        { id: "play", name: "파스텔 놀이터", fit: "kids", p: "Soft pastel playroom or sunny park, gentle daylight, cheerful and wholesome atmosphere." },
+      ],
+      shots: [
+        { id: "lb_full", name: "전신 정면", p: "Full-length front view, model standing relaxed, the entire outfit visible from head to toe." },
+        { id: "lb_walk", name: "걷는 컷", p: "Mid-stride walking, three-quarter view, natural movement of the fabric." },
+        { id: "lb_pose", name: "포즈·기대기", p: "Editorial pose, leaning or seated, relaxed attitude, the outfit clearly visible." },
+        { id: "lb_half", name: "상반신", p: "Waist-up framing that focuses on the upper part of the product and its details." },
+        { id: "lb_flat", name: "소품 플랫레이", p: "No person. Styled flat lay of the product seen from above with a few complementary accessories on a textured surface.", noModel: true },
+      ] },
+    { id: "rw", name: "런웨이",
+      scene: "A fashion show runway photograph for an Instagram post, shot by a professional photographer from the end of the runway with a telephoto lens, no flash. A model walks in the product from the reference photo, styled as a complete look.",
+      styles: [
+        { id: "white", name: "화이트 쇼", p: "Minimalist white runway with softly lit white walls and bright, even show lighting." },
+        { id: "dark", name: "다크 스포트라이트", p: "Dark show space, strong overhead spotlights, dramatic contrast, glossy black floor." },
+        { id: "concrete", name: "콘크리트 쇼룸", p: "Raw concrete venue, industrial minimalism, cool daylight from skylights." },
+        { id: "kidsrw", name: "키즈 파스텔 무대", fit: "kids", p: "Playful pastel kids fashion show stage, soft lights, a child model walking confidently and happily." },
+      ],
+      shots: [
+        { id: "rw_front", name: "정면 풀샷", p: "Full-length front-on view of the model walking straight toward the camera, shoes to head fully visible." },
+        { id: "rw_walk", name: "3/4 워킹", p: "Three-quarter view of the model mid-stride, fabric in motion." },
+        { id: "rw_back", name: "뒷모습", p: "Back view of the model walking away down the runway, showing the back of the product." },
+        { id: "rw_detail", name: "디테일 클로즈업", p: "Close-up detail shot of the product while walking, showing texture and construction, shallow depth of field." },
+      ] },
+    { id: "md", name: "모델컷",
+      scene: "A clean e-commerce model photograph that looks great on an Instagram post. A model wears the product from the reference photo, honest and true to the product, soft even lighting, relaxed natural expression.",
+      styles: [
+        { id: "white", name: "순백 배경", p: "Pure white seamless background." },
+        { id: "grey", name: "라이트 그레이", p: "Light grey seamless background." },
+        { id: "beige", name: "따뜻한 베이지", p: "Warm beige seamless background." },
+        { id: "room", name: "밝은 미니멀 룸", p: "Bright minimal room with soft natural daylight." },
+      ],
+      shots: [
+        { id: "md_front", name: "정면 서있기", p: "Standing straight, front view, full length." },
+        { id: "md_side", name: "측면", p: "Standing in side profile, full length." },
+        { id: "md_back", name: "뒷모습", p: "Standing with the back to the camera, full length, showing the back of the product." },
+        { id: "md_sit", name: "앉은 컷", p: "Sitting casually on a simple stool, outfit fully visible." },
+        { id: "md_close", name: "상반신 클로즈", p: "Close waist-up portrait, focus on neckline, collar and fabric." },
+        { id: "md_sleeve", name: "소매·허리 디테일", p: "Cropped detail of sleeve, cuff or waist area being worn, face not shown." },
+      ] },
+    { id: "ex", name: "추천",
+      scene: "A product-focused photograph for an Instagram post.",
+      styles: [],
+      shots: [
+        { id: "ex_cover", name: "피드 커버 (제목 자리)", p: "Hero cover image: the product (worn by a model if it is clothing) placed in the lower two thirds, leaving clean empty negative space in the upper third reserved for a large title." },
+        { id: "ex_clean", name: "상세 클린컷", p: "No person. The product alone, centred on a pure white background with a soft natural shadow, perfectly lit, e-commerce clean cut.", noModel: true },
+        { id: "ex_macro", name: "소재·로고 매크로", p: "No person. Macro close-up of the product's fabric, stitching or hardware, shallow depth of field, tactile and premium.", noModel: true },
+        { id: "ex_still", name: "무드 스틸라이프", p: "No person. Moody still life of the product with a few props such as flowers, a book or ceramics, soft directional light, styled like a magazine page.", noModel: true },
+        { id: "ex_text", name: "글자용 배경 (카드뉴스)", p: "No person. A soft abstract background in the product's colour palette with subtle paper texture and a small blurred hint of the product in one corner, a large calm empty area for text.", noModel: true },
+        { id: "ex_story", name: "스토리 신상 입고", p: "Vertical story image: the product (or model wearing it) centred, calm background, generous empty space at the top and bottom for stickers and text." },
+      ] },
+  ];
+  const SHOT = {}; MODES.forEach((m) => m.shots.forEach((s) => (SHOT[s.id] = { ...s, mode: m.id })));
+  const SETS = [
+    { name: "신상 입고 캐러셀 6장", desc: "커버 → 착용 → 디테일 → 클린컷 순서로 넘기는 구성", ids: ["ex_cover", "lb_full", "lb_walk", "lb_half", "ex_macro", "ex_clean"] },
+    { name: "화보 무드 5장", desc: "분위기 중심의 룩북 피드", ids: ["lb_full", "lb_pose", "lb_half", "lb_walk", "ex_still"] },
+    { name: "런웨이 4장", desc: "쇼 현장처럼 보이는 정면·워킹·뒷모습·디테일", ids: ["rw_front", "rw_walk", "rw_back", "rw_detail"] },
+    { name: "착용샷 세트 5장", desc: "상세페이지에도 쓰는 정면·측면·뒷면·클로즈업", ids: ["md_front", "md_side", "md_back", "md_close", "ex_macro"] },
+  ];
+  const TONES = [
+    { id: "", name: "자연스럽게", p: "" },
+    { id: "warm", name: "따뜻하고 부드럽게", p: "Warm, soft colour grade." },
+    { id: "cool", name: "차갑고 모던하게", p: "Cool, modern colour grade with crisp contrast." },
+    { id: "film", name: "필름 그레인", p: "35mm film look with subtle grain and gentle highlight roll-off." },
+    { id: "bw", name: "하이패션 흑백", p: "High-fashion black and white photograph with rich tonal range." },
+  ];
+
+  let brand = "buyest", mode = "lb", HEALTH = null;
+  const refs = []; // 올린 상품 사진 { id, data }
+  const sel = new Set(["lb_full"]);
+  const styleOf = { lb: "studio", rw: "white", md: "white" };
+  const modelOpt = { who: "auto", face: "auto" };
+  $("#tone").innerHTML = TONES.map((t) => `<option value="${t.id}">${t.name}</option>`).join("");
+
+  function drawSets() {
+    $("#sets").innerHTML = SETS.map((s, i) => `<button data-i="${i}"><b>${s.name}</b><span>${s.desc}</span></button>`).join("");
+  }
+  $("#sets").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; sel.clear(); SETS[b.dataset.i].ids.forEach((id) => sel.add(id)); drawModes(); updateCost(); };
+
+  function drawModes() {
+    $("#modeTabs").innerHTML = MODES.map((m) => { const c = m.shots.filter((s) => sel.has(s.id)).length; return `<button data-m="${m.id}" class="${m.id === mode ? "on" : ""}">${m.name}${c ? `<span class="cnt">${c}</span>` : ""}</button>`; }).join("");
+    const m = MODES.find((x) => x.id === mode);
+    let opts = "";
+    const styles = m.styles.filter((s) => !s.fit || s.fit === brand);
+    if (styles.length) {
+      if (!styles.some((s) => s.id === styleOf[m.id])) styleOf[m.id] = styles[0].id;
+      opts += `<label class="f">${mode === "rw" ? "무대 분위기" : mode === "md" ? "배경" : "장소·분위기"}</label><div class="chips" id="styleChips">${styles.map((s) => `<button class="chip ${styleOf[m.id] === s.id ? "on" : ""}" data-s="${s.id}">${s.name}</button>`).join("")}</div>`;
+    }
+    if (mode !== "ex") {
+      const who = brand === "kids" ? [["auto", "자동"], ["girl", "여아"], ["boy", "남아"]] : [["auto", "자동"], ["woman", "여성"], ["man", "남성"]];
+      if (!who.some((w) => w[0] === modelOpt.who)) modelOpt.who = "auto";
+      opts += `<div class="grid2" style="margin-top:10px"><div><label class="f">모델</label><select id="optWho">${who.map((w) => `<option value="${w[0]}" ${modelOpt.who === w[0] ? "selected" : ""}>${w[1]}</option>`).join("")}</select></div>
+        <div><label class="f">인상</label><select id="optFace">${[["auto", "자동"], ["korean", "한국인"], ["western", "서양인"]].map((w) => `<option value="${w[0]}" ${modelOpt.face === w[0] ? "selected" : ""}>${w[1]}</option>`).join("")}</select></div></div>`;
+    }
+    $("#modeOpts").innerHTML = opts;
+    $("#shotChips").innerHTML = m.shots.map((s) => `<button class="chip ${sel.has(s.id) ? "on" : ""}" data-id="${s.id}">${s.name}</button>`).join("");
+  }
+  $("#modeTabs").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; mode = b.dataset.m; drawModes(); };
+  $("#modeOpts").onclick = (e) => { const b = e.target.closest("[data-s]"); if (!b) return; styleOf[mode] = b.dataset.s; drawModes(); };
+  $("#modeOpts").onchange = (e) => { if (e.target.id === "optWho") modelOpt.who = e.target.value; if (e.target.id === "optFace") modelOpt.face = e.target.value; };
+  $("#shotChips").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; const id = b.dataset.id; sel.has(id) ? sel.delete(id) : sel.add(id); drawModes(); updateCost(); };
+  $("#brandToggle").onclick = (e) => { const b = e.target.dataset.brand; if (!b) return; brand = b; document.querySelectorAll("#brandToggle button").forEach((x) => x.classList.toggle("on", x.dataset.brand === b)); drawModes(); };
+
+  // ── 서버 상태 ────────────────────────────────────
+  async function wapi(path, body) {
+    let r;
+    try { r = await fetch(WK + path, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", "X-Studio-User": AUTH.id, "X-Studio-Pass": AUTH.pass }, body: body ? JSON.stringify(body) : undefined }); }
+    catch (_) { const e = new Error("AI 서버에 연결하지 못했습니다"); e.status = 0; throw e; }
+    let d = null; try { d = await r.json(); } catch (_) {}
+    if (!r.ok) { const e = new Error((d && d.error) || `AI 서버 오류 (${r.status})`); e.status = r.status; throw e; }
+    return d;
+  }
+  function drawProviders() {
+    const list = (HEALTH && HEALTH.providers) || [{ id: "gemini", label: "Gemini (구글)", ready: false, usd: 0.04 }, { id: "openai", label: "OpenAI (GPT 이미지)", ready: false, usd: 0.06 }];
+    const cur = $("#provider").value;
+    $("#provider").innerHTML = list.map((p) => `<option value="${p.id}" ${p.ready ? "" : "disabled"}>${p.label}${p.ready ? "" : " — 키 미등록"}</option>`).join("");
+    const firstReady = list.find((p) => p.ready);
+    $("#provider").value = list.some((p) => p.id === cur && p.ready) ? cur : firstReady ? firstReady.id : list[0].id;
+    updateCost();
+  }
+  (async () => {
+    drawProviders();
+    try {
+      HEALTH = await wapi("/api/health");
+      const ready = HEALTH.providers.filter((p) => p.ready);
+      const st = $("#status");
+      if (ready.length) st.textContent = `AI 서버 v${HEALTH.version} 연결됨 · ${ready.map((p) => p.label).join(" · ")}`;
+      else { st.textContent = `AI 서버 v${HEALTH.version} 는 연결됐지만 Gemini·OpenAI 키가 아직 등록되지 않았습니다. 담당자가 키를 등록하면 켜집니다.`; st.classList.add("bad"); }
+      drawProviders();
+    } catch (e) { const st = $("#status"); st.textContent = `AI 서버에 연결하지 못했습니다 (${e.message}). 담당자가 서버(Worker)를 배포하면 켜집니다.`; st.classList.add("bad"); }
+  })();
+  function updateCost() {
+    const p = ((HEALTH && HEALTH.providers) || []).find((x) => x.id === $("#provider").value);
+    const total = sel.size * Number($("#perShot").value);
+    $("#cost").innerHTML = sel.size ? `<b>${total}장</b> 만들기${p ? ` · 예상 ${won(total * p.usd)} (장당 약 $${p.usd})` : ""}` : "컷을 하나 이상 골라 주세요.";
+    $("#go").disabled = !sel.size || !refs.length;
+  }
+  $("#provider").onchange = updateCost; $("#perShot").onchange = updateCost;
+
+  // ── 상품 사진 ────────────────────────────────────
+  const drop = $("#drop"), files = $("#files");
+  function shrink(file, max = 1280) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file), im = new Image();
+      im.onload = () => { const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c.toDataURL("image/jpeg", 0.88)); };
+      im.onerror = () => { URL.revokeObjectURL(url); rej(new Error("사진을 열 수 없어요")); };
+      im.src = url;
+    });
+  }
+  async function addFiles(list) {
+    const max = (HEALTH && HEALTH.maxRefs) || 6;
+    for (const f of [...list]) {
+      if (!/^image\//.test(f.type)) continue;
+      if (refs.length >= max) { toast(`사진은 최대 ${max}장까지 올릴 수 있어요`); break; }
+      try { refs.push({ id: uid(), data: await shrink(f) }); } catch (e) { toast(e.message); }
+    }
+    drawRefs();
+  }
+  function drawRefs() {
+    $("#refs").innerHTML = refs.map((r) => `<div class="ref"><img src="${r.data}" alt="상품 사진"><button data-id="${r.id}" aria-label="사진 지우기">×</button></div>`).join("");
+    updateCost();
+  }
+  $("#refs").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; const i = refs.findIndex((r) => r.id === b.dataset.id); if (i >= 0) refs.splice(i, 1); drawRefs(); };
+  drop.onclick = () => files.click();
+  drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); files.click(); } };
+  files.onchange = () => { addFiles(files.files); files.value = ""; };
+  ["dragover", "dragenter"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
+  document.addEventListener("paste", (e) => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) addFiles(fs); });
+
+  // ── 프롬프트 ─────────────────────────────────────
+  function buildPrompt(shot, fm) {
+    const m = MODES.find((x) => x.id === shot.mode);
+    const kids = brand === "kids";
+    const parts = [];
+    const info = [$("#pBrand").value.trim(), $("#pName").value.trim()].filter(Boolean).join(" ");
+    parts.push(`Use the attached reference photo(s) as the exact product${info ? ` (${info})` : ""}. Keep the product's design, colour, fabric, logo placement, proportions and details exactly as in the reference. Do not invent or change logos, prints, hardware or labels.`);
+    parts.push(m.scene);
+    if (!shot.noModel && shot.mode !== "ex" || shot.id === "ex_cover" || shot.id === "ex_story") {
+      const who = { woman: "an adult woman", man: "an adult man", girl: "a young girl", boy: "a young boy" }[modelOpt.who];
+      const face = { korean: "Korean", western: "Western" }[modelOpt.face];
+      if (who || face) parts.push(`The model is ${face ? face + " " : ""}${who || (kids ? "a child" : "a fashion model")}.`);
+    }
+    const st = m.styles.find((s) => s.id === styleOf[m.id] && (!s.fit || s.fit === brand));
+    if (st) parts.push(st.p);
+    parts.push(shot.p);
+    if (kids) parts.push("This is children's fashion. If a child appears, they are naturally posed, cheerful, age-appropriate and fully dressed exactly as the product shows; a wholesome, candid, non-sexualised portrait.");
+    else if (!shot.noModel) parts.push("Refined, sophisticated, high-end adult fashion mood.");
+    if (fm.id === "feed") parts.push("Vertical 4:5 Instagram feed composition. Keep the key subject inside the central 3:4 area because the profile grid crops the sides; leave some breathing room around the subject.");
+    else if (fm.id === "story") parts.push("Vertical 9:16 Instagram story composition. Keep the top 14% and bottom 20% free of important content.");
+    else parts.push("Square 1:1 Instagram composition with the subject centred.");
+    const tone = TONES.find((t) => t.id === $("#tone").value); if (tone && tone.p) parts.push(tone.p);
+    const extra = $("#extra").value.trim(); if (extra) parts.push(`Additional direction from the art director: ${extra}`);
+    parts.push("Photorealistic professional fashion photography, sharp focus, natural skin and fabric texture. No text, captions, watermarks, borders or extra logos anywhere in the image.");
+    return parts.join(" ");
+  }
+
+  // ── 결과(콘택트 시트) ────────────────────────────
+  const items = []; // { id, num, shotId, label, fmt, src, final, layers, picked, status, err, prompt, provider }
+  let counter = 0;
+  const GREASE = '<svg class="circle" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M13 50C9 22 40 7 70 11C93 15 97 46 89 71C81 93 40 97 19 81C6 71 9 54 15 46" fill="none" stroke="#d4372a" stroke-width="2.6" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>';
+  function frameHTML(it) {
+    const f = fmtOf(it.fmt);
+    const pic = it.status === "done" ? `<img src="${it.final || it.src}" alt="${esc(it.label)}">` : it.status === "err" ? `<div class="develop err"><b>만들지 못했어요</b><span>${esc(it.err)}</span></div>` : `<div class="develop"><b>현상 중…</b><span>${esc(it.label)}</span></div>`;
+    const acts = it.status === "done" ? `<button class="btn" data-a="edit">타이틀·로고</button><button class="btn" data-a="refine">수정 요청</button><button class="btn pickbtn" data-a="pick">${it.picked ? "표시 해제" : "표시"}</button><button class="btn" data-a="dl">받기</button><button class="btn red" data-a="del">삭제</button>`
+      : it.status === "err" ? `<button class="btn" data-a="retry">다시 시도</button><button class="btn red" data-a="del">삭제</button>` : `<button class="btn red" data-a="del">취소</button>`;
+    return `<div class="frame ${it.picked ? "picked" : ""}" data-id="${it.id}"><div class="pic" style="aspect-ratio:${f.w}/${f.h}" data-a="${it.status === "done" ? "edit" : ""}">${pic}${GREASE}</div><div class="edge"><span>BUYEST ▸ ${String(it.num).padStart(2, "0")}</span><span>${esc(it.label)}</span></div><div class="acts">${acts}</div></div>`;
+  }
+  function drawFrames() {
+    $("#frames").innerHTML = items.map(frameHTML).join("");
+    $("#empty").style.display = items.length ? "none" : "block";
+    const done = items.filter((i) => i.status === "done").length, pk = items.filter((i) => i.picked).length;
+    $("#sheetInfo").textContent = `${items.length} FRAMES · ${done} DEVELOPED${pk ? ` · ${pk} MARKED` : ""}`;
+  }
+  const byId = (id) => items.find((i) => i.id === id);
+
+  async function runItem(it) {
+    it.status = "pending"; it.err = ""; drawFrames();
+    try {
+      const d = await wapi("/api/generate", { provider: it.provider, prompt: it.prompt, images: it.refs, aspect: fmtOf(it.fmt).ratio, n: 1 });
+      it.src = d.images[0]; it.final = null; it.status = "done";
+    } catch (e) { it.status = "err"; it.err = e.message; }
+    drawFrames();
+  }
+  async function queue(list, limit = 3) {
+    const q = [...list];
+    await Promise.all(Array.from({ length: Math.min(limit, q.length) }, async () => { while (q.length) await runItem(q.shift()); }));
+  }
+  $("#go").onclick = async () => {
+    if (!refs.length) return toast("상품 사진을 먼저 올려 주세요");
+    const prov = $("#provider").value, per = Number($("#perShot").value), rd = refs.map((r) => r.data);
+    const total = sel.size * per;
+    if (total > 8 && !confirm(`${total}장을 한 번에 만듭니다. 계속할까요?`)) return;
+    const list = [];
+    MODES.forEach((m) => m.shots.forEach((s) => { if (!sel.has(s.id)) return; for (let k = 0; k < per; k++) { const sh = SHOT[s.id]; list.push({ id: uid(), num: ++counter, shotId: s.id, label: `${m.name} / ${s.name}`, fmt: fmt.id, prompt: buildPrompt(sh, fmt), provider: prov, refs: rd, status: "pending", picked: false, layers: [], src: "", final: null }); } }));
+    items.unshift(...list); drawFrames();
+    $("#go").disabled = true; await queue(list); updateCost();
+    const bad = list.filter((i) => i.status === "err").length;
+    toast(bad ? `${list.length - bad}장 완성, ${bad}장은 실패했어요` : `${list.length}장 완성!`);
+  };
+
+  $("#frames").onclick = async (e) => {
+    const t = e.target.closest("[data-a]"); if (!t || !t.dataset.a) return;
+    const fr = t.closest(".frame"), it = byId(fr.dataset.id); if (!it) return;
+    const a = t.dataset.a;
+    if (a === "edit") openEditor(it);
+    else if (a === "pick") { it.picked = !it.picked; drawFrames(); }
+    else if (a === "del") { if (it.status === "done" && !confirm("이 컷을 지울까요?")) return; items.splice(items.indexOf(it), 1); drawFrames(); }
+    else if (a === "retry") runItem(it);
+    else if (a === "dl") downloadItem(it, "png");
+    else if (a === "refine") {
+      const txt = await ask("어떻게 고칠까요?", "예) 배경을 더 밝게, 모델 표정을 웃는 얼굴로, 소매를 접어 올려서");
+      if (!txt) return;
+      const n = { ...it, id: uid(), num: ++counter, label: it.label + " (수정)", refs: [it.src], prompt: `Edit the attached image: ${txt}. Keep the product, its logos and all other details exactly the same. No text, captions or watermarks.`, status: "pending", picked: false, layers: [], final: null };
+      items.splice(items.indexOf(it) + 1, 0, n); runItem(n);
+    }
+  };
+  $("#pickAll").onclick = () => { const all = items.filter((i) => i.status === "done"); const on = all.some((i) => !i.picked); all.forEach((i) => (i.picked = on)); drawFrames(); };
+  $("#dlPicked").onclick = async () => { const p = items.filter((i) => i.picked && i.status === "done"); if (!p.length) return toast("받을 컷에 먼저 표시(빨간 동그라미)를 해 주세요"); for (const i of p) { await downloadItem(i, "png"); await new Promise((r) => setTimeout(r, 350)); } };
+  window.addEventListener("beforeunload", (e) => { if (items.some((i) => i.status === "done")) { e.preventDefault(); e.returnValue = ""; } });
+
+  // 간단한 입력 창
+  function ask(title, ph) {
+    return new Promise((res) => {
+      const d = $("#dlg"); $("#dlgTitle").textContent = title; const t = $("#dlgText"); t.value = ""; t.placeholder = ph || "";
+      const done = (v) => { d.close(); res(v); };
+      $("#dlgOk").onclick = () => done(t.value.trim()); $("#dlgNo").onclick = () => done(""); d.oncancel = () => res("");
+      d.showModal(); t.focus();
+    });
+  }
+
+  // ── 로고 보관함 ──────────────────────────────────
+  let LOGOS = [];
+  try { LOGOS = JSON.parse(localStorage.getItem("buyest.v2.logos") || "[]"); } catch (_) {}
+  const saveLogos = () => { try { localStorage.setItem("buyest.v2.logos", JSON.stringify(LOGOS)); } catch (_) { toast("로고를 저장하지 못했어요 (브라우저 저장공간 부족)"); } };
+  const logoImg = {}; // id → HTMLImageElement
+  function loadLogoImg(l) { if (logoImg[l.id]) return logoImg[l.id]; const im = new Image(); im.onload = () => edRender && edRender(); im.src = l.data; return (logoImg[l.id] = im); }
+  function fileToLogo(file) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file), im = new Image();
+      im.onload = () => { const k = Math.min(1, 700 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k)); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c.toDataURL("image/png")); };
+      im.onerror = () => { URL.revokeObjectURL(url); rej(new Error("로고 파일을 열 수 없어요")); };
+      im.src = url;
+    });
+  }
+  function logoLibHTML(withUse) {
+    if (!LOGOS.length) return `<p class="hint" style="grid-column:1/-1">아직 로고가 없어요. 아래 버튼으로 BUYEST 로고를 올려 보세요.</p>`;
+    return LOGOS.map((l) => `<div class="logo-card" data-id="${l.id}"><button class="x" data-a="rm" aria-label="로고 지우기">×</button><div class="th"><img src="${l.data}" alt="${esc(l.name)}"></div><input value="${esc(l.name)}" data-a="name" aria-label="로고 이름">${withUse ? `<div class="mini"><button class="btn" data-a="use">얹기</button><button class="btn" data-a="swap">바꾸기</button></div>` : ""}</div>`).join("");
+  }
+  function drawLogoLib() { $("#logoLib").innerHTML = logoLibHTML(false); $("#logoCount").textContent = LOGOS.length ? `(${LOGOS.length})` : ""; }
+  function pickLogoFile() {
+    return new Promise((res) => { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.onchange = async () => { const f = inp.files[0]; if (!f) return res(null); try { const data = await fileToLogo(f); const l = { id: uid(), name: f.name.replace(/\.[^.]+$/, "").slice(0, 24) || "로고", data }; LOGOS.push(l); saveLogos(); drawLogoLib(); res(l); } catch (e) { toast(e.message); res(null); } }; inp.click(); });
+  }
+  $("#logoAdd").onclick = () => pickLogoFile();
+  function logoLibEvents(root, onUse, onSwap) {
+    root.addEventListener("click", (e) => { const c = e.target.closest(".logo-card"); const b = e.target.closest("[data-a]"); if (!c || !b) return; const l = LOGOS.find((x) => x.id === c.dataset.id); if (!l) return; const a = b.dataset.a;
+      if (a === "rm") { if (!confirm(`"${l.name}" 로고를 보관함에서 지울까요?`)) return; LOGOS = LOGOS.filter((x) => x !== l); saveLogos(); drawLogoLib(); if (onUse) renderEdLogos(); } else if (a === "use" && onUse) onUse(l); else if (a === "swap" && onSwap) onSwap(l); });
+    root.addEventListener("change", (e) => { const c = e.target.closest(".logo-card"); if (!c || e.target.dataset.a !== "name") return; const l = LOGOS.find((x) => x.id === c.dataset.id); if (l) { l.name = e.target.value.trim().slice(0, 24) || "로고"; saveLogos(); } });
+  }
+  logoLibEvents($("#logoLib"));
+  drawLogoLib();
+
+  // ── 합성(글자·로고) ──────────────────────────────
+  const FONTS = [
+    { id: "Noto Serif KR", name: "명조 (Noto Serif)" }, { id: "Noto Sans KR", name: "고딕 (Noto Sans)" }, { id: "Black Han Sans", name: "굵은 제목체 (Black Han Sans)" },
+    { id: "Gowun Batang", name: "고운바탕" }, { id: "Playfair Display", name: "Playfair (영문 세리프)" }, { id: "Cormorant Garamond", name: "Cormorant (영문 우아)" }, { id: "Montserrat", name: "Montserrat (영문 산세리프)" },
+  ];
+  const fontReady = {};
+  function ensureFont(fam, weight, sample) { const k = fam + weight; if (fontReady[k]) return Promise.resolve(); return document.fonts.load(`${weight} 40px "${fam}"`, sample || "가A").then(() => { fontReady[k] = true; }).catch(() => {}); }
+  const tintCache = new Map();
+  function tinted(img, tint, key) {
+    if (tint === "none" || !img.complete || !img.naturalWidth) return img;
+    const k = key + tint + img.naturalWidth; if (tintCache.has(k)) return tintCache.get(k);
+    const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; const x = c.getContext("2d"); x.drawImage(img, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = tint === "white" ? "#fff" : "#000"; x.fillRect(0, 0, c.width, c.height);
+    tintCache.set(k, c); return c;
+  }
+  function measure(ctx, L, W) {
+    const px = (L.size / 100) * W; ctx.font = `${L.bold ? 700 : 400} ${px}px "${L.font}", "Noto Sans KR", serif`; if ("letterSpacing" in ctx) ctx.letterSpacing = `${(L.ls / 100) * px}px`;
+    const lines = String(L.text || "").split("\n"); const lh = px * 1.28; const w = Math.max(1, ...lines.map((s) => ctx.measureText(s).width));
+    return { px, lines, lh, w, h: lines.length * lh };
+  }
+  // 한 컷을 캔버스에 그린다. 반환: 레이어별 영역(마우스 선택용)
+  function renderItem(ctx, W, H, img, layers) {
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = "#222"; ctx.fillRect(0, 0, W, H);
+    if (img && img.naturalWidth) { const k = Math.max(W / img.naturalWidth, H / img.naturalHeight), w = img.naturalWidth * k, h = img.naturalHeight * k; ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h); }
+    const boxes = [];
+    for (const L of layers) {
+      if (L.type === "text") {
+        if (!String(L.text || "").trim()) { boxes.push({ L, x: 0, y: 0, w: 0, h: 0 }); continue; }
+        const m = measure(ctx, L, W); const cx = L.x * W, cy = L.y * H, bx = cx - m.w / 2, by = cy - m.h / 2;
+        ctx.save();
+        if (L.bar) { const pad = m.px * 0.45; ctx.globalAlpha = L.barOp; ctx.fillStyle = L.barColor; ctx.fillRect(bx - pad * 1.4, by - pad * 0.55, m.w + pad * 2.8, m.h + pad * 1.1); ctx.globalAlpha = 1; }
+        ctx.font = `${L.bold ? 700 : 400} ${m.px}px "${L.font}", "Noto Sans KR", serif`; if ("letterSpacing" in ctx) ctx.letterSpacing = `${(L.ls / 100) * m.px}px`;
+        ctx.fillStyle = L.color; ctx.textBaseline = "middle"; ctx.textAlign = L.align;
+        if (L.shadow) { ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = m.px * 0.25; ctx.shadowOffsetY = m.px * 0.04; }
+        const ax = L.align === "left" ? bx : L.align === "right" ? bx + m.w : cx;
+        m.lines.forEach((s, i) => ctx.fillText(s, ax, by + m.lh * (i + 0.5)));
+        ctx.restore(); boxes.push({ L, x: bx, y: by, w: m.w, h: m.h });
+      } else {
+        const lg = LOGOS.find((l) => l.id === L.logoId); if (!lg) { boxes.push({ L, x: 0, y: 0, w: 0, h: 0 }); continue; }
+        const im = loadLogoImg(lg); if (!im.complete || !im.naturalWidth) { boxes.push({ L, x: 0, y: 0, w: 0, h: 0 }); continue; }
+        const w = (L.size / 100) * W, h = w * (im.naturalHeight / im.naturalWidth), x = L.x * W - w / 2, y = L.y * H - h / 2;
+        ctx.save(); ctx.globalAlpha = L.opacity; ctx.drawImage(tinted(im, L.tint, lg.id), x, y, w, h); ctx.restore(); boxes.push({ L, x, y, w, h });
+      }
+    }
+    return boxes;
+  }
+  const imgCache = new Map();
+  function loadImg(src) { if (imgCache.has(src)) return imgCache.get(src); const p = new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("이미지를 열 수 없어요")); im.src = src; }); imgCache.set(src, p); if (imgCache.size > 40) imgCache.delete(imgCache.keys().next().value); return p; }
+  async function composeItem(it, kind = "image/jpeg", q = 0.92) {
+    const f = fmtOf(it.fmt), base = await loadImg(it.src);
+    await Promise.all(it.layers.filter((l) => l.type === "text").map((l) => ensureFont(l.font, l.bold ? 700 : 400, l.text)));
+    await Promise.all(it.layers.filter((l) => l.type === "logo").map((l) => { const lg = LOGOS.find((x) => x.id === l.logoId); return lg ? new Promise((r) => { const im = loadLogoImg(lg); im.complete ? r() : im.addEventListener("load", r, { once: true }); }) : null; }));
+    const c = document.createElement("canvas"); c.width = f.w; c.height = f.h; renderItem(c.getContext("2d"), f.w, f.h, base, it.layers);
+    return kind === "blob-png" ? new Promise((r) => c.toBlob(r, "image/png")) : kind === "blob-jpg" ? new Promise((r) => c.toBlob(r, "image/jpeg", 0.94)) : c.toDataURL(kind, q);
+  }
+  async function downloadItem(it, ext) {
+    const blob = await composeItem(it, ext === "jpg" ? "blob-jpg" : "blob-png"), a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `buyest_ig_${String(it.num).padStart(2, "0")}_${it.shotId}.${ext}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+
+  // ── 편집기 ───────────────────────────────────────
+  let cur = null, work = [], selId = null, edBase = null, edBoxes = [], edRender = null, drag = null;
+  const cv = $("#edCanvas"), cx = cv.getContext("2d");
+  const brandWord = () => (brand === "kids" ? "BUYEST KIDS" : "BUYEST");
+  const textLayer = (o) => ({ type: "text", id: uid(), text: "TEXT", font: "Noto Serif KR", size: 7, color: "#ffffff", bold: true, align: "center", ls: 0, shadow: true, bar: false, barColor: "#000000", barOp: 0.55, x: 0.5, y: 0.5, ...o });
+  const logoLayer = (o) => ({ type: "logo", id: uid(), logoId: "", size: 22, opacity: 1, tint: "none", x: 0.5, y: 0.1, ...o });
+  const val = (id, fallback) => $(id).value.trim() || fallback;
+  const PRESETS = [
+    { name: "매거진 타이틀", make: () => [textLayer({ text: val("#pBrand", brandWord()), font: "Playfair Display", size: 15, ls: 6, bold: true, y: 0.1 }), textLayer({ text: val("#pTitle", "NEW ARRIVAL"), font: "Cormorant Garamond", size: 5.6, ls: 22, bold: false, y: 0.16 }), textLayer({ text: [val("#pName", ""), val("#pPrice", "")].filter(Boolean).join("   ") || "PRODUCT NAME", font: "Montserrat", size: 2.8, ls: 12, bold: false, y: 0.94, shadow: true })] },
+    { name: "하단 정보바", make: () => [textLayer({ text: [val("#pBrand", brandWord()), val("#pName", "상품명")].join("\n") + (val("#pPrice", "") ? "\n" + val("#pPrice", "") : ""), font: "Noto Sans KR", size: 4.2, bold: true, y: 0.9, shadow: false, bar: true, barOp: 0.62 })] },
+    { name: "가운데 포스터", make: () => [textLayer({ text: val("#pTitle", "NEW IN"), font: "Black Han Sans", size: 18, ls: 2, bold: false, y: 0.47 }), textLayer({ text: val("#pBrand", brandWord()), font: "Montserrat", size: 3.6, ls: 30, bold: true, y: 0.6 })] },
+    { name: "신상 입고 스탬프", make: () => [textLayer({ text: val("#pTitle", "신상 입고"), font: "Noto Sans KR", size: 4.6, bold: true, x: 0.2, y: 0.07, shadow: false, bar: true, barColor: "#d4372a", barOp: 1 }), textLayer({ text: val("#pName", ""), font: "Noto Serif KR", size: 4.4, bold: true, y: 0.92 })] },
+    { name: "로고만 (상단 중앙)", make: () => (LOGOS[0] ? [logoLayer({ logoId: LOGOS[0].id, size: 30, y: 0.08, tint: "white" })] : [textLayer({ text: brandWord(), font: "Playfair Display", size: 11, ls: 8, y: 0.08 })]) },
+    { name: "비우기", make: () => [] },
+  ];
+  $("#presets").innerHTML = PRESETS.map((p, i) => `<button class="chip" data-i="${i}">${p.name}</button>`).join("");
+  $("#presets").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; if (work.length && !confirm("지금 넣은 글자·로고가 새 구성으로 바뀝니다. 계속할까요?")) return; work = PRESETS[b.dataset.i].make(); selId = work[0] ? work[0].id : null; edRefresh(); };
+
+  const fmtNow = () => fmtOf(cur.fmt);
+  edRender = function () {
+    if (!cur || !$("#ed").classList.contains("open")) return;
+    const f = fmtNow(); if (cv.width !== f.w || cv.height !== f.h) { cv.width = f.w; cv.height = f.h; }
+    edBoxes = renderItem(cx, f.w, f.h, edBase, work);
+    const sb = edBoxes.find((b) => b.L.id === selId); if (sb && sb.w) { cx.save(); cx.strokeStyle = "#d4372a"; cx.lineWidth = 3; cx.setLineDash([14, 8]); cx.strokeRect(sb.x - 6, sb.y - 6, sb.w + 12, sb.h + 12); cx.restore(); }
+    if ($("#guideOn").checked) drawGuide(f);
+  };
+  function drawGuide(f) {
+    const W = f.w, H = f.h; cx.save(); cx.fillStyle = "rgba(212,55,42,.16)"; cx.strokeStyle = "rgba(255,255,255,.9)"; cx.lineWidth = 3; cx.setLineDash([16, 10]);
+    if (f.id === "story") { cx.fillRect(0, 0, W, H * 0.14); cx.fillRect(0, H * 0.8, W, H * 0.2); cx.strokeRect(0, H * 0.14, W, H * 0.66); }
+    else { const gw = Math.min(W, H * 0.75); cx.fillRect(0, 0, (W - gw) / 2, H); cx.fillRect((W + gw) / 2, 0, (W - gw) / 2, H); cx.beginPath(); cx.moveTo((W - gw) / 2, 0); cx.lineTo((W - gw) / 2, H); cx.moveTo((W + gw) / 2, 0); cx.lineTo((W + gw) / 2, H); cx.stroke(); }
+    cx.restore();
+  }
+  function guideNote() { const f = fmtNow(); $("#guideNote").textContent = f.id === "story" ? "붉게 덮인 위·아래 영역은 스토리 화면에서 프로필·답장창에 가려져요." : "붉게 덮인 양옆은 프로필 격자(3:4)에서 잘려 보이는 부분이에요. 피드 본문에는 모두 보입니다."; }
+
+  function layerLabel(L) { if (L.type === "text") return String(L.text || "(빈 글자)").split("\n")[0].slice(0, 22); const lg = LOGOS.find((l) => l.id === L.logoId); return lg ? lg.name : "(로고 없음)"; }
+  function renderLayerList() {
+    $("#layerList").innerHTML = work.length ? work.map((L) => `<button data-id="${L.id}" class="${L.id === selId ? "on" : ""}"><span class="tag">${L.type === "text" ? "글자" : "로고"}</span>${esc(layerLabel(L))}</button>`).join("") : `<p class="hint">아직 아무것도 없어요. 아래 구성을 고르거나 글자·로고를 추가하세요. 캔버스에서 끌어서 위치를 옮길 수 있어요.</p>`;
+  }
+  function renderProps() {
+    const L = work.find((l) => l.id === selId), p = $("#layerProps");
+    if (!L) { p.innerHTML = ""; p.style.display = "none"; return; } p.style.display = "block";
+    if (L.type === "text") {
+      p.innerHTML = `<label class="f">글자 (줄바꿈 가능)</label><textarea data-k="text">${esc(L.text)}</textarea>
+        <div class="row" style="margin-top:8px"><label>글꼴</label><select data-k="font">${FONTS.map((f) => `<option value="${f.id}" ${f.id === L.font ? "selected" : ""}>${f.name}</option>`).join("")}</select></div>
+        <div class="row"><label>크기</label><input type="range" data-k="size" min="1.5" max="30" step="0.1" value="${L.size}"></div>
+        <div class="row"><label>글자 간격</label><input type="range" data-k="ls" min="0" max="40" step="1" value="${L.ls}"></div>
+        <div class="row"><label>색</label><input type="color" data-k="color" value="${L.color}"><label style="min-width:0"><input type="checkbox" data-k="bold" ${L.bold ? "checked" : ""}> 굵게</label><label style="min-width:0"><input type="checkbox" data-k="shadow" ${L.shadow ? "checked" : ""}> 그림자</label></div>
+        <div class="row"><label>정렬</label><select data-k="align">${[["left", "왼쪽"], ["center", "가운데"], ["right", "오른쪽"]].map((a) => `<option value="${a[0]}" ${L.align === a[0] ? "selected" : ""}>${a[1]}</option>`).join("")}</select></div>
+        <div class="row"><label style="min-width:0"><input type="checkbox" data-k="bar" ${L.bar ? "checked" : ""}> 글자 뒤 띠</label><input type="color" data-k="barColor" value="${L.barColor}"><input type="range" data-k="barOp" min="0.1" max="1" step="0.05" value="${L.barOp}" aria-label="띠 진하기"></div>
+        <div class="row"><button class="btn" data-a="center">가운데 맞춤</button><button class="btn red" data-a="rm">이 글자 지우기</button></div>`;
+    } else {
+      p.innerHTML = `<label class="f">로고</label><div class="row"><select data-k="logoId">${LOGOS.length ? LOGOS.map((l) => `<option value="${l.id}" ${l.id === L.logoId ? "selected" : ""}>${esc(l.name)}</option>`).join("") : '<option value="">(보관함이 비었어요)</option>'}</select><button class="btn" data-a="up" style="flex:none">새 로고 올리기</button></div>
+        <div class="row"><label>크기</label><input type="range" data-k="size" min="4" max="90" step="0.5" value="${L.size}"></div>
+        <div class="row"><label>진하기</label><input type="range" data-k="opacity" min="0.1" max="1" step="0.05" value="${L.opacity}"></div>
+        <div class="row"><label>색 바꾸기</label><select data-k="tint">${[["none", "원본 색"], ["white", "흰색으로"], ["black", "검정으로"]].map((a) => `<option value="${a[0]}" ${L.tint === a[0] ? "selected" : ""}>${a[1]}</option>`).join("")}</select></div>
+        <div class="row"><button class="btn" data-a="center">가운데 맞춤</button><button class="btn red" data-a="rm">이 로고 지우기</button></div>`;
+    }
+  }
+  function edRefresh(props = true) { renderLayerList(); if (props) renderProps(); edRender(); }
+
+  $("#layerList").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; selId = b.dataset.id; edRefresh(); };
+  $("#layerProps").addEventListener("input", (e) => {
+    const L = work.find((l) => l.id === selId), k = e.target.dataset.k; if (!L || !k) return;
+    const v = e.target.type === "checkbox" ? e.target.checked : e.target.type === "range" ? Number(e.target.value) : e.target.value; L[k] = v;
+    if (k === "font" || k === "bold" || k === "text") ensureFont(L.font, L.bold ? 700 : 400, L.text).then(edRender);
+    if (k === "text" || k === "logoId") renderLayerList(); edRender();
+  });
+  $("#layerProps").addEventListener("change", (e) => { if (e.target.dataset.k === "logoId") { renderLayerList(); edRender(); } });
+  $("#layerProps").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-a]"); const L = work.find((l) => l.id === selId); if (!b || !L) return;
+    if (b.dataset.a === "center") { L.x = 0.5; edRender(); }
+    else if (b.dataset.a === "rm") { work = work.filter((l) => l !== L); selId = work.length ? work[work.length - 1].id : null; edRefresh(); }
+    else if (b.dataset.a === "up") { const l = await pickLogoFile(); if (l) { L.logoId = l.id; edRefresh(); } }
+  });
+  $("#addText").onclick = () => { const L = textLayer({ text: val("#pTitle", "NEW ARRIVAL"), size: 8, y: 0.5 }); work.push(L); selId = L.id; ensureFont(L.font, 700, L.text).then(edRender); edRefresh(); };
+  $("#addLogo").onclick = async () => { let lg = LOGOS[0]; if (!lg) lg = await pickLogoFile(); if (!lg) return; const L = logoLayer({ logoId: lg.id }); work.push(L); selId = L.id; edRefresh(); };
+
+  // 로고 바꾸기 탭
+  function renderEdLogos() {
+    const box = $("#edLogos");
+    box.innerHTML = `<p class="hint">보관함의 로고를 이 컷에 <b>얹거나</b>, 선택한 로고를 다른 로고로 <b>바꿀</b> 수 있어요. ${work.find((l) => l.id === selId && l.type === "logo") ? "" : "(바꾸려면 먼저 '글자·로고' 탭에서 로고 층을 선택하세요)"}</p><div class="logos" id="edLogoGrid">${logoLibHTML(true)}</div><div class="row" style="margin-top:12px"><button class="btn" id="edLogoNew">+ 새 로고 올려서 보관</button></div>`;
+    $("#edLogoNew").onclick = async () => { await pickLogoFile(); renderEdLogos(); };
+  }
+  logoLibEvents($("#edLogos"),
+    (l) => { const L = logoLayer({ logoId: l.id }); work.push(L); selId = L.id; setTab("layers"); edRefresh(); },
+    (l) => { const L = work.find((x) => x.id === selId && x.type === "logo"); if (!L) return toast("먼저 '글자·로고' 탭에서 바꿀 로고 층을 선택하세요"); L.logoId = l.id; edRefresh(); toast(`"${l.name}"(으)로 바꿨어요`); });
+
+  function setTab(t) { document.querySelectorAll("#edTabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === t)); $("#edLayers").hidden = t !== "layers"; $("#edLogos").hidden = t !== "logos"; $("#edView").hidden = t !== "view"; if (t === "logos") renderEdLogos(); if (t === "view") guideNote(); }
+  $("#edTabs").onclick = (e) => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
+  $("#guideOn").onchange = () => edRender();
+
+  // 캔버스에서 끌어 옮기기
+  const pt = (e) => { const r = cv.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * cv.width, y: ((e.clientY - r.top) / r.height) * cv.height }; };
+  cv.addEventListener("pointerdown", (e) => {
+    const p = pt(e); const hit = [...edBoxes].reverse().find((b) => b.w && p.x >= b.x - 10 && p.x <= b.x + b.w + 10 && p.y >= b.y - 10 && p.y <= b.y + b.h + 10);
+    if (!hit) { selId = null; edRefresh(); return; }
+    selId = hit.L.id; drag = { L: hit.L, dx: p.x - hit.L.x * cv.width, dy: p.y - hit.L.y * cv.height }; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; edRefresh();
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!drag) return; const p = pt(e); let x = (p.x - drag.dx) / cv.width, y = (p.y - drag.dy) / cv.height;
+    x = Math.min(1, Math.max(0, x)); y = Math.min(1, Math.max(0, y)); if (Math.abs(x - 0.5) < 0.018) x = 0.5; drag.L.x = x; drag.L.y = y; edRender();
+  });
+  const endDrag = () => { drag = null; cv.style.cursor = "grab"; }; cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
+  cv.addEventListener("keydown", () => {});
+
+  async function openEditor(it) {
+    cur = it; work = JSON.parse(JSON.stringify(it.layers || [])); selId = work[0] ? work[0].id : null;
+    edBase = await loadImg(it.src);
+    await Promise.all(FONTS.map((f) => ensureFont(f.id, 700, "가A")));
+    setTab("layers"); $("#ed").classList.add("open"); document.body.style.overflow = "hidden";
+    cv.width = 0; edRefresh();
+  }
+  function closeEd() { $("#ed").classList.remove("open"); document.body.style.overflow = ""; cur = null; }
+  $("#edClose").onclick = closeEd;
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#ed").classList.contains("open") && !$("#dlg").open) closeEd(); });
+  $("#edSave").onclick = async () => { cur.layers = JSON.parse(JSON.stringify(work)); cur.final = cur.layers.length ? await composeItem(cur, "image/jpeg", 0.9) : null; closeEd(); drawFrames(); };
+  async function edDownload(ext) { const tmp = { ...cur, layers: work }; await downloadItem(tmp, ext); }
+  $("#edDl").onclick = () => edDownload("png"); $("#edDlJpg").onclick = () => edDownload("jpg");
+  $("#applyAll").onclick = async () => {
+    const targets = items.filter((i) => i.status === "done" && i !== cur && i.fmt === cur.fmt);
+    if (!targets.length) return toast("같은 크기의 다른 컷이 없어요");
+    if (!confirm(`같은 크기(${fmtNow().name})의 다른 ${targets.length}개 컷에 이 글자·로고 구성을 적용합니다. 컷마다 넣어둔 글자는 덮어써요.`)) return;
+    for (const t of targets) { t.layers = JSON.parse(JSON.stringify(work)).map((l) => ({ ...l, id: uid() })); t.final = await composeItem(t, "image/jpeg", 0.9); }
+    drawFrames(); toast(`${targets.length}개 컷에 적용했어요`);
+  };
+
+  drawFmt(); drawSets(); drawModes(); drawFrames(); updateCost();
+})();
+</script>
+</body>
+</html>
