@@ -582,10 +582,10 @@ function parseInventoryExcel(aoa){
     const idx = {};
     row.forEach((cell,ci) => {
       const t = S(cell);
-      if (t==='분류명') idx.brand = ci;
+      if (t==='분류명' || t==='브랜드') idx.brand = ci;
       if (t==='품목명') idx.item_name = ci;
       if (t==='바코드') idx.barcode = ci;
-      if (t==='재고량') idx.init_qty = ci;
+      if (t==='재고량' || t==='수량' || t==='재고' || t==='재고수량') idx.init_qty = ci;
       if (t==='단가') idx.price = ci;
       if (t==='사이즈' || t==='규격') idx.size = ci;
     });
