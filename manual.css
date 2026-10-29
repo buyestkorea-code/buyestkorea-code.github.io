@@ -56,9 +56,10 @@
 .mnm-body{padding:20px 22px 26px}
 
 /* 상단 "사용법" 버튼 */
-.mn-topbtn{display:none;align-items:center;gap:6px;border:1px solid var(--accent,#2F5D53);background:var(--accent-soft,#E3ECE8);color:var(--accent,#2F5D53);font:inherit;font-size:13px;font-weight:700;padding:6px 12px;border-radius:99px;cursor:pointer;white-space:nowrap}
+.mn-topbtn{display:none;align-items:center;gap:6px;border:1px solid var(--accent,#2F5D53);background:var(--accent,#2F5D53);color:var(--accent-ink,#fff);font:inherit;font-size:14px;font-weight:700;padding:8px 16px;border-radius:99px;cursor:pointer;white-space:nowrap;flex:none;box-shadow:0 1px 4px rgba(47,93,83,.35)}
 .mn-topbtn.show{display:inline-flex}
-.mn-topbtn:hover{background:var(--accent,#2F5D53);color:var(--accent-ink,#fff)}
+.mn-topbtn:hover{filter:brightness(1.12)}
+@media (max-width:600px){.mn-topbtn{padding:7px 11px;font-size:13px}}
 
 /* ───── 사용 설명서 목록 화면 ───── */
 .mnh-hero{background:var(--accent,#2F5D53);color:var(--accent-ink,#fff);border-radius:16px;padding:24px 26px;margin-bottom:20px}

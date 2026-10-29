@@ -9,7 +9,8 @@
   var DOC = 'manual.html';
 
   var topbar = document.querySelector('.topbar');
-  var meta = document.querySelector('.topbar-meta');
+  // 검색창 바로 옆(화면 왼쪽~가운데)에 둔다. 오른쪽 끝은 직원 눈에 잘 안 띔
+  var meta = document.getElementById('meTopAuth') || document.getElementById('meUser') || document.querySelector('.topbar-meta');
   var btn = document.createElement('button');
   btn.type = 'button'; btn.id = 'manualBtn'; btn.className = 'mn-topbtn';
   btn.textContent = '📖 사용법';
