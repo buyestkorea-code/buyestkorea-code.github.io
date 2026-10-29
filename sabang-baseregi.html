@@ -367,7 +367,8 @@ function parseSourceExcel(wb) {
   const rows = [];
   for (let r = 1; r < aoa.length; r++) {
     const row = aoa[r];
-    const name = S(row[col.name]);
+    // 상품명의 작은따옴표(' ’ ‘ ʼ ` ´)는 사방넷 업로드 오류 방지를 위해 삭제 (예: G'S → GS)
+    const name = S(row[col.name]).replace(/['‘’ʼ`´]/g, '');
     if (!name) continue;
     rows.push({
       A: name, B: S(row[col.category]), C: S(row[col.brand]), D: S(row[col.origin]),
