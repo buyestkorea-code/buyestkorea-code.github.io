@@ -136,11 +136,13 @@ function cellNum(c){
 function scanSheet(ws){
   const headers = [], items = []; let cur = null, title = '';
   ws.eachRow({ includeEmpty: false }, (row, r) => {
-    const cols = {};
+    const cols = {}, qtyCols = [];
     row.eachCell({ includeEmpty: false }, (c, n) => {
       const t = cellText(c).toUpperCase();
-      if (t === 'MODEL') cols.model = n; else if (t === '시즌') cols.season = n; else if (t === '작업여부') cols.work = n; else if (t === 'INV. QTY' || t === 'INV.QTY') cols.qty = n; else if (t === 'TOTAL') cols.total = n; else if (t === 'UNIT PRICE') cols.price = n;
+      if (t === 'MODEL') cols.model = n; else if (t === '시즌') cols.season = n; else if (t === '작업여부') cols.work = n; else if (t === 'INV. QTY' || t === 'INV.QTY') { cols.qty = n; qtyCols.push(n); } else if (t === 'TOTAL') cols.total = n; else if (t === 'UNIT PRICE') cols.price = n;
     });
+    // 1차 가공본은 TOTAL 칸 없이 INV. QTY 가 두 번(품번 앞 / 사이즈 칸 뒤) 나온다 → 사이즈 칸의 끝은 MODEL 오른쪽에 있는 INV. QTY
+    if (cols.model && !cols.total) { const q = qtyCols.filter(n => n > cols.model + 1); if (q.length) cols.total = Math.max(...q); }
     if (cols.model && cols.season) {
       cur = { row: r, ...cols, scale: [] };   // 이 블록 머리글의 사이즈 칸(MODEL ~ TOTAL 사이)에 이미 적힌 옵션 라벨
       if (cur.total) for (let c = cur.model + 1; c < cur.total; c++) { const t = cellText(row.getCell(c)); if (t) cur.scale.push({ c, label: t }); }
