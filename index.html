@@ -7500,13 +7500,34 @@ window.__loadLib = (function(){
     function icmBaseName(fname){
       return String(fname||'송장').replace(/\.[^.]+$/, '');
     }
+    // 재고 0(품절)인 코드의 송장 행 목록 — 다운로드 파일에선 코드/단가를 비워둔다 (합산 재고 기준, 화면의 '재고 0' 칩과 동일)
+    function icmZeroStockEntries(){
+      return (state.entries||[]).filter(function(e){
+        if(!e.code) return false;
+        var info = state.stock && state.stock.byCode[e.code];
+        return !info || !(info.qty > 0);
+      });
+    }
     function buildIcmOutputBytes(){
       var inv = state.invoice;
       var newFiles = Object.assign({}, inv.zip.files);
+      var zeroBySheet = {};
+      icmZeroStockEntries().forEach(function(e){ (zeroBySheet[e.sheet] = zeroBySheet[e.sheet] || []).push(e.row); });
       inv.sheetNames.forEach(function(name){
         var sheet = inv.parsedSheets[name];
         if(!sheet.isTarget) return;
-        var serialized = new XMLSerializer().serializeToString(sheet.doc);
+        var outDoc = sheet.doc;
+        if(zeroBySheet[name]){
+          outDoc = sheet.doc.cloneNode(true);   // 화면 상태(매칭결과)는 그대로 두고 출력본에서만 비움
+          var rowMap = buildRowIndexSE(outDoc);
+          zeroBySheet[name].forEach(function(r){
+            var rowEl = rowMap[r];
+            if(!rowEl) return;
+            setCellText(outDoc, rowEl, 11, '');
+            setCellText(outDoc, rowEl, 12, '');
+          });
+        }
+        var serialized = new XMLSerializer().serializeToString(outDoc);
         if(serialized.indexOf('<?xml') !== 0){
           serialized = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + serialized;
         }
@@ -7517,6 +7538,7 @@ window.__loadLib = (function(){
     function buildIcmIssuesCsv(){
       var aoa = [['시트','행','검색값','상태']];
       (state.entries||[]).filter(function(e){ return !e.code; }).forEach(function(e){ aoa.push([e.sheet, e.row, e.name + ' [' + e.size + ']', e.status]); });
+      icmZeroStockEntries().forEach(function(e){ aoa.push([e.sheet, e.row, e.name + ' [' + e.size + ']', '재고0(코드 공란 처리)']); });
       return aoaToCsv(aoa);
     }
     function downloadIcmResult(){
