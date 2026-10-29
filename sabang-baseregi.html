@@ -434,6 +434,13 @@ async function run() {
     result.className = 'ok';
     result.textContent = issueCount ? `✅ 변환 완료. 미매칭 ${issueCount}건은 표에서 빨간 배지를 눌러 값을 입력/저장해주세요.` : '✅ 변환 완료. 미매칭 없음, 바로 다운로드하세요.';
     document.getElementById('dlBtn').style.display = 'inline-block';
+    const ecoRows = RESULT_ROWS.map((r, i) => isEco(r) ? { n: i + 1, r } : null).filter(Boolean);
+    if (ecoRows.length) {
+      result.textContent += ` ⚠ 소재에 에코퍼/에코레더가 들어간 상품 ${ecoRows.length}건이 있어요. 소재를 확인해주세요.`;
+      const list = ecoRows.slice(0, 10).map(x => `${x.n}행 [${x.r.J}] ${x.r.A}`).join('\n');
+      const more = ecoRows.length > 10 ? `\n... 외 ${ecoRows.length - 10}건` : '';
+      alert(`⚠ 소재 확인 필요\n\n소재에 에코퍼/에코레더 문구가 있는 상품이 ${ecoRows.length}건 있어요.\n\n${list}${more}`);
+    }
   } catch (e) {
     status.textContent = '';
     result.className = 'err';
@@ -441,12 +448,17 @@ async function run() {
   }
 }
 
+// 소재에 에코퍼/에코레더 계열 문구가 있으면 확인 필요 (공백 유무 무관)
+const ECO_RE = /에코\s*(퍼|레더)/;
+const isEco = r => ECO_RE.test(String(r.J || ''));
+
 function renderStats() {
   const total = RESULT_ROWS.length;
   const issues = RESULT_ROWS.filter(r => r.unmatched.length).length;
   const brandIssue = RESULT_ROWS.filter(r => r.unmatched.some(u => u.kind === 'brand')).length;
   const catIssue = RESULT_ROWS.filter(r => r.unmatched.some(u => u.kind === 'category')).length;
   const colorIssue = RESULT_ROWS.filter(r => r.unmatched.some(u => u.kind === 'color')).length;
+  const ecoCount = RESULT_ROWS.filter(isEco).length;
   const box = document.getElementById('statRow');
   box.style.display = 'flex';
   box.innerHTML = `
@@ -455,6 +467,7 @@ function renderStats() {
     <div class="stat"><b>${brandIssue}</b>브랜드 미매칭</div>
     <div class="stat"><b>${catIssue}</b>카테고리 미매칭</div>
     <div class="stat"><b>${colorIssue}</b>색상 미매칭</div>
+    <div class="stat ${ecoCount ? 'warn' : ''}"><b>${ecoCount}</b>에코퍼/레더 소재</div>
   `;
 }
 
@@ -464,7 +477,8 @@ function render() {
   renderStats();
   const body = RESULT_ROWS.map((r, i) => {
     const badges = r.unmatched.map(u => `<span class="badge" onclick="openFix(event, ${i}, '${u.kind}')">${u.field} 미매칭</span>`).join(' ');
-    return `<tr class="${r.unmatched.length ? 'row-issue' : ''}" data-idx="${i}">
+    const eco = isEco(r) ? `<span class="badge" style="cursor:default;" title="소재: ${esc(r.J)}">⚠ 소재 확인(${esc(r.J)})</span>` : '';
+    return `<tr class="${r.unmatched.length || eco ? 'row-issue' : ''}" data-idx="${i}">
       <td>${i + 1}</td>
       <td>${esc(r.A)}</td>
       <td>${esc(r.C)}</td>
@@ -473,7 +487,7 @@ function render() {
       <td>${esc(r.AR) || '<span style="color:#b91c1c;">—</span>'}</td>
       <td>${esc(r.T)}</td>
       <td>${esc(r.AD)}</td>
-      <td>${badges}</td>
+      <td>${badges} ${eco}</td>
     </tr>`;
   }).join('');
   document.getElementById('tbl').innerHTML =
