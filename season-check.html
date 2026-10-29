@@ -175,7 +175,7 @@ async function post(url, body){
 async function lookupCells(auth, cells){
   const hits = {}, items = {}; let asOf = 0;
   for (let off = 0; off < cells.length; off += 2000) {
-    const d = await post(API, { user: auth.id, pass: auth.pass, cells: cells.slice(off, off + 2000) });
+    const d = await post(API, { user: auth.id, pass: auth.pass, cells: cells.slice(off, off + 2000), with_options: true });
     Object.keys(d.hits || {}).forEach(k => { hits[cells[off + Number(k)]] = d.hits[k]; });
     Object.assign(items, d.items || {}); asOf = d.as_of;
   }
@@ -243,12 +243,22 @@ function mapTpl(sizes){
   let best = null, bj = -1; TPL.forEach(t => { const j = jac(set, t.set) + (TPL.length - t.n) * 0.0001; if (j > bj) { bj = j; best = t; } });
   return bj >= 0.4 ? { t: best, j: bj } : null;
 }
-const WEV = { dp: 8, ec: 6, key: 4, stem: 3, f2: 2.5, vf: 2, f: 1.5, ecs: 2.5, ecf2: 2, v: 0.6 };   // 근거별 무게: 이카운트 등록 사이즈 > 같은 품번 이력 > 같은 스타일 앞부분 … > 업체 최근 이력
-const EVNAME = { dp: '같은 날짜 완성본의 같은 단가·수량 줄', ec: '이카운트에 등록된 사이즈', key: '같은 품번 이력', stem: '같은 스타일(컬러만 다름) 이력', f2: '품번 앞부분 이력', vf: '같은 업체·품번 앞부분 이력', f: '품번 앞부분 이력', ecs: '이카운트의 같은 스타일 다른 컬러', ecf2: '이카운트의 비슷한 품번', v: '업체의 최근 입고 이력' };
+// 바이스트 사이트에 이미 올라 있는 상품(정확 일치)의 실제 옵션값 — 색상 옵션(단품 등)은 사이즈가 아니라서 거른다
+const SIZE_VAL = /^(?:XXS|XS|S|M|L|XL|XXL|XXXL|[2-4]XL|TU|FREE|ONE SIZE|\d{1,3}(?:\.5)?[AYM+]?|\d{1,3}[-~]\d{1,3})$/i;
+function liveSizes(d){
+  if (!d || !d.exact || !d.it) return null;
+  const site = (d.it.site || []).filter(p => p.opts && p.opts.length);
+  const pick = site.find(p => p.display === 'Y') || site[0]; if (!pick) return null;
+  const vals = [...new Set(pick.opts.map(o => String(o[0]).trim().toUpperCase()).filter(v => SIZE_VAL.test(v)))];
+  return vals.length >= 1 ? vals : null;
+}
+const WEV = { live: 12, dp: 8, ec: 6, key: 4, stem: 3, f2: 2.5, vf: 2, f: 1.5, ecs: 2.5, ecf2: 2, v: 0.6 };   // 근거별 무게: 이카운트 등록 사이즈 > 같은 품번 이력 > 같은 스타일 앞부분 … > 업체 최근 이력
+const EVNAME = { live: '바이스트 사이트 판매중 상품의 옵션값', dp: '같은 날짜 완성본의 같은 단가·수량 줄', ec: '이카운트에 등록된 사이즈', key: '같은 품번 이력', stem: '같은 스타일(컬러만 다름) 이력', f2: '품번 앞부분 이력', vf: '같은 업체·품번 앞부분 이력', f: '품번 앞부분 이력', ecs: '이카운트의 같은 스타일 다른 컬러', ecf2: '이카운트의 비슷한 품번', v: '업체의 최근 입고 이력' };
 function layoutFor(h, ev){
   if (!ev || !h.total) return null;
   const votes = new Map();
   const add = (t, w, lv) => { const v = votes.get(t) || { w: 0, best: 0, lv: '' }; v.w += w; if (w > v.best) { v.best = w; v.lv = lv; } votes.set(t, v); };
+  if (ev.live && ev.live.length) { const m = mapTpl(ev.live); if (m) add(m.t, WEV.live * m.j, 'live'); }
   if (ev.ec && ev.ec.length) { const m = mapTpl(ev.ec); if (m) add(m.t, WEV.ec * m.j, 'ec'); }
   ['dp', 'key', 'stem', 'f2', 'vf', 'f', 'v'].forEach(lv => { const arr = ev[lv] || [], sum = arr.reduce((a, x) => a + x[1], 0); if (!sum) return; arr.forEach(([sc, w]) => { const m = mapTpl(sc.split(',')); if (m) add(m.t, WEV[lv] * (w / sum) * m.j, lv); }); });
   ['ecs', 'ecf2'].forEach(lv => { const arr = ev[lv] || []; arr.forEach(sizes => { const m = mapTpl(sizes); if (m) add(m.t, WEV[lv] / arr.length * m.j, lv); }); });
@@ -317,6 +327,9 @@ $('runBtn').addEventListener('click', async () => {
       const pr = await post(API_SC, { user: auth.id, pass: auth.pass, action: 'predict', date, lines: scan.items.map((it, n) => ({ i: n, model: it.main, vendor: it.batch, qty: it.qty, price: it.price })) });
       (pr.evs || []).forEach(p => { evMap[p.i] = p.ev; });
     } catch (e) { if (/로그인/.test(e.message)) throw e; predWarn = '옵션값 예측을 불러오지 못했어요 (시즌 확인은 계속 진행). ' + e.message; }
+    // 이미 사이트에 있는 상품은 실제 옵션값을 가장 강한 근거로 얹는다 (신상은 위의 예측 그대로)
+    let liveCnt = 0;
+    decided.forEach(({ d }, n) => { const ls = liveSizes(d); if (ls) { evMap[n] = Object.assign({}, evMap[n], { live: ls }); liveCnt++; } });
     const plan = planOptions(scan, evMap);
 
     const results = decided.map(({ i, d }, n) => {
@@ -328,7 +341,7 @@ $('runBtn').addEventListener('click', async () => {
     });
     // 원산지·소재·비고 칸은 비어 있어도 숨기지 않고 원본 그대로 보여 준다 (숨기면 없어진 것처럼 보임)
     const hide = [];
-    Object.assign(S, { buf0, scan, results, hide, plan, date, label, asOf: A.asOf, saved: false });
+    Object.assign(S, { liveCnt, buf0, scan, results, hide, plan, date, label, asOf: A.asOf, saved: false });
     renderResult(); setMsg(predWarn, !!predWarn);
   } catch (e) { setMsg('실패: ' + (e && e.message ? e.message : e), true); }
   $('runBtn').disabled = false;
@@ -337,7 +350,7 @@ $('runBtn').addEventListener('click', async () => {
 function renderResult(){
   $('resultBox').style.display = '';
   const R = S.results, cnt = s => R.filter(r => r.o.status === s).length;
-  $('stats').innerHTML = [['전체 상품 줄', R.length], ['판매중', cnt('판매중')], ['전품(품절)', cnt('전품')], ['미노출', cnt('미노출')], ['다른색상판매', cnt('다른색상판매')], ['신상', cnt('신상')], ['확인필요', cnt('확인필요')], ['최근 입고 이력 있음', R.filter(r => r.hasHist).length], ['옵션값을 찾은 상품', R.filter(r => r.labels).length + ' / ' + R.length]]
+  $('stats').innerHTML = [['전체 상품 줄', R.length], ['판매중', cnt('판매중')], ['전품(품절)', cnt('전품')], ['미노출', cnt('미노출')], ['다른색상판매', cnt('다른색상판매')], ['신상', cnt('신상')], ['확인필요', cnt('확인필요')], ['최근 입고 이력 있음', R.filter(r => r.hasHist).length], ['옵션값을 찾은 상품', R.filter(r => r.labels).length + ' / ' + R.length], ['사이트 옵션값 사용', (S.liveCnt || 0) + ' / ' + R.length]]
     .map(([t, n]) => `<span class="chip">${t} <b>${n.toLocaleString()}</b></span>`).join('');
   const mm = S.date.match(/(\d+)-(\d+)-(\d+)/);
   $('asOf').innerHTML = `이번 입고: <b>${Number(mm[2])}월${Number(mm[3])}일 ${esc(S.label)}</b>` + (S.asOf ? ` · 이카운트 재고 기준 ${new Date(S.asOf * 1000).toLocaleString('ko-KR')}` : '');
