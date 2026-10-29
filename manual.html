@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BUYEST Toolkit 사용 교육자료</title>
+<link rel="stylesheet" href="assets/fonts/pretendard/pretendard.css">
+<link rel="stylesheet" href="manual.css">
+<style>
+  :root{
+    --bg:#F3F1EC; --surface:#FFFFFF; --surface-2:#EAE6DC; --border:#DBD5C7; --ink:#20241F; --ink-muted:#5C6259;
+    --accent:#2F5D53; --accent-ink:#FFFFFF; --accent-soft:#E3ECE8; --success:#3F7D4A; --success-soft:#E4F1E6;
+    --warning:#B4791B; --warning-soft:#F7E9D2; --danger:#B23B3B;
+    --font-ui:"Pretendard Variable",Pretendard,"Malgun Gothic",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-ui);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .doc{max-width:820px;margin:0 auto;padding:24px 18px 80px}
+  .page{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:36px 40px;margin:0 0 22px}
+  .toolbar{position:sticky;top:0;z-index:5;background:var(--accent);color:#fff;display:flex;gap:10px;align-items:center;padding:10px 18px}
+  .toolbar strong{flex:1;font-size:14px}
+  .toolbar button,.toolbar a{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:8px;padding:7px 14px;cursor:pointer;background:#fff;color:var(--accent);text-decoration:none}
+
+  /* 표지 */
+  .cover{min-height:250mm;display:flex;flex-direction:column;justify-content:space-between;background:var(--accent);color:#fff;padding:56px 52px}
+  .cover .mark{width:64px;height:64px;border-radius:16px;background:#fff;color:var(--accent);font-weight:800;font-size:38px;display:flex;align-items:center;justify-content:center}
+  .cover h1{font-size:46px;line-height:1.2;margin:0 0 14px;letter-spacing:-.02em}
+  .cover .sub{font-size:20px;line-height:1.6;opacity:.92;max-width:30em}
+  .cover .foot{font-size:14px;opacity:.85;line-height:1.7}
+  .cover .pill{display:inline-block;border:1px solid rgba(255,255,255,.55);border-radius:99px;padding:3px 14px;font-size:13px;margin-bottom:14px}
+
+  h2.part{font-size:30px;margin:0 0 6px;letter-spacing:-.01em;color:var(--accent)}
+  .lead{font-size:16px;color:var(--ink-muted);margin:0 0 20px;line-height:1.7}
+  h3.sec{font-size:19px;margin:26px 0 10px;color:var(--ink)}
+  .box{background:var(--accent-soft);border-radius:12px;padding:14px 18px;margin:12px 0;break-inside:avoid}
+  .box.warn{background:var(--warning-soft)}
+  table.t{width:100%;border-collapse:collapse;margin:8px 0;font-size:14.5px}
+  table.t th,table.t td{border-bottom:1px solid var(--border);padding:9px 8px;text-align:left;vertical-align:top}
+  table.t th{background:var(--surface-2);font-size:13px;color:var(--ink-muted)}
+  table.t tr{break-inside:avoid}
+  .toc h4{margin:16px 0 4px;color:var(--accent);font-size:14px}
+  .toc a{display:flex;gap:8px;color:var(--ink);text-decoration:none;padding:5px 0;border-bottom:1px dotted var(--border);font-size:15px}
+  .toc a .n{width:28px;color:var(--ink-muted);flex:none}
+  .toc a .nm{flex:1}
+  .toc a .pg{color:var(--ink-muted);font-variant-numeric:tabular-nums}
+  .toc a .tag{font-size:11px;font-weight:700;color:var(--warning);align-self:center}
+  .map{display:grid;grid-template-columns:150px 1fr;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:12px 0;font-size:14px}
+  .map .side{background:var(--accent);color:#fff;padding:12px 14px;line-height:2}
+  .map .main{padding:12px 16px;line-height:1.8}
+  .map .side b{display:block;opacity:.7;font-size:11px;letter-spacing:.06em;margin-top:6px}
+  .mi h3,.mi h2{break-after:avoid}
+  .shot{display:block;max-width:100%;max-height:66mm;margin:0 auto 16px;border:1px solid var(--border);border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+  .shotcap{text-align:center;font-size:12px;color:var(--ink-muted);margin:-10px 0 16px}
+
+  @page{size:A4;margin:16mm 14mm 18mm}
+  @media print{
+    html,body{background:#fff}
+    .toolbar,.noprint{display:none!important}
+    .doc{max-width:none;padding:0}
+    .page{box-shadow:none;border-radius:0;padding:0;margin:0;break-before:page}
+    .page.first{break-before:auto}
+    .cover{min-height:262mm;border-radius:0;padding:40px 36px}
+    .mn{font-size:13px;line-height:1.55}
+    .mn-what{font-size:14.5px;padding:12px 15px;margin-bottom:12px}
+    .mn-steps>li{padding-bottom:9px}
+    .mn-sec,.mn-warn,.mn-tip{margin-bottom:12px}
+    .mn-head h2{font-size:22px}
+  }
+  @media (max-width:640px){.page{padding:22px 18px}.cover h1{font-size:34px}.map{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="toolbar noprint"><strong>BUYEST Toolkit 사용 교육자료</strong><button onclick="window.print()">인쇄 · PDF로 저장</button><a href="index.html#manualHub">툴킷으로 돌아가기</a></div>
+<div class="doc" id="doc"></div>
+
+<script src="manual-data.js"></script>
+<script src="manual-render.js"></script>
+<script>
+(function(){
+  var R = window.ManualR, D = R.data, esc = R.esc, fmt = R.fmt;
+  var q = new URLSearchParams(location.search);
+  var only = q.get('only');
+  var pages = {};
+  pages = window.__pages || {};
+  var items = D.items;
+  var idx = {}; items.filter(function(i){ return i.id !== 'dashboard'; }).forEach(function(it, i){ idx[it.id] = i + 1; });
+
+  function pageTag(s, cls){ return '<section class="page ' + (cls||'') + '">' + s + '</section>'; }
+  var out = '';
+
+  if(only){
+    var it = R.find(only);
+    out += it ? pageTag('<div class="mi">' + R.itemHTML(it) + '</div>', 'first') : pageTag('<p>찾는 메뉴가 없어요.</p>', 'first');
+    document.getElementById('doc').innerHTML = out;
+    return;
+  }
+
+  /* 표지 */
+  out += '<section class="page cover first"><div><div class="mark">B</div></div>' +
+    '<div><span class="pill">직원 교육자료</span><h1>BUYEST Toolkit<br>사용 교육자료</h1>' +
+    '<div class="sub">처음 쓰는 사람도 따라 할 수 있도록,<br>메뉴마다 \"무엇을 누르면 되는지\"만 순서대로 적었어요.</div></div>' +
+    '<div class="foot">버전 ' + esc(D.version) + '<br>툴킷 주소 · buyestkorea-code.github.io<br>이 자료는 툴킷 안 \"사용 설명서\" 메뉴와 같은 내용이에요.</div></section>';
+
+  /* 이 자료 보는 법 + 목차 */
+  var toc = '<h2 class="part">차례</h2><p class="lead">필요한 메뉴만 찾아 읽으면 돼요. 처음이라면 <b>1부 시작하기</b>를 먼저 읽어 보세요.</p><div class="toc">' +
+    '<h4>1부 · 시작하기</h4>' +
+    ['접속하고 로그인하기','화면 읽는 법','모든 메뉴에 공통인 약속','이럴 땐 이 메뉴','용어 사전'].map(function(t, i){
+      return '<a href="#s' + i + '"><span class="n"></span><span class="nm">' + t + '</span><span class="pg" data-pg="s' + i + '"></span></a>';
+    }).join('') +
+    '<h4>2부 · 메뉴별 사용법</h4>';
+  D.groups.forEach(function(g){
+    var its = items.filter(function(i){ return i.g === g.id && i.id !== 'dashboard'; });
+    if(!its.length) return;
+    toc += '<h4 style="color:var(--ink-muted);margin-top:10px">' + esc(g.name) + '</h4>';
+    its.forEach(function(it){
+      toc += '<a href="#m-' + it.id + '"><span class="n">' + idx[it.id] + '</span><span class="nm">' + esc(it.title) + '</span>' +
+        (it.st === 'test' ? '<span class="tag">시험판</span>' : '') + '<span class="pg" data-pg="m-' + it.id + '"></span></a>';
+    });
+  });
+  toc += '<h4>부록</h4><a href="#s9"><span class="n"></span><span class="nm">자주 묻는 질문</span><span class="pg" data-pg="s9"></span></a></div>';
+  out += pageTag(toc);
+
+  /* 1부 */
+  var login = R.find('dashboard');
+  out += pageTag('<h2 class="part" id="s0">1부 · 시작하기</h2><p class="lead">툴킷은 따로 설치할 필요가 없어요. 인터넷이 되는 컴퓨터나 스마트폰에서 주소만 열면 돼요.</p>' +
+    '<div class="mi">' + R.itemHTML(login).replace('<h2>대시보드 · 로그인</h2>', '<h2>접속하고 로그인하기</h2>') + '</div>');
+
+  out += pageTag('<h2 class="part" id="s1">화면 읽는 법</h2><p class="lead">툴킷 화면은 크게 두 부분이에요. 왼쪽에서 메뉴를 고르고, 오른쪽에서 작업해요.</p>' +
+    '<div class="map"><div class="side"><b>왼쪽 메뉴</b>홈<br>사방넷 · 이카운트 연동<br>재고 변환 · 조회<br>사이트 품절<br>매장 · 행사<br>문서 변환<br>상품 이미지</div>' +
+    '<div class="main"><b>오른쪽 작업 화면</b><br>맨 위에 메뉴 이름과 <span class="mbtn" style="display:inline-block;padding:1px 9px;border-radius:7px;background:#2F5D53;color:#fff;font-weight:600">📖 사용법</span> 버튼이 있어요.<br>' +
+    '파일을 올리는 칸 → 실행 버튼 → 결과 표 → 다운로드 버튼 순서로 아래로 내려가며 작업해요.</div></div>' +
+    '<h3 class="sec">메뉴 이름 옆 표시</h3><table class="t"><tr><th style="width:130px">표시</th><th>뜻</th></tr>' +
+    '<tr><td>초록 체크 ✓</td><td><b>사용가능</b> — 안심하고 쓸 수 있는 메뉴예요.</td></tr>' +
+    '<tr><td>플라스크 모양 · TEST</td><td><b>시험판</b> — 쓸 수는 있지만 아직 다듬는 중이에요. 결과를 한 번 더 눈으로 확인하세요.</td></tr></table>' +
+    '<h3 class="sec">버튼 모양</h3><p>이 자료에서 <span class="mn"><span class="mbtn">이런 초록 버튼</span></span> 모양으로 적힌 글자는 화면에 있는 버튼 이름 그대로예요. 같은 이름의 버튼을 찾아 누르면 돼요.</p>' +
+    '<h3 class="sec">메뉴 설명이 나오는 순서</h3><table class="t"><tr><td style="width:150px"><b>이럴 때 쓰세요</b></td><td>어떤 일을 할 때 쓰는 메뉴인지</td></tr><tr><td><b>미리 준비할 것</b></td><td>필요한 엑셀·파일</td></tr><tr><td><b>따라 하기</b></td><td>번호 순서대로 누르면 끝나는 단계</td></tr><tr><td><b>결과는 이렇게 보여요</b></td><td>결과 표를 읽는 법</td></tr><tr><td><b>꼭 확인하세요</b></td><td>실수하기 쉬운 부분 (노란 상자)</td></tr></table>');
+
+  out += pageTag('<h2 class="part" id="s2">모든 메뉴에 공통인 약속</h2><p class="lead">어느 메뉴를 쓰든 이 다섯 가지만 지키면 큰 실수는 없어요.</p>' +
+    '<div class="box"><b>1. 원본 파일은 고치지 말고 그대로 올리세요.</b><br>이카운트·사방넷에서 받은 엑셀을 열어서 열을 지우거나 이름을 바꾸면 인식하지 못할 수 있어요.</div>' +
+    '<div class="box"><b>2. 엑셀은 .xlsx 형식으로 올리세요.</b><br>.xls 파일은 엑셀에서 \"다른 이름으로 저장 → Excel 통합 문서(.xlsx)\"로 바꿔서 올려요.</div>' +
+    '<div class="box"><b>3. 결과 표를 먼저 눈으로 보고 나서 받거나 실행하세요.</b><br>엑셀을 만드는 메뉴는 몇 번을 다시 해도 안전해요.</div>' +
+    '<div class="box warn"><b>4. \"최종 실행\", \"미노출로 실행\", \"서버에 반영하기\" 같은 버튼은 신중하게.</b><br>사이트나 서버에 <u>바로 반영</u>되는 버튼이에요. 되돌리기 어려우니 표를 꼭 확인하고 누르세요.</div>' +
+    '<div class="box"><b>5. 이상하면 화면을 캡처해서 담당자에게.</b><br>Windows는 <b>Win + Shift + S</b>로 화면을 캡처할 수 있어요. \"어떤 메뉴에서 무슨 버튼을 눌렀는지\" 한 줄만 같이 적어 주세요.</div>' +
+    '<h3 class="sec">알아두면 좋은 것</h3><ul><li>대부분의 엑셀 변환 메뉴는 파일을 서버로 보내지 않고 <b>내 브라우저 안에서만</b> 처리해요.</li><li>이카운트와 통신하는 메뉴는 결과가 나오기까지 1~3분 걸릴 수 있어요. 창을 닫지 말고 기다리세요.</li><li>공용 컴퓨터에서는 사용 후 꼭 로그아웃하세요.</li></ul>');
+
+  /* 이럴 땐 이 메뉴 */
+  out += pageTag('<h2 class="part" id="s3">이럴 땐 이 메뉴</h2><p class="lead">하고 싶은 일에서 출발해 메뉴를 찾는 표예요.</p><table class="t"><tr><th>하고 싶은 일</th><th style="width:210px">쓸 메뉴</th></tr>' +
+    D.finder.map(function(f){ var it = R.find(f[1]); return '<tr><td>' + esc(f[0]) + '</td><td><a href="#m-' + f[1] + '" style="color:#2F5D53;font-weight:700;text-decoration:none">' + esc(it ? it.title : f[1]) + '</a></td></tr>'; }).join('') + '</table>');
+
+  /* 용어 */
+  out += pageTag('<h2 class="part" id="s4">용어 사전</h2><p class="lead">메뉴 설명에 자주 나오는 말을 쉽게 풀었어요.</p><table class="t"><tr><th style="width:170px">말</th><th>뜻</th></tr>' +
+    D.glossary.map(function(g){ return '<tr><td><b>' + esc(g[0]) + '</b></td><td>' + fmt(g[1]) + '</td></tr>'; }).join('') + '</table>');
+
+  /* 2부: 메뉴별 */
+  D.groups.forEach(function(g){
+    items.filter(function(i){ return i.g === g.id && i.id !== 'dashboard'; }).forEach(function(it){
+      var shot = '<img class="shot" src="manual-shots/' + it.id + '.png" alt="" onerror="this.nextElementSibling.remove();this.remove()"><div class="shotcap">' + esc(it.title) + ' 첫 화면</div>';
+      out += '<section class="page" id="m-' + it.id + '"><div class="mi">' + R.itemHTML(it).replace('<div class="mn-what">', shot.replace('<div class="shotcap">', '<div class="shotcap">') + '<div class="mn-what">') + '</div></section>';
+    });
+  });
+
+  /* 부록 */
+  out += pageTag('<h2 class="part" id="s9">자주 묻는 질문</h2><p class="lead">막혔을 때 먼저 확인해 보세요.</p><dl class="mn mn-faq" style="font-size:15px">' +
+    D.faq.map(function(q){ return '<dt>' + fmt(q[0]) + '</dt><dd>' + fmt(q[1]) + '</dd>'; }).join('') + '</dl>' +
+    '<div class="box" style="margin-top:22px"><b>그래도 해결이 안 되면</b><br>화면을 캡처해서 담당자에게 보내 주세요. 어떤 메뉴에서 어떤 버튼을 눌렀는지 한 줄이면 충분해요.</div>');
+
+  document.getElementById('doc').innerHTML = out;
+  // 목차 페이지 번호(PDF 만들 때 주입됨)
+  Object.keys(pages).forEach(function(k){ var el = document.querySelector('[data-pg="' + k + '"]'); if(el) el.textContent = pages[k]; });
+})();
+</script>
+</body>
+</html>

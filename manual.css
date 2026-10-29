@@ -1,0 +1,80 @@
+/* BUYEST Toolkit 사용 설명서 공통 스타일 (툴킷 팝업 · 사용 설명서 화면 · 인쇄용 교육자료가 함께 씀) */
+.mn{--mn-bg:var(--bg,#F3F1EC);--mn-surface:var(--surface,#fff);--mn-surface2:var(--surface-2,#EAE6DC);--mn-border:var(--border,#DBD5C7);--mn-ink:var(--ink,#20241F);--mn-muted:var(--ink-muted,#5C6259);--mn-accent:var(--accent,#2F5D53);--mn-accent-ink:var(--accent-ink,#fff);--mn-accent-soft:var(--accent-soft,#E3ECE8);--mn-warn:var(--warning,#B4791B);--mn-warn-soft:var(--warning-soft,#F7E9D2);--mn-danger:var(--danger,#B23B3B);
+  font-family:var(--font-ui,"Pretendard Variable",Pretendard,"Malgun Gothic",system-ui,sans-serif);color:var(--mn-ink);line-height:1.65;font-size:15px;word-break:keep-all;}
+.mn *{box-sizing:border-box}
+.mn b{font-weight:700}
+/* 버튼 이름을 실제 버튼처럼 보여줘서 "화면에서 이걸 누르세요"가 한눈에 보이게 */
+.mn .mbtn{display:inline-block;padding:1px 9px;margin:0 1px;border-radius:7px;background:var(--mn-accent);color:var(--mn-accent-ink);font-weight:600;font-size:.92em;line-height:1.5;white-space:nowrap;box-shadow:0 1px 0 rgba(0,0,0,.18)}
+
+.mn-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.mn-head h2{margin:0;font-size:24px;line-height:1.3;letter-spacing:-.01em}
+.mn-badge{display:inline-block;margin-top:3px;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700;white-space:nowrap}
+.mn-badge.ok{background:var(--success-soft,#E4F1E6);color:var(--success,#3F7D4A)}
+.mn-badge.test{background:var(--mn-warn-soft);color:var(--mn-warn)}
+.mn-group{font-size:12.5px;color:var(--mn-muted);margin-bottom:2px;font-weight:600}
+
+.mn-what{background:var(--mn-accent-soft);border-radius:12px;padding:16px 18px;margin:0 0 18px;font-size:16.5px;font-weight:600;line-height:1.6}
+.mn-sec{margin:0 0 18px}
+.mn-sec>h3{margin:0 0 8px;font-size:15px;color:var(--mn-accent);letter-spacing:.01em;display:flex;align-items:center;gap:8px}
+.mn-sec>h3::after{content:"";flex:1;height:1px;background:var(--mn-border)}
+.mn-sec p{margin:0}
+.mn-sec ul{margin:0;padding-left:20px}
+.mn-sec li{margin:3px 0}
+.mn-login{display:flex;gap:8px;align-items:flex-start;font-size:14px;color:var(--mn-muted);margin:-6px 0 18px}
+.mn-login::before{content:"🔑";font-size:14px;line-height:1.7}
+
+.mn-steps{list-style:none;margin:0;padding:0;counter-reset:s}
+.mn-steps>li{counter-increment:s;position:relative;padding:0 0 14px 46px;margin:0;break-inside:avoid}
+.mn-steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;background:var(--mn-accent);color:var(--mn-accent-ink);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+.mn-steps>li::after{content:"";position:absolute;left:15.5px;top:36px;bottom:4px;width:1px;background:var(--mn-border)}
+.mn-steps>li:last-child::after{display:none}
+.mn-steps .t{font-weight:700;font-size:16px;margin-bottom:2px}
+.mn-steps .d{color:var(--mn-ink)}
+
+.mn-warn{background:var(--mn-warn-soft);border-left:4px solid var(--mn-warn);border-radius:8px;padding:12px 16px;margin:0 0 18px;break-inside:avoid}
+.mn-warn h3{margin:0 0 6px;font-size:15px;color:var(--mn-warn)}
+.mn-warn ul{margin:0;padding-left:20px}
+.mn-warn li{margin:3px 0}
+.mn-tip{background:var(--mn-surface);border:1px solid var(--mn-border);border-radius:8px;padding:12px 16px;margin:0 0 18px;break-inside:avoid}
+.mn-tip h3{margin:0 0 6px;font-size:15px;color:var(--mn-accent)}
+.mn-tip ul{margin:0;padding-left:20px}
+.mn-tip li{margin:3px 0}
+.mn-faq dt{font-weight:700;margin-top:10px}
+.mn-faq dd{margin:2px 0 0;color:var(--mn-ink)}
+.mn-faq dt::before{content:"Q. ";color:var(--mn-accent)}
+.mn-faq dd::before{content:"A. ";color:var(--mn-muted);font-weight:700}
+
+/* ───── 툴킷 안의 팝업 ───── */
+.mnm-back{position:fixed;inset:0;z-index:9000;background:rgba(15,20,17,.55);display:none;align-items:flex-start;justify-content:center;padding:4vh 14px;overflow:auto}
+.mnm-back.open{display:flex}
+.mnm-box{background:var(--surface,#fff);color:var(--ink,#20241F);width:min(760px,100%);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.35);overflow:hidden}
+.mnm-bar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border,#DBD5C7);background:var(--surface-2,#EAE6DC);position:sticky;top:0;z-index:2}
+.mnm-bar strong{font-size:14px;flex:1}
+.mnm-bar button,.mnm-bar a{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--border,#DBD5C7);background:var(--surface,#fff);color:var(--ink,#20241F);border-radius:8px;padding:6px 12px;cursor:pointer;text-decoration:none}
+.mnm-bar button:hover,.mnm-bar a:hover{border-color:var(--accent,#2F5D53)}
+.mnm-bar .x{font-size:18px;line-height:1;padding:4px 10px}
+.mnm-body{padding:20px 22px 26px}
+
+/* 상단 "사용법" 버튼 */
+.mn-topbtn{display:none;align-items:center;gap:6px;border:1px solid var(--accent,#2F5D53);background:var(--accent-soft,#E3ECE8);color:var(--accent,#2F5D53);font:inherit;font-size:13px;font-weight:700;padding:6px 12px;border-radius:99px;cursor:pointer;white-space:nowrap}
+.mn-topbtn.show{display:inline-flex}
+.mn-topbtn:hover{background:var(--accent,#2F5D53);color:var(--accent-ink,#fff)}
+
+/* ───── 사용 설명서 목록 화면 ───── */
+.mnh-hero{background:var(--accent,#2F5D53);color:var(--accent-ink,#fff);border-radius:16px;padding:24px 26px;margin-bottom:20px}
+.mnh-hero h1{margin:0 0 6px;font-size:26px}
+.mnh-hero p{margin:0 0 14px;opacity:.92;line-height:1.6}
+.mnh-hero .acts{display:flex;gap:10px;flex-wrap:wrap}
+.mnh-hero a,.mnh-hero button{font:inherit;font-size:14px;font-weight:700;border:0;border-radius:10px;padding:10px 16px;cursor:pointer;text-decoration:none;background:#fff;color:#2F5D53}
+.mnh-hero a.ghost{background:transparent;color:inherit;border:1px solid rgba(255,255,255,.55)}
+.mnh-search{width:100%;max-width:420px;font:inherit;font-size:15px;padding:10px 14px;border-radius:10px;border:1px solid var(--border,#DBD5C7);background:var(--surface,#fff);color:var(--ink,#20241F);margin-bottom:18px}
+.mnh-g{margin-bottom:22px}
+.mnh-g h3{margin:0 0 10px;font-size:14px;color:var(--ink-muted,#5C6259);letter-spacing:.04em}
+.mnh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.mnh-card{text-align:left;font:inherit;background:var(--surface,#fff);border:1px solid var(--border,#DBD5C7);border-radius:12px;padding:14px 16px;cursor:pointer;color:var(--ink,#20241F);display:flex;flex-direction:column;gap:6px;transition:border-color .15s,transform .15s}
+.mnh-card:hover{border-color:var(--accent,#2F5D53);transform:translateY(-1px)}
+.mnh-card b{font-size:15px}
+.mnh-card span{font-size:13px;color:var(--ink-muted,#5C6259);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mnh-card i{font-style:normal;font-size:11.5px;font-weight:700;color:var(--accent,#2F5D53)}
+.mnh-card i.test{color:var(--warning,#B4791B)}
+@media (max-width:640px){.mnm-back{padding:0}.mnm-box{border-radius:0;min-height:100%}.mn-head h2{font-size:21px}.mnm-body{padding:16px}}

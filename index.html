@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BUYEST Toolkit</title>
 <link rel="manifest" href="assets/manifest.json">
+<link rel="stylesheet" href="manual.css">
 <meta name="theme-color" content="#2F5D53">
 <link rel="icon" href="assets/icon-192.png">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
@@ -978,6 +979,10 @@
       <button class="nav-item" data-nav="dashboard">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h5v-5h2v5h5v-9"/></svg></span>
         대시보드
+      </button>
+      <button class="nav-item" data-nav="manualHub">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5v-15Z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5v-15Z"/></svg></span>
+        사용 설명서
       </button>
       <button class="nav-item" data-nav="hrAdmin" id="navHrAdmin" hidden>
         <span class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.7.2 5 2.2 5 5.8"/></svg></span>
@@ -1989,6 +1994,11 @@
         <iframe data-src="team-dashboard.html" title="팀 대시보드" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <!-- ============ 사용 설명서 ============ -->
+      <section data-view="manualHub">
+        <div id="manualHubBox"></div>
+      </section>
+
       <!-- ============ ROADMAP ============ -->
       <section data-view="roadmap">
         <div class="hero">
@@ -2070,7 +2080,7 @@ window.__loadLib = (function(){
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', videoStudio:'영상 스튜디오', videoStudio2:'영상 스튜디오 V2', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'TEST 바이스트사이트 품절', ecountChangeTest:'TEST 오늘 변동 자동확인', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'이카운트-송장 재고매칭', sabangMatchTest:'TEST 사방넷-이카운트 매칭 관리', stocktake:'재고조사 (바코드 실사)',
     listCheck:'품번 리스트 재고확인', costCheck:'상품가격체크', seasonCheck:'물류팀 시즌체크', barcodeStock:'바코드 재고조회', ecountQty:'이카운트재고조회', kreamSoldOut:'크림 품절 정리',
-    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', hrAdmin:'직원관리', barcodeListTest:'TEST 바코드→리스트화', tagPrintTest:'TEST 택 출력', priceCheckTest:'TEST 최저가 조회', photoFinderTest:'TEST 사진 자동 찾기', kidsDm:'키즈 인스타 DM 자동화', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구'
+    orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', hrAdmin:'직원관리', barcodeListTest:'TEST 바코드→리스트화', tagPrintTest:'TEST 택 출력', priceCheckTest:'TEST 최저가 조회', photoFinderTest:'TEST 사진 자동 찾기', kidsDm:'키즈 인스타 DM 자동화', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구', manualHub:'사용 설명서'
   };
 
   /* ---------------- 개발중메뉴 (buyest, buyest1 전용, 내부적으로는 비밀 채팅방) ----------------
@@ -2217,7 +2227,7 @@ window.__loadLib = (function(){
   // 로그인 없이도 쓸 수 있는 기능은 '재고조사(바코드 실사)'뿐 — 나머지 도구는 로그인해야
   // 열리도록 막는다. localStorage를 직접 읽어서 판단하므로(아래 인트라넷 IIFE가 아직 실행
   // 되기 전인 첫 로드 시점에도) 순서에 상관없이 항상 정확하다.
-  var GUEST_ALLOWED = {miniChat:1, dashboard:1, stocktake:1, barcodeStock:1, roadmap:1};
+  var GUEST_ALLOWED = {miniChat:1, dashboard:1, stocktake:1, barcodeStock:1, roadmap:1, manualHub:1};
   function isLoggedInNow(){
     try{ return !!JSON.parse(localStorage.getItem('buyest.dash.auth')); }catch(e){ return false; }
   }
@@ -8693,6 +8703,9 @@ window.__loadLib = (function(){
 })();
 </script>
 <script src="colresize.js"></script>
+<script src="manual-data.js"></script>
+<script src="manual-render.js"></script>
+<script src="manual-ui.js"></script>
 <script>
 /* 사이드바 "TEST 오늘 변동 자동확인" 배지: 아직 처리 안 된 확인필요 건수(5분마다). 로그인 안 했거나 실패하면 조용히 숨김 */
 (function(){

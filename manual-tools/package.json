@@ -1,0 +1,1 @@
+{"name":"manual-tools","private":true,"description":"툴킷 교육자료 PDF·화면 캡처 생성 도구 (사이트에는 배포되지 않음)","dependencies":{"@napi-rs/canvas":"^1.0.13","mupdf":"^1.28.1","pdfjs-dist":"^4.10.38","puppeteer-core":"^24.0.0"}}
