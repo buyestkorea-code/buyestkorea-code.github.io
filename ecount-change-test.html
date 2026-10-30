@@ -74,7 +74,7 @@
 const API = 'https://buyest.co.kr/ecount_change_today_api.php';
 const LABEL = { review: '확인필요', ready: '자동 반영 가능', unmapped: '사이트 연결 없음', already_ok: '이미 맞음', done: '처리완료' };
 const CHIP = { review: 'c-review', ready: 'c-ready', unmapped: 'c-grey', already_ok: 'c-ok', done: 'c-ok' };
-const REASON = { option_not_found: '옵션(사이즈) 못 찾음', dup_codes: '같은 사이즈에 이카운트 코드 여러 개 — 재고를 합친 합계로 판단', no_product_row: '사이트 상품 없음', discontinued_only: '이카운트 사용중단 코드뿐 — 재고를 확인할 수 없어 자동 변경 안 함', no_product_code: '연결된 상품코드 없음', apply_error: '반영 오류' };
+const REASON = { option_not_found: '옵션(사이즈) 못 찾음', dup_codes: '같은 사이즈에 이카운트 코드 여러 개 — 재고를 합친 합계로 판단', no_product_row: '사이트 상품 없음', discontinued_only: '이카운트 사용중단 코드뿐 — 재고를 확인할 수 없어 자동 변경 안 함', no_product_code: '연결된 상품코드 없음', apply_error: '반영 오류', season_hold: '시즌변경 대기 — 이카운트 이름에 "시즌변경"이 있어 자동 반영 안 함 (새 상품에 수동매핑하면 풀려요)', season_hold_unknown: '시즌변경 대기 목록을 확인하지 못해 자동 반영 안 함' };
 let DATA = null, FILTER = 'review', RECON = false;
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }

@@ -32,7 +32,7 @@
   tr.click { cursor:pointer; } tr.click:hover { background:#f9fafb; }
   .chip { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap; }
   .c-auto { background:#f0fdf4; color:#15803d; } .c-manual { background:#eff6ff; color:#1d4ed8; } .c-review { background:#fef3c7; color:#92400e; }
-  .c-un { background:#fef2f2; color:#b91c1c; } .c-un0 { background:#f3f4f6; color:#6b7280; } .c-recheck { background:#fce7f3; color:#9d174d; } .c-none { background:#ede9fe; color:#5b21b6; }
+  .c-un { background:#fef2f2; color:#b91c1c; } .c-un0 { background:#f3f4f6; color:#6b7280; } .c-recheck { background:#fce7f3; color:#9d174d; } .c-none { background:#ede9fe; color:#5b21b6; } .c-hold { background:#ffedd5; color:#c2410c; }
   .delta-up { color:var(--ok); font-weight:700; } .delta-dn { color:var(--bad); font-weight:700; }
   small.dim { color:var(--muted); }
   .modal { position:fixed; inset:0; background:rgba(17,24,39,.45); display:none; align-items:flex-start; justify-content:center; padding:30px 12px; overflow:auto; z-index:50; }
@@ -47,7 +47,7 @@
 </head>
 <body>
 <h1>사방넷-이카운트 매칭 관리<span class="tag">TEST</span></h1>
-<p class="lead">사방넷 단품대량수정 전체 파일과 이카운트 재고를 비교합니다. <b>코드(품번)·이름·규격이 확실한 줄은 자동 확정</b>하고, 중복·키즈/여성·스크래치처럼 애매한 줄은 직접 골라 <b>서버에 저장</b>합니다. 저장한 줄은 다음번부터 <b>"수동매칭"</b>으로 자동 적용돼요. (툴킷 로그인 필요)</p>
+<p class="lead">사방넷 단품대량수정 전체 파일과 이카운트 재고를 비교합니다. <b>코드(품번)·이름·규격이 확실한 줄은 자동 확정</b>하고, 중복·키즈/여성·스크래치처럼 애매한 줄은 직접 골라 <b>서버에 저장</b>합니다. 저장한 줄은 다음번부터 <b>"수동매칭"</b>으로 자동 적용돼요. (툴킷 로그인 필요)<br><b>시즌이 바뀌는 이카운트 품목은 이름 앞에 "시즌변경"을 붙여 두세요.</b> 그 품목은 어떤 사방넷 상품에도 자동 반영되지 않고 "시즌변경 대기"에 남아 있다가, 새 시즌 사방넷 상품에 <b>수동매칭</b>하는 순간부터 반영됩니다(수동매칭한 코드는 같은 품번의 옛 상품이 다시 가져가지 못해요). 새 매칭이 끝나면 이카운트 이름의 "시즌변경"은 지워도 됩니다.</p>
 
 <div class="card">
   <div class="row">
@@ -204,6 +204,18 @@ function buildEcIndex(items){
 
 /* ───────── 매칭 판정 ─────────
    status: auto(자동 확정) · manual(수동매칭) · none(대응 없음 확정) · review(확인 필요) · un(미매칭, 재고 있음) · un0(미매칭, 재고 0) · recheck(수동 코드 재확인) */
+const SEASON_MARK = '시즌변경';
+function isSeasonHold(it){ return String(it && it.name || '').indexOf(SEASON_MARK) !== -1; }
+/* 이카운트 코드 → 그 코드를 수동매칭으로 쓰는 사방넷 옵션 코드들. 다른 사방넷 코드가 쓰고 있으면 그 코드(첫 번째)를 돌려준다. */
+function ownedByOther(ecCode, sbCode){
+  if(!S.owner){
+    S.owner = {};
+    Object.keys(S.manual).forEach(k => { const m = S.manual[k]; if(m && m.m === 'match') String(m.e || '').split(',').filter(Boolean).forEach(c => { (S.owner[c] = S.owner[c] || []).push(k); }); });
+  }
+  const arr = S.owner[ecCode]; if(!arr) return '';
+  for(const k of arr) if(k !== sbCode) return k;
+  return '';
+}
 function classify(row){
   const mn = S.manual[row.code];
   const res = { status:'', items:[], newVal:null, reasons:[], cands:[], bestScore:0 };
@@ -217,9 +229,26 @@ function classify(row){
     return res;
   }
   const key = codeSuffix(row.name);
-  const all = key ? (S.ecByKey[key] || []) : [];
+  const allRaw = key ? (S.ecByKey[key] || []) : [];
+  /* 자동 매칭에서 빼는 이카운트 품목 (2026-10-30, 시즌 바뀐 신상품 재고가 옛 시즌 상품으로 풀린 사고 방지)
+     ① 이름에 '시즌변경'이 있는 품목: 새 시즌 사방넷 상품에 직접(수동매칭) 이어주기 전까지는 어떤 사방넷 상품에도 자동 반영하지 않는다.
+     ② 이미 다른 사방넷 옵션에 수동매칭으로 연결된 품목: 같은 품번의 옛 상품이 그 재고를 자동으로 다시 가져가지 않게 한다. */
+  const heldIt = allRaw.filter(isSeasonHold), ownedIt = allRaw.filter(it => !isSeasonHold(it) && ownedByOther(it.code, row.code));
+  const all = allRaw.filter(it => heldIt.indexOf(it) === -1 && ownedIt.indexOf(it) === -1);
   const spec = all.filter(it => specsMatch(it.spec, row.spec) && labelOk(it.name, row.name) && genderOk(it.name, row.name));
   if(!spec.length){
+    const heldSpec = heldIt.filter(it => specsMatch(it.spec, row.spec) && labelOk(it.name, row.name) && genderOk(it.name, row.name));
+    if(heldSpec.length){
+      res.status = 'hold'; res.items = heldSpec;
+      res.reasons.push('이카운트 이름에 "시즌변경"이 있어 자동 반영 안 함 — 새 시즌 사방넷 상품이 등록되면 그 상품에 수동매칭해 주세요');
+      return res;
+    }
+    const ownSpec = ownedIt.filter(it => specsMatch(it.spec, row.spec) && labelOk(it.name, row.name) && genderOk(it.name, row.name));
+    if(ownSpec.length){
+      res.status = row.cur > 0 ? 'un' : 'un0';
+      res.reasons.push('이 이카운트 코드(' + ownSpec.map(i => i.code).join(', ') + ')는 다른 사방넷 옵션(' + ownedByOther(ownSpec[0].code, row.code) + ')에 수동매칭돼 있어서 자동 반영 안 함');
+      return res;
+    }
     res.status = row.cur > 0 ? 'un' : 'un0';
     res.reasons.push(all.length ? '같은 품번은 있지만 이 규격/구분의 이카운트 코드가 없어요' : '같은 품번의 이카운트 품목이 없어요');
     return res;
@@ -256,10 +285,11 @@ function classify(row){
 }
 
 function runAll(){
+  S.owner = null;
   S.rows = S.sb.map(row => ({ row, res: classify(row) }));
 }
 function counts(){
-  const c = { all:S.rows.length, auto:0, manual:0, none:0, review:0, un:0, un0:0, recheck:0, change:0 };
+  const c = { all:S.rows.length, auto:0, manual:0, none:0, review:0, un:0, un0:0, recheck:0, hold:0, change:0 };
   for(const x of S.rows){ c[x.res.status]++; if(x.res.newVal != null && x.res.status !== 'none' && x.res.newVal !== x.row.cur) c.change++; }
   return c;
 }
@@ -267,13 +297,13 @@ function counts(){
 /* ───────── 화면 ───────── */
 const STATUS = {
   auto:['자동 확정','c-auto'], manual:['수동매칭','c-manual'], none:['대응 없음(확정)','c-none'], review:['확인 필요','c-review'],
-  un:['미매칭 · 재고 있음','c-un'], un0:['이카운트 미등록(재고 0)','c-un0'], recheck:['수동매칭 재확인','c-recheck']
+  un:['미매칭 · 재고 있음','c-un'], un0:['이카운트 미등록(재고 0)','c-un0'], recheck:['수동매칭 재확인','c-recheck'], hold:['시즌변경 대기','c-hold']
 };
 function renderStats(){
   const c = counts();
   const cards = [
     ['all','전체 사방넷 옵션',c.all,''], ['change','재고 변경 예정',c.change,'c-blue'], ['auto','자동 확정',c.auto,'c-ok'], ['manual','수동매칭',c.manual,'c-blue'],
-    ['review','확인 필요',c.review,'c-warn'], ['un','미매칭 · 재고 있음 (확인)',c.un,'c-bad'], ['un0','이카운트 미등록 · 재고 0 (정상)',c.un0,''], ['recheck','수동매칭 재확인',c.recheck,'c-warn'], ['none','대응 없음(확정)',c.none,'']
+    ['review','확인 필요',c.review,'c-warn'], ['hold','시즌변경 대기 (자동반영 안 함)',c.hold,'c-warn'], ['un','미매칭 · 재고 있음 (확인)',c.un,'c-bad'], ['un0','이카운트 미등록 · 재고 0 (정상)',c.un0,''], ['recheck','수동매칭 재확인',c.recheck,'c-warn'], ['none','대응 없음(확정)',c.none,'']
   ];
   $('stats').innerHTML = cards.map(([k,l,n,cl]) => `<div class="stat ${cl} ${S.filter===k?'on':''}" data-f="${k}"><b>${fmt(n)}</b>${l}</div>`).join('');
   $('stats').querySelectorAll('.stat').forEach(el => el.onclick = () => { S.filter = el.dataset.f; S.limit = 300; render(); });
@@ -292,7 +322,7 @@ function visibleRows(){
     return true;
   });
 }
-const ORDER = { recheck:0, review:1, un:2, auto:3, manual:4, none:5, un0:6 };
+const ORDER = { recheck:0, hold:0.5, review:1, un:2, auto:3, manual:4, none:5, un0:6 };
 function render(){
   renderStats();
   $('tools').style.display = 'flex';
@@ -315,7 +345,7 @@ function render(){
   const more = $('moreBar'); more.innerHTML = '';
   const info = document.createElement('span'); info.className = 'msg'; info.style.margin = 0; info.textContent = `${fmt(vis.length)}줄 중 ${fmt(shown.length)}줄 표시 (화면이 멈추지 않도록 일부만 그립니다)`; more.appendChild(info);
   if(vis.length > shown.length){ const b = document.createElement('button'); b.className = 'btn sec sm'; b.textContent = '300줄 더 보기'; b.onclick = () => { S.limit += 300; render(); }; more.appendChild(b); }
-  const FL = { all:'전체', change:'재고 변경 예정', auto:'자동 확정', manual:'수동매칭', review:'확인 필요', un:'미매칭·재고 있음', un0:'이카운트 미등록·재고 0', recheck:'수동매칭 재확인', none:'대응 없음(확정)' };
+  const FL = { all:'전체', change:'재고 변경 예정', auto:'자동 확정', manual:'수동매칭', review:'확인 필요', un:'미매칭·재고 있음', un0:'이카운트 미등록·재고 0', recheck:'수동매칭 재확인', hold:'시즌변경 대기', none:'대응 없음(확정)' };
   $('dlListBtn').textContent = `지금 보는 목록 엑셀 받기 — ${FL[S.filter] || ''} ${fmt(vis.length)}건`;
   const bulk = $('bulkBtn');
   const bulkable = vis.filter(x => (x.res.status === 'auto' || x.res.status === 'review') && x.res.items.length && groupCount(x.res) === 1);
@@ -380,6 +410,7 @@ async function api(body){
   const d = await res.json(); if(!d.ok) throw new Error(d.error || '요청 실패'); return d;
 }
 function applySaved(items, d){
+  S.owner = null;
   const a = auth();
   items.forEach(it => { S.manual[it.sabang_code] = { c:it.sabang_code, m:it.mode, e:it.ecount_codes || '', memo:it.memo || '', u:(d && d.user) || (a && a.id) || '', t:(d && d.at) || Math.floor(Date.now()/1000) }; });
 }
@@ -397,7 +428,7 @@ async function saveOne(mode){
 }
 async function delOne(){
   const x = S.rows[EDIT.i], r = x.row; const em = $('emsg');
-  try{ await api({ action:'delete', codes:[r.code] }); delete S.manual[r.code]; S.rows[EDIT.i].res = classify(r); closeEditor(); render(); }
+  try{ await api({ action:'delete', codes:[r.code] }); delete S.manual[r.code]; S.owner = null; S.rows[EDIT.i].res = classify(r); closeEditor(); render(); }
   catch(e){ em.className = 'msg err'; em.textContent = e.message; }
 }
 $('bulkBtn').onclick = async () => {
@@ -537,7 +568,7 @@ $('dlListBtn').onclick = () => {
   const vis = visibleRows();
   if(!vis.length){ $('tmsg').textContent = '내려받을 줄이 없어요.'; return; }
   vis.sort((a, b) => (ORDER[a.res.status] - ORDER[b.res.status]));
-  const FL = { all:'전체', change:'재고변경예정', auto:'자동확정', manual:'수동매칭', review:'확인필요', un:'미매칭_재고있음', un0:'이카운트미등록_재고0', recheck:'수동매칭재확인', none:'대응없음확정' };
+  const FL = { all:'전체', change:'재고변경예정', auto:'자동확정', manual:'수동매칭', review:'확인필요', un:'미매칭_재고있음', un0:'이카운트미등록_재고0', recheck:'수동매칭재확인', hold:'시즌변경대기', none:'대응없음확정' };
   const aoa = [['사방넷 코드','사방넷 상품명','옵션','사방넷 현재고','상태','이카운트 코드','이카운트 상품명','이카운트 옵션','이카운트 재고(반영값)','재고 차이(이카운트-사방넷)','사유','메모','등록자','등록일시']];
   vis.forEach(x => {
     const r = x.row, res = x.res, mn = S.manual[r.code];
