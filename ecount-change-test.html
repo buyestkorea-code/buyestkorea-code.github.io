@@ -52,6 +52,7 @@
   <div>
     <input type="date" id="day"> <button class="btn sec" onclick="load()">조회</button>
     <button class="btn danger" id="runBtn" onclick="runNow()">수동 실행 (이카운트 재고 새로 받아 반영)</button>
+    <button class="btn" id="namesBtn" onclick="namesNow()" title="재고담당자가 늦게 재고추가·이름변경을 했을 때만 사용. 오늘 재고가 바뀐 품목의 이름을 이카운트에서 바로 다시 받아요(평소엔 매시 28분에 자동).">수동 이름 받아오기</button>
     <button class="btn sec" id="reconBtn" onclick="reconcile()">재고·사이트 상태 불일치 점검</button>
     <button class="btn" id="mapEditBtn" onclick="openMapPanel()">연결 정리 (웹에서 바로 수정)</button>
     <button class="btn sec" id="mapBtn" onclick="downloadMapping()">연결 정리 엑셀 다운로드 (최초 1회용)</button>
@@ -143,6 +144,12 @@ async function runNow() {
   const d = await act({ action: 'run_now' }, '이카운트 재고 받는 중... 비교·반영 중... (최대 1~2분)'); if (!d) return;
   showRun(d, '수동 실행'); await load(true);
 }
+async function namesNow() {
+  if (!confirm('오늘 재고가 바뀐 품목의 이름을 이카운트에서 지금 다시 받아요(평소엔 매시 28분에 자동). 재고담당자가 늦게 재고추가·이름변경을 했을 때만 사용하세요. 진행할까요?')) return;
+  const d = await act({ action: 'names_now' }, '이카운트에서 이름 받는 중...'); if (!d) return;
+  if (d.ok) { setMsg('<b>이름 받기 완료</b> — ' + (d.skipped ? esc(d.message || '오늘 변동된 코드 없음') : '변동 ' + (d.changed_codes || 0) + '개 품목의 이름을 새로 받았어요.') + ' 이제 수동 실행을 눌러 반영하세요.', 'okbox'); await load(true); }
+  else setMsg(esc(d.error || '실패'), 'err');
+}
 async function confirmGroup(code) {
   const it = DATA.items.find(i => i.ec_code === code);
   if (!confirm(`${it.name || code}
@@ -155,6 +162,7 @@ function showRun(d, title) {
   if (!d.ok) { setMsg(esc(d.error || '실패'), 'err'); return; }
   const sk = d.snapshot && d.snapshot.skip ? ` (비교: ${esc(d.snapshot.skip)})` : '';
   let h = `<b>${title} 완료</b>${sk}<br>` + (d.collect ? `${esc(d.collect.msg)}<br>` : '') + `반영 ${d.applied}건 · 오류 ${d.errors}건 · 확인필요(미처리 누적) ${d.pending_total != null ? d.pending_total : d.review}건`;
+  if (d.name_stale > 0) h += `<br>⚠ 이카운트 이름을 아직 새로 받지 못해 반영을 보류한 건이 ${d.name_stale}건 있어요. 시즌변경·재고추가를 방금 했다면 [수동 이름 받아오기](직전 재고 받기 후 15분 뒤 가능) → [수동 실행] 순서로 하세요.`;
   if (d.kids_error) h += `<br>⚠ 키즈 반영 알림: ${esc(d.kids_error)}`;
   if (d.exec_error) h += `<br>⚠ ${esc(d.exec_error)}`;
   if (d.pending_total > 0) h += `<br>확인필요 ${d.pending_total}건이 남아 있어요. 직원이 확인해 처리해 주세요.`;
