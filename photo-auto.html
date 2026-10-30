@@ -53,6 +53,17 @@
   .hist .hmeta{flex:1;min-width:0;font-size:12.5px;line-height:1.5;}
   .hist .hmeta b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .hist .hmeta span{color:#777;}
+  .regtbl{border-collapse:collapse;width:100%;font-size:12.5px;margin:8px 0;}
+  .regtbl th{width:120px;text-align:left;vertical-align:top;color:var(--sub);font-weight:600;padding:5px 8px;border-top:1px solid var(--line);}
+  .regtbl td{padding:5px 8px;border-top:1px solid var(--line);line-height:1.55;}
+  .regtbl.hist2 th{width:auto;} .regtbl.hist2 td,.regtbl.hist2 th{padding:4px 6px;white-space:nowrap;} .regtbl.hist2 td:nth-child(4){white-space:normal;}
+  .rbad{color:var(--bad);font-weight:700;} .rok{color:var(--ok);font-weight:700;}
+  .rwarn{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:8px 12px;margin:8px 0;font-size:12.5px;line-height:1.6;}
+  .rokbox{background:var(--okbg);color:var(--ok);border-radius:10px;padding:8px 12px;margin:8px 0;font-size:13px;}
+  .rprob{margin:6px 0;padding-left:18px;color:var(--bad);font-size:12.5px;line-height:1.7;}
+  .alertbox{background:var(--badbg);border:2px solid var(--bad);color:var(--bad);border-radius:10px;padding:10px 12px;margin:8px 0;font-size:13px;}
+  .alertbox pre{white-space:pre-wrap;font:12.5px var(--font);margin:6px 0;color:#7a1710;}
+  .cok{background:var(--okbg);color:var(--ok);} .cwarn{background:var(--warnbg);color:var(--warn);} .cbad{background:var(--badbg);color:var(--bad);}
 </style>
 </head>
 <body>
@@ -101,6 +112,7 @@
   </div>
   <div class="row" style="margin-top:12px">
     <label class="hint"><input type="checkbox" id="zoom" checked> 마지막에 확대컷 자동 추가</label>
+    <label class="hint"><input type="checkbox" id="bgwhite" checked> 연한 회색 배경 사진은 흰 배경으로 자동 정리</label>
   </div>
 </div>
 
@@ -114,7 +126,52 @@
 <div class="hint" id="editHint" style="display:none;margin:0 0 8px">✏ 만든 뒤에는 <b>미리보기의 글자를 눌러 바로 고칠 수 있습니다</b>(Enter=적용, Esc=취소). 다시 '만들기'를 누르면 미리보기에서 직접 고친 글자(표·고정문구)는 초기화되고, 위 입력칸 값은 유지됩니다. PSD의 글자 레이어를 보려면 PC에 Pretendard 글꼴(Light·Regular·Bold)이 설치돼 있어야 합니다.</div>
 <div class="prev" id="prev" style="display:none"></div>
 
+<div class="box" id="regBox" style="margin-top:14px">
+  <h2>④ 사이트 등록 <span class="hint">(위에서 만든 이미지 + 아래 정보를 그대로 사이트에 등록 · 새 상품은 미노출·임시가 5,000,000원으로 들어가고 담당자가 관리자에서 가격·노출을 바꿉니다)</span></h2>
+  <div id="regLogin" class="hint" style="display:none">등록 기능은 툴킷에 <b>로그인한 직원</b>만 쓸 수 있어요. 툴킷 메인 화면에서 로그인한 뒤 이 페이지를 새로고침하세요.</div>
+  <div id="rAlerts"></div>
+  <div id="regMain" style="display:none">
+    <div class="row" style="margin-bottom:10px">
+      <select id="rTpl" style="font:14px var(--font);padding:8px;border:1px solid var(--line);border-radius:8px"><option value="">— 카테고리 템플릿 선택 —</option></select>
+      <button class="btn btn-out btn-sm" id="rTplApply" type="button">템플릿 적용</button>
+      <button class="btn btn-out btn-sm" id="rTplSave" type="button" style="display:none" title="툴킷 관리자만">현재 설정을 템플릿으로 저장</button>
+      <button class="btn btn-out btn-sm" id="rXlsx" type="button" title="지금 입력한 값이 들어간 자동등록용 엑셀을 내려받습니다">엑셀로 받기</button>
+      <span id="rHints" class="row"></span>
+    </div>
+    <div class="grid">
+      <div><label>브랜드 (사이트 브랜드와 일치해야 함)</label><input type="text" id="rBrand" list="rBrandList" placeholder="예) BURBERRY 또는 버버리"></div>
+      <div><label>소재</label><input type="text" id="rMaterial" placeholder="예) 울 100%"></div>
+      <div><label>원산지</label><input type="text" id="rOrigin" placeholder="예) 이탈리아"></div>
+      <div><label>옵션1 이름</label><input type="text" id="rT1n" placeholder="사이즈"></div>
+      <div><label>옵션1 값 (쉼표로 구분)</label><input type="text" id="rT1v" placeholder="단품 또는 S,M,L"></div>
+      <div><label>옵션1 실제 입고된 값 (비우면 전부 품절 등록)</label><input type="text" id="rT1s" placeholder="예) M,L"></div>
+      <div><label>옵션2 이름 (선택)</label><input type="text" id="rT2n" placeholder="색상"></div>
+      <div><label>옵션2 값</label><input type="text" id="rT2v"></div>
+      <div><label>옵션2 실제 입고된 값</label><input type="text" id="rT2s"></div>
+      <div class="wide"><label>카테고리 (목록에서 선택하거나 입력 · 1개 이상)</label>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
+          <input type="text" id="rC1" list="rCatList" placeholder="예) WOMEN > 패션잡화"><input type="text" id="rC2" list="rCatList"><input type="text" id="rC3" list="rCatList"><input type="text" id="rC4" list="rCatList"><input type="text" id="rC5" list="rCatList">
+        </div></div>
+      <div class="wide row"><label class="hint"><input type="checkbox" id="rKids"> 키즈 사이트에도 동시 등록</label>
+        <input type="text" id="rKidsPrice" placeholder="키즈 판매가(숫자)" style="width:180px;display:none">
+        <label class="hint" id="rKidsShowWrap" style="display:none"><input type="checkbox" id="rKidsShow"> 키즈 사이트에 바로 노출</label></div>
+    </div>
+    <datalist id="rBrandList"></datalist><datalist id="rCatList"></datalist>
+    <div class="hint" style="margin-top:6px">목록 이미지(_01)는 <b>첫 번째 사진</b>, 오버 이미지(_02)는 <b>두 번째 사진</b>(1장이면 같은 사진)이 자동으로 쓰입니다. 상세 이미지(_00)는 위에서 만든 결과입니다.</div>
+    <div class="row" style="margin:12px 0 6px">
+      <button class="btn btn-out" id="rPreviewBtn" type="button" disabled>미리보기 (저장 안 됨)</button>
+      <button class="btn btn-pri" id="rRegBtn" type="button" disabled>사이트에 등록</button>
+      <span id="rMsg" class="hint"></span>
+    </div>
+    <div id="rPrev" style="display:none"></div>
+    <div id="rResult" style="display:none"></div>
+    <h2 style="margin-top:16px">등록 이력 <span class="hint">(누가 · 언제 · 무엇을 — 팀 공용)</span> <button class="btn btn-out btn-sm" id="rHistRefresh" type="button">새로고침</button></h2>
+    <div id="rHist" class="hint" style="overflow:auto">불러오는 중…</div>
+  </div>
+</div>
+
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/libs/jpeg-encoder-0.4.4.js"></script>
 <script>
 (function(){
 'use strict';
@@ -126,6 +183,7 @@ var CATEGORY_WORDS=['카드지갑','반지갑','장지갑','중지갑','명함�
 var COLOR_WORDS=['블랙','화이트','그레이','네이비','베이지','브라운','카키','그린','블루','레드','핑크','옐로우','오렌지','퍼플','아이보리','크림','실버','골드','차콜','민트','와인','버건디','멀티','카멜','라벤더','데님'];
 var DEFAULTS={'수입여부':'병행 수입','구성품':'정품택 + 더스트백 + 정품제품 + 자체보증서'};
 var HANGUL=/[가-힣]/, SEASON=/^\d{2}[A-Za-z]{2,3}$/;
+var BAGS=['숄더백','크로스백','토트백','백팩','클러치','파우치','버킷백','미니백','핸드백','가방','쇼퍼백'];
 
 var $=function(id){return document.getElementById(id);};
 var state={xl:{}, photos:[], dirty:{}, info:null, canvas:null, fileName:'', last:null, chart:null, slots:null, ov:{}, wrapEl:null, hl:null, job:'', jobName:'', pending:null};
@@ -191,9 +249,9 @@ function readXlsx(file){
 }
 function setXlsx(file){
   readXlsx(file).then(function(o){
-    state.xl=o; $('xName').textContent='✔ '+file.name+' — 브랜드 '+(o.brand||'?')+' · 제조국 '+(o.origin||'?')+' · 소재 '+(o.material||'?');
+    state.xl=o; state.xlFile=file; $('xName').textContent='✔ '+file.name+' — 브랜드 '+(o.brand||'?')+' · 제조국 '+(o.origin||'?')+' · 소재 '+(o.material||'?');
     ['브랜드','제조국','소재'].forEach(function(k){ state.dirty[k]=false; });
-    applyAuto();
+    applyAuto(); if(window.PhotoRegister) PhotoRegister.onXlsx(file);
   }).catch(function(e){ $('xName').textContent='엑셀을 읽지 못했습니다: '+e.message; });
 }
 
@@ -238,6 +296,58 @@ function toWhiteCanvas(im){
   var c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight;
   var x=c.getContext('2d',{willReadFrequently:true}); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0); return c;
 }
+/* 회색 스튜디오 배경 → 흰색. 사진 테두리 색이 거의 균일한 연한 회색일 때만, 가장자리에서 이어진 배경 영역만 칠한다
+   (제품 안쪽의 밝은 부분은 건드리지 않음). 반환: 0=정리 불필요(이미 흰색/어두운 배경) 1=정리함 2=배경이 균일하지 않아 건너뜀 */
+function whitenBackdrop(c){
+  var w=c.width,h=c.height, ctx=c.getContext('2d',{willReadFrequently:true}), im=ctx.getImageData(0,0,w,h), d=im.data;
+  var R=[],G=[],B=[], step=Math.max(1,Math.floor(Math.max(w,h)/600));
+  function samp(x,y){ var i=(y*w+x)*4; R.push(d[i]); G.push(d[i+1]); B.push(d[i+2]); }
+  for(var x=0;x<w;x+=step){ samp(x,0); samp(x,h-1); }
+  for(var y=0;y<h;y+=step){ samp(0,y); samp(w-1,y); }
+  function med(a){ a.sort(function(p,q){return p-q;}); return a[a.length>>1]; }
+  var br=med(R.slice()), bg=med(G.slice()), bb=med(B.slice());
+  var lum=(299*br+587*bg+114*bb)/1000;
+  if(lum>=250 || lum<190) return 0;
+  var TOL=26, STEP=10;
+  function dist(i){ var a=Math.abs(d[i]-br), b=Math.abs(d[i+1]-bg), e=Math.abs(d[i+2]-bb); return a>b?(a>e?a:e):(b>e?b:e); }
+  var near=0; for(var k=0;k<R.length;k++){ if(Math.max(Math.abs(R[k]-br),Math.abs(G[k]-bg),Math.abs(B[k]-bb))<=TOL) near++; }
+  if(near/R.length<0.9) return 2;
+  var mask=new Uint8Array(w*h), stack=new Int32Array(w*h), sp=0;
+  function seed(x,y){ var j=y*w+x; if(!mask[j] && dist(j*4)<=TOL){ mask[j]=1; stack[sp++]=j; } }
+  for(var x2=0;x2<w;x2++){ seed(x2,0); seed(x2,h-1); }
+  for(var y2=0;y2<h;y2++){ seed(0,y2); seed(w-1,y2); }
+  while(sp){
+    var j=stack[--sp], jx=j%w, jy=(j-jx)/w, ji=j*4, nb=[];
+    if(jx>0) nb.push(j-1); if(jx<w-1) nb.push(j+1); if(jy>0) nb.push(j-w); if(jy<h-1) nb.push(j+w);
+    for(var n=0;n<nb.length;n++){
+      var q=nb[n]; if(mask[q]) continue; var qi=q*4;
+      if(dist(qi)<=TOL && Math.max(Math.abs(d[qi]-d[ji]),Math.abs(d[qi+1]-d[ji+1]),Math.abs(d[qi+2]-d[ji+2]))<=STEP){ mask[q]=1; stack[sp++]=q; }
+    }
+  }
+  var edge=[];
+  for(var y3=0;y3<h;y3++) for(var x3=0;x3<w;x3++){
+    var m=y3*w+x3; if(mask[m]) continue;
+    if((x3>0&&mask[m-1])||(x3<w-1&&mask[m+1])||(y3>0&&mask[m-w])||(y3<h-1&&mask[m+w])) edge.push(m);
+  }
+  for(var m2=0;m2<w*h;m2++){ if(mask[m2]){ var o=m2*4; d[o]=255; d[o+1]=255; d[o+2]=255; } }
+  for(var e=0;e<edge.length;e++){ var oi=edge[e]*4;
+    if(dist(oi)<=TOL*3){ d[oi]+= (255-d[oi])*0.6; d[oi+1]+=(255-d[oi+1])*0.6; d[oi+2]+=(255-d[oi+2])*0.6; } }
+  ctx.putImageData(im,0,0); return 1;
+}
+/* 저장: Chrome 기본 저장은 품질 0.995 미만에서 색을 절반 해상도(4:2:0)로 저장해 글자·로고 가장자리가 번진다.
+   그렇다고 1.0으로 저장하면 용량이 2배라, 4:4:4로 저장하는 JPEG 인코더(jpeg-js 0.4.4, BSD)로 품질 JPEG_Q 저장.
+   인코더를 못 불러오면 브라우저 기본 저장(품질 1.0, 4:4:4)으로 대신한다. */
+var JPEG_Q=90;
+function encodeJpeg(c){
+  return new Promise(function(res){
+    try{
+      var enc=window['jpeg-js']&&window['jpeg-js'].encode;
+      if(enc){ var id=c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,c.width,c.height);
+        res(new Blob([enc(id,JPEG_Q).data],{type:'image/jpeg'})); return; }
+    }catch(e){ console.error(e); }
+    c.toBlob(res,'image/jpeg',1);
+  });
+}
 function trimBox(c){
   var w=c.width,h=c.height, d=c.getContext('2d').getImageData(0,0,w,h).data;
   var x0=w,y0=h,x1=-1,y1=-1;
@@ -276,6 +386,7 @@ function makeZoom(c){
 }
 
 /* ---------- 실측표 ---------- */
+function sizeHasEmpty(chart){ var e=false; chart.rows.forEach(function(r){ for(var i=1;i<chart.header.length;i++){ if(!r[i]) e=true; } }); return e; }
 function buildSizeChart(){
   var tbl=$('table').value.split('\n').map(function(l){return l.trim();}).filter(Boolean);
   if(tbl.length){ var rows=tbl.map(function(l){return l.split(/[\t ]+/);}); return {header:rows[0], rows:rows.slice(1), given:true}; }
@@ -351,8 +462,9 @@ function render(f,chart,slots,ov){
   y=top+slotH;
 
   text('Information',33.4,y+(2290.84-2162),40,'Bold',DARK);
-  var rowTop=y+(2329-2162), n=INFO_ROWS.length;
-  INFO_ROWS.forEach(function(k,i){
+  var ROWS=INFO_ROWS.filter(function(k){ return k!=='수납공간' || f['수납공간'] || BAGS.indexOf(f['카테고리'])>=0; });
+  var rowTop=y+(2329-2162), n=ROWS.length;
+  ROWS.forEach(function(k,i){
     var val=f[k]||'', lines=val?wrap(val,450,300,18):[''];
     var h=Math.max(40,16+24*lines.length), last=i===n-1;
     if(last) h=Math.max(63,h);
@@ -417,7 +529,7 @@ function showPreview(){
 }
 function rerender(){
   var r=render(readF(),state.chart,state.slots,state.ov);
-  state.last=r; state.canvas=r.canvas; showPreview();
+  state.last=r; state.canvas=r.canvas; state.genId=(state.genId||0)+1; if(window.PhotoRegister) PhotoRegister.invalidate(); showPreview();
   $('status').textContent='완료: '+W+' × '+r.canvas.height+' px · 사진 '+state.photos.length+'장 · 글자를 눌러 바로 고칠 수 있어요';
   queueSave(1500);
 }
@@ -520,13 +632,14 @@ $('go').addEventListener('click',function(){
   if(!state.photos.length){ $('status').textContent='사진을 한 장 이상 올려주세요.'; return; }
   applyAuto();
   var f=readF();
-  ['브랜드','카테고리','제조년월','색상','제조국','소재','수납공간'].forEach(function(k){ if(!f[k]) warns.push('"'+k+'" 비어 있음'); });
+  ['브랜드','카테고리','제조년월','색상','제조국','소재'].concat(BAGS.indexOf(f['카테고리'])>=0?['수납공간']:[]).forEach(function(k){ if(!f[k]) warns.push('"'+k+'" 비어 있음'); });
   if(state.info.color && !state.info.colorKnown) warns.push('색상 "'+state.info.color+'" 이(가) 일반 색상어가 아님 — 확인');
   if(!state.info.category) warns.push('카테고리를 상품명에서 못 찾음 — 직접 입력');
   var chart=(state.pending&&state.pending.chart)||buildSizeChart();
   state.pending=null;
   var pn=$('pname').value.trim(); if(!state.job||state.jobName!==pn){ state.job=newId(); state.jobName=pn; }
   if(!chart.given) warns.push('★ 실측 입력 필요 — 실측 칸을 채우고 다시 만드세요');
+  else if(sizeHasEmpty(chart)) warns.push('★ 실측 표에 비어 있는 칸이 있습니다 — 채우고 다시 만드세요');
   btn.disabled=true; $('dl').disabled=true; $('dlp').disabled=true; state.ov=(state.pending&&state.pending.ov)||{}; $('status').textContent='만드는 중…';
 
   Promise.all([loadFonts(),loadStatic()]).then(function(){
@@ -534,7 +647,7 @@ $('go').addEventListener('click',function(){
     function next(){
       if(i>=state.photos.length) return Promise.resolve();
       var p=state.photos[i++]; $('status').textContent='사진 처리 중… ('+i+'/'+state.photos.length+')';
-      return loadImg(p.url).then(function(im){ var c=toWhiteCanvas(im); seq.push({name:p.file.name,c:c}); }).then(function(){ return new Promise(function(r){setTimeout(r,0);}); }).then(next);
+      return loadImg(p.url).then(function(im){ var c=toWhiteCanvas(im); if($('bgwhite').checked){ var bw=whitenBackdrop(c); if(bw===2) warns.push(p.file.name+': 배경이 균일한 회색이 아니라 배경 정리를 건너뜀 — 확인'); } seq.push({name:p.file.name,c:c}); }).then(function(){ return new Promise(function(r){setTimeout(r,0);}); }).then(next);
     }
     return next().then(function(){
       var items=[seq[0]].concat(seq);                       /* 메인 + 상세(메인 포함 전부) */
@@ -549,15 +662,17 @@ $('go').addEventListener('click',function(){
     if(c.height>30000) warns.push('★ 세로 '+c.height+'px — 브라우저 한도(약 32,000px)에 가깝습니다. 사진 수를 줄이세요');
     showPreview(); $('editHint').style.display='block';
     $('status').textContent='완료: '+W+' × '+c.height+' px · 사진 '+state.photos.length+'장';
+    state.genId=(state.genId||0)+1;
     $('dl').disabled=false; $('dlp').disabled=false; showWarns(warns); queueSave(300);
+    if(window.PhotoRegister) PhotoRegister.onGenerated();
   }).catch(function(e){ $('status').textContent='실패: '+e.message; console.error(e); }).then(function(){ btn.disabled=false; });
 });
 $('dl').addEventListener('click',function(){
   if(!state.canvas) return;
-  state.canvas.toBlob(function(b){
+  encodeJpeg(state.canvas).then(function(b){
     var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=codeOf()+'_00.jpg';
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
-  },'image/jpeg',0.95);
+  });
 });
 $('dlp').addEventListener('click',function(){
   if(!state.last) return;
@@ -597,7 +712,7 @@ function saveHistory(){
   saving=true; setHist('서버에 보관 중…');
   var id=state.job, photos=state.photos.slice(), canvas=state.canvas;
   var meta={v:1,pname:$('pname').value.trim(),code:codeOf(),fields:readF(),dirty:state.dirty,size:$('size').value,table:$('table').value,
-    zoom:$('zoom').checked,ov:state.ov,chart:state.chart,xl:state.xl,
+    zoom:$('zoom').checked,bgwhite:$('bgwhite').checked,ov:state.ov,chart:state.chart,xl:state.xl,
     photos:photos.map(function(p){return {key:p.key,name:p.file.name,type:p.file.type,lm:p.file.lastModified};})};
   phJson('has',{job:id,keys:JSON.stringify(photos.map(function(p){return p.key;}))}).then(function(j){
     var todo=photos.filter(function(p){ return j.have.indexOf(p.key)<0; }), i=0;
@@ -610,7 +725,7 @@ function saveHistory(){
     var x=t.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,200,200); x.drawImage(canvas,0,1150,720,720,0,0,200,200);
     return toBlob(t,0.8);
   }).then(function(b){ return phJson('put',{job:id,kind:'thumb'},b); })
-  .then(function(){ return toBlob(canvas,0.92); })
+  .then(function(){ return encodeJpeg(canvas); })
   .then(function(b){ return phJson('put',{job:id,kind:'jpg'},b); })
   .then(function(){ return phJson('meta',{job:id,meta:JSON.stringify(meta)}); })
   .then(function(){ setHist('✔ 서버에 3일간 보관됨'); loadHistList(); })
@@ -648,7 +763,7 @@ function loadJob(id){
     var m=j.meta, miss=[];
     state.job=id; state.jobName=m.pname; $('pname').value=m.pname||''; state.xl=m.xl||{}; state.dirty=m.dirty||{};
     FIELD_KEYS.forEach(function(k){ fld(k).value=(m.fields&&m.fields[k])||''; });
-    $('size').value=m.size||''; $('table').value=m.table||''; $('zoom').checked=m.zoom!==false;
+    $('size').value=m.size||''; $('table').value=m.table||''; $('zoom').checked=m.zoom!==false; $('bgwhite').checked=m.bgwhite!==false;
     $('xName').textContent=(state.xl.brand||state.xl.origin||state.xl.material)?'✔ (보관된 작업) 브랜드 '+(state.xl.brand||'?')+' · 제조국 '+(state.xl.origin||'?')+' · 소재 '+(state.xl.material||'?'):'';
     state.photos=[]; var i=0, list=m.photos||[];
     function next(){ if(i>=list.length) return Promise.resolve(); var p=list[i++];
@@ -667,7 +782,50 @@ function loadJob(id){
 $('histRefresh').addEventListener('click',loadHistList);
 loadHistList();
 mark();
+
+/* ---------- 사이트 등록 패널(register.js)에 제공하는 기능 ---------- */
+function sizeTableRows(){
+  var t=$('table').value.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+  if(t.length) return t.map(function(l){return l.split(/[\t ]+/);});
+  var ch=buildSizeChart(); return ch.given?[ch.header].concat(ch.rows):[];
+}
+window.PhotoAuto={
+  readF:readF, sizeTableRows:sizeTableRows, encodeJpeg:encodeJpeg,
+  sizeIncomplete:function(){ var ch=buildSizeChart(); return !ch.given || sizeHasEmpty(ch); },
+  ctx:function(){
+    if(!state.canvas||!state.photos.length||!state.last) return null;
+    return {pname:$('pname').value.trim(),code:codeOf(),canvas:state.canvas,photos:state.photos,genId:state.genId||0};
+  },
+  /* 목록/오버 이미지용: 흰 배경 정리 → 긴 변 1600px 이하 → 4:4:4 JPEG */
+  photoJpeg:function(p){
+    return loadImg(p.url).then(function(im){
+      var c=toWhiteCanvas(im); if($('bgwhite').checked) whitenBackdrop(c);
+      var m=Math.max(c.width,c.height);
+      if(m>1600){ var k=1600/m; c=resizeFrom(c,0,0,c.width,c.height,Math.round(c.width*k),Math.round(c.height*k)); }
+      return encodeJpeg(c);
+    });
+  },
+  /* 템플릿: 실측 항목(머리글)만 채움. 값은 사람이 입력 */
+  applyTemplate:function(b){
+    var labels=b.sizeLabels||[];
+    if(labels.length && !$('table').value.trim() && !$('size').value.trim()){
+      var sizes=[]; (b.tiers||[]).forEach(function(t){ if(t.name==='사이즈') sizes=t.values||[]; });
+      var lines=['사이즈 '+labels.join(' ')];
+      if(sizes.length===1||!sizes.length) lines.push('단품');
+      else sizes.forEach(function(sz){ lines.push(sz); });
+      $('table').value=lines.join('\n');
+    }
+  },
+  /* 엑셀 '상세' 시트의 값으로 정보칸·실측표 채우기 */
+  applyDetail:function(kv,table){
+    Object.keys(kv||{}).forEach(function(k){ if(FIELD_KEYS.indexOf(k)>=0 && kv[k]){ fld(k).value=kv[k]; state.dirty[k]=true; } });
+    mark();
+    if(table&&table.length) $('table').value=table.map(function(r){return r.join(' ');}).join('\n');
+  }
+};
+if(window.PhotoRegister) PhotoRegister.init();
 })();
 </script>
+<script src="assets/photo-auto/register.js"></script>
 </body>
 </html>
