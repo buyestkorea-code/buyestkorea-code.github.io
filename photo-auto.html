@@ -47,11 +47,23 @@
   .prev .cw{position:relative;display:inline-block;width:100%;max-width:720px;}
   .prev .hl{position:absolute;pointer-events:none;border:1.5px dashed #2b6cb0;background:rgba(43,108,176,.10);border-radius:3px;}
   .prev .ed{position:absolute;box-sizing:border-box;padding:0 6px;border:2px solid #2b6cb0;border-radius:4px;background:#fff;color:#111;font-family:inherit;outline:none;z-index:3;}
+  .hist .hrow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line,#e5e5e0);}
+  .hist .hrow:first-child{border-top:0;}
+  .hist .hth{width:56px;height:56px;border-radius:6px;background:#f0f0ee;object-fit:cover;flex:none;}
+  .hist .hmeta{flex:1;min-width:0;font-size:12.5px;line-height:1.5;}
+  .hist .hmeta b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .hist .hmeta span{color:#777;}
 </style>
 </head>
 <body>
 <h1>사진 자동화 <span class="badge">TEST</span></h1>
-<p class="lead">사진 + 기본틀 엑셀 + 상품명만 넣으면 상세페이지 이미지(폭 720px)를 자동으로 조립합니다. <b>실측</b>은 직접 입력하세요. 전부 이 브라우저 안에서 처리되며 서버로 올라가지 않습니다.</p>
+<p class="lead">사진 + 기본틀 엑셀 + 상품명만 넣으면 상세페이지 이미지(폭 720px)를 자동으로 조립합니다. <b>실측</b>은 직접 입력하세요. 만드는 작업은 이 브라우저 안에서 처리되고, 결과와 사진은 <b>서버에 3일간 보관</b>돼 아래 '최근 작업'에서 다시 불러올 수 있습니다.</p>
+
+<div class="box hist">
+  <h2>최근 작업 <span class="hint">(서버에 마지막 작업 후 3일간 보관 · 팀 공용)</span> <button class="btn btn-out btn-sm" id="histRefresh" type="button">새로고침</button></h2>
+  <div id="histList" class="hint">불러오는 중…</div>
+  <div class="hint" id="histNote" style="margin-top:6px"></div>
+</div>
 
 <div class="box">
   <h2>① 상품명</h2>
@@ -116,7 +128,7 @@ var DEFAULTS={'수입여부':'병행 수입','구성품':'정품택 + 더스트�
 var HANGUL=/[가-힣]/, SEASON=/^\d{2}[A-Za-z]{2,3}$/;
 
 var $=function(id){return document.getElementById(id);};
-var state={xl:{}, photos:[], dirty:{}, info:null, canvas:null, fileName:'', last:null, chart:null, slots:null, ov:{}, wrapEl:null, hl:null};
+var state={xl:{}, photos:[], dirty:{}, info:null, canvas:null, fileName:'', last:null, chart:null, slots:null, ov:{}, wrapEl:null, hl:null, job:'', jobName:'', pending:null};
 
 /* ---------- 필드 입력칸 ---------- */
 var fieldBox=$('fields');
@@ -199,7 +211,7 @@ function natCmp(a,b){ var x=natKey(a),y=natKey(b); for(var i=0;i<Math.min(x.leng
 wireDrop($('dropP'),$('fileP'),function(fs){
   fs.filter(function(f){return /^image\//.test(f.type)||/\.(jpe?g|png|webp)$/i.test(f.name);}).forEach(function(f){
     if(/_00\.jpg$/i.test(f.name)) return;
-    state.photos.push({file:f,url:URL.createObjectURL(f)});
+    state.photos.push({file:f,url:URL.createObjectURL(f),key:keyOf(f)});
   });
   state.photos.sort(function(a,b){return natCmp(a.file.name,b.file.name);});
   drawPhotos();
@@ -407,6 +419,7 @@ function rerender(){
   var r=render(readF(),state.chart,state.slots,state.ov);
   state.last=r; state.canvas=r.canvas; showPreview();
   $('status').textContent='완료: '+W+' × '+r.canvas.height+' px · 사진 '+state.photos.length+'장 · 글자를 눌러 바로 고칠 수 있어요';
+  queueSave(1500);
 }
 function hitText(e){
   if(!state.last) return null;
@@ -510,9 +523,11 @@ $('go').addEventListener('click',function(){
   ['브랜드','카테고리','제조년월','색상','제조국','소재','수납공간'].forEach(function(k){ if(!f[k]) warns.push('"'+k+'" 비어 있음'); });
   if(state.info.color && !state.info.colorKnown) warns.push('색상 "'+state.info.color+'" 이(가) 일반 색상어가 아님 — 확인');
   if(!state.info.category) warns.push('카테고리를 상품명에서 못 찾음 — 직접 입력');
-  var chart=buildSizeChart();
+  var chart=(state.pending&&state.pending.chart)||buildSizeChart();
+  state.pending=null;
+  var pn=$('pname').value.trim(); if(!state.job||state.jobName!==pn){ state.job=newId(); state.jobName=pn; }
   if(!chart.given) warns.push('★ 실측 입력 필요 — 실측 칸을 채우고 다시 만드세요');
-  btn.disabled=true; $('dl').disabled=true; $('dlp').disabled=true; state.ov={}; $('status').textContent='만드는 중…';
+  btn.disabled=true; $('dl').disabled=true; $('dlp').disabled=true; state.ov=(state.pending&&state.pending.ov)||{}; $('status').textContent='만드는 중…';
 
   Promise.all([loadFonts(),loadStatic()]).then(function(){
     var seq=[], i=0;
@@ -534,7 +549,7 @@ $('go').addEventListener('click',function(){
     if(c.height>30000) warns.push('★ 세로 '+c.height+'px — 브라우저 한도(약 32,000px)에 가깝습니다. 사진 수를 줄이세요');
     showPreview(); $('editHint').style.display='block';
     $('status').textContent='완료: '+W+' × '+c.height+' px · 사진 '+state.photos.length+'장';
-    $('dl').disabled=false; $('dlp').disabled=false; showWarns(warns);
+    $('dl').disabled=false; $('dlp').disabled=false; showWarns(warns); queueSave(300);
   }).catch(function(e){ $('status').textContent='실패: '+e.message; console.error(e); }).then(function(){ btn.disabled=false; });
 });
 $('dl').addEventListener('click',function(){
@@ -556,6 +571,101 @@ $('dlp').addEventListener('click',function(){
     $('status').textContent=old;
   }).catch(function(e){ $('status').textContent='PSD 저장 실패: '+e.message; console.error(e); }).then(function(){ b.disabled=false; });
 });
+
+/* ---------- 작업 내역 서버 보관(3일) ---------- */
+var HIST_API='https://buyest.co.kr/photo_history_api.php';
+function actorId(){ try{ var a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return a&&a.id?String(a.id):''; }catch(e){ return ''; } }
+function newId(){ var a=new Uint8Array(8); window.crypto.getRandomValues(a); return [].map.call(a,function(b){return ('0'+b.toString(16)).slice(-2);}).join(''); }
+function keyOf(f){ var s=f.name+'|'+f.size+'|'+f.lastModified, h=5381; for(var i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return 'k'+h.toString(36)+f.size.toString(36); }
+function phCall(action,fields,file){
+  var fd=new FormData(); fd.append('action',action); fd.append('actor',actorId());
+  Object.keys(fields||{}).forEach(function(k){ fd.append(k,fields[k]); });
+  if(file) fd.append('file',file,'f.jpg');
+  return fetch(HIST_API,{method:'POST',body:fd});
+}
+function phJson(action,fields,file){
+  return phCall(action,fields,file).then(function(r){ return r.json(); }).then(function(j){ if(!j.ok) throw new Error(j.error||'서버 오류'); return j; });
+}
+function toBlob(c,q){ return new Promise(function(res){ c.toBlob(res,'image/jpeg',q); }); }
+var saveTimer=null, saving=false;
+function setHist(t){ $('histNote').textContent=t; }
+function queueSave(ms){ clearTimeout(saveTimer); saveTimer=setTimeout(saveHistory,ms||1500); }
+function saveHistory(){
+  if(!state.last||!state.job) return;
+  if(!actorId()){ setHist('로그인 정보가 없어 서버 보관은 건너뜀'); return; }
+  if(saving){ queueSave(2000); return; }
+  saving=true; setHist('서버에 보관 중…');
+  var id=state.job, photos=state.photos.slice(), canvas=state.canvas;
+  var meta={v:1,pname:$('pname').value.trim(),code:codeOf(),fields:readF(),dirty:state.dirty,size:$('size').value,table:$('table').value,
+    zoom:$('zoom').checked,ov:state.ov,chart:state.chart,xl:state.xl,
+    photos:photos.map(function(p){return {key:p.key,name:p.file.name,type:p.file.type,lm:p.file.lastModified};})};
+  phJson('has',{job:id,keys:JSON.stringify(photos.map(function(p){return p.key;}))}).then(function(j){
+    var todo=photos.filter(function(p){ return j.have.indexOf(p.key)<0; }), i=0;
+    function next(){ if(i>=todo.length) return Promise.resolve(); var p=todo[i++];
+      setHist('원본 사진 보관 중… ('+i+'/'+todo.length+')');
+      return phJson('put',{job:id,kind:'photo',key:p.key},p.file).then(next); }
+    return next();
+  }).then(function(){
+    var t=document.createElement('canvas'); t.width=200; t.height=200;
+    var x=t.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,200,200); x.drawImage(canvas,0,1150,720,720,0,0,200,200);
+    return toBlob(t,0.8);
+  }).then(function(b){ return phJson('put',{job:id,kind:'thumb'},b); })
+  .then(function(){ return toBlob(canvas,0.92); })
+  .then(function(b){ return phJson('put',{job:id,kind:'jpg'},b); })
+  .then(function(){ return phJson('meta',{job:id,meta:JSON.stringify(meta)}); })
+  .then(function(){ setHist('✔ 서버에 3일간 보관됨'); loadHistList(); })
+  .catch(function(e){ setHist('서버 보관 실패(만든 이미지는 그대로 저장 가능): '+e.message); console.error(e); })
+  .then(function(){ saving=false; });
+}
+function fmtTime(ts){ var d=new Date(ts*1000), p=function(n){return ('0'+n).slice(-2);}; return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+function fmtLeft(ts){ var h=Math.max(0,72-(Date.now()/1000-ts)/3600); return h>=24?'약 '+Math.floor(h/24)+'일 '+Math.round(h%24)+'시간 남음':'약 '+Math.round(h)+'시간 남음'; }
+function loadHistList(){
+  var box=$('histList');
+  if(!actorId()){ box.textContent='로그인 후 이용할 수 있어요.'; return; }
+  phJson('list',{}).then(function(j){
+    if(!j.jobs.length){ box.textContent='아직 보관된 작업이 없어요. 상세페이지를 만들면 자동으로 보관돼요.'; return; }
+    box.innerHTML='';
+    j.jobs.forEach(function(it){
+      var d=document.createElement('div'); d.className='hrow';
+      d.innerHTML='<img class="hth" alt=""><div class="hmeta"><b></b><span></span></div>'+
+        '<button class="btn btn-out btn-sm" data-a="load">불러오기</button><button class="btn btn-out btn-sm" data-a="jpg">JPG 받기</button><button class="btn btn-out btn-sm" data-a="del">삭제</button>';
+      d.querySelector('b').textContent=it.pname||'(이름 없음)';
+      d.querySelector('span').textContent=it.actor+' · '+fmtTime(it.updated)+' · 사진 '+it.photos+'장 · '+(it.bytes/1048576).toFixed(1)+'MB · '+fmtLeft(it.updated);
+      if(it.has_thumb) phCall('file',{job:it.id,kind:'thumb'}).then(function(r){return r.blob();}).then(function(b){ d.querySelector('img').src=URL.createObjectURL(b); });
+      d.addEventListener('click',function(e){ var a=e.target.dataset&&e.target.dataset.a; if(!a) return;
+        if(a==='load') loadJob(it.id);
+        else if(a==='del'){ if(confirm('이 작업을 서버에서 지울까요?\n'+(it.pname||''))) phJson('delete',{job:it.id}).then(function(){ if(state.job===it.id) state.job=''; loadHistList(); }).catch(function(er){ alert(er.message); }); }
+        else if(a==='jpg') phCall('file',{job:it.id,kind:'jpg'}).then(function(r){return r.blob();}).then(function(b){
+          var u=URL.createObjectURL(b), l=document.createElement('a'); l.href=u; l.download=(it.code||'detail')+'_00.jpg'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(function(){URL.revokeObjectURL(u);},3000); });
+      });
+      box.appendChild(d);
+    });
+  }).catch(function(e){ box.textContent='작업 내역을 불러오지 못했어요: '+e.message; });
+}
+function loadJob(id){
+  $('status').textContent='보관된 작업 불러오는 중…';
+  phJson('get',{job:id}).then(function(j){
+    var m=j.meta, miss=[];
+    state.job=id; state.jobName=m.pname; $('pname').value=m.pname||''; state.xl=m.xl||{}; state.dirty=m.dirty||{};
+    FIELD_KEYS.forEach(function(k){ fld(k).value=(m.fields&&m.fields[k])||''; });
+    $('size').value=m.size||''; $('table').value=m.table||''; $('zoom').checked=m.zoom!==false;
+    $('xName').textContent=(state.xl.brand||state.xl.origin||state.xl.material)?'✔ (보관된 작업) 브랜드 '+(state.xl.brand||'?')+' · 제조국 '+(state.xl.origin||'?')+' · 소재 '+(state.xl.material||'?'):'';
+    state.photos=[]; var i=0, list=m.photos||[];
+    function next(){ if(i>=list.length) return Promise.resolve(); var p=list[i++];
+      return phCall('file',{job:id,kind:'photo',key:p.key}).then(function(r){ return r.blob(); }).then(function(b){
+        if(b.type.indexOf('image')!==0) throw 0;
+        var f=new File([b],p.name,{type:p.type||b.type,lastModified:p.lm||0}); state.photos.push({file:f,url:URL.createObjectURL(f),key:p.key});
+      }).catch(function(){ miss.push(p.name); }).then(next); }
+    return next().then(function(){
+      state.pending={ov:m.ov||{},chart:m.chart||null}; drawPhotos(); mark();
+      if(!state.photos.length){ $('status').textContent='보관된 사진을 찾지 못했어요.'; return; }
+      $('go').click(); window.scrollTo(0,0);
+      if(miss.length) setHist('일부 사진을 찾지 못했어요: '+miss.join(', '));
+    });
+  }).catch(function(e){ $('status').textContent='불러오기 실패: '+e.message; });
+}
+$('histRefresh').addEventListener('click',loadHistList);
+loadHistList();
 mark();
 })();
 </script>
