@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>작업 기록</title>
+<style>
+  :root{
+    --bg:#F3F1EC; --card:#FFFFFF; --soft:#EAE6DC; --line:#DBD5C7; --ink:#20241F; --mut:#5C6259;
+    --acc:#2F5D53; --acc-soft:#E3ECE8; --warn:#B4791B; --warn-soft:#F7E9D2; --bad:#B23B3B; --bad-soft:#F6E2E0; --ok:#3F7D4A; --ok-soft:#E4F1E6;
+  }
+  *{box-sizing:border-box;}
+  [hidden]{display:none !important;}
+  html,body{margin:0;}
+  body{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:var(--bg);color:var(--ink);padding:18px 20px 40px;font-size:14px;}
+  h1{font-size:20px;margin:0;letter-spacing:-.01em;}
+  .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;}
+  .top .sp{flex:1;}
+  .lead{margin:0 0 14px;color:var(--mut);font-size:12.5px;line-height:1.6;max-width:760px;}
+  select,.btn{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;}
+  .btn:hover{background:var(--soft);}
+  select:focus-visible,.btn:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 14px 10px;}
+  .tw{overflow-x:auto;}
+  table{border-collapse:collapse;width:100%;font-size:12.8px;}
+  th{font-size:11.5px;color:var(--mut);font-weight:600;text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  td{padding:9px 8px;border-bottom:1px solid var(--soft);vertical-align:top;}
+  td.t{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--mut);}
+  td.ip{white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .who{font-weight:700;}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:99px;margin-left:6px;vertical-align:1px;}
+  .pill.ok{background:var(--ok-soft);color:var(--ok);} .pill.bad{background:var(--bad-soft);color:var(--bad);}
+  tr.unk td{background:var(--warn-soft);}
+  .sum{line-height:1.55;}
+  .sum small{display:block;color:var(--mut);font-size:11.5px;word-break:break-all;}
+  .msg{padding:26px 10px;color:var(--mut);text-align:center;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>작업 기록</h1>
+  <div class="sp"></div>
+  <select id="tool" aria-label="도구 선택"><option value="">전체 도구</option><option value="season_soldout">시즌 품절</option><option value="ecount_sync">재고 반영·매핑</option></select>
+  <button class="btn" id="reload" type="button">새로고침</button>
+</div>
+<p class="lead">상품을 숨기거나 재고를 바꾸는 작업을 누가 했는지 최근 300건까지 보여줘요. <b>확인됨</b>은 툴킷 비밀번호까지 맞은 경우이고, <b>미확인</b>은 로그인 정보 없이 보내진 요청이에요. 접속 주소는 서버가 직접 본 값이라 바꿀 수 없어요.</p>
+
+<div class="card">
+  <div class="tw"><table>
+    <thead><tr><th>시각</th><th>작업자</th><th>작업</th><th>내용</th><th>접속 주소</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <div class="msg" id="msg">불러오는 중...</div>
+</div>
+
+<script>
+var API='https://buyest.co.kr/toolkit_register_api.php';
+var LABEL={'season_soldout/execute':'시즌 품절 처리','ecount_sync/execute':'재고 반영','ecount_sync/save_mapping':'매핑 저장'};
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function auth(){ try{ var a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return (a&&a.id&&a.pass)?a:null; }catch(e){ return null; } }
+function show(t){ var m=document.getElementById('msg'); m.textContent=t; m.hidden=!t; }
+function summary(r){
+  var d={}; try{ d=JSON.parse(r.detail||'{}'); }catch(e){}
+  var n=d.count!=null?d.count:0, extra='';
+  if(d.pids&&d.pids.length) extra='상품번호 '+d.pids.slice(0,12).join(', ')+(d.pids.length>12?' 외':'');
+  else if(d.items&&d.items.length) extra=d.items.slice(0,6).map(function(x){return (x.ec||'')+(x.code?' → '+x.code:'');}).join(' / ')+(d.items.length>6?' 외':'');
+  return '<div class="sum">'+esc(n)+'건'+(extra?'<small>'+esc(extra)+'</small>':'')+'</div>';
+}
+function load(){
+  var a=auth();
+  if(!a){ document.getElementById('rows').innerHTML=''; show('툴킷에 로그인한 뒤 새로고침해 주세요.'); return; }
+  show('불러오는 중...');
+  var fd=new FormData(); fd.append('action','audit'); fd.append('user',a.id); fd.append('pass',a.pass); fd.append('tool',document.getElementById('tool').value);
+  fetch(API,{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(j){
+    if(!j.ok){ document.getElementById('rows').innerHTML=''; show(j.error||'불러오지 못했어요.'); return; }
+    if(!j.rows.length){ document.getElementById('rows').innerHTML=''; show('아직 기록이 없어요. 시즌 품절·재고 반영 같은 작업을 하면 여기에 쌓여요.'); return; }
+    show('');
+    document.getElementById('rows').innerHTML=j.rows.map(function(r){
+      var ok=String(r.verified)==='1';
+      var who=r.username?esc(r.username):'(로그인 정보 없음)';
+      return '<tr class="'+(ok?'':'unk')+'"><td class="t">'+esc(r.created_at)+'</td>'+
+        '<td><span class="who">'+who+'</span><span class="pill '+(ok?'ok':'bad')+'">'+(ok?'확인됨':'미확인')+'</span></td>'+
+        '<td>'+esc(LABEL[r.tool+'/'+r.action]||(r.tool+' '+r.action))+'</td>'+
+        '<td>'+summary(r)+'</td><td class="ip">'+esc(r.ip)+'</td></tr>';
+    }).join('');
+  }).catch(function(){ show('서버에 연결하지 못했어요. 잠시 뒤 다시 눌러주세요.'); });
+}
+document.getElementById('reload').onclick=load;
+document.getElementById('tool').onchange=load;
+load();
+</script>
+</body>
+</html>
