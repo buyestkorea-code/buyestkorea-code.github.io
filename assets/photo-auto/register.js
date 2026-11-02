@@ -26,13 +26,27 @@ function buildInfoWorkbook(XLSX,v){
   ws['!cols']=[{wch:2},{wch:2},{wch:22},{wch:24},{wch:30},{wch:30},{wch:30},{wch:30}];
   // 2번 시트 '상세': 서버 자동등록은 읽지 않고, 사진 자동화 툴이 정보표·실측표를 채우는 데 사용
   var rows=[['항목','값']];
-  [['브랜드한글',v.brandKo],['카테고리',v.categoryWord],['수입여부',v.imported],['제조년월',v.mfg],['색상',v.color],['구성품',v.parts],['수납공간',v.storage]].forEach(function(r){ if(r[1]) rows.push(r); });
+  [['브랜드한글',v.brandKo],['카테고리',v.categoryWord],['수입여부',v.imported],['제조년월',v.mfg],['색상',v.color],['구성품',v.parts],['수납공간',v.storage],['실측',v.sizeText]].forEach(function(r){ if(r[1]||v.blank) rows.push([r[0],r[1]||'']); });
+  Object.keys(v.extras||{}).forEach(function(k){ if(v.extras[k]) rows.push([k,v.extras[k]]); });
   rows.push([]); rows.push(['실측표']);
   (v.sizeTable||[]).forEach(function(r){ rows.push(r); });
   rows.forEach(function(r,ri){ r.forEach(function(c,ci){ if(c!=='' && c!=null) put(d,XLSX.utils.encode_cell({r:ri,c:ci}),c); }); });
   d['!ref']='A1:H'+Math.max(rows.length,2);
   XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
   XLSX.utils.book_append_sheet(wb,d,'상세');
+  if(v.blank){
+    var g={}, tips=[['기본양식 작성 방법'],[],
+      ['1번 시트(Sheet1): 브랜드·소재·원산지, 키즈 여부, 옵션, 카테고리를 D열에 적습니다. 칸 위치는 서버 자동등록 엑셀과 같으니 옮기지 마세요.'],
+      ['  · 옵션: 이름(예 사이즈) / 값(쉼표로 구분, 예 S,M,L 또는 단품) / 실제 입고된 값(비우면 전부 품절 등록)'],
+      ['  · 카테고리: 사이트 카테고리 전체 경로를 1~5차 칸에 하나씩 (예 WOMEN > 지갑/벨트 > 여성용지갑)'],
+      ['2번 시트(상세): 상세페이지 정보표에 들어갈 값 — 브랜드한글, 카테고리(품목 단어), 수입여부, 제조년월, 색상, 구성품, 수납공간, 실측(한 줄).'],
+      ['  · 실측이 사이즈별 표이면 "실측표" 아래 줄에 첫 줄=항목(사이즈 총장 어깨…), 다음 줄부터 사이즈별로 칸을 나눠 적습니다.'],
+      ['  · 정보 항목은 상품 종류마다 다릅니다(지갑=수납공간, 의류=핏·세탁방법 등). 필요한 항목 이름을 [항목] 칸 아래에 추가해 적으면 화면의 정보 항목에 자동으로 추가됩니다. 화면에서는 ③의 템플릿으로 항목 목록을 정합니다.'],
+      ['비워둔 칸은 사진 자동화 화면에서 직접 입력하면 됩니다. 상품명·사진은 엑셀이 아니라 화면에서 넣습니다.']];
+    tips.forEach(function(r,ri){ if(r[0]) g[XLSX.utils.encode_cell({r:ri,c:0})]={t:'s',v:r[0]}; });
+    g['!ref']='A1:A'+tips.length; g['!cols']=[{wch:120}];
+    XLSX.utils.book_append_sheet(wb,g,'작성방법');
+  }
   return wb;
 }
 function cellStr(ws,a){ var c=ws&&ws[a]; return c&&c.v!=null?String(c.v).trim():''; }
@@ -91,6 +105,8 @@ function collect(){
   return {brand:$('rBrand').value.trim(),material:$('rMaterial').value.trim(),origin:$('rOrigin').value.trim(),
     kids:$('rKids').checked,kidsPrice:$('rKidsPrice').value.trim(),kidsShow:$('rKidsShow').checked,
     tiers:tiers,cats:cats,
+    extras:(function(){ var o={}, base=['상품명','브랜드한글','브랜드','카테고리','수입여부','제조년월','색상','제조국','구성품','수납공간','소재']; Object.keys(f).forEach(function(k){ if(base.indexOf(k)<0) o[k]=f[k]; }); return o; })(),
+    sizeText:PA.sizeText?PA.sizeText():'',
     brandKo:f['브랜드한글'],categoryWord:f['카테고리'],imported:f['수입여부'],mfg:f['제조년월'],color:f['색상'],parts:f['구성품'],storage:f['수납공간'],
     sizeTable:PA.sizeTableRows()};
 }
@@ -131,14 +147,14 @@ function applyTpl(){
       hints.appendChild(bt);
     });
     PA.applyTemplate(b);
-    msg('템플릿 "'+j.name+'" 적용 — 옵션·실측 항목이 채워졌어요. 실제 입고된 옵션값(실제재고)을 꼭 확인하세요.'+(b.note?' ('+b.note+')':''),'ok');
+    msg('템플릿 "'+j.name+'" 적용 — 정보 항목·옵션·실측 항목이 채워졌어요. 실제 입고된 옵션값(실제재고)을 꼭 확인하세요.'+(b.note?' ('+b.note+')':''),'ok');
   }).catch(function(e){ msg(e.message,'bad'); });
 }
 function saveTpl(){
   var v=collect(), id=prompt('템플릿 번호(영문 소문자·숫자, 예: scarf)'); if(!id) return;
   var name=prompt('템플릿 이름(예: 머플러)'); if(!name) return;
   var labels=(PA.sizeTableRows()[0]||[]).slice(1);
-  var body={tiers:v.tiers.map(function(t){return {name:t.name,values:t.values};}),sizeLabels:labels,storage:!!v.storage,catHints:v.cats,note:''};
+  var body={tiers:v.tiers.map(function(t){return {name:t.name,values:t.values};}),sizeLabels:labels,storage:!!v.storage,catHints:v.cats,note:'',infoRows:PA.infoRows()||undefined};
   api('tpl_save',{id:id,name:name,body:JSON.stringify(body),sort_no:'100'}).then(function(j){
     if(!j.ok){ msg(j.error||'저장하지 못했어요','bad'); return; } msg('템플릿을 저장했어요','ok'); loadTpls();
   });
@@ -270,7 +286,7 @@ function init(){
   PA=root.PhotoAuto; if(!PA||!$('regBox')) return;
   R.auth=getAuth();
   if(!R.auth){ $('regLogin').style.display='block'; $('regMain').style.display='none'; return; }
-  $('regLogin').style.display='none'; $('regMain').style.display='block';
+  $('regLogin').style.display='none'; $('regMain').style.display='block'; $('tplBar').style.display='block';
   api('me').then(function(j){
     if(!j.ok){ $('regLogin').style.display='block'; $('regLogin').textContent=(j.error||'로그인 확인 실패')+' — 툴킷에 다시 로그인해 주세요.'; $('regMain').style.display='none'; return; }
     R.role=j.role; if(j.role==='admin') $('rTplSave').style.display='';
@@ -281,6 +297,7 @@ function init(){
     ]);
   }).catch(function(e){ msg('서버에 연결하지 못했어요: '+e.message,'bad'); });
   ['rBrand','rMaterial','rOrigin','rKidsPrice','rT1n','rT1v','rT1s','rT2n','rT2v','rT2s','rC1','rC2','rC3','rC4','rC5'].forEach(function(id){ $(id).addEventListener('input',invalidate); });
+  [['rBrand','브랜드'],['rMaterial','소재'],['rOrigin','제조국']].forEach(function(m){ $(m[0]).addEventListener('input',function(){ PA.setField(m[1],$(m[0]).value); }); });
   $('rKids').addEventListener('change',function(){ kidsToggle(); invalidate(); });
   $('rKidsShow').addEventListener('change',invalidate);
   $('rTplApply').addEventListener('click',applyTpl);
@@ -302,9 +319,16 @@ root.PhotoRegister={
       if(v.tiers.length||v.cats.length||v.kids){ o.kids=v.kids; o.kidsPrice=v.kidsPrice; o.kidsShow=v.kidsShow; if(v.tiers.length) o.tiers=v.tiers; if(v.cats.length) o.cats=v.cats; }
       fill(o);
       if(v.detail) PA.applyDetail(v.detail,v.sizeTable||[]);
+      var bits=[];
+      if(v.brand) bits.push('브랜드 '+v.brand); if(v.origin) bits.push('원산지 '+v.origin); if(v.material) bits.push('소재 '+v.material);
+      if(v.tiers.length) bits.push('옵션 '+v.tiers.map(function(t){ return t.name+'('+t.values.join(',')+')'; }).join(' / '));
+      if(v.cats.length) bits.push('카테고리 '+v.cats.length+'개'); if(v.kids) bits.push('키즈 동시등록');
+      if(v.detail) bits.push('상세 정보 '+Object.keys(v.detail).filter(function(k){ return v.detail[k]; }).length+'항목'+((v.sizeTable||[]).length?' + 실측표':''));
+      PA.xlSummary('엑셀에서 읽음 → '+bits.join(' · ')+'  (③ 상세 정보와 ④ 사이트 등록에 모두 채워졌어요)');
     }).catch(function(){});
   },
-  invalidate:invalidate
+  invalidate:invalidate,
+  mirror:function(k,val){ var id={'브랜드':'rBrand','소재':'rMaterial','제조국':'rOrigin'}[k]; if(id&&$(id)&&$(id).value!==val){ $(id).value=val; invalidate(); } }
 };
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })(typeof window!=='undefined'?window:globalThis);
