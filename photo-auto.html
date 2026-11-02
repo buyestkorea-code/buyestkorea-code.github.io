@@ -38,6 +38,9 @@
   .ph img{width:48px;height:48px;object-fit:contain;background:#f0f0ee;border-radius:6px;}
   .ph .nm{flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .ph img{cursor:pointer;}
+  .szt{border-collapse:collapse;font-size:13px;} .szt td,.szt th{padding:2px;} .szt input{width:84px;padding:6px 7px;border:1px solid var(--line);border-radius:6px;font:13px var(--font);text-align:center;}
+  .szt input.hd{background:#f5f5f5;font-weight:600;} .szt input.emp{border-color:var(--bad);background:var(--badbg);}
+  .szt .x{border:0;background:none;color:var(--sub);cursor:pointer;font-size:14px;padding:0 4px;}
   .adjbg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:center;justify-content:center;padding:12px;}
   .adjbg.on{display:flex;}
   .adjbox{background:#fff;border-radius:14px;max-width:880px;width:100%;max-height:94vh;overflow:auto;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;}
@@ -124,12 +127,16 @@
   <div class="grid" id="fields"></div>
   <div class="grid" style="margin-top:12px">
     <div class="wide">
-      <label>실측 (사람이 입력) — 예) 가로 10.5 / 세로 8.5 / 폭 1.5</label>
-      <input type="text" id="size" placeholder="가로 10.5 / 세로 8.5 / 폭 1.5">
-    </div>
-    <div class="wide">
-      <label>옷·신발 등 사이즈가 여러 개일 때 — 표로 입력 (첫 줄=항목, 다음 줄부터 사이즈별, 칸은 공백/탭으로 구분). 쓰면 위 실측 칸보다 우선합니다.</label>
-      <textarea id="table" placeholder="사이즈 총장 어깨 가슴&#10;S 66 45 50&#10;M 68 47 52"></textarea>
+      <label>실측 표 — 칸을 눌러 바로 입력 (엑셀에서 복사해 붙여넣어도 됩니다. 첫 줄 = 항목 이름, 첫 칸 = 사이즈 이름)</label>
+      <div id="szGrid" style="overflow:auto"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn btn-out btn-sm" id="szAddRow" type="button">＋ 사이즈(줄) 추가</button>
+        <button class="btn btn-out btn-sm" id="szAddCol" type="button">＋ 항목(칸) 추가</button>
+        <button class="btn btn-out btn-sm" id="szPreWallet" type="button" title="가로·세로·폭, 단품 한 줄">단품 기본(가로/세로/폭)</button>
+        <button class="btn btn-out btn-sm" id="szPreCloth" type="button" title="총장·어깨·가슴·소매, S/M/L">의류 기본(총장/어깨/가슴/소매)</button>
+        <span class="hint">단위 cm · 빈 칸(빨간색)이 남아 있으면 경고가 떠요</span>
+      </div>
+      <input type="text" id="size" hidden><textarea id="table" hidden></textarea>
     </div>
   </div>
   <div class="row" style="margin-top:12px">
@@ -322,11 +329,9 @@ function wireDrop(box,input,handler){
   box.addEventListener('drop',function(e){ handler([].slice.call(e.dataTransfer.files)); });
 }
 $('xBlank').addEventListener('click',function(){
-  var X=window.XLSX, R=window.PhotoRegisterXlsx; if(!X||!R) return;
-  var wb=R.build(X,{blank:true,tiers:[],cats:[]});
-  var out=X.write(wb,{type:'array',bookType:'xlsx',bookSST:true});
-  var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-  a.download='상품정보_기본양식.xlsx'; document.body.appendChild(a); a.click(); a.remove();
+  $('xSum').textContent='기본양식을 만드는 중…';
+  PhotoTemplate.download({},'상품정보_기본양식.xlsx').then(function(){ $('xSum').textContent='기본양식을 내려받았어요. 노란 칸은 항목 이름, 파란 칸에 값을 적어 ②에 다시 올리세요.'; })
+    .catch(function(e){ $('xSum').textContent='기본양식을 만들지 못했어요: '+e.message; });
 });
 wireDrop($('dropX'),$('fileX'),function(fs){ var f=fs.filter(function(f){return /\.xlsx?$/i.test(f.name);})[0]; if(f) setXlsx(f); });
 function natKey(s){return s.toLowerCase().split(/(\d+)/).map(function(t){return /^\d+$/.test(t)?parseInt(t,10):t;});}
@@ -521,10 +526,80 @@ function makeZoom(c){
 }
 
 /* ---------- 실측표 ---------- */
+/* 실측 표 편집기: 화면은 grid 배열, 저장은 숨은 칸 #table(탭·줄바꿈) — 나머지 코드는 예전과 똑같이 #table 을 읽는다 */
+var grid=[];
+var PRE_WALLET=[['사이즈','가로','세로','폭'],['단품','','','']];
+var PRE_CLOTH=[['사이즈','총장','어깨','가슴','소매'],['S','','','',''],['M','','','',''],['L','','','','']];
+function gridFromText(){
+  var t=$('table').value.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+  if(t.length) return t.map(tblSplit);
+  var txt=$('size').value, re=/([가-힣A-Za-z]+)\s*[:=]?\s*([\d.]+)/g, m, L=[], V=[];
+  while((m=re.exec(txt))){ L.push(m[1]); V.push(m[2]); }
+  if(L.length) return [['사이즈'].concat(L),['단품'].concat(V)];
+  return null;
+}
+function normGrid(g){
+  var n=0; g.forEach(function(r){ n=Math.max(n,r.length); });
+  return g.map(function(r){ var o=r.slice(); while(o.length<n) o.push(''); return o; });
+}
+function gridSave(){ $('table').value=grid.map(function(r){ return r.join('\t'); }).join('\n'); $('size').value=''; }
+function gridDraw(){
+  var box=$('szGrid'); box.innerHTML='';
+  var tb=document.createElement('table'); tb.className='szt';
+  var nc=grid[0].length;
+  var hr=document.createElement('tr'); hr.appendChild(document.createElement('td'));
+  for(var c=0;c<nc;c++){ var th=document.createElement('td');
+    if(c>0&&nc>2){ var xb=document.createElement('button'); xb.type='button'; xb.className='x'; xb.textContent='✕'; xb.title='이 항목 칸 삭제'; xb.setAttribute('data-delc',c); th.appendChild(xb); }
+    hr.appendChild(th); }
+  tb.appendChild(hr);
+  grid.forEach(function(row,r){
+    var tr=document.createElement('tr'), td0=document.createElement('td');
+    if(r>0&&grid.length>2){ var rb=document.createElement('button'); rb.type='button'; rb.className='x'; rb.textContent='✕'; rb.title='이 줄 삭제'; rb.setAttribute('data-delr',r); td0.appendChild(rb); }
+    tr.appendChild(td0);
+    row.forEach(function(v,c){
+      var td=document.createElement('td'), inp=document.createElement('input'); inp.type='text'; inp.value=v; inp.setAttribute('data-r',r); inp.setAttribute('data-c',c);
+      if(r===0||c===0) inp.className='hd'; if(r>0&&c>0&&!v) inp.className+=(inp.className?' ':'')+'emp';
+      td.appendChild(inp); tr.appendChild(td); });
+    tb.appendChild(tr);
+  });
+  box.appendChild(tb);
+}
+function gridSet(g){ grid=normGrid(g&&g.length?g:PRE_WALLET.map(function(r){return r.slice();})); if(grid.length<2) grid.push(grid[0].map(function(x,i){return i?'':'단품';})); gridSave(); gridDraw(); }
+function setGridRows(rows){ gridSet(rows); }
+$('szGrid').addEventListener('input',function(e){
+  var t=e.target; if(t.getAttribute('data-r')==null) return;
+  var r=+t.getAttribute('data-r'), c=+t.getAttribute('data-c'); grid[r][c]=t.value.replace(/[\t\n]/g,' ');
+  gridSave();
+  if(r>0&&c>0) t.classList.toggle('emp',!t.value.trim());
+});
+$('szGrid').addEventListener('change',function(){ if(window.PhotoRegister) PhotoRegister.invalidate(); });
+$('szGrid').addEventListener('click',function(e){
+  var dc=e.target.getAttribute('data-delc'), dr=e.target.getAttribute('data-delr');
+  if(dc!=null){ grid.forEach(function(r){ r.splice(+dc,1); }); gridSave(); gridDraw(); }
+  if(dr!=null){ grid.splice(+dr,1); gridSave(); gridDraw(); }
+});
+$('szGrid').addEventListener('paste',function(e){
+  var t=e.target; if(t.getAttribute('data-r')==null) return;
+  var txt=(e.clipboardData||window.clipboardData).getData('text');
+  if(txt.indexOf('\t')<0&&txt.indexOf('\n')<0) return;
+  e.preventDefault();
+  var r0=+t.getAttribute('data-r'), c0=+t.getAttribute('data-c');
+  txt.replace(/[\r\n]+$/,'').split(/\r?\n/).forEach(function(line,i){
+    line.split('\t').forEach(function(v,j){
+      while(grid.length<=r0+i) grid.push(grid[0].map(function(){return '';}));
+      grid.forEach(function(row){ while(row.length<=c0+j) row.push(''); });
+      grid[r0+i][c0+j]=v.trim(); }); });
+  grid=normGrid(grid); gridSave(); gridDraw();
+});
+$('szAddRow').addEventListener('click',function(){ grid.push(grid[0].map(function(){return '';})); gridSave(); gridDraw(); });
+$('szAddCol').addEventListener('click',function(){ grid.forEach(function(r,i){ r.push(i===0?'항목':''); }); gridSave(); gridDraw(); });
+$('szPreWallet').addEventListener('click',function(){ gridSet(PRE_WALLET.map(function(r){return r.slice();})); });
+$('szPreCloth').addEventListener('click',function(){ gridSet(PRE_CLOTH.map(function(r){return r.slice();})); });
 function sizeHasEmpty(chart){ var e=false; chart.rows.forEach(function(r){ for(var i=1;i<chart.header.length;i++){ if(!r[i]) e=true; } }); return e; }
+function tblSplit(l){ return l.indexOf('\t')>=0 ? l.split('\t').map(function(x){return x.trim();}) : l.split(/ +/); }
 function buildSizeChart(){
   var tbl=$('table').value.split('\n').map(function(l){return l.trim();}).filter(Boolean);
-  if(tbl.length){ var rows=tbl.map(function(l){return l.split(/[\t ]+/);}); return {header:rows[0], rows:rows.slice(1), given:true}; }
+  if(tbl.length){ var rows=tbl.map(tblSplit); return {header:rows[0], rows:rows.slice(1), given:true}; }
   var txt=$('size').value, labels=['가로','세로','폭'], values=['','',''], re=/([가-힣A-Za-z]+)\s*[:=]?\s*([\d.]+)/g, m, L=[],V=[];
   while((m=re.exec(txt))){ L.push(m[1]); V.push(m[2]); }
   if(L.length){ labels=L; values=V; }
@@ -900,7 +975,7 @@ function loadJob(id){
     Object.keys(m.fields||{}).forEach(function(k){ if(!fld(k)&&m.fields[k]) ensureField(k); });
     setInfoRows(m.infoRows||null);
     fieldKeys().forEach(function(k){ fld(k).value=(m.fields&&m.fields[k])||''; });
-    $('size').value=m.size||''; $('table').value=m.table||''; $('zoom').checked=false; $('bgwhite').checked=m.bgwhite!==false;
+    $('size').value=m.size||''; $('table').value=m.table||''; gridSet(gridFromText()); $('zoom').checked=false; $('bgwhite').checked=m.bgwhite!==false;
     $('xName').textContent=(state.xl.brand||state.xl.origin||state.xl.material)?'✔ (보관된 작업) 브랜드 '+(state.xl.brand||'?')+' · 제조국 '+(state.xl.origin||'?')+' · 소재 '+(state.xl.material||'?'):'';
     state.photos=[]; var i=0, list=m.photos||[];
     function next(){ if(i>=list.length) return Promise.resolve(); var p=list[i++];
@@ -923,7 +998,7 @@ mark();
 /* ---------- 사이트 등록 패널(register.js)에 제공하는 기능 ---------- */
 function sizeTableRows(){
   var t=$('table').value.split('\n').map(function(l){return l.trim();}).filter(Boolean);
-  if(t.length) return t.map(function(l){return l.split(/[\t ]+/);});
+  if(t.length) return t.map(tblSplit);
   var ch=buildSizeChart(); return ch.given?[ch.header].concat(ch.rows):[];
 }
 setInfoRows(null);
@@ -959,27 +1034,30 @@ window.PhotoAuto={
     var labels=b.sizeLabels||[];
     if(labels.length && !$('table').value.trim() && !$('size').value.trim()){
       var sizes=[]; (b.tiers||[]).forEach(function(t){ if(t.name==='사이즈') sizes=t.values||[]; });
-      var lines=['사이즈 '+labels.join(' ')];
-      if(sizes.length===1||!sizes.length) lines.push('단품');
-      else sizes.forEach(function(sz){ lines.push(sz); });
-      $('table').value=lines.join('\n');
+      var rows=[['사이즈'].concat(labels)];
+      function blank(n){ var o=[]; for(var q=0;q<labels.length;q++) o.push(''); return [n].concat(o); }
+      if(sizes.length===1||!sizes.length) rows.push(blank('단품'));
+      else sizes.forEach(function(sz){ rows.push(blank(sz)); });
+      gridSet(rows);
     }
   },
   /* 엑셀 '상세' 시트의 값으로 정보칸·실측표 채우기 */
   applyDetail:function(kv,table){
     Object.keys(kv||{}).forEach(function(k){
       if(!kv[k]) return;
-      if(k==='실측'){ $('size').value=kv[k]; return; }
+      if(k==='실측'){ if(!$('table').value.trim()){ $('size').value=kv[k]; gridSet(gridFromText()); } return; }
       if(!fld(k)){ ensureField(k); if(state.infoRows&&state.infoRows.indexOf(k)<0) setInfoRows(state.infoRows.concat([k])); }
       fld(k).value=kv[k]; state.dirty[k]=true;
     });
     mark();
-    if(table&&table.length) $('table').value=table.map(function(r){return r.join(' ');}).join('\n');
+    if(table&&table.length) gridSet(table);
   }
 };
+gridSet(gridFromText());
 if(window.PhotoRegister) PhotoRegister.init();
 })();
 </script>
+<script src="assets/photo-auto/template.js"></script>
 <script src="assets/photo-auto/register.js"></script>
 </body>
 </html>

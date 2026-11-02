@@ -57,6 +57,8 @@ function parseInfoWorkbook(XLSX,wb){
   out.kids=cellStr(ws,'D9').toUpperCase()==='Y'; out.kidsPrice=cellStr(ws,'D10'); out.kidsShow=cellStr(ws,'D11').toUpperCase()==='Y';
   [17,18].forEach(function(r){ var n=cellStr(ws,'D'+r); if(n) out.tiers.push({name:n,values:csv(cellStr(ws,'E'+r)),real:csv(cellStr(ws,'F'+r))}); });
   ['D20','E20','F20','G20','H20','D23','E23','F23','G23','H23'].forEach(function(a){ var c=cellStr(ws,a); if(c) out.cats.push(c); });
+  /* 한 장짜리 기본양식: 26행부터 상세 정보 · 추가 항목 · 실측표를 C열 이름표로 찾아 읽는다 */
+  var s1=parseSheet1Detail(XLSX,ws);
   var d=wb.Sheets['상세'];
   if(d){
     var rng=XLSX.utils.decode_range(d['!ref']||'A1:A1'), kv={}, table=[], inTable=false;
@@ -71,7 +73,37 @@ function parseInfoWorkbook(XLSX,wb){
     }
     out.detail=kv; out.sizeTable=table;
   }
+  if(s1){
+    out.detail=out.detail||{};
+    Object.keys(s1.detail).forEach(function(k){ if(s1.detail[k]) out.detail[k]=s1.detail[k]; });
+    if(s1.sizeTable.length) out.sizeTable=s1.sizeTable;
+  }
   return out;
+}
+function parseSheet1Detail(XLSX,ws){
+  var rng=XLSX.utils.decode_range(ws['!ref']||'A1:A1'), last=Math.min(rng.e.r+1,120), detail={}, table=[], any=false, r, c;
+  var MAP={'브랜드한글':'브랜드한글','품목(카테고리 단어)':'카테고리','수입여부':'수입여부','제조년월':'제조년월','색상':'색상','구성품':'구성품','수납공간':'수납공간'};
+  var COLS=['D','E','F','G','H','I'];
+  for(r=26;r<=last;r++){
+    var lb=cellStr(ws,'C'+r); if(!lb) continue;
+    if(MAP[lb]){ var val=cellStr(ws,'D'+r); if(val){ detail[MAP[lb]]=val; any=true; } continue; }
+    if(/^추가항목 \d/.test(lb)){ var nm=cellStr(ws,'D'+r), nv=cellStr(ws,'E'+r); if(nm&&nv){ detail[nm]=nv; any=true; } continue; }
+    if(lb.indexOf('사이즈 ↓')===0){
+      var hdr=['사이즈'], n=0;
+      COLS.forEach(function(col,i){ var h=cellStr(ws,col+r); hdr.push(h); if(h) n=i+1; });
+      hdr=hdr.slice(0,n+1);
+      if(n){
+        table.push(hdr);
+        for(var rr=r+1;rr<=r+12;rr++){
+          var sz=cellStr(ws,'C'+rr); if(!sz||sz.length>20) continue;
+          var row=[sz]; for(c=0;c<n;c++) row.push(cellStr(ws,COLS[c]+rr)); table.push(row);
+        }
+        any=true;
+      }
+      break;
+    }
+  }
+  return any?{detail:detail,sizeTable:table}:null;
 }
 root.PhotoRegisterXlsx={build:buildInfoWorkbook,parse:parseInfoWorkbook};
 if(typeof document==='undefined') return;   // node 시험용
@@ -160,10 +192,8 @@ function saveTpl(){
   });
 }
 function downloadXlsx(){
-  var X=root.XLSX, wb=buildInfoWorkbook(X,collect());
-  var out=X.write(wb,{type:'array',bookType:'xlsx',bookSST:true});
-  var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-  a.download='상품정보_'+(PA.ctx()?PA.ctx().code:'양식')+'.xlsx'; document.body.appendChild(a); a.click(); a.remove();
+  var v=collect();
+  root.PhotoTemplate.download(v,'상품정보_'+(PA.ctx()?PA.ctx().code:'양식')+'.xlsx').catch(function(e){ msg(e.message,'bad'); });
 }
 
 /* ---------- 메시지 ---------- */
