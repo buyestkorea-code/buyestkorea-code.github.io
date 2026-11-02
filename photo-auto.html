@@ -37,6 +37,14 @@
   .ph{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:6px 8px;background:#fff;}
   .ph img{width:48px;height:48px;object-fit:contain;background:#f0f0ee;border-radius:6px;}
   .ph .nm{flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ph img{cursor:pointer;}
+  .adjbg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:center;justify-content:center;padding:12px;}
+  .adjbg.on{display:flex;}
+  .adjbox{background:#fff;border-radius:14px;max-width:880px;width:100%;max-height:94vh;overflow:auto;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;}
+  @media(max-width:700px){.adjbox{grid-template-columns:1fr;}}
+  .adjprev{background:#f0f0ee;border-radius:10px;display:flex;align-items:center;justify-content:center;min-height:240px;}
+  .adjprev canvas{max-width:100%;max-height:68vh;}
+  .adjrow{margin-bottom:10px;font-size:13px;} .adjrow label{display:flex;justify-content:space-between;margin-bottom:2px;} .adjrow input{width:100%;}
   .ph .tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--okbg);color:var(--ok);}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
   .chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;}
@@ -67,7 +75,7 @@
 </style>
 </head>
 <body>
-<h1>사진 자동화 <span class="badge">TEST</span></h1>
+<h1>사진 자동화 <span class="badge">TEST</span> <button class="btn btn-out btn-sm" id="newJob" type="button" title="지금 작업은 최근 작업에 그대로 남고, 빈 화면으로 새로 시작합니다">＋ 새 작업</button></h1>
 <p class="lead">사진 + 기본틀 엑셀 + 상품명만 넣으면 상세페이지 이미지(폭 720px)를 자동으로 조립합니다. <b>실측</b>은 직접 입력하세요. 만드는 작업은 이 브라우저 안에서 처리되고, 결과와 사진은 <b>서버에 3일간 보관</b>돼 아래 '최근 작업'에서 다시 불러올 수 있습니다.</p>
 
 <div class="box hist">
@@ -179,6 +187,25 @@
     <div id="rHist" class="hint" style="overflow:auto">불러오는 중…</div>
   </div>
 </div>
+
+<div class="adjbg" id="adjBg"><div class="adjbox">
+  <div><div class="adjprev"><canvas id="adjCv"></canvas></div><div class="hint" id="adjName" style="margin-top:6px"></div></div>
+  <div>
+    <h2 style="margin-top:0">사진 보정</h2>
+    <div class="adjrow"><label>밝기 <b id="v_br">0</b></label><input type="range" id="s_br" min="-100" max="100" value="0"></div>
+    <div class="adjrow"><label>대비 <b id="v_ct">0</b></label><input type="range" id="s_ct" min="-100" max="100" value="0"></div>
+    <div class="adjrow"><label>채도 <b id="v_sat">0</b></label><input type="range" id="s_sat" min="-100" max="100" value="0"></div>
+    <div class="adjrow"><label>색온도 (왼쪽 차갑게 · 오른쪽 따뜻하게) <b id="v_temp">0</b></label><input type="range" id="s_temp" min="-100" max="100" value="0"></div>
+    <div class="adjrow"><label>선명도 <b id="v_sharp">0</b></label><input type="range" id="s_sharp" min="0" max="100" value="0"></div>
+    <div class="row" style="margin:10px 0">
+      <button class="btn btn-out btn-sm" id="adjAuto" type="button">자동 보정</button>
+      <button class="btn btn-out btn-sm" id="adjReset" type="button">원래대로</button>
+      <button class="btn btn-out btn-sm" id="adjAll" type="button">모든 사진에 같은 값 적용</button>
+    </div>
+    <div class="hint">보정은 상세페이지 이미지와 사이트 목록·오버 이미지에 모두 적용됩니다. 보정한 뒤 <b>'상세페이지 만들기'를 다시 눌러야</b> 결과에 반영돼요. 원본 파일은 바뀌지 않습니다.</div>
+    <div class="row" style="margin-top:12px"><button class="btn btn-pri" id="adjOk" type="button">확인</button></div>
+  </div>
+</div></div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
 <script src="assets/libs/jpeg-encoder-0.4.4.js"></script>
@@ -316,10 +343,11 @@ function drawPhotos(){
   var box=$('photos'); box.innerHTML='';
   state.photos.forEach(function(p,i){
     var d=document.createElement('div'); d.className='ph';
-    d.innerHTML='<img src="'+p.url+'"><div class="nm"></div>'+(i===0?'<span class="tag">메인</span>':'')+
-      '<button class="btn btn-out btn-sm" data-a="up">▲</button><button class="btn btn-out btn-sm" data-a="dn">▼</button><button class="btn btn-out btn-sm" data-a="rm">삭제</button>';
+    d.innerHTML='<img data-a="adj" title="눌러서 색상 보정" src="'+(p.thumb||p.url)+'"><div class="nm"></div>'+(i===0?'<span class="tag">메인</span>':'')+(isAdj(p.adj)?'<span class="tag">보정됨</span>':'')+
+      '<button class="btn btn-out btn-sm" data-a="adj">보정</button><button class="btn btn-out btn-sm" data-a="up">▲</button><button class="btn btn-out btn-sm" data-a="dn">▼</button><button class="btn btn-out btn-sm" data-a="rm">삭제</button>';
     d.querySelector('.nm').textContent=(i+1)+'. '+p.file.name;
     d.addEventListener('click',function(e){ var a=e.target.dataset.a; if(!a)return;
+      if(a==='adj'){ openAdj(i); return; }
       if(a==='rm') state.photos.splice(i,1);
       if(a==='up'&&i>0){ var t=state.photos[i-1]; state.photos[i-1]=state.photos[i]; state.photos[i]=t; }
       if(a==='dn'&&i<state.photos.length-1){ var t2=state.photos[i+1]; state.photos[i+1]=state.photos[i]; state.photos[i]=t2; }
@@ -327,6 +355,75 @@ function drawPhotos(){
     box.appendChild(d);
   });
 }
+
+/* ---------- 사진 색상 보정 (밝기·대비·채도·색온도·선명도) ---------- */
+var ADJ0={br:0,ct:0,sat:0,temp:0,sharp:0};
+function isAdj(a){ return !!a&&!!(a.br||a.ct||a.sat||a.temp||a.sharp); }
+function adjustCanvas(c,a){
+  if(!isAdj(a)) return c;
+  var w=c.width,h=c.height, ctx=c.getContext('2d',{willReadFrequently:true}), im=ctx.getImageData(0,0,w,h), d=im.data, n=d.length;
+  var br=(a.br||0)*1.28, cc=(a.ct||0)*2.55, f=(259*(cc+255))/(255*(259-cc)), sat=1+(a.sat||0)/100, t=(a.temp||0)*0.3, i, r, g, b, gy;
+  for(i=0;i<n;i+=4){
+    r=d[i]+t+br; g=d[i+1]+br; b=d[i+2]-t+br;
+    r=f*(r-128)+128; g=f*(g-128)+128; b=f*(b-128)+128;
+    gy=0.299*r+0.587*g+0.114*b;
+    d[i]=gy+(r-gy)*sat; d[i+1]=gy+(g-gy)*sat; d[i+2]=gy+(b-gy)*sat;
+  }
+  if(a.sharp){
+    var src=new Uint8ClampedArray(d), amt=a.sharp/100*1.2, x, y, ch, k, row=w*4, s9, q;
+    for(y=1;y<h-1;y++){ for(x=1;x<w-1;x++){ k=(y*w+x)*4;
+      for(ch=0;ch<3;ch++){ q=k+ch;
+        s9=(src[q-row-4]+src[q-row]+src[q-row+4]+src[q-4]+src[q]+src[q+4]+src[q+row-4]+src[q+row]+src[q+row+4])/9;
+        d[q]=src[q]+amt*(src[q]-s9); } } }
+  }
+  ctx.putImageData(im,0,0); return c;
+}
+function autoAdj(c){
+  var ctx=c.getContext('2d',{willReadFrequently:true}), d=ctx.getImageData(0,0,c.width,c.height).data, hist=new Array(256).fill(0), tot=0, i;
+  for(i=0;i<d.length;i+=4){ if(d[i]>245&&d[i+1]>245&&d[i+2]>245) continue; hist[Math.round(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])]++; tot++; }
+  if(!tot) return {br:0,ct:0,sat:0,temp:0,sharp:0};
+  var acc=0, lo=0, hi=255; for(i=0;i<256;i++){ acc+=hist[i]; if(acc>=tot*0.01){ lo=i; break; } }
+  acc=0; for(i=255;i>=0;i--){ acc+=hist[i]; if(acc>=tot*0.01){ hi=i; break; } }
+  hi=Math.max(hi,lo+40); var f=255/(hi-lo), cc=255*259*(f-1)/(259+255*f), mid=(lo+hi)/2;
+  function cl(v,a,b){ return Math.max(a,Math.min(b,Math.round(v))); }
+  return {br:cl((128-mid)*0.5/1.28,-40,40), ct:cl(cc/2.55,0,50), sat:8, temp:0, sharp:15};
+}
+var adjIdx=-1, adjBase=null, adjCur=null, adjRaf=0;
+function openAdj(i){
+  var p=state.photos[i]; if(!p) return; adjIdx=i; adjCur=Object.assign({},ADJ0,p.adj||{});
+  loadImg(p.url).then(function(im){
+    var m=Math.max(im.naturalWidth,im.naturalHeight), k=Math.min(1,700/m);
+    adjBase=document.createElement('canvas'); adjBase.width=Math.round(im.naturalWidth*k); adjBase.height=Math.round(im.naturalHeight*k);
+    var x=adjBase.getContext('2d',{willReadFrequently:true}); x.fillStyle='#fff'; x.fillRect(0,0,adjBase.width,adjBase.height); x.drawImage(im,0,0,adjBase.width,adjBase.height);
+    $('adjName').textContent=(i+1)+'. '+p.file.name; $('adjBg').classList.add('on'); adjSync(); adjDraw();
+  }).catch(function(e){ alert('사진을 열 수 없어요: '+e.message); });
+}
+function adjSync(){ ['br','ct','sat','temp','sharp'].forEach(function(k){ $('s_'+k).value=adjCur[k]; $('v_'+k).textContent=adjCur[k]; }); }
+function adjDraw(){
+  var c=document.createElement('canvas'); c.width=adjBase.width; c.height=adjBase.height; c.getContext('2d').drawImage(adjBase,0,0);
+  adjustCanvas(c,adjCur); var v=$('adjCv'); v.width=c.width; v.height=c.height; v.getContext('2d').drawImage(c,0,0);
+}
+function adjSchedule(){ if(adjRaf) return; adjRaf=requestAnimationFrame(function(){ adjRaf=0; adjDraw(); }); }
+['br','ct','sat','temp','sharp'].forEach(function(k){ $('s_'+k).addEventListener('input',function(){ adjCur[k]=parseInt($('s_'+k).value,10)||0; $('v_'+k).textContent=adjCur[k]; adjSchedule(); }); });
+$('adjReset').addEventListener('click',function(){ adjCur=Object.assign({},ADJ0); adjSync(); adjDraw(); });
+$('adjAuto').addEventListener('click',function(){ adjCur=autoAdj(adjBase); adjSync(); adjDraw(); });
+function thumbOf(p,a){
+  return loadImg(p.url).then(function(im){
+    var k=Math.min(1,96/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement('canvas'); c.width=Math.max(1,Math.round(im.naturalWidth*k)); c.height=Math.max(1,Math.round(im.naturalHeight*k));
+    var x=c.getContext('2d',{willReadFrequently:true}); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0,c.width,c.height);
+    adjustCanvas(c,a); p.thumb=isAdj(a)?c.toDataURL('image/jpeg',0.8):''; });
+}
+function adjClose(all){
+  var targets=all?state.photos:[state.photos[adjIdx]], a=isAdj(adjCur)?Object.assign({},adjCur):null;
+  $('adjBg').classList.remove('on');
+  Promise.all(targets.filter(Boolean).map(function(p){ p.adj=a?Object.assign({},a):null; return thumbOf(p,a); })).then(function(){
+    drawPhotos(); $('status').textContent='보정을 바꿨어요 — "상세페이지 만들기"를 다시 눌러 반영하세요.';
+    if(window.PhotoRegister) PhotoRegister.invalidate();
+  });
+}
+$('adjOk').addEventListener('click',function(){ adjClose(false); });
+$('adjAll').addEventListener('click',function(){ adjClose(true); });
+$('adjBg').addEventListener('click',function(e){ if(e.target===$('adjBg')) adjClose(false); });
 
 /* ---------- 사진 처리 (build_detail.py 의 trim_white / fit_photo / make_zoom) ---------- */
 function loadImg(url){ return new Promise(function(res,rej){ var im=new Image(); im.onload=function(){res(im);}; im.onerror=function(){rej(new Error('이미지를 열 수 없음'));}; im.src=url; }); }
@@ -685,7 +782,7 @@ $('go').addEventListener('click',function(){
     function next(){
       if(i>=state.photos.length) return Promise.resolve();
       var p=state.photos[i++]; $('status').textContent='사진 처리 중… ('+i+'/'+state.photos.length+')';
-      return loadImg(p.url).then(function(im){ var c=toWhiteCanvas(im); if($('bgwhite').checked){ var bw=whitenBackdrop(c); if(bw===2) warns.push(p.file.name+': 배경이 균일한 회색이 아니라 배경 정리를 건너뜀 — 확인'); } seq.push({name:p.file.name,c:c}); }).then(function(){ return new Promise(function(r){setTimeout(r,0);}); }).then(next);
+      return loadImg(p.url).then(function(im){ var c=adjustCanvas(toWhiteCanvas(im),p.adj); if($('bgwhite').checked){ var bw=whitenBackdrop(c); if(bw===2) warns.push(p.file.name+': 배경이 균일한 회색이 아니라 배경 정리를 건너뜀 — 확인'); } seq.push({name:p.file.name,c:c}); }).then(function(){ return new Promise(function(r){setTimeout(r,0);}); }).then(next);
     }
     return next().then(function(){
       var items=[seq[0]].concat(seq);                       /* 메인 + 상세(메인 포함 전부) */
@@ -751,7 +848,7 @@ function saveHistory(){
   var id=state.job, photos=state.photos.slice(), canvas=state.canvas;
   var meta={v:1,pname:$('pname').value.trim(),code:codeOf(),fields:readF(),dirty:state.dirty,size:$('size').value,table:$('table').value,
     zoom:$('zoom').checked,bgwhite:$('bgwhite').checked,ov:state.ov,chart:state.chart,xl:state.xl,infoRows:state.infoRows,
-    photos:photos.map(function(p){return {key:p.key,name:p.file.name,type:p.file.type,lm:p.file.lastModified};})};
+    photos:photos.map(function(p){return {key:p.key,name:p.file.name,type:p.file.type,lm:p.file.lastModified,adj:p.adj||null};})};
   phJson('has',{job:id,keys:JSON.stringify(photos.map(function(p){return p.key;}))}).then(function(j){
     var todo=photos.filter(function(p){ return j.have.indexOf(p.key)<0; }), i=0;
     function next(){ if(i>=todo.length) return Promise.resolve(); var p=todo[i++];
@@ -809,7 +906,7 @@ function loadJob(id){
     function next(){ if(i>=list.length) return Promise.resolve(); var p=list[i++];
       return phCall('file',{job:id,kind:'photo',key:p.key}).then(function(r){ return r.blob(); }).then(function(b){
         if(b.type.indexOf('image')!==0) throw 0;
-        var f=new File([b],p.name,{type:p.type||b.type,lastModified:p.lm||0}); state.photos.push({file:f,url:URL.createObjectURL(f),key:p.key});
+        var f=new File([b],p.name,{type:p.type||b.type,lastModified:p.lm||0}); var np={file:f,url:URL.createObjectURL(f),key:p.key,adj:p.adj||null}; state.photos.push(np); return isAdj(np.adj)?thumbOf(np,np.adj):null;
       }).catch(function(){ miss.push(p.name); }).then(next); }
     return next().then(function(){
       state.pending={ov:m.ov||{},chart:m.chart||null}; drawPhotos(); mark();
@@ -830,6 +927,12 @@ function sizeTableRows(){
   var ch=buildSizeChart(); return ch.given?[ch.header].concat(ch.rows):[];
 }
 setInfoRows(null);
+$('newJob').addEventListener('click',function(){
+  var has=state.photos.length||$('pname').value.trim();
+  if(has && !state.last && !confirm('아직 "상세페이지 만들기"를 하지 않은 작업은 저장되지 않아요. 새 작업을 시작할까요?')) return;
+  if(has && state.last && !confirm('새 작업을 시작합니다. 지금 작업은 "최근 작업"에 그대로 남아 있어요.')) return;
+  location.reload();
+});
 window.PhotoAuto={
   infoRows:function(){ return state.infoRows; },
   setField:function(k,v){ if(fld(k)){ fld(k).value=v; state.dirty[k]=true; mark(); } },
@@ -844,7 +947,7 @@ window.PhotoAuto={
   /* 목록/오버 이미지용: 흰 배경 정리 → 긴 변 1600px 이하 → 4:4:4 JPEG */
   photoJpeg:function(p){
     return loadImg(p.url).then(function(im){
-      var c=toWhiteCanvas(im); if($('bgwhite').checked) whitenBackdrop(c);
+      var c=adjustCanvas(toWhiteCanvas(im),p.adj); if($('bgwhite').checked) whitenBackdrop(c);
       var m=Math.max(c.width,c.height);
       if(m>1600){ var k=1600/m; c=resizeFrom(c,0,0,c.width,c.height,Math.round(c.width*k),Math.round(c.height*k)); }
       return encodeJpeg(c);
