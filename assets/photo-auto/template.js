@@ -19,6 +19,27 @@ var DETAIL_ROWS=[
 var KEY_OF={'품목(카테고리 단어)':'카테고리'};
 var EXTRA_N=5, SIZE_ROWS=10, SIZE_COLS=6, COLS='DEFGHI';
 
+
+/* 옵션값 작은 순 정렬: XXS<XS<S<M<L<XL<XXL / 숫자(35<35.5<36) / 나이(3-6M<2A<3A<14Y) / 범위(68-74<80-86). 못 읽는 값(단품·FREE 등)은 맨 뒤 */
+var LETTER={XXXS:-3,'3XS':-3,XXS:-2,'2XS':-2,XS:-1,S:0,M:1,L:2,XL:3,XXL:4,'2XL':4,XXXL:5,'3XL':5,'4XL':6,XXXXL:6};
+function sizeKey(raw){
+  var s=String(raw==null?'':raw).trim().toUpperCase().replace(/\s+/g,''), m;
+  if(LETTER.hasOwnProperty(s)) return [2,LETTER[s],0];
+  if((m=s.match(/^(\d)XL$/))) return [2,+m[1]+1,0];
+  if((m=s.match(/^(\d{1,2})(?:-(\d{1,2}))?\(?X?\)?([MAY])$/))){
+    var u=m[3]==='M'?1:12; return [1,(+m[1])*u,(+(m[2]||0))*u];
+  }
+  if((m=s.match(/^(\d{1,2})\+$/))) return [1,(+m[1])*12,0.5];
+  if((m=s.match(/^(\d+(?:\.\d+)?)(?:-(\d+(?:\.\d+)?))?([A-Z]?)$/))) return [0,+m[1],(m[2]?+m[2]:0)+(m[3]?m[3].charCodeAt(0)/1000:0)];
+  return [3,0,0];
+}
+function sortSizes(arr){
+  return arr.map(function(v,i){ return {v:v,i:i,k:sizeKey(v)}; }).sort(function(a,b){
+    for(var j=0;j<3;j++){ if(a.k[j]!==b.k[j]) return a.k[j]<b.k[j]?-1:1; }
+    return a.i-b.i;
+  }).map(function(o){ return o.v; });
+}
+
 function build(ExcelJS,v){
   v=v||{}; var wb=new ExcelJS.Workbook(), ws=wb.addWorksheet('Sheet1',{views:[{state:'frozen',ySplit:4,showGridLines:false}]});
   var thin={style:'thin',color:{argb:'FFBFBFBF'}}, border={top:thin,left:thin,bottom:thin,right:thin};
@@ -55,13 +76,15 @@ function build(ExcelJS,v){
   ws.getCell('D9').dataValidation={type:'list',allowBlank:true,formulae:['"Y,N"']};
   ws.getCell('D11').dataValidation={type:'list',allowBlank:true,formulae:['"Y,N"']};
 
-  cell('D16','옵션1차','label'); cell('E16','옵션2차','label'); cell('F16','실제재고옵션','label');
-  cell('G16','▲ 위 칸 이름은 그대로 두세요. 아래 줄: 옵션 이름 / 옵션 값(쉼표로 구분) / 실제 입고된 값','note');
-  cell('C17','옵션','label'); cell('C18','옵션 (두 번째 줄, 필요할 때만)','label');
+  /* 옵션 표: 칸 위치(D17~F18)는 서버가 읽으므로 그대로 두고, 이름표만 알아보기 쉽게 */
+  cell('C16','옵션 (사이즈 등)','title'); cell('D16','① 옵션 이름','label'); cell('E16','② 옵션 값 (쉼표로 구분 · 작은 사이즈부터)','label'); cell('F16','③ 실제 입고된 값 (쉼표)','label');
+  cell('G16','옵션 값은 불러올 때 작은 순(XS·S·M·L·XL / 35·35.5·36 / 3A·4A)으로 자동 정렬돼요','note');
+  cell('C17','옵션 1줄 (필수)','label'); cell('C18','옵션 2줄 (색상 등, 필요할 때만)','label');
   [17,18].forEach(function(r,i){ var t=tiers[i]||{};
-    cell('D'+r,t.name,'input'); cell('E'+r,(t.values||[]).join(','),'input'); cell('F'+r,(t.real||[]).join(','),'input'); });
+    cell('D'+r,t.name,'input'); cell('E'+r,sortSizes(t.values||[]).join(','),'input'); cell('F'+r,sortSizes(t.real||[]).join(','),'input'); });
   cell('G17','예) 사이즈 | S,M,L | M,L   (단품이면 단품 | 단품 | 단품)','note');
-  cell('G18','실제 입고된 값을 비우면 그 옵션은 전부 품절로 등록돼요','note');
+  cell('G18','③을 비우면 그 옵션은 전부 품절로 등록돼요. ③의 값은 ②에 있는 값만 쓰세요','note');
+  ws.getRow(17).height=24; ws.getRow(18).height=24;
 
   var cc=['D','E','F','G','H'];
   cc.forEach(function(c,i){ cell(c+'19','카테고리'+(i+1)+'차','label'); cell(c+'22','카테고리'+(i+6)+'차','label'); });
@@ -113,5 +136,6 @@ function download(v,filename){
     a.download=filename||'상품정보_기본양식.xlsx'; document.body.appendChild(a); a.click(); a.remove();
   });
 }
+root.PhotoSizeSort=sortSizes;
 root.PhotoTemplate={build:build,download:download,REF:REF,DETAIL_ROWS:DETAIL_ROWS,KEY_OF:KEY_OF};
 })(typeof window!=='undefined'?window:globalThis);

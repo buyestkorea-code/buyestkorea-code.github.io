@@ -51,6 +51,7 @@ function buildInfoWorkbook(XLSX,v){
 }
 function cellStr(ws,a){ var c=ws&&ws[a]; return c&&c.v!=null?String(c.v).trim():''; }
 function csv(s){ return String(s||'').split(',').map(function(x){return x.trim();}).filter(Boolean); }
+function sortCsv(a){ return root.PhotoSizeSort?root.PhotoSizeSort(a):a; }
 function parseInfoWorkbook(XLSX,wb){
   var ws=wb.Sheets[wb.SheetNames[0]], out={tiers:[],cats:[]};
   out.brand=cellStr(ws,'D6'); out.material=cellStr(ws,'D7'); out.origin=cellStr(ws,'D8');
@@ -129,7 +130,7 @@ function newReq(){ var a=new Uint8Array(8); window.crypto.getRandomValues(a); re
 function collect(){
   var tiers=[];
   [1,2].forEach(function(i){
-    var n=$('rT'+i+'n').value.trim(), vals=csv($('rT'+i+'v').value), real=csv($('rT'+i+'s').value);
+    var n=$('rT'+i+'n').value.trim(), vals=sortCsv(csv($('rT'+i+'v').value)), real=sortCsv(csv($('rT'+i+'s').value));
     if(n||vals.length) tiers.push({name:n,values:vals,real:real});
   });
   var cats=[1,2,3,4,5].map(function(i){ return $('rC'+i).value.trim(); }).filter(Boolean);
@@ -148,7 +149,7 @@ function fill(v){
   if(v.origin!=null) $('rOrigin').value=v.origin;
   if(v.kids!=null){ $('rKids').checked=!!v.kids; $('rKidsPrice').value=v.kidsPrice||''; $('rKidsShow').checked=!!v.kidsShow; }
   if(v.tiers){ [1,2].forEach(function(i){ var t=v.tiers[i-1]||{name:'',values:[],real:[]};
-    $('rT'+i+'n').value=t.name||''; $('rT'+i+'v').value=(t.values||[]).join(','); $('rT'+i+'s').value=(t.real||[]).join(','); }); }
+    $('rT'+i+'n').value=t.name||''; $('rT'+i+'v').value=sortCsv(t.values||[]).join(','); $('rT'+i+'s').value=sortCsv(t.real||[]).join(','); }); }
   if(v.cats){ [1,2,3,4,5].forEach(function(i){ $('rC'+i).value=v.cats[i-1]||''; }); }
   kidsToggle(); invalidate();
 }
@@ -332,6 +333,7 @@ function init(){
   $('rKidsShow').addEventListener('change',invalidate);
   $('rTplApply').addEventListener('click',applyTpl);
   $('rTplSave').addEventListener('click',saveTpl);
+  ['rT1v','rT1s','rT2v','rT2s'].forEach(function(id){ $(id).addEventListener('change',function(){ var a=sortCsv(csv(this.value)).join(','); if(this.value!==a){ this.value=a; invalidate(); } }); });
   $('rXlsx').addEventListener('click',downloadXlsx);
   $('rPreviewBtn').addEventListener('click',doPreview);
   $('rRegBtn').addEventListener('click',doRegister);
