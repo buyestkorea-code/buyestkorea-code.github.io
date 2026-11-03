@@ -146,6 +146,7 @@
   <div class="row" style="margin-top:12px">
     <input type="checkbox" id="zoom" hidden>
     <label class="hint"><input type="checkbox" id="bgwhite" checked> 연한 회색 배경 사진은 흰 배경으로 자동 정리</label>
+    <label class="hint" style="margin-left:14px" title="JPG 전체 저장으로 나오는 3컷(960×1280 · 1000×1000 두 장)에서 상품이 차지하는 가로 폭(px)">컷 사진 상품 폭 <input type="number" id="cutW" value="500" min="200" max="900" step="10" style="width:68px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> px</label>
     <label class="hint" style="margin-left:14px" title="Product Detail 아래 상세 사진들 사이의 세로 간격(px). 전체에 한 번에 적용됩니다">사진 사이 여백 <input type="number" id="photoGap" value="37" min="0" max="400" step="1" style="width:68px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> px
       <button class="btn btn-out btn-sm" type="button" data-gap="0">0</button><button class="btn btn-out btn-sm" type="button" data-gap="37">기본</button><button class="btn btn-out btn-sm" type="button" data-gap="80">80</button><button class="btn btn-out btn-sm" type="button" data-gap="150">150</button></label>
   </div>
@@ -153,7 +154,8 @@
 
 <div class="row" style="margin-bottom:12px">
   <button class="btn btn-pri" id="go">상세페이지 만들기</button>
-  <button class="btn btn-out" id="dl" disabled>JPG 저장</button>
+  <button class="btn btn-out" id="dl" disabled title="상세페이지 이미지(_00)만 저장">JPG 저장</button>
+  <button class="btn btn-out" id="dla" disabled title="상세페이지(_00) + 다른 팀에 넘기는 3컷(_0012 · _01_ · _02_)을 한 번에 저장">JPG 전체 저장</button>
   <button class="btn btn-out" id="dlp" disabled title="글자는 글자 레이어, 사진·박스는 각각 레이어로 저장">PSD 저장</button>
   <span id="status" class="hint"></span>
 </div>
@@ -867,7 +869,7 @@ $('go').addEventListener('click',function(){
   if(state.chartMode!=='full'){}
   else if(!chart.given) warns.push('★ 실측 입력 필요 — 실측 칸을 채우고 다시 만드세요');
   else if(sizeHasEmpty(chart)) warns.push('★ 실측 표에 비어 있는 칸이 있습니다 — 채우고 다시 만드세요');
-  btn.disabled=true; $('dl').disabled=true; $('dlp').disabled=true; state.ov=(state.pending&&state.pending.ov)||{}; $('status').textContent='만드는 중…';
+  btn.disabled=true; $('dl').disabled=true; $('dla').disabled=true; $('dlp').disabled=true; state.ov=(state.pending&&state.pending.ov)||{}; $('status').textContent='만드는 중…';
 
   Promise.all([loadFonts(),loadStatic()]).then(function(){
     var seq=[], i=0;
@@ -890,7 +892,7 @@ $('go').addEventListener('click',function(){
     showPreview(); $('editHint').style.display='block';
     $('status').textContent='완료: '+W+' × '+c.height+' px · 사진 '+state.photos.length+'장';
     state.genId=(state.genId||0)+1;
-    $('dl').disabled=false; $('dlp').disabled=false; showWarns(warns); queueSave(300);
+    $('dl').disabled=false; $('dla').disabled=false; $('dlp').disabled=false; showWarns(warns); queueSave(300);
     if(window.PhotoRegister) PhotoRegister.onGenerated();
   }).catch(function(e){ $('status').textContent='실패: '+e.message; console.error(e); }).then(function(){ btn.disabled=false; });
 });
@@ -900,6 +902,33 @@ $('dl').addEventListener('click',function(){
     var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=codeOf()+'_00.jpg';
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
   });
+});
+/* 다른 팀에 넘기는 컷: 첫 사진 → _0012(960×1280)·_01_(1000×1000), 둘째 사진(없으면 첫 사진) → _02_(1000×1000)
+   상품 가장자리를 잘라낸 뒤 가로 cutW px 로 맞춰 흰 캔버스 가운데에 놓는다(세로가 너무 길면 캔버스의 80% 이하로 줄임) */
+function cutCanvas(p,cw,ch){
+  return loadImg(p.url).then(function(im){
+    var c=adjustCanvas(toWhiteCanvas(im),p.adj); if($('bgwhite').checked) whitenBackdrop(c);
+    var b=trimBox(c), bw=b[2]-b[0], bh=b[3]-b[1], tw=Math.max(100,parseInt($('cutW').value,10)||500);
+    var k=Math.min(tw/bw,(ch*0.8)/bh), w=Math.max(1,Math.round(bw*k)), h=Math.max(1,Math.round(bh*k));
+    var r=resizeFrom(c,b[0],b[1],bw,bh,w,h), o=document.createElement('canvas'); o.width=cw; o.height=ch;
+    var x=o.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,cw,ch); x.drawImage(r,Math.round((cw-w)/2),Math.round((ch-h)/2)); return o;
+  });
+}
+function saveBlob(b,name){ var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},4000); }
+$('dla').addEventListener('click',function(){
+  if(!state.canvas||!state.photos.length) return;
+  var btn=$('dla'), old=$('status').textContent, code=codeOf(), p1=state.photos[0], p2=state.photos[1]||state.photos[0];
+  btn.disabled=true; $('status').textContent='JPG 전체 만드는 중…';
+  var jobs=[[function(){ return Promise.resolve(state.canvas); },code+'_00.jpg'],
+            [function(){ return cutCanvas(p1,960,1280); },code+'_0012.jpg'],
+            [function(){ return cutCanvas(p1,1000,1000); },code+'_01_.jpg'],
+            [function(){ return cutCanvas(p2,1000,1000); },code+'_02_.jpg']], i=0;
+  function next(){
+    if(i>=jobs.length) return Promise.resolve();
+    var j=jobs[i++];
+    return j[0]().then(encodeJpeg).then(function(b){ saveBlob(b,j[1]); return new Promise(function(r){ setTimeout(r,400); }); }).then(next);
+  }
+  next().then(function(){ $('status').textContent=old; }).catch(function(e){ $('status').textContent='JPG 전체 저장 실패: '+e.message; console.error(e); }).then(function(){ btn.disabled=false; });
 });
 $('dlp').addEventListener('click',function(){
   if(!state.last) return;
