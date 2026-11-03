@@ -160,38 +160,6 @@ function keyOf(){
   return JSON.stringify([c.pname,c.genId,collect(),c.photos.slice(0,2).map(function(p){return p.file.name+p.file.size;})]);
 }
 
-/* ---------- 템플릿 ---------- */
-function loadTpls(){
-  return api('tpl_list').then(function(j){
-    if(!j.ok) return; R.tpls=j.templates||[];
-    var s=$('rTpl'); s.innerHTML='<option value="">— 카테고리 템플릿 선택 —</option>'+R.tpls.map(function(t){ return '<option value="'+esc(t.tpl_id)+'">'+esc(t.name)+'</option>'; }).join('');
-  });
-}
-function applyTpl(){
-  var id=$('rTpl').value; if(!id) return;
-  api('tpl_get',{id:id}).then(function(j){
-    if(!j.ok){ msg(j.error||'템플릿을 불러오지 못했어요','bad'); return; }
-    var b=j.body||{}, tiers=(b.tiers||[]).map(function(t){ return {name:t.name,values:t.values||[],real:[]}; });
-    fill({tiers:tiers});
-    var hints=$('rHints'); hints.innerHTML='';
-    (b.catHints||[]).forEach(function(h){
-      var bt=document.createElement('button'); bt.type='button'; bt.className='btn btn-out btn-sm'; bt.textContent=h;
-      bt.addEventListener('click',function(){ for(var i=1;i<=5;i++){ if(!$('rC'+i).value){ $('rC'+i).value=h; break; } } invalidate(); });
-      hints.appendChild(bt);
-    });
-    PA.applyTemplate(b);
-    msg('템플릿 "'+j.name+'" 적용 — 정보 항목·옵션·실측 항목이 채워졌어요. 실제 입고된 옵션값(실제재고)을 꼭 확인하세요.'+(b.note?' ('+b.note+')':''),'ok');
-  }).catch(function(e){ msg(e.message,'bad'); });
-}
-function saveTpl(){
-  var v=collect(), id=prompt('템플릿 번호(영문 소문자·숫자, 예: scarf)'); if(!id) return;
-  var name=prompt('템플릿 이름(예: 머플러)'); if(!name) return;
-  var labels=(PA.sizeTableRows()[0]||[]).slice(1);
-  var body={tiers:v.tiers.map(function(t){return {name:t.name,values:t.values};}),sizeLabels:labels,storage:!!v.storage,catHints:v.cats,note:'',infoRows:PA.infoRows()||undefined};
-  api('tpl_save',{id:id,name:name,body:JSON.stringify(body),sort_no:'100'}).then(function(j){
-    if(!j.ok){ msg(j.error||'저장하지 못했어요','bad'); return; } msg('템플릿을 저장했어요','ok'); loadTpls();
-  });
-}
 function downloadXlsx(){
   var v=collect();
   root.PhotoTemplate.download(v,'상품정보_'+(PA.ctx()?PA.ctx().code:'양식')+'.xlsx').catch(function(e){ msg(e.message,'bad'); });
@@ -317,22 +285,20 @@ function init(){
   PA=root.PhotoAuto; if(!PA||!$('regBox')) return;
   R.auth=getAuth();
   if(!R.auth){ $('regLogin').style.display='block'; $('regMain').style.display='none'; return; }
-  $('regLogin').style.display='none'; $('regMain').style.display='block'; $('tplBar').style.display='block';
+  $('regLogin').style.display='none'; $('regMain').style.display='block';
   api('me').then(function(j){
     if(!j.ok){ $('regLogin').style.display='block'; $('regLogin').textContent=(j.error||'로그인 확인 실패')+' — 툴킷에 다시 로그인해 주세요.'; $('regMain').style.display='none'; return; }
-    R.role=j.role; if(j.role==='admin') $('rTplSave').style.display='';
+    R.role=j.role;
     return Promise.all([
       api('brands').then(function(b){ if(b.ok){ $('rBrandList').innerHTML=b.brands.map(function(x){ return '<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>'; }).join(''); } }),
       api('categories').then(function(c){ if(c.ok){ R.cats=c.categories; $('rCatList').innerHTML=c.categories.map(function(x){ return '<option value="'+esc(x)+'">'; }).join(''); } }),
-      loadTpls(), loadHistory()
+      loadHistory()
     ]);
   }).catch(function(e){ msg('서버에 연결하지 못했어요: '+e.message,'bad'); });
   ['rBrand','rMaterial','rOrigin','rKidsPrice','rT1n','rT1v','rT1s','rT2n','rT2v','rT2s','rC1','rC2','rC3','rC4','rC5'].forEach(function(id){ $(id).addEventListener('input',invalidate); });
   [['rBrand','브랜드'],['rMaterial','소재'],['rOrigin','제조국']].forEach(function(m){ $(m[0]).addEventListener('input',function(){ PA.setField(m[1],$(m[0]).value); }); });
   $('rKids').addEventListener('change',function(){ kidsToggle(); invalidate(); });
   $('rKidsShow').addEventListener('change',invalidate);
-  $('rTplApply').addEventListener('click',applyTpl);
-  $('rTplSave').addEventListener('click',saveTpl);
   ['rT1v','rT1s','rT2v','rT2s'].forEach(function(id){ $(id).addEventListener('change',function(){ var a=sortCsv(csv(this.value)).join(','); if(this.value!==a){ this.value=a; invalidate(); } }); });
   $('rXlsx').addEventListener('click',downloadXlsx);
   $('rPreviewBtn').addEventListener('click',doPreview);
@@ -342,6 +308,7 @@ function init(){
 }
 root.PhotoRegister={
   init:init,
+  setTier:function(i,name,values){ var n=$('rT'+i+'n'); if(!n) return; if(!n.value.trim()) n.value=name; $('rT'+i+'v').value=sortCsv(values).join(','); $('rT'+i+'s').value=csv($('rT'+i+'s').value).filter(function(x){ return values.indexOf(x)>=0; }).join(','); invalidate(); },
   onGenerated:function(){ invalidate(); $('rResult').style.display='none'; if(R.auth) msg('이미지가 준비됐어요. 아래 정보를 확인하고 [미리보기]를 누르세요.'); },
   onXlsx:function(file){
     if(!root.XLSX||!file||!$('regBox')) return;

@@ -1,6 +1,6 @@
 /* 상품정보 기본양식 엑셀 생성기 (서식 포함: ExcelJS)
  * 한 장짜리 시트: 기존 '기본틀'(서버 자동등록 칸 위치 D6~D11, D17~F18, D20~H23)을 그대로 두고,
- * 그 아래에 사진 자동화용 항목(상세 정보·추가 항목·실측표)을 이어 붙이고, 오른쪽 J~L열에 참고 메뉴 목록을 둔다.
+ * 그 아래에 사진 자동화용 항목(상세 정보·추가 항목)을 이어 붙이고, 오른쪽 J~L열에 참고 메뉴 목록을 둔다.
  * 읽기는 register.js 의 parseInfoWorkbook 이 같은 칸 규칙으로 처리한다.
  */
 (function(root){
@@ -105,16 +105,6 @@ function build(ExcelJS,v){
   var ex=v.extras||{}, exKeys=Object.keys(ex).filter(function(k){ return ex[k]; });
   for(var i=0;i<EXTRA_N;i++){ var r=37+i; cell('C'+r,'추가항목 '+(i+1),'label'); cell('D'+r,exKeys[i],'input'); cell('E'+r,exKeys[i]?ex[exKeys[i]]:'','input'); }
   cell('F37','예) 핏 | 레귤러핏',"note"); cell('F38','예) 세탁방법 | 드라이클리닝','note');
-
-  /* ===== 4. 실측표 ===== */
-  cell('C43','실측표 (단위 cm)','title'); cell('D43','▼ 첫 줄은 항목 이름(예: 가로·세로·폭 / 총장·어깨·가슴·소매), 아래는 사이즈별 값','note');
-  cell('C44','사이즈 ↓   /   항목 →','label');
-  var tbl=v.sizeTable||[], hdr=tbl[0]||[];
-  for(var c=0;c<SIZE_COLS;c++) cell(COLS[c]+'44',hdr[c+1],'input');
-  for(var r=0;r<SIZE_ROWS;r++){ var row=tbl[r+1]||[];
-    cell('C'+(45+r),row[0],'input');
-    for(var c2=0;c2<SIZE_COLS;c2++) cell(COLS[c2]+(45+r),row[c2+1],'input'); }
-  cell('C55','단품(지갑·가방 등)은 C45에 "단품", 의류·신발은 S/M/L 또는 사이즈 숫자를 적으세요. 값은 숫자만(cm)','note');
 
   /* ===== 참고 메뉴 목록 (J~L열) — 복사해서 붙여넣기용 ===== */
   cell('J2','◀ 참고용 메뉴 목록 (필요한 것을 복사해서 왼쪽 칸에 붙여넣기)','note');

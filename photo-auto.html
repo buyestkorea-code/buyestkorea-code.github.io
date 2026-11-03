@@ -88,7 +88,16 @@
 </div>
 
 <div class="box">
-  <h2>① 상품명</h2>
+  <h2>① 템플릿 · 상품명</h2>
+  <div class="row" style="margin-bottom:8px">
+    <select id="tplSel" style="font:14px var(--font);padding:8px;border:1px solid var(--line);border-radius:8px;min-width:260px"><option value="">— 템플릿 선택 (의류 · 슈즈 · 브랜드별 …) —</option></select>
+    <span id="rHints" class="row"></span>
+  </div>
+  <div class="row" style="margin-bottom:10px">
+    <label class="hint">실측표 <select id="chartMode" style="font:13px var(--font);padding:5px 6px;border:1px solid var(--line);border-radius:6px"><option value="full">표 넣기</option><option value="notice">오차 안내 문구만</option><option value="none">넣지 않기</option></select></label>
+    <label class="hint">하단 안내 이미지 <select id="bottomSel" style="font:13px var(--font);padding:5px 6px;border:1px solid var(--line);border-radius:6px"></select></label>
+    <span class="hint" id="tplNote">템플릿을 고르면 정보 항목 · 실측표 방식 · 하단 안내(반품/교환 예시 사진)가 PSD와 같게 맞춰집니다. 아래 두 칸은 따로 바꿀 수도 있어요.</span>
+  </div>
   <input type="text" id="pname" placeholder="예) 아페쎄 26FW 제네바 금장 로고 카드지갑 블랙 PXAWV F63349 LZZ">
   <div class="hint" style="margin-top:6px">폴더 이름과 같은 형식: <b>브랜드(한글) 시즌 … 색상 품번</b>. 입력하면 아래 항목이 자동으로 채워집니다.</div>
 </div>
@@ -113,27 +122,22 @@
 
 <div class="box">
   <h2>③ 상세 정보 <span class="hint">(자동으로 채운 값 — 틀리면 고쳐 쓰세요)</span></h2>
-  <div id="tplBar" style="display:none;margin-bottom:10px">
-    <div class="row">
-      <select id="rTpl" style="font:14px var(--font);padding:8px;border:1px solid var(--line);border-radius:8px"><option value="">— 상품 종류 템플릿 선택 (지갑·의류·신발…) —</option></select>
-      <button class="btn btn-out btn-sm" id="rTplApply" type="button">템플릿 적용</button>
-      <button class="btn btn-out btn-sm" id="rTplSave" type="button" style="display:none" title="툴킷 관리자만">현재 설정을 템플릿으로 저장</button>
-      <span id="rHints" class="row"></span>
-    </div>
-    <div class="hint" style="margin-top:6px">템플릿을 적용하면 아래 <b>정보 항목</b>(예: 지갑은 수납공간, 의류는 핏·세탁 등)과 옵션·실측 머리글이 그 상품 종류에 맞게 바뀝니다.</div>
-    <label class="hint" style="display:block;margin-top:6px">정보 항목 목록 (쉼표로 구분 · 순서대로 상세페이지 Information 표에 들어갑니다 — 직접 고쳐도 되고, 관리자는 이 목록을 템플릿으로 저장)</label>
-    <input type="text" id="tplRows" placeholder="상품명,브랜드,카테고리,수입여부,제조년월,색상,제조국,구성품,수납공간,소재">
+  <div id="tplBar" style="margin-bottom:10px">
+    <label class="hint" style="display:block;margin-top:6px">정보 항목 목록 (쉼표로 구분 · 순서대로 상세페이지 Information 표에 들어갑니다 — 템플릿이 채워 주고, 직접 고쳐도 됩니다)</label>
+    <input type="text" id="tplRows" placeholder="상품명,브랜드,카테고리,수입여부,제조년월,색상,제조국,구성품,소재">
   </div>
   <div class="grid" id="fields"></div>
-  <div class="grid" style="margin-top:12px">
+  <div class="grid" style="margin-top:12px" id="szBlock">
     <div class="wide">
       <label>실측 표 — 칸을 눌러 바로 입력 (엑셀에서 복사해 붙여넣어도 됩니다. 첫 줄 = 항목 이름, 첫 칸 = 사이즈 이름)</label>
+      <div class="hint" style="margin:2px 0 4px">① 항목 세트 (표의 맨 윗줄)</div>
+      <div class="row" id="itemChips" style="margin-bottom:8px"></div>
+      <div class="hint" style="margin:2px 0 4px">② 사이즈 세트 (표의 첫 칸 + 옵션 1 값도 같이 채워짐)</div>
+      <div class="row" id="sizeChips" style="margin-bottom:10px"></div>
       <div id="szGrid" style="overflow:auto"></div>
       <div class="row" style="margin-top:8px">
         <button class="btn btn-out btn-sm" id="szAddRow" type="button">＋ 사이즈(줄) 추가</button>
         <button class="btn btn-out btn-sm" id="szAddCol" type="button">＋ 항목(칸) 추가</button>
-        <button class="btn btn-out btn-sm" id="szPreWallet" type="button" title="가로·세로·폭, 단품 한 줄">단품 기본(가로/세로/폭)</button>
-        <button class="btn btn-out btn-sm" id="szPreCloth" type="button" title="총장·어깨·가슴·소매, S/M/L">의류 기본(총장/어깨/가슴/소매)</button>
         <span class="hint">단위 cm · 빈 칸(빨간색)이 남아 있으면 경고가 떠요</span>
       </div>
       <input type="text" id="size" hidden><textarea id="table" hidden></textarea>
@@ -218,6 +222,7 @@
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
 <script src="assets/libs/jpeg-encoder-0.4.4.js"></script>
+<script src="assets/photo-auto/templates.js"></script>
 <script>
 (function(){
 'use strict';
@@ -232,7 +237,7 @@ var HANGUL=/[가-힣]/, SEASON=/^\d{2}[A-Za-z]{2,3}$/;
 var BAGS=['숄더백','크로스백','토트백','백팩','클러치','파우치','버킷백','미니백','핸드백','가방','쇼퍼백'];
 
 var $=function(id){return document.getElementById(id);};
-var state={extra:[], infoRows:null, xl:{}, photos:[], dirty:{}, info:null, canvas:null, fileName:'', last:null, chart:null, slots:null, ov:{}, wrapEl:null, hl:null, job:'', jobName:'', pending:null};
+var state={extra:[], infoRows:null, xl:{}, photos:[], dirty:{}, info:null, canvas:null, fileName:'', last:null, chart:null, slots:null, ov:{}, wrapEl:null, hl:null, job:'', jobName:'', pending:null, chartMode:'full', bottomKey:'', defaults:null, tplId:''};
 
 /* ---------- 필드 입력칸 ---------- */
 var fieldBox=$('fields');
@@ -291,7 +296,7 @@ function applyAuto(){
   var info=parseName($('pname').value); state.info=info;
   var auto={'상품명':info.name,'브랜드한글':info.brandKo,'브랜드':state.xl.brand||'','카테고리':info.category,
     '수입여부':DEFAULTS['수입여부'],'제조년월':info.mfg,'색상':info.color,'제조국':state.xl.origin||'',
-    '구성품':DEFAULTS['구성품'],'수납공간':'','소재':state.xl.material||''};
+    '구성품':(state.defaults&&state.defaults['구성품'])||DEFAULTS['구성품'],'수납공간':'','소재':state.xl.material||''};
   FIELD_KEYS.forEach(function(k){ if(!state.dirty[k]) fld(k).value=auto[k]; });
   mark();
 }
@@ -595,8 +600,6 @@ $('szGrid').addEventListener('paste',function(e){
 });
 $('szAddRow').addEventListener('click',function(){ grid.push(grid[0].map(function(){return '';})); gridSave(); gridDraw(); });
 $('szAddCol').addEventListener('click',function(){ grid.forEach(function(r,i){ r.push(i===0?'항목':''); }); gridSave(); gridDraw(); });
-$('szPreWallet').addEventListener('click',function(){ gridSet(PRE_WALLET.map(function(r){return r.slice();})); });
-$('szPreCloth').addEventListener('click',function(){ gridSet(PRE_CLOTH.map(function(r){return r.slice();})); });
 function sizeHasEmpty(chart){ var e=false; chart.rows.forEach(function(r){ for(var i=1;i<chart.header.length;i++){ if(!r[i]) e=true; } }); return e; }
 function tblSplit(l){ return l.indexOf('\t')>=0 ? l.split('\t').map(function(x){return x.trim();}) : l.split(/ +/); }
 function buildSizeChart(){
@@ -621,10 +624,11 @@ function loadFonts(){
 }
 
 /* ---------- 조립 (build_detail.py 의 build_html 좌표를 그대로 사용) ---------- */
-var topImg=null, botImg=null;
+var topImg=null, botImg=null, botCache={};
+function bottomUrl(k){ return k?'assets/photo-auto/bottoms/'+k+'.png':'assets/photo-auto/bottom.png'; }
 function loadStatic(){
-  if(topImg&&botImg) return Promise.resolve();
-  return Promise.all([loadImg('assets/photo-auto/top.png'),loadImg('assets/photo-auto/bottom.png')]).then(function(r){topImg=r[0];botImg=r[1];});
+  var k=state.bottomKey||'';
+  return Promise.all([topImg||loadImg('assets/photo-auto/top.png'), botCache[k]||loadImg(bottomUrl(k))]).then(function(r){ topImg=r[0]; botCache[k]=r[1]; botImg=r[1]; });
 }
 var cv=document.createElement('canvas').getContext('2d');
 var hasLS=('letterSpacing' in cv);
@@ -695,9 +699,11 @@ function render(f,chart,slots,ov){
   });
   var infoBottom=rowTop;
 
+  var mode=state.chartMode||'full', noticeTop;
+  if(mode==='full'){
   var scBase=infoBottom+(2837.84-2752);
   text('Size Chart',34.4,scBase,40,'Bold',DARK);
-  text('단위 : CM',686,scBase+(2849.27-2837.84),12,'Light',MID,'right');
+  text(chart.header.length===2&&chart.header[1]==='MM'?'단위 : MM':'단위 : CM',686,scBase+(2849.27-2837.84),12,'Light',MID,'right');
   var hdrTop=scBase+(2858-2837.84), ncols=chart.header.length, colw=653/ncols;
   box(33,hdrTop,653,43,'#f5f5f5');
   chart.header.forEach(function(lb,c){ text(lb,33+colw*(c+0.5),hdrTop+(2886.27-2858),18,'Regular',DARK,'center',{id:'h:'+c,type:'hdr',c:c}); });
@@ -707,13 +713,16 @@ function render(f,chart,slots,ov){
     for(var c=0;c<ncols;c++) text(r[c]||'',33+colw*(c+0.5),rTop+(2924.27-2901),18,'Light',MID,'center',{id:'c:'+ri+':'+c,type:'cell',r:ri,c:c});
     rTop+=37;
   });
-  var noticeTop=rTop-1;
-  box(35,noticeTop,650,75,'#f5f5f5');
+  noticeTop=rTop-1;
+  } else if(mode==='notice'){ noticeTop=infoBottom+64; }
+  if(mode!=='none') box(35,noticeTop,650,75,'#f5f5f5');
+  if(mode!=='none'){
   text('•',40,noticeTop+29.5,15,'Light',LIGHT);
   text('모든 상품의 실측은 수기로 측정되어 1~2cm 내외의 오차가 발생할 수 있으며, 이는 판매자 귀책에 따른',54,noticeTop+29.5,15,'Light',LIGHT);
   text('환불 사유에 해당하지 않습니다.  (니트 및 신축성 있는 소재는 오차 범위가 더 클 수 있음）',54,noticeTop+53.5,15,'Light',LIGHT);
+  }
 
-  var pdBase=noticeTop+75+(3155.98-3012);
+  var pdBase=mode==='none'?infoBottom+(2837.84-2752):noticeTop+75+(3155.98-3012);
   text('Product Detail',33.1,pdBase,40,'Bold',DARK);
   text('모니터의 사양 및 설정에 따라 색상 및 밝기의 차이가 있을 수 있습니다.',35.1,pdBase+(3189.98-3155.98),18,'Light',LIGHT);
   var slotTop=pdBase+(3229-3155.98), gap=photoGap();
@@ -855,7 +864,8 @@ $('go').addEventListener('click',function(){
   var chart=(state.pending&&state.pending.chart)||buildSizeChart();
   state.pending=null;
   var pn=$('pname').value.trim(); if(!state.job||state.jobName!==pn){ state.job=newId(); state.jobName=pn; }
-  if(!chart.given) warns.push('★ 실측 입력 필요 — 실측 칸을 채우고 다시 만드세요');
+  if(state.chartMode!=='full'){}
+  else if(!chart.given) warns.push('★ 실측 입력 필요 — 실측 칸을 채우고 다시 만드세요');
   else if(sizeHasEmpty(chart)) warns.push('★ 실측 표에 비어 있는 칸이 있습니다 — 채우고 다시 만드세요');
   btn.disabled=true; $('dl').disabled=true; $('dlp').disabled=true; state.ov=(state.pending&&state.pending.ov)||{}; $('status').textContent='만드는 중…';
 
@@ -929,7 +939,7 @@ function saveHistory(){
   saving=true; setHist('서버에 보관 중…');
   var id=state.job, photos=state.photos.slice(), canvas=state.canvas;
   var meta={v:1,pname:$('pname').value.trim(),code:codeOf(),fields:readF(),dirty:state.dirty,size:$('size').value,table:$('table').value,
-    zoom:$('zoom').checked,bgwhite:$('bgwhite').checked,ov:state.ov,chart:state.chart,xl:state.xl,infoRows:state.infoRows,
+    zoom:$('zoom').checked,bgwhite:$('bgwhite').checked,ov:state.ov,chart:state.chart,xl:state.xl,infoRows:state.infoRows,tplId:state.tplId,chartMode:state.chartMode,bottomKey:state.bottomKey,
     photos:photos.map(function(p){return {key:p.key,name:p.file.name,type:p.file.type,lm:p.file.lastModified,adj:p.adj||null};})};
   phJson('has',{job:id,keys:JSON.stringify(photos.map(function(p){return p.key;}))}).then(function(j){
     var todo=photos.filter(function(p){ return j.have.indexOf(p.key)<0; }), i=0;
@@ -981,6 +991,7 @@ function loadJob(id){
     state.job=id; state.jobName=m.pname; $('pname').value=m.pname||''; state.xl=m.xl||{}; state.dirty=m.dirty||{};
     Object.keys(m.fields||{}).forEach(function(k){ if(!fld(k)&&m.fields[k]) ensureField(k); });
     setInfoRows(m.infoRows||null);
+    restoreTpl(m);
     fieldKeys().forEach(function(k){ fld(k).value=(m.fields&&m.fields[k])||''; });
     $('size').value=m.size||''; $('table').value=m.table||''; gridSet(gridFromText()); $('zoom').checked=false; $('bgwhite').checked=m.bgwhite!==false;
     $('xName').textContent=(state.xl.brand||state.xl.origin||state.xl.material)?'✔ (보관된 작업) 브랜드 '+(state.xl.brand||'?')+' · 제조국 '+(state.xl.origin||'?')+' · 소재 '+(state.xl.material||'?'):'';
@@ -1015,13 +1026,80 @@ $('newJob').addEventListener('click',function(){
   if(has && state.last && !confirm('새 작업을 시작합니다. 지금 작업은 "최근 작업"에 그대로 남아 있어요.')) return;
   location.reload();
 });
+
+/* ---------- 템플릿 · 실측 항목/사이즈 세트 ---------- */
+var TPL=window.PhotoTpl;
+function afterTplChange(){
+  if(!state.slots||!state.chart) return;
+  loadStatic().then(function(){ state.chart=buildSizeChart(); rerender(); });
+}
+function szVisible(){ $('szBlock').style.display=state.chartMode==='full'?'':'none'; }
+function fillSel(sel,list,key,label){ list.forEach(function(x){ var o=document.createElement('option'); o.value=x[key]; o.textContent=x[label]; sel.appendChild(o); }); }
+fillSel($('tplSel'),TPL.TEMPLATES,'id','name');
+fillSel($('bottomSel'),TPL.BOTTOMS,'k','name');
+function chip(box,label,attr,val){ var b=document.createElement('button'); b.type='button'; b.className='btn btn-out btn-sm'; b.textContent=label; b.setAttribute(attr,val); box.appendChild(b); }
+TPL.ITEMS.forEach(function(it){ chip($('itemChips'),it.name,'data-item',it.k); });
+TPL.SIZES.forEach(function(z){ chip($('sizeChips'),z.name,'data-size',z.k); });
+function gridHasValues(){ for(var r=1;r<grid.length;r++) for(var c=1;c<grid[r].length;c++) if(grid[r][c]) return true; return false; }
+function applyItemSet(k,fresh){
+  var it=TPL.item(k); if(!it) return;
+  var old=grid||[], oh=old[0]||[], labels=old.slice(1).map(function(r){return r[0];}).filter(Boolean);
+  var needNum=/^\d/.test(it.rows[0]), rows=(labels.length&&!fresh)?labels:it.rows;
+  if(it.rows[0]==='단품') rows=['단품'];
+  else if(fresh){}
+  else if(rows.length===1&&rows[0]==='단품') rows=it.rows;
+  else if(needNum && !rows.every(function(x){ return /^[\d.]+$/.test(x); })) rows=it.rows;
+  var g=[[it.corner].concat(it.cols)];
+  rows.forEach(function(lb){
+    var orow=old.filter(function(x){return x[0]===lb;})[0], r=[lb];
+    it.cols.forEach(function(c){ var oi=oh.indexOf(c); r.push(orow&&oi>0?(orow[oi]||''):''); });
+    g.push(r);
+  });
+  gridSet(g); if(window.PhotoRegister) PhotoRegister.invalidate();
+}
+function applySizeSet(k){
+  var z=TPL.size(k); if(!z) return;
+  if(gridHasValues() && !confirm('입력해 둔 실측 값이 지워집니다. 사이즈 줄을 바꿀까요?')) return;
+  var header=(grid[0]&&grid[0].length>1)?grid[0].slice():['사이즈','가로','세로','폭'];
+  if(z.mm && header.indexOf('MM')<0){ var it=TPL.item(k.indexOf('us')===0?'shoeUS':'shoeEU'); header=[it.corner].concat(it.cols); }
+  var mmI=header.indexOf('MM'), g=[header];
+  z.v.forEach(function(lb,i){ var r=[lb]; for(var c=1;c<header.length;c++) r.push(c===mmI&&z.mm?z.mm[i]:''); g.push(r); });
+  gridSet(g);
+  if(window.PhotoRegister&&PhotoRegister.setTier) PhotoRegister.setTier(1,'사이즈',z.v);
+  if(window.PhotoRegister) PhotoRegister.invalidate();
+}
+$('itemChips').addEventListener('click',function(e){ var k=e.target.getAttribute('data-item'); if(k) applyItemSet(k); });
+$('sizeChips').addEventListener('click',function(e){ var k=e.target.getAttribute('data-size'); if(k) applySizeSet(k); });
+function applyTplObj(t){
+  state.tplId=t?t.id:'';
+  state.defaults=t&&t.defaults||null;
+  if(!t){ $('tplNote').textContent=''; return; }
+  setInfoRows(t.rows);
+  state.chartMode=t.chart; $('chartMode').value=t.chart;
+  state.bottomKey=t.bottom||''; $('bottomSel').value=state.bottomKey;
+  applyAuto(); szVisible();
+  if(t.items) applyItemSet(t.items,!gridHasValues());
+  $('tplNote').textContent='적용: '+t.name+' (PSD '+t.src+')';
+  if(window.PhotoRegister) PhotoRegister.invalidate();
+  afterTplChange();
+}
+function restoreTpl(m){
+  var t=m&&m.tplId?TPL.tpl(m.tplId):null;
+  state.tplId=t?t.id:''; state.defaults=t&&t.defaults||null; $('tplSel').value=state.tplId;
+  state.chartMode=(m&&m.chartMode)||'full'; $('chartMode').value=state.chartMode;
+  state.bottomKey=(m&&m.bottomKey)||''; $('bottomSel').value=state.bottomKey; szVisible();
+}
+$('tplSel').addEventListener('change',function(){ applyTplObj(TPL.tpl(this.value)); });
+$('chartMode').addEventListener('change',function(){ state.chartMode=this.value; szVisible(); if(window.PhotoRegister) PhotoRegister.invalidate(); afterTplChange(); });
+$('bottomSel').addEventListener('change',function(){ state.bottomKey=this.value; afterTplChange(); });
+
 window.PhotoAuto={
   infoRows:function(){ return state.infoRows; },
   setField:function(k,v){ if(fld(k)){ fld(k).value=v; state.dirty[k]=true; mark(); } },
   sizeText:function(){ return $('size').value.trim(); },
   xlSummary:function(t){ $('xSum').textContent=t||''; },
   readF:readF, sizeTableRows:sizeTableRows, encodeJpeg:encodeJpeg,
-  sizeIncomplete:function(){ var ch=buildSizeChart(); return !ch.given || sizeHasEmpty(ch); },
+  sizeIncomplete:function(){ if(state.chartMode!=='full') return false; var ch=buildSizeChart(); return !ch.given || sizeHasEmpty(ch); },
   ctx:function(){
     if(!state.canvas||!state.photos.length||!state.last) return null;
     return {pname:$('pname').value.trim(),code:codeOf(),canvas:state.canvas,photos:state.photos,genId:state.genId||0};
