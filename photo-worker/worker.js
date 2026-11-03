@@ -18,6 +18,10 @@ const BLOCK_EXACT = new Set(['x.com', 't.co']);
 const OFFICIAL = /(^|\.)(gucci|prada|saintlaurent|ysl|burberry|moncler|stoneisland|canadagoose|dolcegabbana|versace|fendi|balenciaga|bottegaveneta|loewe|dior|chanel|hermes|louisvuitton|givenchy|valentino|ferragamo|tods|furla|armani|msgm|moschino|golden-goose|goldengoose|palmangels|off---white|maisonmargiela|jilsander|acnestudios|maxmara|marni|miumiu|etro|lanvin|celine|apc|ganni|stellamccartney|viviennewestwood|nike|adidas|newbalance|puma|asics|converse|vans|ugg|birkenstock|gfore|herno|amiparis|isabelmarant|pucci|isseymiyake|mcmworldwide|thombrowne|chloe|tory-?burch|toryburch|kongessloejd|kongesslojd)\./i;
 // 1차 출처(결과에 이 도메인이 있으면 우선)
 const PREFERRED = ['cettire.com', 'vitkac.com', 'thedoublef.com', 'biffi.com', 'the-fashion-square.com'];
+// 사용자가 실제로 사진을 찾아낸 사이트(2026-11-03, 재고추가 10.15 비고 기준) — 2차 검색에서 이 도메인만 따로 한 번 더 찾고, 결과에서도 우선한다.
+// 사이트를 더 알려주면 여기에만 추가하면 된다.
+const PARTNER_SITES = ['answear.it', 'gebnegozionline.com', 'levelshoes.com', 'sendegaro.com', 'thebs.com', 'lodenfrey.com', 'golfclub-boutique.com', 'pozzilei.it', 'harresoe.com', 'brandshop.ru'];
+PREFERRED.push(...PARTNER_SITES);
 
 const norm = (s) => String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
@@ -248,7 +252,8 @@ async function stage1(ctx, p) {
   const steps = [['Cettire', () => cettire(ctx, p)], ['Vitkac', () => vitkac(ctx, p)],
     ['TheDoubleF', () => shopify(ctx, p, 'https://www.thedoublef.com/en-eu', 'TheDoubleF')],
     ['Biffi', () => shopify(ctx, p, 'https://www.biffi.com/en-us', 'Biffi')],
-    ['Fashion Square', () => fashionSquare(ctx, p)]];
+    ['Fashion Square', () => fashionSquare(ctx, p)],
+    ['Harresoe', () => shopify(ctx, p, 'https://harresoe.com', 'Harresoe')]];
   const partials = [];
   for (const [name, fn] of steps) {
     try {
@@ -266,12 +271,13 @@ async function stage2(ctx, p) {
   if (!key) return { error: 'SERPER_KEY 미설정' };
   // 품번을 적는 방식이 사이트마다 달라서(공백·붙여쓰기) 검색어를 몇 가지로 바꿔 본다
   const joined = p.tokens.join('');
-  const queries = dedupe([`"${p.raw}"`, p.tokens.length > 1 ? `"${joined}"` : '', `"${p.rawModel}"` + (p.color ? ' ' + p.color : '')].filter(Boolean));
+  const siteQ = '(' + PARTNER_SITES.map((d) => 'site:' + d).join(' OR ') + ')';
+  const queries = dedupe([`"${p.raw}" ${siteQ}`, `"${p.raw}"`, p.tokens.length > 1 ? `"${joined}"` : '', `"${p.rawModel}"` + (p.color ? ' ' + p.color : '')].filter(Boolean));
   const cands = [];
   const seen = new Set();
   let qn = 0;
   for (const q of queries) {
-    if (qn >= 3) break; qn++;
+    if (qn >= 4) break; qn++;
     const r = await ctx.fetch('https://google.serper.dev/search', { method: 'POST', headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' }, body: JSON.stringify({ q, num: 10, gl: 'us', hl: 'en' }) });
     if (!r.ok) return { error: 'Serper ' + r.status };
     const d = await r.json();
@@ -285,7 +291,7 @@ async function stage2(ctx, p) {
       if (!hay0.includes(p.modelQ) && !hay0.includes(p.model) && !(p.first.length >= 7 && hay0.includes(p.first))) continue;
       cands.push({ link: it.link, host: h, pref: PREFERRED.some((x) => h.endsWith(x)) ? 0 : 1 });
     }
-    if (cands.length >= 3) break;
+    if (cands.length >= 3 && qn >= 2) break;
   }
   cands.sort((a, b) => a.pref - b.pref);
   const found = [], partials = [], log = [];
