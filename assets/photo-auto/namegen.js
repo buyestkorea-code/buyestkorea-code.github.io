@@ -78,8 +78,8 @@ function generate(){
   if(busy) return;
   var a=auth();
   if(!a){ fail('툴킷에 로그인한 뒤 새로고침해 주세요.'); return; }
-  var photos=ctx.photos();
-  if(!photos.length){ fail('위에서 상품 사진을 먼저 올려 주세요. (최대 3장까지 분석)'); return; }
+  var photos=own.length?own.map(function(f){ return {file:f}; }):ctx.photos();
+  if(!photos.length){ fail('상품 사진을 먼저 올려 주세요. (최대 3장까지 분석)'); return; }
   var req=++lastReq; setBusy(true,'사진 '+Math.min(3,photos.length)+'장을 읽는 중…');
   Promise.all(photos.slice(0,3).map(function(p){ return toSmallJpeg(p.file,1024); })).then(function(imgs){
     return fetch(WK+'/api/names',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':a.id,'X-Studio-Pass':a.pass},
@@ -90,6 +90,24 @@ function generate(){
     if(!res.ok){ fail(res.error||'이름을 만들지 못했습니다.'); return; }
     setBusy(false); render(res);
   }).catch(function(e){ fail('이름을 만들지 못했습니다: '+(e&&e.message||e)); });
+}
+
+/* 이 박스 전용 사진 (상세페이지 만들기용 사진과 별개) */
+var own=[], autoTimer=0;
+function drawThumbs(){
+  var box=$('ngThumbs'); box.innerHTML='';
+  own.forEach(function(f,i){
+    var el=document.createElement('div'); el.className='ngth'+(i>=3?' skip':'');
+    el.innerHTML='<img alt="" src="'+URL.createObjectURL(f)+'"><button type="button" class="x" data-rm="'+i+'" title="빼기">×</button>'+(i>=3?'<span>분석 제외</span>':'');
+    box.appendChild(el);
+  });
+}
+function addOwn(list){
+  var added=0;
+  Array.prototype.forEach.call(list||[],function(f){ if(/^image\//.test(f.type)){ own.push(f); added++; } });
+  if(!added) return;
+  drawThumbs();
+  clearTimeout(autoTimer); autoTimer=setTimeout(generate,700);
 }
 
 function use(i,edit){
@@ -105,7 +123,11 @@ function init(c){
   ctx=c;
   var host=$('ngHost'); if(!host) return;
   host.innerHTML=
-    '<div class="nghead"><b>AI 이름 자동생성</b><span class="hint">메인·키즈 사이트 상품 약 2만 3천 개의 이름 문법을 학습 · 사진 최대 3장 분석 · 후보 4개</span></div>'+
+    '<div class="nghead"><b>AI 이름 자동생성</b><span class="hint">메인·키즈 사이트 상품 약 2만 3천 개의 이름 문법을 학습 · 사진만 올리면 후보 4개</span></div>'+
+    '<div class="drop ngdrop" id="ngDrop">상품 사진을 끌어놓거나 클릭 (붙여넣기도 가능 · 최대 3장 분석)<div class="hint">여기에 올린 사진은 이름 만들기에만 쓰이고, 상세페이지 만들기와는 무관합니다. 올리면 바로 이름을 만듭니다.</div></div>'+
+    '<input type="file" id="ngFile" accept="image/*" multiple hidden>'+
+    '<div class="ngthumbs" id="ngThumbs"></div>'+
+    '<div class="hint" style="margin:8px 0 4px">아래는 모두 선택 사항입니다. 비워 두면 사진만 보고 만들고, 브랜드·시즌·품번을 넣으면 이름 앞뒤에 붙여 줍니다.</div>'+
     '<div class="ngform">'+
       '<div><label>브랜드(한글)</label><input type="text" id="ng_brand" placeholder="예) 스톤아일랜드"></div>'+
       '<div><label>시즌</label><input type="text" id="ng_season" placeholder="예) 26SS"></div>'+
@@ -117,6 +139,17 @@ function init(c){
     '<div id="ngList" class="nglist"></div>';
   ['brand','season','code'].forEach(function(k){ $('ng_'+k).addEventListener('input',function(){ userEdited[k]=true; }); });
   $('ngGo').addEventListener('click',generate);
+  var drop=$('ngDrop'), fin=$('ngFile');
+  drop.addEventListener('click',function(){ fin.click(); });
+  fin.addEventListener('change',function(){ addOwn(fin.files); fin.value=''; });
+  ['dragenter','dragover'].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add('on'); }); });
+  ['dragleave','drop'].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.remove('on'); }); });
+  drop.addEventListener('drop',function(e){ addOwn(e.dataTransfer.files); });
+  document.addEventListener('paste',function(e){
+    var fs=[]; Array.prototype.forEach.call((e.clipboardData&&e.clipboardData.files)||[],function(f){ if(/^image\//.test(f.type)) fs.push(f); });
+    if(fs.length) addOwn(fs);
+  });
+  $('ngThumbs').addEventListener('click',function(e){ var i=e.target.dataset&&e.target.dataset.rm; if(i!=null){ own.splice(+i,1); drawThumbs(); } });
   $('ngList').addEventListener('click',function(e){
     var t=e.target; if(!t.dataset) return;
     if(t.dataset.use!=null) use(+t.dataset.use,false);
