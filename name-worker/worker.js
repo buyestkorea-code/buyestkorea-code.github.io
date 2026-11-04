@@ -158,9 +158,9 @@ async function callGemini(env, system, userText, images) {
 
 // Groq: OpenAI 호환 주소. 사진을 읽는 모델(기본 Llama 4 Scout)을 쓴다.
 async function callGroq(env, system, userText, images) {
-  const model = env.GROQ_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct";
+  const model = env.GROQ_MODEL || "qwen/qwen3.8-27b";
   const payload = {
-    model, temperature: 0.7, max_tokens: 1200, response_format: { type: "json_object" },
+    model, temperature: 0.7, max_tokens: 6000, response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
       { role: "user", content: [...images.map((i) => ({ type: "image_url", image_url: { url: i.url } })), { type: "text", text: userText }] },
@@ -222,8 +222,9 @@ async function handleNames(request, env) {
     const p = PROVIDERS[k];
     try {
       const res = await p.call(env, systemPrompt(book, p.compact), userText, images);
-      const m = /\{[\s\S]*\}/.exec(res.text);
-      const parsed = JSON.parse(m ? m[0] : res.text);
+      const txt = res.text.replace(/<think>[\s\S]*?<\/think>/g, ""); // 생각 과정 글 제거
+      const m = /\{[\s\S]*\}/.exec(txt);
+      const parsed = JSON.parse(m ? m[0] : txt);
       if (!Array.isArray(parsed.candidates) || !parsed.candidates.some((c) => c && c.name)) throw new ProviderError(p.name, 502, "후보 없음");
       out = parsed; used = p.name; break;
     } catch (e) {
