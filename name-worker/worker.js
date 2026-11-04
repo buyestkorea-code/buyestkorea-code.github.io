@@ -157,9 +157,9 @@ async function handleNames(request, env) {
   const payload = {
     systemInstruction: { parts: [{ text: systemPrompt(book) }] },
     contents: [{ role: "user", parts: [...images, { text: lines.join("\n") }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 2048, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
+    generationConfig: { temperature: 0.7, maxOutputTokens: 4096, responseMimeType: "application/json" },
   };
-  const model = env.GEMINI_MODEL || "gemini-2.5-flash";
+  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
   let r;
   try {
     r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
