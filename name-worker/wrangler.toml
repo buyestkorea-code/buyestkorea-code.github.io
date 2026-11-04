@@ -1,0 +1,17 @@
+# BUYEST 상품명 AI 자동생성 Worker
+name = "buyest-namegen"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# (선택) 직원 1명당 하루 사용 횟수 제한을 쓰려면:  npx wrangler kv namespace create NAMEGEN_KV  → 나온 id 를 넣고 주석 해제
+# [[kv_namespaces]]
+# binding = "NAMEGEN_KV"
+# id = "여기에_KV_id"
+
+[vars]
+# 모델 이름 (바뀌면 여기만 고치면 됩니다)
+CLAUDE_MODEL = "claude-sonnet-5-5"
+# 직원 1명 하루 생성 횟수 (KV 를 연결했을 때만 적용)
+LIMIT_PER_DAY = "150"
+# 학습자료 주소 (툴킷 사이트에 올라간 namebook.json)
+NAMEBOOK_URL = "https://buyestkorea-code.github.io/assets/photo-auto/namebook.json"

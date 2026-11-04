@@ -50,6 +50,20 @@
   .adjrow{margin-bottom:10px;font-size:13px;} .adjrow label{display:flex;justify-content:space-between;margin-bottom:2px;} .adjrow input{width:100%;}
   .ph .tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--okbg);color:var(--ok);}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  /* AI 이름 자동생성 */
+  .ngbox{margin-top:14px;padding:14px;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:10px;background:#fbfcff;}
+  .nghead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px;} .nghead b{font-size:14px;}
+  .ngform{display:grid;grid-template-columns:1.1fr .7fr 1.6fr .9fr;gap:8px 10px;} @media(max-width:700px){.ngform{grid-template-columns:1fr 1fr;}}
+  .ngform label{display:block;font-size:12px;color:var(--sub);margin-bottom:3px;} .ngform .wide{grid-column:1/-1;}
+  .ngform select{width:100%;font:14px var(--font);padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);}
+  .nglist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-top:12px;}
+  .nglist:empty{display:none;}
+  .ngcard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:7px;}
+  .ngcard.on{border-color:var(--ok);box-shadow:0 0 0 2px var(--okbg);}
+  .ngtag{font-size:11px;font-weight:700;color:var(--blue);letter-spacing:.02em;}
+  .ngname{font-size:15px;font-weight:600;line-height:1.5;word-break:keep-all;}
+  .ngname .ngb,.ngname .ngs,.ngname .ngk{font-weight:500;color:var(--sub);} .ngname .ngk{font-family:ui-monospace,Consolas,monospace;font-size:13px;}
+  .ngname .ngc{color:var(--blue);} .ngnote{margin:0;}
   .chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;}
   .warns{margin:10px 0 0;padding:0;list-style:none;font-size:12.5px;line-height:1.7;}
   .warns li{color:var(--warn);} .warns li.bad{color:var(--bad);font-weight:700;}
@@ -118,6 +132,7 @@
     </div>
   </div>
   <div class="photos" id="photos"></div>
+  <div class="ngbox" id="ngHost"></div>
 </div>
 
 <div class="box">
@@ -225,6 +240,7 @@
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
 <script src="assets/libs/jpeg-encoder-0.4.4.js"></script>
 <script src="assets/photo-auto/templates.js"></script>
+<script src="assets/photo-auto/namegen.js"></script>
 <script>
 (function(){
 'use strict';
@@ -303,6 +319,15 @@ function applyAuto(){
   mark();
 }
 $('pname').addEventListener('input',applyAuto);
+if(window.NameGen){
+  NameGen.init({
+    photos:function(){ return state.photos; },
+    pname:function(){ return $('pname').value; },
+    parsed:function(){ return parseName($('pname').value); },
+    setPname:function(v){ $('pname').value=v; $('pname').dispatchEvent(new Event('input')); }
+  });
+  $('pname').addEventListener('input',function(){ NameGen.prefill(); });
+}
 
 /* ---------- 엑셀 ---------- */
 function readXlsx(file){
