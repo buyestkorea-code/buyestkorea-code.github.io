@@ -63,9 +63,9 @@ function render(res){
     el.innerHTML='<div class="ngtag">'+esc(TAGS[i]||('후보 '+(i+1)))+'</div>'+
       '<div class="ngname" data-full="'+esc(full)+'">'+tokensHtml(full)+'</div>'+
       (c.note?'<div class="hint ngnote">'+esc(c.note)+'</div>':'')+
-      '<div class="row"><button type="button" class="btn btn-pri btn-sm" data-use="'+i+'">이 이름 사용</button>'+
-      '<button type="button" class="btn btn-out btn-sm" data-edit="'+i+'">수정해서 사용</button>'+
-      '<button type="button" class="btn btn-out btn-sm" data-copy="'+i+'">복사</button></div>';
+      '<div class="row">'+(ctx.setPname?'<button type="button" class="btn btn-pri btn-sm" data-use="'+i+'">이 이름 사용</button>'+
+      '<button type="button" class="btn btn-out btn-sm" data-edit="'+i+'">수정해서 사용</button>':'')+
+      '<button type="button" class="btn '+(ctx.setPname?'btn-out':'btn-pri')+' btn-sm" data-copy="'+i+'">복사</button></div>';
     box.appendChild(el);
   });
   box._cands=res.candidates;

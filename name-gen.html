@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 상품명 생성</title>
+<style>
+  @import url("assets/fonts/pretendard/pretendard.css");
+  :root{
+    --bg:#f6f6f4; --card:#fff; --ink:#15171a; --sub:#6a6f76; --line:#e4e4e0;
+    --pri:#15171a; --ok:#0f766e; --okbg:#ecf8f5; --warn:#a15c07; --warnbg:#fdf3e0; --bad:#b42318; --badbg:#fdeceb; --blue:#1d4ed8; --bluebg:#eef3ff;
+    --font:"Pretendard Variable","Pretendard",-apple-system,"Malgun Gothic",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);margin:0;padding:16px;font-size:14px;}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
+  h1 .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--warnbg);color:var(--warn);}
+  .lead{color:var(--sub);font-size:13px;margin:0 0 14px;line-height:1.6;}
+  .btn{font:600 14px var(--font);padding:9px 15px;border:1px solid transparent;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .btn-pri{background:var(--pri);color:#fff;} .btn-out{background:#fff;color:var(--ink);border-color:var(--line);}
+  .btn-sm{padding:5px 9px;font-size:12px;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  input[type=text]{font:14px var(--font);padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%;}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;max-width:980px;}
+  .hint{font-size:12px;color:var(--sub);line-height:1.55;}
+  .drop{border:2px dashed #c9c9c2;border-radius:12px;padding:14px;text-align:center;color:var(--sub);cursor:pointer;background:#fff;}
+  .drop.on{border-color:var(--blue);background:var(--bluebg);}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .nghead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px;} .nghead b{font-size:14px;}
+  .ngform{display:grid;grid-template-columns:1.1fr .7fr 1.6fr .9fr;gap:8px 10px;} @media(max-width:700px){.ngform{grid-template-columns:1fr 1fr;}}
+  .ngform label{display:block;font-size:12px;color:var(--sub);margin-bottom:3px;} .ngform .wide{grid-column:1/-1;}
+  .ngform select{width:100%;font:14px var(--font);padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);}
+  .nglist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-top:12px;}
+  .nglist:empty{display:none;}
+  .ngcard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:7px;}
+  .ngcard.on{border-color:var(--ok);box-shadow:0 0 0 2px var(--okbg);}
+  .ngtag{font-size:11px;font-weight:700;color:var(--blue);letter-spacing:.02em;}
+  .ngname{font-size:15px;font-weight:600;line-height:1.5;word-break:keep-all;}
+  .ngname .ngb,.ngname .ngs,.ngname .ngk{font-weight:500;color:var(--sub);} .ngname .ngk{font-family:ui-monospace,Consolas,monospace;font-size:13px;}
+  .ngname .ngc{color:var(--blue);} .ngnote{margin:0;}
+  .ngdrop{padding:14px;} .ngthumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;} .ngthumbs:empty{display:none;}
+  .ngth{position:relative;width:72px;height:72px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#f0f0ee;}
+  .ngth img{width:100%;height:100%;object-fit:contain;} .ngth.skip{opacity:.45;}
+  .ngth .x{position:absolute;top:2px;right:2px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;padding:0;}
+  .ngth span{position:absolute;bottom:0;left:0;right:0;font-size:10px;text-align:center;background:rgba(0,0,0,.6);color:#fff;}
+</style>
+</head>
+<body>
+<h1>AI 상품명 생성 <span class="badge">TEST</span></h1>
+<p class="lead">상품 사진을 올리고 버튼을 누르면 바이스트 메인·키즈 사이트의 이름 형식에 맞춘 상품명 후보 4개를 만들어 줍니다. 마음에 드는 것을 복사해서 쓰고, 브랜드·색상 등 틀린 부분은 직접 고치세요. 사진은 이름을 만드는 데만 쓰이고 저장되지 않습니다.</p>
+<div class="box"><div id="ngHost"></div></div>
+<script src="assets/photo-auto/namegen.js"></script>
+<script>
+NameGen.init({
+  photos:function(){ return []; },
+  pname:function(){ return ''; },
+  parsed:function(){ return {brandKo:'',code:''}; }
+  /* setPname 없음 → 후보에는 '복사' 버튼만 나온다 */
+});
+</script>
+</body>
+</html>
