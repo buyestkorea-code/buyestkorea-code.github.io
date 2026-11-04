@@ -1024,10 +1024,6 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4-8-4Z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg></span>
         이카운트재고조회<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
-      <button class="nav-item" data-nav="stockMismatch">
-        <span class="ic"><svg viewBox="0 0 24 24"><path d="M8 4 4 8l4 4"/><path d="M4 8h9"/><path d="m16 20 4-4-4-4"/><path d="M20 16h-9"/></svg></span>
-        이카운트-사이트 재고 불일치 확인<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
-      </button>
       <button class="nav-item" data-nav="listCheck">
         <span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.2-4.2"/><path d="M8.5 11h5M11 8.5v5"/></svg></span>
         품번 리스트 재고확인<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
@@ -1431,11 +1427,6 @@
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">시험판</span></div>
             <h3>물류팀 시즌체크</h3>
             <p>1차 가공한 재고추가 엑셀을 올리면 품번을 이카운트·바이스트 DB에서 찾아 시즌·판매중상품명·최근 3개월 입고내역을 채워 줍니다. 작업여부는 확인하며 직접 적도록 비워 둡니다.</p>
-          </button>
-          <button class="tool-card" data-nav="stockMismatch">
-            <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
-            <h3>이카운트-사이트 재고 불일치 확인</h3>
-            <p>매핑된 이카운트코드 전체를 실제 이카운트 재고와 대조해서, 사이트 품절/판매 상태가 어긋난 것만 찾아줍니다. 자동수정은 안 하고 목록만 뽑아요.</p>
           </button>
           <button class="tool-card" data-nav="icmTest">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
@@ -1988,10 +1979,6 @@
 
       <section data-view="listCheck">
         <iframe data-src="list-check.html" title="품번 리스트 재고확인" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
-      </section>
-
-      <section data-view="stockMismatch">
-        <iframe data-src="stock-mismatch.html" title="이카운트-사이트 재고 불일치 확인" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
       <section data-view="kreamSoldOut">
