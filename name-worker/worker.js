@@ -3,7 +3,8 @@
  *
  * 상품 사진 1~3장 + 힌트(브랜드·시즌·품번·성인/키즈) → 바이스트 상품명 후보 4개.
  * 학습자료(namebook.json) = 메인·키즈 사이트의 실제 상품명 2만 3천여 개에서 뽑은 어휘·브랜드별 작명 예시.
- * 키는 이 Worker 의 비밀값에만 둔다 (화면 코드·저장소·채팅에 쓰지 말 것):  npx wrangler secret put GEMINI_API_KEY
+ * 키는 이 Worker 의 비밀값에만 둔다 (화면 코드·저장소·채팅에 쓰지 말 것):  npx wrangler secret put GROQ_API_KEY  /  GEMINI_API_KEY
+ * AI 는 PROVIDERS(기본 "groq,gemini") 순서대로 시도하고, 붐비거나 막히면 다음 AI 로 자동으로 넘어간다.
  *
  *   GET  /api/health    설정 상태 (키가 있는지 여부만)
  *   POST /api/names     { images:[dataURL...], brand, season, code, kind:"auto|adult|kids", hint }  →  { candidates:[{name, note}], usage }
@@ -77,11 +78,12 @@ function brandProfile(book, brand) {
 }
 
 // ── 지시문 (모든 요청에 같은 내용 → 캐시) ───────────────
-function systemPrompt(book) {
-  const colors = book.colors.map((c) => c[0]).join(", ");
-  const items = book.items.map((c) => c[0]).join(", ");
-  const mods = book.mods.map((c) => c[0]).join(", ");
-  const ex = (s) => book.examples.filter((e) => e.s === s).map((e) => e.n).join("\n");
+// compact: 한 번에 보낼 수 있는 글자 수가 작은 무료 AI(Groq)용으로 어휘·예시를 줄인 지시문
+function systemPrompt(book, compact) {
+  const colors = book.colors.slice(0, compact ? 50 : 999).map((c) => c[0]).join(", ");
+  const items = book.items.slice(0, compact ? 90 : 999).map((c) => c[0]).join(", ");
+  const mods = book.mods.slice(0, compact ? 70 : 999).map((c) => c[0]).join(", ");
+  const ex = (s) => book.examples.filter((e) => e.s === s).slice(0, compact ? 45 : 999).map((e) => e.n).join("\n");
   return `당신은 해외 명품·디자이너 브랜드 병행수입 쇼핑몰 "바이스트(BUYEST)"와 키즈 사이트의 상품명 작성자입니다.
 상품 사진을 보고, 이 쇼핑몰의 기존 상품명(총 ${book.total.toLocaleString()}개, 메인 ${book.main.toLocaleString()} · 키즈 ${book.kids.toLocaleString()})과 똑같은 문법으로 상품명 후보 4개를 만듭니다.
 
@@ -124,12 +126,70 @@ function parseDataUrl(u) {
   const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(typeof u === "string" ? u : "");
   if (!m) throw new HttpError(400, "사진 형식이 올바르지 않습니다 (jpg · png · webp 만 가능)");
   if (m[2].length > 2500000) throw new HttpError(400, "사진 한 장이 너무 큽니다. 더 작은 사진으로 시도해 주세요.");
-  return { inline_data: { mime_type: m[1], data: m[2] } };
+  return { mime: m[1], b64: m[2], url: u };
 }
 const clean = (s, n = 60) => String(s || "").replace(/[\r\n\t]+/g, " ").slice(0, n).trim();
+const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+
+// ── AI 서비스 호출 (각각 { text } 를 돌려주고, 실패하면 ProviderError) ─────
+class ProviderError extends Error { constructor(provider, status, message) { super(message); this.provider = provider; this.status = status; } }
+
+async function callGemini(env, system, userText, images) {
+  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
+  const payload = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts: [...images.map((i) => ({ inline_data: { mime_type: i.mime, data: i.b64 } })), { text: userText }] }],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 4096, responseMimeType: "application/json" },
+  };
+  let r, d;
+  for (let attempt = 0; attempt < 2; attempt++) { // 일시 과부하는 한 번만 더 시도하고 다른 AI 로 넘어간다
+    if (attempt) await sleep(1200);
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": String(env.GEMINI_API_KEY).trim() }, body: JSON.stringify(payload),
+      });
+    } catch (_) { if (attempt < 1) continue; throw new ProviderError("Gemini", 502, "연결 실패"); }
+    d = await r.json().catch(() => ({}));
+    if (r.status !== 500 && r.status !== 503) break;
+  }
+  if (!r.ok) throw new ProviderError("Gemini", r.status, String((d && d.error && d.error.message) || "").slice(0, 140));
+  return { text: ((((d.candidates || [])[0] || {}).content || {}).parts || []).map((c) => c.text || "").join("") };
+}
+
+// Groq: OpenAI 호환 주소. 사진을 읽는 모델(기본 Llama 4 Scout)을 쓴다.
+async function callGroq(env, system, userText, images) {
+  const model = env.GROQ_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct";
+  const payload = {
+    model, temperature: 0.7, max_tokens: 1200, response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: [...images.map((i) => ({ type: "image_url", image_url: { url: i.url } })), { type: "text", text: userText }] },
+    ],
+  };
+  let r, d;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt) await sleep(1200);
+    try {
+      r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + String(env.GROQ_API_KEY).trim() }, body: JSON.stringify(payload),
+      });
+    } catch (_) { if (attempt < 1) continue; throw new ProviderError("Groq", 502, "연결 실패"); }
+    d = await r.json().catch(() => ({}));
+    if (r.status !== 500 && r.status !== 503) break;
+  }
+  if (!r.ok) throw new ProviderError("Groq", r.status, String((d && d.error && d.error.message) || "").slice(0, 140));
+  return { text: String(((((d.choices || [])[0] || {}).message) || {}).content || "") };
+}
+
+const PROVIDERS = {
+  groq: { name: "Groq", key: "GROQ_API_KEY", call: callGroq, compact: true },
+  gemini: { name: "Gemini", key: "GEMINI_API_KEY", call: callGemini, compact: false },
+};
+const providerOrder = (env) => String(env.PROVIDERS || "groq,gemini").split(",").map((s) => s.trim()).filter((k) => PROVIDERS[k] && env[PROVIDERS[k].key]);
 
 async function handleNames(request, env) {
-  if (!env.GEMINI_API_KEY) throw new HttpError(503, "AI 키가 아직 등록되지 않았습니다. 관리자에게 알려 주세요.");
+  const order = providerOrder(env);
+  if (!order.length) throw new HttpError(503, "AI 키가 아직 등록되지 않았습니다. 관리자에게 알려 주세요.");
   const user = await requireStaff(request);
   let body;
   try { body = await request.json(); } catch (_) { throw new HttpError(400, "요청 형식이 올바르지 않습니다."); }
@@ -153,44 +213,32 @@ async function handleNames(request, env) {
     if (prof.items && prof.items.length) lines.push(`이 브랜드에서 많이 파는 아이템: ${prof.items.join(", ")}`);
   }
   lines.push(`\n위 사진(${images.length}장은 같은 상품)을 보고 JSON 으로만 답하세요.`);
+  const userText = lines.join("\n");
 
-  const payload = {
-    systemInstruction: { parts: [{ text: systemPrompt(book) }] },
-    contents: [{ role: "user", parts: [...images, { text: lines.join("\n") }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 4096, responseMimeType: "application/json" },
-  };
-  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
-  // 구글이 일시적으로 붐빌 때(500·503)는 잠깐 쉬었다가 최대 4번까지 다시 시도한다
-  let r, d;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    if (attempt) await new Promise((ok) => setTimeout(ok, 1200 * attempt));
+  // 순서대로 시도: 한 곳이 붐비거나 막히면 바로 다음 AI 로 넘어간다
+  const errs = [];
+  let out = null, used = "";
+  for (const k of order) {
+    const p = PROVIDERS[k];
     try {
-      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": String(env.GEMINI_API_KEY).trim() },
-        body: JSON.stringify(payload),
-      });
-    } catch (_) { if (attempt < 3) continue; throw new HttpError(502, "AI 서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요."); }
-    d = await r.json().catch(() => ({}));
-    if (r.status !== 500 && r.status !== 503) break;
+      const res = await p.call(env, systemPrompt(book, p.compact), userText, images);
+      const m = /\{[\s\S]*\}/.exec(res.text);
+      const parsed = JSON.parse(m ? m[0] : res.text);
+      if (!Array.isArray(parsed.candidates) || !parsed.candidates.some((c) => c && c.name)) throw new ProviderError(p.name, 502, "후보 없음");
+      out = parsed; used = p.name; break;
+    } catch (e) {
+      errs.push(e instanceof ProviderError ? `${e.provider} ${e.status} ${e.message}` : `${p.name} 답변 해석 실패`);
+    }
   }
-  if (!r.ok) {
-    const msg = String((d && d.error && d.error.message) || "").slice(0, 160);
-    if (r.status === 503 || r.status === 500) throw new HttpError(503, "구글 AI가 지금 많이 붐빕니다. 자동으로 4번 다시 시도했지만 안 됐어요. 1~2분 뒤 다시 눌러 주세요.");
-    if (r.status === 400 || r.status === 401 || r.status === 403) throw new HttpError(503, `AI 키가 올바르지 않거나 권한이 없습니다. (${msg})`);
-    if (r.status === 429) throw new HttpError(429, "무료 사용량 한도에 걸렸습니다. 1분쯤 뒤 다시 시도해 주세요. (하루 한도면 내일 다시)");
-    throw new HttpError(502, `AI 요청 실패 (${r.status}) ${msg}`);
+  if (!out) {
+    const busy = errs.some((s) => / (429|500|502|503) /.test(s));
+    throw new HttpError(busy ? 503 : 502, (busy ? "AI 가 지금 붐빕니다. 잠시 뒤 다시 눌러 주세요. " : "AI 요청에 실패했습니다. ") + "(" + errs.join(" / ").slice(0, 300) + ")");
   }
-  const text = ((((d.candidates || [])[0] || {}).content || {}).parts || []).map((c) => c.text || "").join("");
-  const m = /\{[\s\S]*\}/.exec(text);
-  let out;
-  try { out = JSON.parse(m ? m[0] : text); } catch (_) { throw new HttpError(502, "AI 답변을 읽지 못했습니다. 다시 시도해 주세요."); }
-  const cands = (Array.isArray(out.candidates) ? out.candidates : [])
+  const cands = out.candidates
     .map((c) => ({ name: clean(c && c.name, 120), note: clean(c && c.note, 120) }))
     .filter((c) => c.name)
     .slice(0, 4);
-  if (!cands.length) throw new HttpError(502, "후보를 만들지 못했습니다. 다시 시도해 주세요.");
-  return json({ ok: true, item: clean(out.item, 30), color: clean(out.color, 30), candidates: cands, brandMatched: prof ? prof.name : "", usage: d.usage || null, version: VERSION });
+  return json({ ok: true, item: clean(out.item, 30), color: clean(out.color, 30), candidates: cands, brandMatched: prof ? prof.name : "", by: used, fellBack: errs.length ? errs : undefined, version: VERSION });
 }
 
 export default {
@@ -198,7 +246,7 @@ export default {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
     try {
-      if (url.pathname === "/api/health") return json({ ok: true, ready: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL, version: VERSION });
+      if (url.pathname === "/api/health") return json({ ok: true, ready: providerOrder(env).length > 0, providers: providerOrder(env), version: VERSION });
       if (url.pathname === "/api/names" && request.method === "POST") return await handleNames(request, env);
       throw new HttpError(404, "없는 주소입니다.");
     } catch (e) {
