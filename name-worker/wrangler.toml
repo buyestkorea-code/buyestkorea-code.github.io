@@ -10,7 +10,7 @@ compatibility_date = "2025-01-01"
 
 [vars]
 # 모델 이름 (바뀌면 여기만 고치면 됩니다)
-CLAUDE_MODEL = "claude-sonnet-5-5"
+GEMINI_MODEL = "gemini-2.5-flash"
 # 직원 1명 하루 생성 횟수 (KV 를 연결했을 때만 적용)
 LIMIT_PER_DAY = "150"
 # 학습자료 주소 (툴킷 사이트에 올라간 namebook.json)

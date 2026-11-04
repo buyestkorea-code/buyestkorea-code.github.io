@@ -1,14 +1,14 @@
 # 상품명 AI 자동생성 Worker (Cloudflare)
 - 화면: `../photo-auto.html` → ② 파일 → 상품 사진 목록 바로 아래 "AI 이름 자동생성" (코드: `../assets/photo-auto/namegen.js`)
 - 주소: https://buyest-namegen.buyest.workers.dev  (다르면 `namegen.js` 맨 위 `WK` 값만 바꾸면 됨)
-- 동작: 사진 1~3장(화면에서 1024px로 줄여 전송) + 브랜드·시즌·품번·사이트 구분 → Claude 비전이 후보 4개 작성. 브랜드·시즌·품번은 AI가 짓지 않고 입력칸 값을 그대로 붙인다.
+- 동작: 사진 1~3장(화면에서 1024px로 줄여 전송) + 브랜드·시즌·품번·사이트 구분 → Gemini 비전(무료 키)이 후보 4개 작성. 브랜드·시즌·품번은 AI가 짓지 않고 입력칸 값을 그대로 붙인다.
 - 학습자료: `../assets/photo-auto/namebook.json` (메인+키즈 상품명 약 2만 3천 개에서 뽑은 아이템·색상·디테일 어휘, 브랜드별 대표 예시 10개, 전체 대표 예시 347개). Worker 가 1시간마다 이 파일을 읽어 지시문에 넣는다 → 갱신해서 push 만 하면 반영.
 
 ## 배포 (PowerShell 에서 한 줄씩)
 ```powershell
 cd <저장소>\name-worker
 npx wrangler login
-npx wrangler secret put ANTHROPIC_API_KEY
+npx wrangler secret put GEMINI_API_KEY
 npx wrangler deploy
 ```
 키는 묻는 칸에만 붙여넣는다 (화면에 안 보이는 게 정상). **채팅·코드·저장소에 쓰지 말 것.**

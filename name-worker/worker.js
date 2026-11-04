@@ -3,7 +3,7 @@
  *
  * 상품 사진 1~3장 + 힌트(브랜드·시즌·품번·성인/키즈) → 바이스트 상품명 후보 4개.
  * 학습자료(namebook.json) = 메인·키즈 사이트의 실제 상품명 2만 3천여 개에서 뽑은 어휘·브랜드별 작명 예시.
- * 키는 이 Worker 의 비밀값에만 둔다 (화면 코드·저장소·채팅에 쓰지 말 것):  npx wrangler secret put ANTHROPIC_API_KEY
+ * 키는 이 Worker 의 비밀값에만 둔다 (화면 코드·저장소·채팅에 쓰지 말 것):  npx wrangler secret put GEMINI_API_KEY
  *
  *   GET  /api/health    설정 상태 (키가 있는지 여부만)
  *   POST /api/names     { images:[dataURL...], brand, season, code, kind:"auto|adult|kids", hint }  →  { candidates:[{name, note}], usage }
@@ -124,12 +124,12 @@ function parseDataUrl(u) {
   const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(typeof u === "string" ? u : "");
   if (!m) throw new HttpError(400, "사진 형식이 올바르지 않습니다 (jpg · png · webp 만 가능)");
   if (m[2].length > 2500000) throw new HttpError(400, "사진 한 장이 너무 큽니다. 더 작은 사진으로 시도해 주세요.");
-  return { type: "image", source: { type: "base64", media_type: m[1], data: m[2] } };
+  return { inline_data: { mime_type: m[1], data: m[2] } };
 }
 const clean = (s, n = 60) => String(s || "").replace(/[\r\n\t]+/g, " ").slice(0, n).trim();
 
 async function handleNames(request, env) {
-  if (!env.ANTHROPIC_API_KEY) throw new HttpError(503, "AI 키가 아직 등록되지 않았습니다. 관리자에게 알려 주세요.");
+  if (!env.GEMINI_API_KEY) throw new HttpError(503, "AI 키가 아직 등록되지 않았습니다. 관리자에게 알려 주세요.");
   const user = await requireStaff(request);
   let body;
   try { body = await request.json(); } catch (_) { throw new HttpError(400, "요청 형식이 올바르지 않습니다."); }
@@ -155,27 +155,27 @@ async function handleNames(request, env) {
   lines.push(`\n위 사진(${images.length}장은 같은 상품)을 보고 JSON 으로만 답하세요.`);
 
   const payload = {
-    model: env.CLAUDE_MODEL || "claude-sonnet-5-5",
-    max_tokens: 900,
-    system: [{ type: "text", text: systemPrompt(book), cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content: [...images, { type: "text", text: lines.join("\n") }] }],
+    systemInstruction: { parts: [{ text: systemPrompt(book) }] },
+    contents: [{ role: "user", parts: [...images, { text: lines.join("\n") }] }],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 2048, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
   };
+  const model = env.GEMINI_MODEL || "gemini-2.5-flash";
   let r;
   try {
-    r = await fetch("https://api.anthropic.com/v1/messages", {
+    r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": String(env.ANTHROPIC_API_KEY).trim(), "anthropic-version": "2023-06-01" },
+      headers: { "content-type": "application/json", "x-goog-api-key": String(env.GEMINI_API_KEY).trim() },
       body: JSON.stringify(payload),
     });
   } catch (_) { throw new HttpError(502, "AI 서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요."); }
   const d = await r.json().catch(() => ({}));
   if (!r.ok) {
     const msg = String((d && d.error && d.error.message) || "").slice(0, 160);
-    if (r.status === 401 || r.status === 403) throw new HttpError(503, `AI 키가 올바르지 않거나 권한이 없습니다. (${msg})`);
-    if (r.status === 429) throw new HttpError(429, "AI 사용량 한도에 걸렸습니다. 잠시 뒤 다시 시도해 주세요.");
+    if (r.status === 400 || r.status === 401 || r.status === 403) throw new HttpError(503, `AI 키가 올바르지 않거나 권한이 없습니다. (${msg})`);
+    if (r.status === 429) throw new HttpError(429, "무료 사용량 한도에 걸렸습니다. 1분쯤 뒤 다시 시도해 주세요. (하루 한도면 내일 다시)");
     throw new HttpError(502, `AI 요청 실패 (${r.status}) ${msg}`);
   }
-  const text = (d.content || []).map((c) => c.text || "").join("");
+  const text = ((((d.candidates || [])[0] || {}).content || {}).parts || []).map((c) => c.text || "").join("");
   const m = /\{[\s\S]*\}/.exec(text);
   let out;
   try { out = JSON.parse(m ? m[0] : text); } catch (_) { throw new HttpError(502, "AI 답변을 읽지 못했습니다. 다시 시도해 주세요."); }
@@ -192,7 +192,7 @@ export default {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
     try {
-      if (url.pathname === "/api/health") return json({ ok: true, ready: !!env.ANTHROPIC_API_KEY, model: env.CLAUDE_MODEL, version: VERSION });
+      if (url.pathname === "/api/health") return json({ ok: true, ready: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL, version: VERSION });
       if (url.pathname === "/api/names" && request.method === "POST") return await handleNames(request, env);
       throw new HttpError(404, "없는 주소입니다.");
     } catch (e) {
