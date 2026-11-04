@@ -160,17 +160,23 @@ async function handleNames(request, env) {
     generationConfig: { temperature: 0.7, maxOutputTokens: 4096, responseMimeType: "application/json" },
   };
   const model = env.GEMINI_MODEL || "gemini-3.8-flash";
-  let r;
-  try {
-    r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": String(env.GEMINI_API_KEY).trim() },
-      body: JSON.stringify(payload),
-    });
-  } catch (_) { throw new HttpError(502, "AI 서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요."); }
-  const d = await r.json().catch(() => ({}));
+  // 구글이 일시적으로 붐빌 때(500·503)는 잠깐 쉬었다가 최대 4번까지 다시 시도한다
+  let r, d;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await new Promise((ok) => setTimeout(ok, 1200 * attempt));
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": String(env.GEMINI_API_KEY).trim() },
+        body: JSON.stringify(payload),
+      });
+    } catch (_) { if (attempt < 3) continue; throw new HttpError(502, "AI 서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요."); }
+    d = await r.json().catch(() => ({}));
+    if (r.status !== 500 && r.status !== 503) break;
+  }
   if (!r.ok) {
     const msg = String((d && d.error && d.error.message) || "").slice(0, 160);
+    if (r.status === 503 || r.status === 500) throw new HttpError(503, "구글 AI가 지금 많이 붐빕니다. 자동으로 4번 다시 시도했지만 안 됐어요. 1~2분 뒤 다시 눌러 주세요.");
     if (r.status === 400 || r.status === 401 || r.status === 403) throw new HttpError(503, `AI 키가 올바르지 않거나 권한이 없습니다. (${msg})`);
     if (r.status === 429) throw new HttpError(429, "무료 사용량 한도에 걸렸습니다. 1분쯤 뒤 다시 시도해 주세요. (하루 한도면 내일 다시)");
     throw new HttpError(502, `AI 요청 실패 (${r.status}) ${msg}`);
