@@ -93,7 +93,7 @@ function generate(){
 }
 
 /* 이 박스 전용 사진 (상세페이지 만들기용 사진과 별개) */
-var own=[], autoTimer=0;
+var own=[];
 function drawThumbs(){
   var box=$('ngThumbs'); box.innerHTML='';
   own.forEach(function(f,i){
@@ -107,7 +107,6 @@ function addOwn(list){
   Array.prototype.forEach.call(list||[],function(f){ if(/^image\//.test(f.type)){ own.push(f); added++; } });
   if(!added) return;
   drawThumbs();
-  clearTimeout(autoTimer); autoTimer=setTimeout(generate,700);
 }
 
 function use(i,edit){
@@ -123,8 +122,8 @@ function init(c){
   ctx=c;
   var host=$('ngHost'); if(!host) return;
   host.innerHTML=
-    '<div class="nghead"><b>AI 이름 자동생성</b><span class="hint">메인·키즈 사이트 상품 약 2만 3천 개의 이름 문법을 학습 · 사진만 올리면 후보 4개</span></div>'+
-    '<div class="drop ngdrop" id="ngDrop">상품 사진을 끌어놓거나 클릭 (붙여넣기도 가능 · 최대 3장 분석)<div class="hint">여기에 올린 사진은 이름 만들기에만 쓰이고, 상세페이지 만들기와는 무관합니다. 올리면 바로 이름을 만듭니다.</div></div>'+
+    '<div class="nghead"><b>AI 이름 자동생성</b><span class="hint">메인·키즈 사이트 상품 약 2만 3천 개의 이름 문법을 학습 · 사진을 올리고 버튼을 누르면 후보 4개</span></div>'+
+    '<div class="drop ngdrop" id="ngDrop">상품 사진을 끌어놓거나 클릭 (붙여넣기도 가능 · 최대 3장 분석)<div class="hint">여기에 올린 사진은 이름 만들기에만 쓰이고, 상세페이지 만들기와는 무관합니다. 올린 뒤 아래 AI로 이름 만들기 버튼을 누르면 만듭니다.</div></div>'+
     '<input type="file" id="ngFile" accept="image/*" multiple hidden>'+
     '<div class="ngthumbs" id="ngThumbs"></div>'+
     '<div class="hint" style="margin:8px 0 4px">아래는 모두 선택 사항입니다. 비워 두면 사진만 보고 만들고, 브랜드·시즌·품번을 넣으면 이름 앞뒤에 붙여 줍니다.</div>'+

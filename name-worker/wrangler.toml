@@ -15,3 +15,7 @@ GEMINI_MODEL = "gemini-3.8-flash"
 LIMIT_PER_DAY = "150"
 # 학습자료 주소 (툴킷 사이트에 올라간 namebook.json)
 NAMEBOOK_URL = "https://buyestkorea-code.github.io/assets/photo-auto/namebook.json"
+
+# 구글 Gemini 는 일부 지역(예: 홍콩)에서 오는 호출을 막는다 → Worker 를 미국에서 실행
+[placement]
+region = "aws:us-east-1"
