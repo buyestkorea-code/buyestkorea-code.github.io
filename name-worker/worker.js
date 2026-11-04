@@ -80,10 +80,10 @@ function brandProfile(book, brand) {
 // ── 지시문 (모든 요청에 같은 내용 → 캐시) ───────────────
 // compact: 한 번에 보낼 수 있는 글자 수가 작은 무료 AI(Groq)용으로 어휘·예시를 줄인 지시문
 function systemPrompt(book, compact) {
-  const colors = book.colors.slice(0, compact ? 50 : 999).map((c) => c[0]).join(", ");
-  const items = book.items.slice(0, compact ? 90 : 999).map((c) => c[0]).join(", ");
-  const mods = book.mods.slice(0, compact ? 70 : 999).map((c) => c[0]).join(", ");
-  const ex = (s) => book.examples.filter((e) => e.s === s).slice(0, compact ? 45 : 999).map((e) => e.n).join("\n");
+  const colors = book.colors.slice(0, compact ? 30 : 999).map((c) => c[0]).join(", ");
+  const items = book.items.slice(0, compact ? 50 : 999).map((c) => c[0]).join(", ");
+  const mods = book.mods.slice(0, compact ? 40 : 999).map((c) => c[0]).join(", ");
+  const ex = (s) => book.examples.filter((e) => e.s === s).slice(0, compact ? 14 : 999).map((e) => e.n).join("\n");
   return `당신은 해외 명품·디자이너 브랜드 병행수입 쇼핑몰 "바이스트(BUYEST)"와 키즈 사이트의 상품명 작성자입니다.
 상품 사진을 보고, 이 쇼핑몰의 기존 상품명(총 ${book.total.toLocaleString()}개, 메인 ${book.main.toLocaleString()} · 키즈 ${book.kids.toLocaleString()})과 똑같은 문법으로 상품명 후보 4개를 만듭니다.
 
@@ -163,7 +163,7 @@ async function callGroq(env, system, userText, images) {
     model, temperature: 0.7, max_tokens: 6000, response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
-      { role: "user", content: [...images.map((i) => ({ type: "image_url", image_url: { url: i.url } })), { type: "text", text: userText }] },
+      { role: "user", content: [...images.slice(0, 1).map((i) => ({ type: "image_url", image_url: { url: i.url } })), { type: "text", text: userText }] },
     ],
   };
   let r, d;
@@ -177,7 +177,7 @@ async function callGroq(env, system, userText, images) {
     d = await r.json().catch(() => ({}));
     if (r.status !== 500 && r.status !== 503) break;
   }
-  if (!r.ok) throw new ProviderError("Groq", r.status, String((d && d.error && d.error.message) || "").slice(0, 140));
+  if (!r.ok) throw new ProviderError("Groq", r.status, String((d && d.error && d.error.message) || "").slice(0, 320));
   return { text: String(((((d.choices || [])[0] || {}).message) || {}).content || "") };
 }
 
