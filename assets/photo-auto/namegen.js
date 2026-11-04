@@ -8,7 +8,7 @@
 'use strict';
 var WK='https://buyest-namegen.buyest.workers.dev';
 var TAGS=['간결형','표준형','디테일형','대안 표기'];
-var ctx=null, busy=false, userEdited={brand:false,season:false,code:false}, lastReq=0;
+var lastRes=null, ctx=null, busy=false, userEdited={brand:false,season:false,code:false}, lastReq=0;
 
 function $(id){ return document.getElementById(id); }
 function auth(){ try{ var a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return a&&a.id&&a.pass?a:null; }catch(e){ return null; } }
@@ -68,7 +68,18 @@ function render(res){
       '<button type="button" class="btn '+(ctx.setPname?'btn-out':'btn-pri')+' btn-sm" data-copy="'+i+'">복사</button></div>';
     box.appendChild(el);
   });
-  box._cands=res.candidates;
+  box._cands=res.candidates; lastRes=res;
+  var lz=$('ngLens'), L=res.lens||{};
+  if(L.used){
+    lz.innerHTML='<details><summary><b>구글 이미지 검색</b>에서 다른 판매처 이름 '+L.total+'개를 찾아 참고했습니다 (한글 '+L.korean+'개) — 눌러서 보기</summary><ul style="margin:6px 0 0;padding-left:18px">'+
+      L.refs.map(function(x){ return '<li>'+(x.link?'<a href="'+esc(x.link)+'" target="_blank" rel="noopener">'+esc(x.title)+'</a>':esc(x.title))+(x.source?' <span>· '+esc(x.source)+'</span>':'')+'</li>'; }).join('')+'</ul></details>';
+  }else if($('ng_lens').checked){
+    lz.innerHTML='<span style="color:var(--warn)">구글 이미지 검색을 쓰지 못했습니다'+(L.why?' ('+esc(L.why)+')':'')+' → 사진만 보고 만들었습니다.</span>';
+  }else lz.innerHTML='';
+  if(res.codeGuess && !$('ng_code').value.trim()){
+    lz.innerHTML+=' <div style="margin-top:6px">참고 이름에서 찾은 품번 후보: <b>'+esc(res.codeGuess)+'</b> <span>(확인 필요)</span> <button type="button" class="btn btn-out btn-sm" id="ngFillCode">품번칸에 넣기</button></div>';
+    var fb=$('ngFillCode'); if(fb) fb.addEventListener('click',function(){ $('ng_code').value=res.codeGuess; userEdited.code=true; render(lastRes); });
+  }
   var meta=[]; if(res.item) meta.push('아이템 '+res.item); if(res.color) meta.push('색상 '+res.color);
   meta.push(res.brandMatched?('<b>'+esc(res.brandMatched)+'</b> 브랜드 작명 예시 반영'):'브랜드 예시 없음 — 전체 상품명 기준');
   $('ngMsg').innerHTML='AI가 읽은 값: '+meta.join(' · ')+' <span class="hint">· 브랜드·시즌·품번은 위 칸 그대로 붙였습니다</span>';
@@ -83,7 +94,7 @@ function generate(){
   var req=++lastReq; setBusy(true,'사진 '+Math.min(3,photos.length)+'장을 읽는 중…');
   Promise.all(photos.slice(0,3).map(function(p){ return toSmallJpeg(p.file,1024); })).then(function(imgs){
     return fetch(WK+'/api/names',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':a.id,'X-Studio-Pass':a.pass},
-      body:JSON.stringify({images:imgs,brand:$('ng_brand').value.trim(),season:$('ng_season').value.trim(),code:$('ng_code').value.trim(),kind:$('ng_kind').value,hint:$('ng_hint').value.trim()})});
+      body:JSON.stringify({images:imgs,brand:$('ng_brand').value.trim(),season:$('ng_season').value.trim(),code:$('ng_code').value.trim(),kind:$('ng_kind').value,hint:$('ng_hint').value.trim(),lens:$('ng_lens').checked})});
   }).then(function(r){ return r.json().catch(function(){ return {ok:false,error:'서버 응답을 읽지 못했습니다.'}; }); })
   .then(function(res){
     if(req!==lastReq) return;
@@ -133,8 +144,10 @@ function init(c){
       '<div><label>품번</label><input type="text" id="ng_code" placeholder="예) L1S15 4100106 S0183"></div>'+
       '<div><label>사이트</label><select id="ng_kind"><option value="auto">사진으로 판단</option><option value="adult">메인 (성인)</option><option value="kids">키즈</option></select></div>'+
       '<div class="wide"><label>메모 <span class="hint">(선택 · AI가 사진만으로 모르는 것: 소재, 모델명, 라인 등)</span></label><input type="text" id="ng_hint" placeholder="예) 모델명 란스 LANS, 경량 나일론"></div>'+
+      '<div class="wide"><label style="display:flex;gap:8px;align-items:center;cursor:pointer;margin:0"><input type="checkbox" id="ng_lens" checked> 구글 이미지 검색으로 다른 판매처의 상품명을 먼저 찾아 참고 <span class="hint">(정확도↑ · 몇 초 더 걸림 · 못 찾으면 사진만 보고 만듭니다)</span></label></div>'+
     '</div>'+
     '<div class="row" style="margin-top:10px"><button type="button" class="btn btn-pri" id="ngGo">AI로 이름 만들기</button><span id="ngMsg" class="hint"></span></div>'+
+    '<div id="ngLens" class="hint" style="margin-top:8px"></div>'+
     '<div id="ngList" class="nglist"></div>';
   ['brand','season','code'].forEach(function(k){ $('ng_'+k).addEventListener('input',function(){ userEdited[k]=true; }); });
   $('ngGo').addEventListener('click',generate);

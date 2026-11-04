@@ -3,10 +3,10 @@ name = "buyest-namegen"
 main = "worker.js"
 compatibility_date = "2025-01-01"
 
-# (선택) 직원 1명당 하루 사용 횟수 제한을 쓰려면:  npx wrangler kv namespace create NAMEGEN_KV  → 나온 id 를 넣고 주석 해제
-# [[kv_namespaces]]
-# binding = "NAMEGEN_KV"
-# id = "여기에_KV_id"
+# 임시 저장소(KV): 구글 이미지 검색에 넘길 사진을 10분만 맡겨 두는 곳 + 직원별 하루 사용 횟수 기록.
+# id 를 안 적으면 `npx wrangler deploy` 가 알아서 만들어 연결한다 (안 되면: npx wrangler kv namespace create NAMEGEN_KV → 나온 id 를 아래에 추가)
+[[kv_namespaces]]
+binding = "NAMEGEN_KV"
 
 [vars]
 # 모델 이름 (바뀌면 여기만 고치면 됩니다)

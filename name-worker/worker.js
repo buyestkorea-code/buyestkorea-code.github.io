@@ -116,10 +116,11 @@ ${ex("k")}
 1. 사진에서 아이템 종류, 색상, 눈에 보이는 디테일(로고 위치·패치·자수·소재감·실루엣)을 판단한다. 위 어휘 목록에 있는 단어를 우선 쓴다.
 2. 후보 4개는 서로 달라야 한다: ① 간결형(디테일 1~2개) ② 표준형(디테일 2~3개, 가장 흔한 쇼핑몰 문법) ③ 디테일 강조형 ④ 대안 표현형(같은 아이템의 다른 표기: 예 "자켓/재킷", "후드티/후드 티셔츠" 중 이 쇼핑몰에서 더 흔한 쪽을 우선).
 3. 사진으로 확신할 수 없는 정보(소재, 모델명, 정확한 색상명)는 단정하지 말고, note 에 "확인 필요: …"로 짧게 적는다.
-4. 같은 브랜드의 예시가 주어지면 그 브랜드의 작명 습관(디테일 단어, 모델명 표기법)을 따른다.
+4. "다른 판매처의 상품명"이 참고로 주어지면 베끼지 말고 공통 정보(모델명·소재·디테일·품번)만 활용한다. 참고가 없으면 사진만 보고 만든다.
+5. 같은 브랜드의 예시가 주어지면 그 브랜드의 작명 습관(디테일 단어, 모델명 표기법)을 따른다.
 
 ## 출력 형식 (이것만 출력, 설명 금지)
-{"item":"판단한 아이템","color":"판단한 색상","candidates":[{"name":"시즌 … 색상","note":"한 줄 메모(없으면 빈 문자열)"},{...},{...},{...}]}`;
+{"item":"판단한 아이템","color":"판단한 색상","codeGuess":"참고 이름에서 찾은 품번 또는 빈 문자열","candidates":[{"name":"시즌 … 색상","note":"한 줄 메모(없으면 빈 문자열)"},{...},{...},{...}]}`;
 }
 
 function parseDataUrl(u) {
@@ -187,6 +188,58 @@ const PROVIDERS = {
 };
 const providerOrder = (env) => String(env.PROVIDERS || "groq,gemini").split(",").map((s) => s.trim()).filter((k) => PROVIDERS[k] && env[PROVIDERS[k].key]);
 
+// ── 구글 이미지 검색 (Serper Lens) ──────────────────────
+// 구글 이미지 검색은 사진의 "인터넷 주소"가 필요하다 → 올린 사진을 KV 에 10분만 맡겨 두고 /i/<id> 주소로 열어 준다 (id 는 추측 불가능한 24자리).
+const hasHangul = (s) => /[가-힣]/.test(s);
+const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (_) { return ""; } };
+
+async function serveTempImage(env, id) {
+  if (!env.NAMEGEN_KV || !/^[0-9a-f]{24}$/.test(id)) return new Response("not found", { status: 404 });
+  const hit = await env.NAMEGEN_KV.getWithMetadata("img:" + id, "arrayBuffer");
+  if (!hit || !hit.value) return new Response("not found", { status: 404 });
+  return new Response(hit.value, { headers: { "Content-Type": (hit.metadata && hit.metadata.type) || "image/jpeg", "Cache-Control": "private, max-age=600" } });
+}
+
+// 결과: { used, refs:[{title,source,link}], error? } — 실패해도 예외를 던지지 않고 사유만 돌려준다 (그러면 사진만으로 만든다)
+async function runLens(env, request, dataUrl) {
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!m) return { used: false, error: "사진 형식" };
+  const id = hex(crypto.getRandomValues(new Uint8Array(12)));
+  const key = "img:" + id;
+  try {
+    const bytes = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0));
+    await env.NAMEGEN_KV.put(key, bytes, { expirationTtl: 600, metadata: { type: m[1] } });
+    const imgUrl = new URL(request.url).origin + "/i/" + id;
+    const r = await fetch("https://google.serper.dev/lens", {
+      method: "POST",
+      headers: { "X-API-KEY": String(env.SERPER_KEY).trim(), "Content-Type": "application/json" },
+      body: JSON.stringify({ url: imgUrl, gl: "kr", hl: "ko" }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return { used: false, error: `검색 서비스 ${r.status} ${String((d && (d.message || d.error)) || "").slice(0, 100)}` };
+    // 응답 안의 목록(organic·visual_matches·products …)에서 title 이 있는 항목을 모두 모은다
+    const seen = new Set(), all = [];
+    for (const v of Object.values(d || {})) {
+      if (!Array.isArray(v)) continue;
+      for (const it of v) {
+        if (!it || typeof it.title !== "string") continue;
+        const title = it.title.replace(/\s+/g, " ").trim();
+        if (title.length < 4 || seen.has(title)) continue;
+        seen.add(title);
+        const link = typeof it.link === "string" ? it.link : (typeof it.url === "string" ? it.url : "");
+        all.push({ title: title.slice(0, 120), source: String(it.source || hostOf(link)).slice(0, 40), link: link.slice(0, 300) });
+      }
+    }
+    const ko = all.filter((x) => hasHangul(x.title)), other = all.filter((x) => !hasHangul(x.title));
+    const refs = [...ko.slice(0, 10), ...other.slice(0, 4)];
+    return { used: refs.length > 0, refs, total: all.length, korean: ko.length, error: refs.length ? undefined : "비슷한 상품을 찾지 못함" };
+  } catch (e) {
+    return { used: false, error: "이미지 검색 실패: " + String((e && e.message) || e).slice(0, 80) };
+  } finally {
+    try { await env.NAMEGEN_KV.delete(key); } catch (_) { /* 10분 뒤 자동 삭제 */ }
+  }
+}
+
 async function handleNames(request, env) {
   const order = providerOrder(env);
   if (!order.length) throw new HttpError(503, "AI 키가 아직 등록되지 않았습니다. 관리자에게 알려 주세요.");
@@ -213,6 +266,17 @@ async function handleNames(request, env) {
     if (prof.items && prof.items.length) lines.push(`이 브랜드에서 많이 파는 아이템: ${prof.items.join(", ")}`);
   }
   lines.push(`\n위 사진(${images.length}장은 같은 상품)을 보고 JSON 으로만 답하세요.`);
+  // 구글 이미지 검색 (켜져 있고 검색 키·임시 저장소가 있을 때만). 실패해도 사진만으로 계속한다.
+  let lens = { used: false };
+  if (body.lens !== false) {
+    if (!env.SERPER_KEY) lens = { used: false, error: "검색 키 미등록" };
+    else if (!env.NAMEGEN_KV) lens = { used: false, error: "임시 저장소 미연결" };
+    else lens = await runLens(env, request, imgs[0]);
+  }
+  if (lens.used) {
+    lines.push("\n[구글 이미지 검색으로 찾은 다른 판매처의 상품명 — 참고용]\n" + lens.refs.slice(0, 12).map((x) => "- " + x.title + (x.source ? " (" + x.source + ")" : "")).join("\n"));
+    lines.push("위 이름을 그대로 베끼지 말고, 여러 곳에 공통으로 나오는 모델명·소재·디테일·품번만 뽑아 바이스트 문법으로 새로 쓰세요. 사진과 다르면 사진을 믿으세요. 같은 품번처럼 보이는 문자열이 여러 곳에서 반복되면 codeGuess 에 적고, 확실치 않으면 빈 문자열로 두세요.");
+  }
   const userText = lines.join("\n");
 
   // 순서대로 시도: 한 곳이 붐비거나 막히면 바로 다음 AI 로 넘어간다
@@ -239,7 +303,7 @@ async function handleNames(request, env) {
     .map((c) => ({ name: clean(c && c.name, 120), note: clean(c && c.note, 120) }))
     .filter((c) => c.name)
     .slice(0, 4);
-  return json({ ok: true, item: clean(out.item, 30), color: clean(out.color, 30), candidates: cands, brandMatched: prof ? prof.name : "", by: used, fellBack: errs.length ? errs : undefined, version: VERSION });
+  return json({ ok: true, item: clean(out.item, 30), color: clean(out.color, 30), candidates: cands, brandMatched: prof ? prof.name : "", by: used, fellBack: errs.length ? errs : undefined, codeGuess: lens.used ? clean(out.codeGuess, 60) : "", lens: lens.used ? { used: true, total: lens.total, korean: lens.korean, refs: lens.refs.slice(0, 8) } : { used: false, why: lens.error || "" }, version: VERSION });
 }
 
 export default {
@@ -248,6 +312,7 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
     try {
       if (url.pathname === "/api/health") return json({ ok: true, ready: providerOrder(env).length > 0, providers: providerOrder(env), version: VERSION });
+      if (request.method === "GET" && url.pathname.startsWith("/i/")) return await serveTempImage(env, url.pathname.slice(3));
       if (url.pathname === "/api/names" && request.method === "POST") return await handleNames(request, env);
       throw new HttpError(404, "없는 주소입니다.");
     } catch (e) {
