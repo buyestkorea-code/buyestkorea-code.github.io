@@ -12,7 +12,7 @@ const BUDGET = 44;          // 요청 1건당 외부 호출 상한(무료 플랜
 const FETCH_TIMEOUT = 9000; // 외부 사이트 한 번 기다리는 최대 시간(ms)
 
 // 2차 검색에서 제외: 한국 사이트·개인 판매자 마켓·SNS·검색엔진·위키 등
-const BLOCK_WORDS = /(naver|coupang|11st|gmarket|auction\.co|danawa|kream|musinsa|29cm|wconcept|ssfshop|lotte|shinsegae|buyma|amazon|ebay|aliexpress|temu|etsy|poshmark|depop|vestiaire|pinterest|facebook|instagram|youtube|tiktok|reddit|twitter|wikipedia|alibaba|dhgate|taobao|rakuten|rakuma|fril|mercari|yahoo|shopee|lyst|grailed|buyest|feelway|xiaohongshu|tmall|qoo10|carousell|wish\.com|trenbe\.kr)/i;
+const BLOCK_WORDS = /(naver|coupang|11st|gmarket|auction\.co|danawa|kream|musinsa|29cm|wconcept|ssfshop|lotte|shinsegae|buyma|amazon|ebay|aliexpress|temu|etsy|poshmark|depop|vestiaire|pinterest|facebook|instagram|youtube|tiktok|reddit|twitter|wikipedia|alibaba|dhgate|taobao|rakuten|rakuma|fril|mercari|yahoo|shopee|lyst|grailed|buyest|feelway|xiaohongshu|tmall|qoo10|carousell|wish\.com|trenbe|reversible|eraldo|farfetch)/i;
 const BLOCK_EXACT = new Set(['x.com', 't.co']);
 // 브랜드 공식몰(공식 사진은 쓰지 않음)
 const OFFICIAL = /(^|\.)(gucci|prada|saintlaurent|ysl|burberry|moncler|stoneisland|canadagoose|dolcegabbana|versace|fendi|balenciaga|bottegaveneta|loewe|dior|chanel|hermes|louisvuitton|givenchy|valentino|ferragamo|tods|furla|armani|msgm|moschino|golden-goose|goldengoose|palmangels|off---white|maisonmargiela|jilsander|acnestudios|maxmara|marni|miumiu|etro|lanvin|celine|apc|ganni|stellamccartney|viviennewestwood|nike|adidas|newbalance|puma|asics|converse|vans|ugg|birkenstock|gfore|herno|amiparis|isabelmarant|pucci|isseymiyake|mcmworldwide|thombrowne|chloe|tory-?burch|toryburch|kongessloejd|kongesslojd)\./i;
