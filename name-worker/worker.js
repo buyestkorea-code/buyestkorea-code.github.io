@@ -140,7 +140,7 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 class ProviderError extends Error { constructor(provider, status, message) { super(message); this.provider = provider; this.status = status; } }
 
 async function callGemini(env, system, userText, images, opts = {}) {
-  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
+  const model = opts.model || env.GEMINI_MODEL || "gemini-3.8-flash";
   const payload = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [...images.map((i) => ({ inline_data: { mime_type: i.mime, data: i.b64 } })), { text: userText }] }],
@@ -323,17 +323,19 @@ const PROMO_SYSTEM = `당신은 해외 명품 병행수입 쇼핑몰의 MD 보�
 - 상품 종류는 한국 쇼핑몰 상품명에 실제로 쓰이는 한글 단어로 바꿉니다. 예) 패딩 → 패딩, 다운, 푸퍼, 퀄팅 / 코트 → 코트 / 가방 → 백, 토트, 숄더, 크로스.
 - 시즌, 세일, 11월 같은 말은 상품 종류가 아니므로 words 에 넣지 않습니다.`;
 
+const PROMO_MODELS = ["gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-flash-lite"];
+
 async function runJson(env, system, userText, opts = {}) {
   // 기획전은 답이 짧다: 출력 한도를 작게(Groq 무료 분당 출력 1000토큰 한도 회피) + 한도 넉넉한 Gemini 를 먼저 쓴다
   const base = providerOrder(env);
-  const order = opts.first ? [...base.filter((k) => k === opts.first), ...base.filter((k) => k !== opts.first)] : base;
+  const order = opts.model ? base.filter((k) => k === "gemini") : opts.first ? [...base.filter((k) => k === opts.first), ...base.filter((k) => k !== opts.first)] : base;
   if (!order.length) throw new HttpError(503, "AI 키가 아직 등록되지 않았습니다. 관리자에게 알려 주세요.");
   const errs = [];
   for (const k of order) {
     const p = PROVIDERS[k];
     if (p.compact && system.length + userText.length > 4500) { errs.push(`${p.name} 건너뜀(글이 길어 무료 한도 초과)`); continue; } // Groq 무료: 분당 입력 7000토큰
     try {
-      const res = await p.call(env, system, userText, [], { fast: true, maxTokens: p.compact ? 700 : (opts.maxTokens || 2048) });
+      const res = await p.call(env, system, userText, [], { fast: true, model: opts.model, maxTokens: p.compact ? 700 : (opts.maxTokens || 2048) });
       const txt = res.text.replace(/<think>[\s\S]*?<\/think>/g, "");
       const m = /\{[\s\S]*\}/.exec(txt);
       return { data: JSON.parse(m ? m[0] : txt), by: p.name, fellBack: errs.length ? errs : undefined };
@@ -368,10 +370,13 @@ async function handlePromo(request, env) {
       .map((x) => ({ i: Number(x && x.i), n: clean(x && x.n, 90) })).filter((x) => Number.isInteger(x.i) && x.n);
     if (!items.length) return json({ ok: true, keep: [], version: VERSION });
     const userText = `[MD 요청]\n${req}\n\n아래 상품 중 요청 취지에 맞는 상품의 번호만 고르세요. 애매하면 제외합니다.\n[상품]\n${items.map((x) => x.i + ": " + x.n).join("\n")}\n\n출력: {"keep":[번호,...]}`;
-    const { data, by, fellBack } = await runJson(env, PROMO_SYSTEM, userText, { first: "gemini" });
+    const t0 = Date.now();
+    const model = PROMO_MODELS.includes(body.model) ? body.model : undefined; // 시험용: 허용된 모델만 직접 지정 가능
+    const { data, by, fellBack } = await runJson(env, PROMO_SYSTEM, userText, { first: "gemini", model });
+    const ms = Date.now() - t0;
     const allow = new Set(items.map((x) => x.i));
     const keep = (Array.isArray(data.keep) ? data.keep : []).map(Number).filter((n) => allow.has(n));
-    return json({ ok: true, keep: [...new Set(keep)], by, fellBack, version: VERSION });
+    return json({ ok: true, keep: [...new Set(keep)], by, model: model || "", ms, fellBack, version: VERSION });
   }
   throw new HttpError(400, "mode 가 올바르지 않습니다.");
 }

@@ -81,6 +81,10 @@
     <div class="hint">개수를 정하면 위 정렬 기준으로 앞에서부터 자릅니다. "고르게 섞기"를 켜면 한 브랜드가 다 차지하지 않게 브랜드를 번갈아 뽑아요.</div></div>
   <div class="f" id="stockWrap" hidden><label class="chip" for="stockOnly" style="display:inline-flex"><input type="checkbox" id="stockOnly" checked> 현재고가 있는 상품만</label></div>
   <div class="f"><label class="chip" for="aiSel" style="display:inline-flex"><input type="checkbox" id="aiSel"> AI 정밀 선별 (상품명을 AI가 하나씩 보고 고름 · 느리지만 단어로 못 잡는 상품까지 찾음)</label>
+  <div class="f" id="modelBox" style="font-size:12px;color:var(--mute,#666)">🧪 AI 모델 시험:
+    <select id="aiModel"><option value="">현재 기본 모델</option><option value="gemini-3.8-flash">Gemini 3.8 Flash</option><option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option><option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option><option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option></select>
+    <button class="btn btn-out" type="button" id="cmpBtn" style="padding:4px 10px">두 모델 비교하기</button>
+    <span id="cmpOut"></span></div>
     <div class="hint">체크하면 선택한 브랜드의 상품(최대 450개)을 AI가 요청 취지에 맞는지 판단합니다. 체크 안 하면 위 단어로만 거릅니다.</div></div>
   <div class="row"><button class="btn btn-pri" id="pick">상품 고르기</button><button class="btn btn-out" id="dl" disabled>엑셀 다운로드</button></div>
   <div class="msg" id="msg"></div>
@@ -231,6 +235,39 @@ $('analyze').onclick=async()=>{
     showCond(rule.brands,rule.words,'',rule.audiences);
   }finally{ $('analyze').disabled=false; }
 };
+
+// 50개씩 나눠 4묶음을 동시에 AI에게 보낸다. model 을 주면 그 모델로만 (시험용). 결과: {keep:Set, ms, model}
+async function aiSelect(base,model,onProg){
+  const keep=new Set(), t0=Date.now(), req=$('req').value.trim();
+  const chunks=[]; for(let i=0;i<base.length;i+=50) chunks.push(i);
+  let done=0,next=0; onProg&&onProg(0);
+  const worker=async()=>{
+    while(next<chunks.length){
+      const i=chunks[next++];
+      const items=base.slice(i,i+50).map((r,k)=>({i:i+k,n:r.name+(r.cat?' ['+r.cat+']':'')}));
+      const d=await callAI({mode:'select',request:req,items,model:model||undefined});
+      d.keep.forEach(n=>keep.add(n)); done++; onProg&&onProg(Math.min(done*50,base.length));
+    }
+  };
+  await Promise.all([worker(),worker(),worker(),worker()]);
+  return {keep,ms:Date.now()-t0,model};
+}
+$('cmpBtn').onclick=async()=>{
+  const brands=[...$('brandChips').querySelectorAll('input:checked')].map(i=>i.value);
+  if(!brands.length||!DATA){ $('cmpOut').textContent=' 브랜드를 먼저 고르세요'; return; }
+  const o=getOpts();
+  let base=PromoPick.order(PromoPick.select(DATA.rows,brands,[],$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o.ord,false).slice(0,150);
+  const A='gemini-3.8-flash', B=$('aiModel').value&&$('aiModel').value!==A?$('aiModel').value:'gemini-3.1-flash-lite';
+  $('cmpBtn').disabled=true;
+  try{
+    $('cmpOut').textContent=` ${A} 로 ${base.length}개 보는 중...`; const ra=await aiSelect(base,A);
+    $('cmpOut').textContent=` ${B} 로 보는 중...`; const rb=await aiSelect(base,B);
+    let both=0,onlyA=[],onlyB=[]; base.forEach((r,k)=>{const a=ra.keep.has(k),b=rb.keep.has(k); if(a&&b)both++; else if(a)onlyA.push(r.name); else if(b)onlyB.push(r.name);});
+    const list=(t,a)=>a.length?`<details><summary>${t} ${a.length}개만 선택</summary><div style="max-height:160px;overflow:auto">${a.map(esc).join('<br>')}</div></details>`:'';
+    $('cmpOut').innerHTML=`<br><b>${A}</b>: ${(ra.ms/1000).toFixed(1)}초, ${ra.keep.size}개 선택 · <b>${B}</b>: ${(rb.ms/1000).toFixed(1)}초, ${rb.keep.size}개 선택 · 둘 다 고른 상품 ${both}개`+list(A,onlyA)+list(B,onlyB);
+  }catch(err){ $('cmpOut').textContent=' 오류: '+err.message; }
+  finally{ $('cmpBtn').disabled=false; }
+};
 $('pick').onclick=async()=>{
   const brands=[...$('brandChips').querySelectorAll('input:checked')].map(i=>i.value);
   const words=$('words').value.split(/[,\n]+/).map(s=>s.trim()).filter(Boolean);
@@ -242,21 +279,8 @@ $('pick').onclick=async()=>{
       const o=getOpts();
       let base=PromoPick.order(PromoPick.select(DATA.rows,brands,[],$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o.ord,false);
       let capped=false; if(base.length>450){ base=base.slice(0,450); capped=true; }
-      const keep=new Set();
-      // 50개씩 나눠 4묶음을 동시에 AI에게 보낸다 (순서대로 하는 것보다 약 3배 빠름)
-      const chunks=[]; for(let i=0;i<base.length;i+=50) chunks.push(i);
-      let done=0, next=0;
-      const upd=()=>{ $('msg').className='msg'; $('msg').textContent=`AI가 고르는 중... ${Math.min(done*50,base.length)} / ${base.length}`; };
-      upd();
-      const worker=async()=>{
-        while(next<chunks.length){
-          const i=chunks[next++];
-          const items=base.slice(i,i+50).map((r,k)=>({i:i+k,n:r.name+(r.cat?' ['+r.cat+']':'')}));
-          const d=await callAI({mode:'select',request:$('req').value.trim(),items});
-          d.keep.forEach(n=>keep.add(n)); done++; upd();
-        }
-      };
-      await Promise.all([worker(),worker(),worker(),worker()]);
+      const R=await aiSelect(base,$('aiModel').value,n=>{ $('msg').className='msg'; $('msg').textContent=`AI가 고르는 중... ${n} / ${base.length}`; });
+      const keep=R.keep; $('msg').dataset.t=`(${R.model||'기본 모델'} · ${(R.ms/1000).toFixed(1)}초) `;
       PICKED=applyOrder(base.filter((r,k)=>keep.has(k)),o);
       if(capped) $('msg').dataset.cap='브랜드 상품이 많아 앞 450개만 AI가 봤습니다. ';
     } else {
@@ -267,8 +291,8 @@ $('pick').onclick=async()=>{
     $('tb').innerHTML=PICKED.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.brand)}</td></tr>`).join('');
     $('tw').hidden=!PICKED.length;
     $('msg').className=PICKED.length?'msg ok':'msg';
-    $('msg').textContent=(PICKED.length?`✅ ${PICKED.length.toLocaleString()}개 상품을 골랐습니다.`:'조건에 맞는 상품이 없습니다.')+($('aiSel').checked?' (AI 정밀 선별) ':' ')+($('msg').dataset.cap||'');
-    $('msg').dataset.cap='';
+    $('msg').textContent=(PICKED.length?`✅ ${PICKED.length.toLocaleString()}개 상품을 골랐습니다.`:'조건에 맞는 상품이 없습니다.')+($('aiSel').checked?' (AI 정밀 선별) '+($('msg').dataset.t||''):' ')+($('msg').dataset.cap||'');
+    $('msg').dataset.cap=''; $('msg').dataset.t='';
     $('dl').disabled=!PICKED.length;
   }catch(err){ $('msg').className='msg err'; $('msg').textContent='오류: '+err.message+' — AI 정밀 선별을 끄고 다시 눌러 보세요.'; }
   finally{ $('pick').disabled=false; }
