@@ -19,6 +19,14 @@
   function cellStr(v) { return v == null ? '' : String(v).replace(/\r?\n/g, ' ').trim(); }
 
   // aoa(2차원 배열) → {rows:[{code,name,brand}], cols}
+  // 상품명 맨 앞 시즌 코드 (예: "26FW 마야 ..." → "26FW"). 없으면 빈 문자열.
+  function seasonOf(name) {
+    var m = /^\s*(\d{2})\s?(SS|FW)\b/i.exec(String(name || ''));
+    return m ? m[1] + m[2].toUpperCase() : '';
+  }
+  // 시즌 코드 → 정렬용 숫자 (26FW > 26SS > 25FW)
+  function seasonRank(s) { return s ? parseInt(s.slice(0, 2), 10) * 2 + (s.slice(2) === 'FW' ? 1 : 0) : -1; }
+
   // 두 가지 사방넷 형식을 읽는다.
   //  A) 상품대량수정: 한 줄 = 상품 1개 (품번코드, 상품명, 브랜드명 …)
   //  B) 단품대량수정: 한 줄 = 옵션(사이즈) 1개 (사방넷상품코드 "184326-0001", 상품명, 옵션상세명칭, 현재고, 제조사 …) → 상품별로 합친다
@@ -45,6 +53,7 @@
     var cStock = col(starts('현재고'));
     if (cStock < 0) cStock = col(starts('총재고수량')); // 쇼핑몰상품등록 다운로드 형식
     var cCat = col(starts('상품분류'));
+    var cReg = col(starts('등록일시'));
     var cMod = col(starts('수정일시'));
     if (cMod < 0) cMod = col(starts('등록일시'));
     var asOf = '';
@@ -62,7 +71,7 @@
       if (cMod >= 0) { var dt = cellStr(row[cMod]); if (dt > asOf && /^\d{4}-\d{2}-\d{2}/.test(dt)) asOf = dt; }
       var rec = map[code];
       if (!rec) {
-        rec = { code: code, name: name, brand: cBrand >= 0 ? cellStr(row[cBrand]) : '', stock: null, sizes: [], cat: cCat >= 0 ? cellStr(row[cCat]) : '', price: cPrice >= 0 ? parseFloat(cellStr(row[cPrice])) || 0 : 0 };
+        rec = { code: code, name: name, brand: cBrand >= 0 ? cellStr(row[cBrand]) : '', stock: null, sizes: [], reg: cReg >= 0 ? cellStr(row[cReg]) : '', season: seasonOf(name), cat: cCat >= 0 ? cellStr(row[cCat]) : '', price: cPrice >= 0 ? parseFloat(cellStr(row[cPrice])) || 0 : 0 };
         map[code] = rec; rows.push(rec);
       }
       if (cStock >= 0) {
@@ -110,11 +119,12 @@
   }
 
   // audiences: ['여성','남성','아동'] 중 허용할 대상 (상품분류 맨 앞 단어 기준). 비어 있거나 분류가 없으면 거르지 않는다.
-  function select(rows, brands, words, inStockOnly, audiences) {
+  function select(rows, brands, words, inStockOnly, audiences, seasons) {
     var bset = {};
     brands.forEach(function (b) { bset[b] = true; });
     return rows.filter(function (r) {
       if (inStockOnly && !(r.stock > 0)) return false;
+      if (seasons && seasons.length && seasons.indexOf(r.season || seasonOf(r.name)) < 0) return false;
       if (audiences && audiences.length && r.cat) {
         var a = r.cat.split('>')[0].trim();
         if (audiences.indexOf(a) < 0) return false;
@@ -130,6 +140,35 @@
     });
   }
 
-  var api = { parseSabangnet: parseSabangnet, parseRequest: parseRequest, select: select, KIND_MAP: KIND_MAP };
+  // 정렬: 'stock' 재고 많은 순 / 'new' 신상(등록일 최신) 순 / 그 외는 그대로. balance=true 면 정렬 순서를 지키며 브랜드별로 번갈아 뽑는다.
+  function order(rows, mode, balance) {
+    var out = rows.slice();
+    if (mode === 'stock') out.sort(function (a, b) { return (b.stock || 0) - (a.stock || 0); });
+    else if (mode === 'new') out.sort(function (a, b) { return (b.reg || '') < (a.reg || '') ? -1 : (b.reg || '') > (a.reg || '') ? 1 : 0; });
+    if (balance) {
+      var groups = {}, keys = [];
+      out.forEach(function (r) { if (!groups[r.brand]) { groups[r.brand] = []; keys.push(r.brand); } groups[r.brand].push(r); });
+      var mixed = [], more = true, i = 0;
+      while (more) {
+        more = false;
+        keys.forEach(function (k) { if (groups[k][i]) { mixed.push(groups[k][i]); more = true; } });
+        i++;
+      }
+      out = mixed;
+    }
+    return out;
+  }
+  // 브랜드별 상품 수·재고 합
+  function brandStats(rows) {
+    var st = {};
+    rows.forEach(function (r) {
+      if (!r.brand) return;
+      var s = st[r.brand] || (st[r.brand] = { n: 0, stock: 0 });
+      s.n++; s.stock += r.stock || 0;
+    });
+    return st;
+  }
+
+  var api = { seasonOf: seasonOf, seasonRank: seasonRank, order: order, brandStats: brandStats, parseSabangnet: parseSabangnet, parseRequest: parseRequest, select: select, KIND_MAP: KIND_MAP };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PromoPick = api;
 })(typeof window !== 'undefined' ? window : this);

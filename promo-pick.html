@@ -59,11 +59,24 @@
 
 <div class="box" id="condBox" hidden>
   <div class="step">③ 찾은 조건 확인 (고쳐도 됩니다)</div>
-  <div class="f"><label class="l">브랜드 <span class="hint" id="brandHint"></span></label><div class="chips" id="brandChips"></div></div>
+  <div class="f"><label class="l">브랜드 <span class="hint" id="brandHint"></span></label><div class="chips" id="brandChips"></div>
+    <div class="row" style="margin-top:8px"><button class="btn btn-out" type="button" id="topBrands">재고 많은 상위 5개만 선택</button><button class="btn btn-out" type="button" id="clearBrands">선택 해제</button></div>
+    <div class="hint">브랜드 옆 숫자는 상품 수 · 재고 합계입니다(재고 많은 순). 체크한 브랜드만 대상이 돼요.</div></div>
   <div class="f"><label class="l" for="words">상품명에 들어갈 단어 (하나라도 있으면 포함)</label>
     <input type="text" id="words" placeholder="패딩, 다운, 푸퍼">
     <div class="hint">비워두면 선택한 브랜드의 모든 상품이 나옵니다. 쉼표로 구분하세요.</div></div>
   <div class="f" id="audWrap" hidden><label class="l">대상</label><div class="chips" id="audChips"></div></div>
+  <div class="f" id="seasonWrap" hidden><label class="l">시즌 <span class="hint">— 아무것도 안 고르면 시즌 상관없이 전부</span></label><div class="chips" id="seasonChips"></div></div>
+  <div class="f"><label class="l">정렬 (우선해서 보여줄 상품)</label>
+    <div class="chips" id="ordChips">
+      <label class="chip on" id="ordStockL"><input type="radio" name="ord" value="stock" checked> 재고 많은 순</label>
+      <label class="chip" id="ordNewL"><input type="radio" name="ord" value="new"> 신상 순 (등록일 최신)</label>
+      <label class="chip"><input type="radio" name="ord" value="none"> 파일 순서 그대로</label>
+    </div></div>
+  <div class="f"><div class="row">
+    <label class="l" for="maxN" style="margin:0">최대 개수</label><input type="text" id="maxN" inputmode="numeric" placeholder="전체" style="width:90px">
+    <label class="chip" for="balance" style="display:inline-flex"><input type="checkbox" id="balance"> 브랜드별로 고르게 섞기</label></div>
+    <div class="hint">개수를 정하면 위 정렬 기준으로 앞에서부터 자릅니다. "고르게 섞기"를 켜면 한 브랜드가 다 차지하지 않게 브랜드를 번갈아 뽑아요.</div></div>
   <div class="f" id="stockWrap" hidden><label class="chip" for="stockOnly" style="display:inline-flex"><input type="checkbox" id="stockOnly" checked> 현재고가 있는 상품만</label></div>
   <div class="f"><label class="chip" for="aiSel" style="display:inline-flex"><input type="checkbox" id="aiSel"> AI 정밀 선별 (상품명을 AI가 하나씩 보고 고름 · 느리지만 단어로 못 잡는 상품까지 찾음)</label>
     <div class="hint">체크하면 선택한 브랜드의 상품(최대 450개)을 AI가 요청 취지에 맞는지 판단합니다. 체크 안 하면 위 단어로만 거릅니다.</div></div>
@@ -98,7 +111,7 @@ $('file').onchange=async e=>{
 };
 
 // ── 올린 파일을 이 브라우저에 보관 + 기준 날짜 기록 ──────────────────────
-// 기준 날짜 = 파일 안 "수정일시"의 가장 최근 값 (없으면 올린 시각). 3일 넘으면 경고, 7일 넘으면 새 파일을 올릴 때까지 막는다.
+// 기준 날짜 = 파일 안 "수정일시"의 가장 최근 값 (없으면 올린 시각). 3일 넘으면 경고, 7일 넘으면 더 강하게 경고한다 (막지는 않음).
 const STALE_WARN_DAYS=3, STALE_BLOCK_DAYS=7;
 function idbOpen(){ return new Promise((ok,no)=>{ const q=indexedDB.open('promoPick',1); q.onupgradeneeded=()=>q.result.createObjectStore('kv'); q.onsuccess=()=>ok(q.result); q.onerror=()=>no(q.error); }); }
 async function idbSet(k,v){ try{ const db=await idbOpen(); return await new Promise(ok=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(v,k); t.oncomplete=()=>ok(true); t.onerror=()=>ok(false); }); }catch(e){ return false; } }
@@ -110,8 +123,15 @@ function ageDays(d,meta){
 }
 function applyBase(d,meta,restored){
   DATA=d;
-  const bs={}; d.rows.forEach(r=>{ if(r.brand) bs[r.brand]=(bs[r.brand]||0)+1; });
-  ALLB=Object.keys(bs).sort((a,b)=>bs[b]-bs[a]); window.BCOUNT=bs;
+  d.rows.forEach(r=>{ if(r.season===undefined) r.season=PromoPick.seasonOf(r.name); });
+  window.BSTAT=PromoPick.brandStats(d.rows);
+  ALLB=Object.keys(BSTAT).sort((a,b)=>BSTAT[b].n-BSTAT[a].n);
+  window.BORDER=Object.keys(BSTAT).sort((a,b)=>d.hasStock?BSTAT[b].stock-BSTAT[a].stock:BSTAT[b].n-BSTAT[a].n);
+  const ss={}; d.rows.forEach(r=>{ if(r.season) ss[r.season]=(ss[r.season]||0)+1; });
+  window.SEASONS=Object.keys(ss).sort((a,b)=>PromoPick.seasonRank(b)-PromoPick.seasonRank(a)).slice(0,8); window.SCOUNT=ss;
+  window.HASREG=d.rows.some(r=>r.reg);
+  $('ordStockL').style.display=d.hasStock?'':'none'; $('ordNewL').style.display=HASREG?'':'none';
+  { const v=d.hasStock?'stock':(HASREG?'new':'none'); const el=document.querySelector('input[name=ord][value='+v+']'); el.checked=true; document.querySelectorAll('#ordChips .chip').forEach(c=>c.classList.toggle('on',c.querySelector('input').checked)); }
   $('fileInfo').textContent=meta.fileName;
   $('fileMsg').className='msg ok';
   $('fileMsg').textContent=`✅ 상품 ${d.rows.length.toLocaleString()}개, 브랜드 ${ALLB.length.toLocaleString()}개`+(restored?' (이전에 올린 파일을 불러왔습니다)':'를 읽었습니다.')+(d.hasBrand?'':' (브랜드명 열이 없어 브랜드 조건은 쓸 수 없습니다)');
@@ -119,8 +139,8 @@ function applyBase(d,meta,restored){
   const age=ageDays(d,meta), asOfTxt=d.asOf?`파일 기준 ${d.asOf.slice(0,16)}`:'기준일 없음 — 올린 시각으로 계산';
   const info=`${asOfTxt} · 올린 시각 ${fmt(meta.uploadedAt)} · ${age<1?'오늘':Math.floor(age)+'일 전'} 자료`;
   if(age>=STALE_BLOCK_DAYS){
-    $('ageMsg').className='msg err'; $('ageMsg').textContent=`⛔ ${info}. ${STALE_BLOCK_DAYS}일이 지나 재고·판매 상태가 맞지 않을 수 있어요. 사방넷에서 새 파일을 내려받아 올려 주세요.`;
-    $('analyze').disabled=true;
+    $('ageMsg').className='msg err'; $('ageMsg').textContent=`⛔ ${info}. ${STALE_BLOCK_DAYS}일이 지나 재고·판매 상태가 맞지 않을 수 있어요. 새 파일을 내려받아 올리는 것을 권합니다. (그대로 써도 됩니다)`;
+    $('analyze').disabled=false;
   } else if(age>=STALE_WARN_DAYS){
     $('ageMsg').className='msg'; $('ageMsg').style.color='var(--warn)'; $('ageMsg').textContent=`⚠️ ${info}. 오래된 자료예요 — 새 파일로 바꾸는 것을 권합니다.`;
     $('analyze').disabled=false;
@@ -134,8 +154,9 @@ function applyBase(d,meta,restored){
 function renderBrands(sel){
   const set=new Set(sel);
   // 선택된 것 먼저, 그다음 상품 많은 순
-  const list=[...sel, ...ALLB.filter(b=>!set.has(b))].slice(0,sel.length+40);
-  $('brandChips').innerHTML=list.map(b=>`<label class="chip ${set.has(b)?'on':''}"><input type="checkbox" value="${esc(b)}" ${set.has(b)?'checked':''}> ${esc(b)} <span style="opacity:.6">${BCOUNT[b]||0}</span></label>`).join('');
+  const list=[...sel, ...BORDER.filter(b=>!set.has(b))].slice(0,sel.length+40);
+  const lab=b=>{ const s=BSTAT[b]||{n:0,stock:0}; return DATA.hasStock?`${s.n} · 재고 ${s.stock.toLocaleString()}`:`${s.n}`; };
+  $('brandChips').innerHTML=list.map(b=>`<label class="chip ${set.has(b)?'on':''}"><input type="checkbox" value="${esc(b)}" ${set.has(b)?'checked':''}> ${esc(b)} <span style="opacity:.6">${lab(b)}</span></label>`).join('');
   $('brandChips').querySelectorAll('input').forEach(i=>i.onchange=()=>i.parentElement.classList.toggle('on',i.checked));
   $('brandHint').textContent=sel.length?'':'— 문장에서 못 찾았어요. 아래에서 직접 골라 주세요';
 }
@@ -155,9 +176,20 @@ function renderAud(sel){
   $('audChips').innerHTML=['여성','남성','아동'].map(a=>`<label class="chip ${sel.includes(a)?'on':''}"><input type="checkbox" value="${a}" ${sel.includes(a)?'checked':''}> ${a}</label>`).join('');
   $('audChips').querySelectorAll('input').forEach(i=>i.onchange=()=>i.parentElement.classList.toggle('on',i.checked));
 }
+function renderSeasons(){
+  $('seasonWrap').hidden=!SEASONS.length;
+  $('seasonChips').innerHTML=SEASONS.map(s=>`<label class="chip"><input type="checkbox" value="${s}"> ${s} <span style="opacity:.6">${SCOUNT[s]}</span></label>`).join('');
+  $('seasonChips').querySelectorAll('input').forEach(i=>i.onchange=()=>i.parentElement.classList.toggle('on',i.checked));
+}
+function getSeasons(){ return [...$('seasonChips').querySelectorAll('input:checked')].map(i=>i.value); }
+document.querySelectorAll('input[name=ord]').forEach(i=>i.onchange=()=>document.querySelectorAll('#ordChips .chip').forEach(c=>c.classList.toggle('on',c.querySelector('input').checked)));
+$('topBrands').onclick=()=>renderBrands(BORDER.slice(0,5));
+$('clearBrands').onclick=()=>renderBrands([]);
+function getOpts(){ const n=parseInt(($('maxN').value||'').replace(/[^0-9]/g,''),10); return {ord:document.querySelector('input[name=ord]:checked').value,max:n>0?n:0,balance:$('balance').checked,seasons:getSeasons()}; }
+function applyOrder(rows,o){ let out=PromoPick.order(rows,o.ord,o.balance); if(o.max&&out.length>o.max) out=out.slice(0,o.max); return out; }
 function getAud(){ return DATA&&DATA.hasCat?[...$('audChips').querySelectorAll('input:checked')].map(i=>i.value):[]; }
 function showCond(brands,words,msg,aud){
-  $('condBox').hidden=false; renderBrands(brands); renderAud(aud||['여성','남성']); $('words').value=words.join(', ');
+  $('condBox').hidden=false; renderBrands(brands); renderAud(aud||['여성','남성']); renderSeasons(); $('words').value=words.join(', ');
   $('msg').className='msg'; $('msg').textContent=msg||''; $('tw').hidden=true; $('dl').disabled=true; PICKED=[];
 }
 $('analyze').onclick=async()=>{
@@ -184,7 +216,8 @@ $('pick').onclick=async()=>{
   try{
     if($('aiSel').checked){
       if(!brands.length) throw new Error('AI 정밀 선별은 브랜드를 먼저 골라야 합니다');
-      let base=PromoPick.select(DATA.rows,brands,[],$('stockOnly').checked&&DATA.hasStock,getAud());
+      const o=getOpts();
+      let base=PromoPick.order(PromoPick.select(DATA.rows,brands,[],$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o.ord,false);
       let capped=false; if(base.length>450){ base=base.slice(0,450); capped=true; }
       const keep=new Set();
       for(let i=0;i<base.length;i+=150){
@@ -193,10 +226,12 @@ $('pick').onclick=async()=>{
         const d=await callAI({mode:'select',request:$('req').value.trim(),items});
         d.keep.forEach(n=>keep.add(n));
       }
-      PICKED=base.filter((r,k)=>keep.has(k));
+      PICKED=applyOrder(base.filter((r,k)=>keep.has(k)),o);
       if(capped) $('msg').dataset.cap='브랜드 상품이 많아 앞 450개만 AI가 봤습니다. ';
     } else {
-      PICKED=PromoPick.select(DATA.rows,brands,words,$('stockOnly').checked&&DATA.hasStock,getAud());
+      const o=getOpts();
+      PICKED=applyOrder(PromoPick.select(DATA.rows,brands,words,$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o);
+      if(o.ord==='new'&&!HASREG) $('msg').dataset.cap='(등록일 정보가 없는 파일이라 신상 순은 적용되지 않았어요) ';
     }
     $('tb').innerHTML=PICKED.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.brand)}</td></tr>`).join('');
     $('tw').hidden=!PICKED.length;
