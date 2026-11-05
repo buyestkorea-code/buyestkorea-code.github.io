@@ -34,6 +34,8 @@
   th{background:#fafaf8;position:sticky;top:0;}
   .tw{max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff;margin-top:12px;}
   .note{font-size:12px;color:var(--sub);background:#fafaf8;border:1px dashed var(--line);border-radius:10px;padding:10px 14px;line-height:1.6;}
+  .dz{border:2px dashed var(--line);border-radius:12px;padding:14px;transition:.15s;}
+  .dz.over{border-color:#111;background:#f3f3f3;}
 </style>
 </head>
 <body>
@@ -42,8 +44,8 @@
 
 <div class="box">
   <div class="step">① 사방넷 상품 파일 올리기</div>
-  <div class="row">
-    <button class="btn btn-out" type="button" id="pickFile">파일 선택</button><input type="file" id="file" accept=".xlsx,.xls" hidden>
+  <div class="row dz" id="dz1">
+    <button class="btn btn-out" type="button" id="pickFile">파일 선택 또는 여기로 끌어놓기</button><input type="file" id="file" accept=".xlsx,.xls" hidden>
     <span class="hint" id="fileInfo" style="margin:0">사방넷 <b>쇼핑몰상품등록 다운로드</b> 엑셀이 가장 좋아요 (카테고리·재고 포함). 상품대량수정·단품대량수정 파일도 됩니다.</span>
   </div>
   <div class="msg" id="fileMsg"></div>
@@ -88,7 +90,7 @@
 <div class="box" id="mallBox">
   <div class="step">④ 플랫폼에 맞게 바꾸기</div>
   <div class="f"><label class="l">쇼핑몰 자료 (사방넷 &gt; 쇼핑몰관리 &gt; 쇼핑몰상품수정 &gt; 다운로드 엑셀)</label>
-    <div class="row"><button class="btn btn-out" type="button" id="mallPick">파일 올리기 (여러 개 가능)</button><input type="file" id="mallFile" accept=".xlsx" multiple hidden><span class="hint" id="mallBusy" style="margin:0"></span></div>
+    <div class="row dz" id="dz2"><button class="btn btn-out" type="button" id="mallPick">파일 올리기 또는 여기로 끌어놓기 (여러 개 가능)</button><input type="file" id="mallFile" accept=".xlsx" multiple hidden><span class="hint" id="mallBusy" style="margin:0"></span></div>
     <div class="hint">연도별로 나뉜 파일(2020~2023, 2024, 2025 …)을 모두 올리면 쇼핑몰별로 합쳐 이 브라우저에 보관합니다. 새 파일을 다시 올리면 같은 상품은 더 최근 자료로 바뀌고, 없던 상품은 추가돼요.</div>
     <div class="tw" id="mallListW" hidden style="max-height:240px"><table><thead><tr><th>쇼핑몰</th><th>ID</th><th>상품 수</th><th>자료 기준일</th><th></th></tr></thead><tbody id="mallList"></tbody></table></div></div>
   <div class="f"><label class="l" for="mallSel">플랫폼 선택</label>
@@ -286,6 +288,21 @@ function renderMalls(){
 }
 function updateConvBtn(){ $('convert').disabled=!($('mallSel').value && PICKED.length); $('cmsg').className='msg'; if(!PICKED.length && $('mallSel').value) $('cmsg').textContent='먼저 위 ③에서 상품을 고르세요.'; else if($('cmsg').textContent==='먼저 위 ③에서 상품을 고르세요.') $('cmsg').textContent=''; }
 $('mallSel').onchange=updateConvBtn;
+
+// 드래그앤드롭: 파일을 점선 칸에 끌어놓으면 '파일 선택'과 똑같이 처리
+[['dz1','file',false],['dz2','mallFile',true]].forEach(([z,inp,multi])=>{
+  const el=$(z), input=$(inp);
+  ['dragenter','dragover'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();el.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();el.classList.remove('over');}));
+  el.addEventListener('drop',e=>{
+    const fs=[...e.dataTransfer.files].filter(f=>/\.xlsx?$/i.test(f.name));
+    if(!fs.length) return;
+    const dt=new DataTransfer(); (multi?fs:fs.slice(0,1)).forEach(f=>dt.items.add(f));
+    input.files=dt.files; input.dispatchEvent(new Event('change'));
+  });
+});
+// 칸 밖에 잘못 놓아도 브라우저가 파일을 열어버리지 않게
+['dragover','drop'].forEach(ev=>window.addEventListener(ev,e=>e.preventDefault()));
 $('mallPick').onclick=()=>$('mallFile').click();
 $('mallFile').onchange=async e=>{
   const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
