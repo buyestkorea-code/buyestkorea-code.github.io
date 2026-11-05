@@ -528,7 +528,7 @@ $('run').onclick = async () => {
         const items = base.rows.map(r => ({ code:r[0], name:r[1], spec:r[2], qty:r[3] })), by = {};
         items.forEach(it => { by[it.code] = it; });
         let upd = 0, add = 0;
-        S.manualEc.items.forEach(m => { const it = by[m.code]; if(it){ if(it.qty !== m.qty) upd++; it.qty = m.qty; } else { items.push({ code:m.code, name:m.name, spec:m.spec, qty:m.qty }); add++; } });
+        S.manualEc.items.forEach(m => { const it = by[m.code]; if(it){ if(it.qty !== m.qty) upd++; it.qty = m.qty; if(m.name){ it.name = m.name; if(m.spec != null && m.spec !== '') it.spec = m.spec; } } else { items.push({ code:m.code, name:m.name, spec:m.spec, qty:m.qty }); add++; } });
         buildEcIndex(items);
         $('asof').style.display = ''; $('asof').textContent = `서버 품목 + 수동 엑셀 ${fmt(S.manualEc.items.length)}품목 덮어씀 (재고 변경 ${fmt(upd)} · 신규 ${fmt(add)}) · ${S.manualEc.name}`;
       } else {
