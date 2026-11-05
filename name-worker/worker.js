@@ -154,10 +154,11 @@ async function callGemini(env, system, userText, images, opts = {}) {
     try {
       r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
         method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": String(env.GEMINI_API_KEY).trim() }, body: JSON.stringify(payload),
+        signal: opts.fast ? AbortSignal.timeout(25000) : undefined, // 짧은 작업이 25초 넘게 걸리면 끊고 다시
       });
-    } catch (_) { if (attempt < 1) continue; throw new ProviderError("Gemini", 502, "연결 실패"); }
+    } catch (_) { if (attempt < 2) continue; throw new ProviderError("Gemini", 502, "연결 실패(시간 초과)"); }
     d = await r.json().catch(() => ({}));
-    if (r.status !== 500 && r.status !== 503 && !(r.status === 400 && opts.fast && attempt < 2)) break;
+    if (![500, 503, 504, 524].includes(r.status) && !(r.status === 400 && opts.fast && attempt < 2)) break;
   }
   if (!r.ok) throw new ProviderError("Gemini", r.status, String((d && d.error && d.error.message) || "").slice(0, 140));
   return { text: ((((d.candidates || [])[0] || {}).content || {}).parts || []).map((c) => c.text || "").join("") };
@@ -330,6 +331,7 @@ async function runJson(env, system, userText, opts = {}) {
   const errs = [];
   for (const k of order) {
     const p = PROVIDERS[k];
+    if (p.compact && system.length + userText.length > 4500) { errs.push(`${p.name} 건너뜀(글이 길어 무료 한도 초과)`); continue; } // Groq 무료: 분당 입력 7000토큰
     try {
       const res = await p.call(env, system, userText, [], { fast: true, maxTokens: p.compact ? 700 : (opts.maxTokens || 2048) });
       const txt = res.text.replace(/<think>[\s\S]*?<\/think>/g, "");

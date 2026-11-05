@@ -240,20 +240,20 @@ $('pick').onclick=async()=>{
       let base=PromoPick.order(PromoPick.select(DATA.rows,brands,[],$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o.ord,false);
       let capped=false; if(base.length>450){ base=base.slice(0,450); capped=true; }
       const keep=new Set();
-      // 100개씩 나눠 3묶음을 동시에 AI에게 보낸다 (순서대로 하는 것보다 약 3배 빠름)
-      const chunks=[]; for(let i=0;i<base.length;i+=100) chunks.push(i);
+      // 50개씩 나눠 4묶음을 동시에 AI에게 보낸다 (순서대로 하는 것보다 약 3배 빠름)
+      const chunks=[]; for(let i=0;i<base.length;i+=50) chunks.push(i);
       let done=0, next=0;
-      const upd=()=>{ $('msg').className='msg'; $('msg').textContent=`AI가 고르는 중... ${Math.min(done*100,base.length)} / ${base.length}`; };
+      const upd=()=>{ $('msg').className='msg'; $('msg').textContent=`AI가 고르는 중... ${Math.min(done*50,base.length)} / ${base.length}`; };
       upd();
       const worker=async()=>{
         while(next<chunks.length){
           const i=chunks[next++];
-          const items=base.slice(i,i+100).map((r,k)=>({i:i+k,n:r.name+(r.cat?' ['+r.cat+']':'')}));
+          const items=base.slice(i,i+50).map((r,k)=>({i:i+k,n:r.name+(r.cat?' ['+r.cat+']':'')}));
           const d=await callAI({mode:'select',request:$('req').value.trim(),items});
           d.keep.forEach(n=>keep.add(n)); done++; upd();
         }
       };
-      await Promise.all([worker(),worker(),worker()]);
+      await Promise.all([worker(),worker(),worker(),worker()]);
       PICKED=applyOrder(base.filter((r,k)=>keep.has(k)),o);
       if(capped) $('msg').dataset.cap='브랜드 상품이 많아 앞 450개만 AI가 봤습니다. ';
     } else {
