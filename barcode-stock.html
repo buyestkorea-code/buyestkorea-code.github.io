@@ -103,7 +103,10 @@
     <button class="btn btn-primary" id="scanToggle">카메라로 스캔 시작</button>
     <div class="field">
       <label>또는 직접 입력 / 전용 스캐너로 스캔</label>
-      <input type="text" id="manualInput" placeholder="코드 입력 후 Enter" autocomplete="off" inputmode="numeric">
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="manualInput" placeholder="코드 입력 후 조회" autocomplete="off" inputmode="numeric" enterkeyhint="search" style="flex:1;min-width:0;">
+        <button class="btn btn-primary" id="manualGo" type="button" style="width:auto;padding:0 18px;white-space:nowrap;">조회</button>
+      </div>
     </div>
   </div>
 
@@ -337,13 +340,17 @@ async function stopScan() {
 }
 
 // ---- 수동/전용 스캐너 입력 ----
+function submitManual() {
+  const el = document.getElementById('manualInput');
+  const v = el.value;
+  if (!v.trim()) return;
+  el.value = '';
+  handleCode(v);
+}
 document.getElementById('manualInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    const v = e.target.value;
-    e.target.value = '';
-    handleCode(v);
-  }
+  if (e.key === 'Enter') { e.preventDefault(); submitManual(); }
 });
+document.getElementById('manualGo').addEventListener('click', submitManual);
 
 function beep() {
   try {
