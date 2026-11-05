@@ -92,7 +92,8 @@
   <div class="f"><label class="l">쇼핑몰 자료 (사방넷 &gt; 쇼핑몰관리 &gt; 쇼핑몰상품수정 &gt; 다운로드 엑셀)</label>
     <div class="row dz" id="dz2"><button class="btn btn-out" type="button" id="mallPick">파일 올리기 또는 여기로 끌어놓기 (여러 개 가능)</button><input type="file" id="mallFile" accept=".xlsx" multiple hidden><span class="hint" id="mallBusy" style="margin:0"></span></div>
     <div class="hint">연도별로 나뉜 파일(2020~2023, 2024, 2025 …)을 모두 올리면 쇼핑몰별로 합쳐 이 브라우저에 보관합니다. 새 파일을 다시 올리면 같은 상품은 더 최근 자료로 바뀌고, 없던 상품은 추가돼요.</div>
-    <div class="tw" id="mallListW" hidden style="max-height:240px"><table><thead><tr><th>쇼핑몰</th><th>ID</th><th>상품 수</th><th>자료 기준일</th><th></th></tr></thead><tbody id="mallList"></tbody></table></div></div>
+    <div class="hint" id="mallStamp" style="font-weight:600"></div>
+    <div class="tw" id="mallListW" hidden style="max-height:240px"><table><thead><tr><th>쇼핑몰</th><th>ID</th><th>상품 수</th><th>자료 기준일(파일 속)</th><th>마지막 업데이트(올린 시각)</th><th></th></tr></thead><tbody id="mallList"></tbody></table></div></div>
   <div class="f"><label class="l" for="mallSel">플랫폼 선택</label>
     <select id="mallSel" style="font:14px var(--font);padding:10px 12px;border:1px solid var(--line);border-radius:8px;min-width:280px"><option value="">— 쇼핑몰 자료를 먼저 올려 주세요 —</option></select></div>
   <div class="f"><label class="chip" for="exPaused" style="display:inline-flex"><input type="checkbox" id="exPaused" checked> 그 쇼핑몰에서 일시중지된 상품은 제외</label></div>
@@ -178,14 +179,14 @@ function renderBrands(sel){
 }
 const WK='https://buyest-namegen.buyest.workers.dev';
 function auth(){ try{ const a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return a&&a.id&&a.pass?a:null; }catch(e){ return null; } }
-async function callAI(payload){
+async function callAI(payload,maxRetry=4){
   const a=auth(); if(!a) throw new Error('툴킷에 로그인해야 AI를 쓸 수 있어요');
   // AI가 붐비면(503) 사용자가 다시 누르지 않아도 알아서 잠깐 쉬었다가 최대 4번까지 다시 시도
   for(let t=0;;t++){
     const r=await fetch(WK+'/api/promo',{signal:AbortSignal.timeout(90000),method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':encodeURIComponent(a.id),'X-Studio-Pass':encodeURIComponent(a.pass),'X-Studio-Enc':'1'},body:JSON.stringify(payload)});
     const d=await r.json().catch(()=>({}));
     if(r.ok&&d.ok) return d;
-    if(r.status===503&&t<4){ for(let s=20;s>0;s--){ $('msg').className='msg'; $('msg').textContent=`AI가 붐벼서 ${s}초 뒤 자동으로 다시 시도합니다 (${t+1}/4)...`; await new Promise(o=>setTimeout(o,1000)); } continue; }
+    if(r.status===503&&t<maxRetry){ for(let s=20;s>0;s--){ $('msg').className='msg'; $('msg').textContent=`AI가 붐벼서 ${s}초 뒤 자동으로 다시 시도합니다 (${t+1}/${maxRetry})...`; await new Promise(o=>setTimeout(o,1000)); } continue; }
     throw new Error(d.error||('AI 서버 오류 '+r.status));
   }
 }
@@ -219,7 +220,9 @@ $('analyze').onclick=async()=>{
   const rule=PromoPick.parseRequest(text,ALLB);
   $('analyze').disabled=true; $('aiState').textContent='AI가 읽는 중...';
   try{
-    const d=await callAI({mode:'parse',request:text,brands:ALLB.slice(0,500)});
+    // 브랜드 전체(수백 개)를 보내면 글이 길어 AI가 느려지고 무료 한도에 걸림 → 상위 120개 + 규칙으로 찾은 브랜드만 보냄. 실패하면 바로 규칙 결과 사용
+    const cand=[...new Set([...rule.brands,...ALLB.slice(0,120)])];
+    const d=await callAI({mode:'parse',request:text,brands:cand},1);
     const brands=d.brands.length?d.brands:rule.brands, words=d.words.length?d.words:rule.words;
     $('aiState').textContent='AI('+(d.by||'')+')가 읽었습니다'+(d.note?' — '+d.note:'');
     showCond(brands,words,'',rule.audiences);
@@ -287,8 +290,10 @@ async function loadMallIndex(){ MALLS=(await idbGet('malls'))||{}; renderMalls()
 function renderMalls(){
   const keys=Object.keys(MALLS).sort((a,b)=>MALLS[b].n-MALLS[a].n);
   $('mallListW').hidden=!keys.length;
+  const lastUp=keys.reduce((a,k)=>Math.max(a,MALLS[k].updatedAt||0),0);
+  $('mallStamp').textContent=lastUp?'🕒 쇼핑몰 자료 마지막 업데이트: '+fmt(lastUp):'아직 올린 쇼핑몰 자료가 없습니다';
   $('mallList').innerHTML=keys.map(k=>{ const m=MALLS[k], age=mallAge(m.asOf); const old=age>=MALL_WARN_DAYS;
-    return `<tr><td>${esc(m.mall)}</td><td>${esc(m.id)}</td><td>${m.n.toLocaleString()}</td><td>${esc(mallFmtAsOf(m.asOf))}</td><td style="color:${old?'var(--warn)':'var(--ok)'}">${old?'⚠️ '+Math.floor(age)+'일 전 — 새 파일 권장':'최신'}</td></tr>`; }).join('');
+    return `<tr><td>${esc(m.mall)}</td><td>${esc(m.id)}</td><td>${m.n.toLocaleString()}</td><td>${esc(mallFmtAsOf(m.asOf))}</td><td>${m.updatedAt?esc(fmt(m.updatedAt)):'-'}</td><td style="color:${old?'var(--warn)':'var(--ok)'}">${old?'⚠️ '+Math.floor(age)+'일 전 — 새 파일 권장':'최신'}</td></tr>`; }).join('');
   const cur=$('mallSel').value;
   $('mallSel').innerHTML=keys.length?'<option value="">— 플랫폼을 고르세요 —</option>'+keys.map(k=>`<option value="${esc(k)}">${esc(MALLS[k].mall)} · ${esc(MALLS[k].id)} (${MALLS[k].n.toLocaleString()}개)</option>`).join(''):'<option value="">— 쇼핑몰 자료를 먼저 올려 주세요 —</option>';
   if(cur&&MALLS[cur]) $('mallSel').value=cur;
