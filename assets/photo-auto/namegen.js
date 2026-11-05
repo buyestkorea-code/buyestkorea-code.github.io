@@ -93,7 +93,7 @@ function generate(){
   if(!photos.length){ fail('상품 사진을 먼저 올려 주세요. (최대 3장까지 분석)'); return; }
   var req=++lastReq; setBusy(true,'사진 '+Math.min(3,photos.length)+'장을 읽는 중…');
   Promise.all(photos.slice(0,3).map(function(p){ return toSmallJpeg(p.file,1024); })).then(function(imgs){
-    return fetch(WK+'/api/names',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':a.id,'X-Studio-Pass':a.pass},
+    return fetch(WK+'/api/names',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':encodeURIComponent(a.id),'X-Studio-Pass':encodeURIComponent(a.pass),'X-Studio-Enc':'1'},
       body:JSON.stringify({images:imgs,brand:$('ng_brand').value.trim(),season:$('ng_season').value.trim(),code:$('ng_code').value.trim(),kind:$('ng_kind').value,hint:$('ng_hint').value.trim(),lens:$('ng_lens').checked})});
   }).then(function(r){ return r.json().catch(function(){ return {ok:false,error:'서버 응답을 읽지 못했습니다.'}; }); })
   .then(function(res){

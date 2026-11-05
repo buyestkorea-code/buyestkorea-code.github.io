@@ -18,7 +18,7 @@ const VERSION = "1.0.0";
 const cors = () => ({
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,X-Studio-User,X-Studio-Pass",
+  "Access-Control-Allow-Headers": "Content-Type,X-Studio-User,X-Studio-Pass,X-Studio-Enc",
   "Access-Control-Max-Age": "600",
   Vary: "Origin",
 });
@@ -31,8 +31,12 @@ const sha256 = async (s) => hex(await crypto.subtle.digest("SHA-256", new TextEn
 // ── 직원 로그인 확인 (10분 기억) ───────────────────────
 const loginCache = new Map();
 async function requireStaff(request) {
-  const user = (request.headers.get("X-Studio-User") || "").trim();
-  const pass = request.headers.get("X-Studio-Pass") || "";
+  let user = (request.headers.get("X-Studio-User") || "").trim();
+  let pass = request.headers.get("X-Studio-Pass") || "";
+  // 한글 ID/비밀번호는 헤더에 그대로 못 실으므로 클라이언트가 URL 인코딩해서 보냄 (X-Studio-Enc: 1)
+  if (request.headers.get("X-Studio-Enc") === "1") {
+    try { user = decodeURIComponent(user).trim(); pass = decodeURIComponent(pass); } catch (e) {}
+  }
   if (!user || !pass) throw new HttpError(401, "로그인이 필요합니다. 툴키트에서 로그인한 뒤 새로고침해 주세요.");
   const key = user + ":" + (await sha256(pass));
   const hit = loginCache.get(key);
