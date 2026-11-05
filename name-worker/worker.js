@@ -13,7 +13,7 @@
  */
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 
 const cors = () => ({
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -310,6 +310,66 @@ async function handleNames(request, env) {
   return json({ ok: true, item: clean(out.item, 30), color: clean(out.color, 30), candidates: cands, brandMatched: prof ? prof.name : "", by: used, fellBack: errs.length ? errs : undefined, codeGuess: lens.used ? clean(out.codeGuess, 60) : "", lens: lens.used ? { used: true, total: lens.total, korean: lens.korean, refs: lens.refs.slice(0, 8) } : { used: false, why: lens.error || "" }, version: VERSION });
 }
 
+// ── 기획전 상품 뽑기 (텍스트 전용, 사진 없음) ───────────────
+// mode "parse":  MD 요청 문장 + 파일 속 브랜드 목록 → { brands:[목록에 있는 이름만], words:[상품명 단어], note }
+// mode "select": MD 요청 문장 + 상품 {i,n} 목록(최대 150개) → { keep:[i...] }  (요청 취지에 맞는 상품 번호)
+const PROMO_SYSTEM = `당신은 해외 명품 병행수입 쇼핑몰의 MD 보조입니다. 플랫폼 MD가 보낸 기획전 요청 문장을 읽고 상품을 고르는 일을 돕습니다.
+규칙:
+- 반드시 JSON 만 출력합니다. 설명 문장 금지.
+- 브랜드는 사용자가 준 [브랜드 목록]에 있는 이름을 글자 그대로만 고릅니다. 목록에 없는 브랜드는 만들지 않습니다. 줄임말(예: 몽클 → 몽클레어)은 목록에서 가장 가까운 이름으로 연결합니다. 키즈 브랜드는 요청에 키즈/아동 얘기가 없으면 고르지 않습니다.
+- 상품 종류는 한국 쇼핑몰 상품명에 실제로 쓰이는 한글 단어로 바꿉니다. 예) 패딩 → 패딩, 다운, 푸퍼, 퀄팅 / 코트 → 코트 / 가방 → 백, 토트, 숄더, 크로스.
+- 시즌, 세일, 11월 같은 말은 상품 종류가 아니므로 words 에 넣지 않습니다.`;
+
+async function runJson(env, system, userText) {
+  const order = providerOrder(env);
+  if (!order.length) throw new HttpError(503, "AI 키가 아직 등록되지 않았습니다. 관리자에게 알려 주세요.");
+  const errs = [];
+  for (const k of order) {
+    const p = PROVIDERS[k];
+    try {
+      const res = await p.call(env, system, userText, []);
+      const txt = res.text.replace(/<think>[\s\S]*?<\/think>/g, "");
+      const m = /\{[\s\S]*\}/.exec(txt);
+      return { data: JSON.parse(m ? m[0] : txt), by: p.name, fellBack: errs.length ? errs : undefined };
+    } catch (e) {
+      errs.push(e instanceof ProviderError ? `${e.provider} ${e.status} ${e.message}` : `${p.name} 답변 해석 실패`);
+    }
+  }
+  const busy = errs.some((s) => / (429|500|502|503) /.test(s));
+  throw new HttpError(busy ? 503 : 502, (busy ? "AI 가 지금 붐빕니다. 잠시 뒤 다시 눌러 주세요. " : "AI 요청에 실패했습니다. ") + "(" + errs.join(" / ").slice(0, 300) + ")");
+}
+
+async function handlePromo(request, env) {
+  const user = await requireStaff(request);
+  let body;
+  try { body = await request.json(); } catch (_) { throw new HttpError(400, "요청 형식이 올바르지 않습니다."); }
+  const req = clean(body.request, 600);
+  if (!req) throw new HttpError(400, "요청 문장이 비어 있습니다.");
+  await spend(env, user);
+
+  if (body.mode === "parse") {
+    const brands = (Array.isArray(body.brands) ? body.brands : []).map((b) => clean(b, 40)).filter(Boolean).slice(0, 500);
+    const userText = `[MD 요청]\n${req}\n\n[브랜드 목록]\n${brands.join("\n")}\n\n출력: {"brands":["목록에 있는 이름 그대로"],"words":["상품명에 들어갈 한글 단어"],"note":"한 줄 해석"}`;
+    const { data, by, fellBack } = await runJson(env, PROMO_SYSTEM, userText);
+    const allow = new Set(brands);
+    const outB = (Array.isArray(data.brands) ? data.brands : []).map((b) => clean(b, 40)).filter((b) => allow.has(b));
+    const outW = (Array.isArray(data.words) ? data.words : []).map((w) => clean(w, 20)).filter(Boolean).slice(0, 20);
+    return json({ ok: true, brands: [...new Set(outB)], words: [...new Set(outW)], note: clean(data.note, 120), by, fellBack, version: VERSION });
+  }
+
+  if (body.mode === "select") {
+    const items = (Array.isArray(body.items) ? body.items : []).slice(0, 150)
+      .map((x) => ({ i: Number(x && x.i), n: clean(x && x.n, 90) })).filter((x) => Number.isInteger(x.i) && x.n);
+    if (!items.length) return json({ ok: true, keep: [], version: VERSION });
+    const userText = `[MD 요청]\n${req}\n\n아래 상품 중 요청 취지에 맞는 상품의 번호만 고르세요. 애매하면 제외합니다.\n[상품]\n${items.map((x) => x.i + ": " + x.n).join("\n")}\n\n출력: {"keep":[번호,...]}`;
+    const { data, by, fellBack } = await runJson(env, PROMO_SYSTEM, userText);
+    const allow = new Set(items.map((x) => x.i));
+    const keep = (Array.isArray(data.keep) ? data.keep : []).map(Number).filter((n) => allow.has(n));
+    return json({ ok: true, keep: [...new Set(keep)], by, fellBack, version: VERSION });
+  }
+  throw new HttpError(400, "mode 가 올바르지 않습니다.");
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -318,6 +378,7 @@ export default {
       if (url.pathname === "/api/health") return json({ ok: true, ready: providerOrder(env).length > 0, providers: providerOrder(env), version: VERSION });
       if (request.method === "GET" && url.pathname.startsWith("/i/")) return await serveTempImage(env, url.pathname.slice(3));
       if (url.pathname === "/api/names" && request.method === "POST") return await handleNames(request, env);
+      if (url.pathname === "/api/promo" && request.method === "POST") return await handlePromo(request, env);
       throw new HttpError(404, "없는 주소입니다.");
     } catch (e) {
       if (e instanceof HttpError) return json({ ok: false, error: e.message }, e.status);
