@@ -182,7 +182,7 @@ async function callAI(payload){
   const a=auth(); if(!a) throw new Error('툴킷에 로그인해야 AI를 쓸 수 있어요');
   // AI가 붐비면(503) 사용자가 다시 누르지 않아도 알아서 잠깐 쉬었다가 최대 4번까지 다시 시도
   for(let t=0;;t++){
-    const r=await fetch(WK+'/api/promo',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':encodeURIComponent(a.id),'X-Studio-Pass':encodeURIComponent(a.pass),'X-Studio-Enc':'1'},body:JSON.stringify(payload)});
+    const r=await fetch(WK+'/api/promo',{signal:AbortSignal.timeout(90000),method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':encodeURIComponent(a.id),'X-Studio-Pass':encodeURIComponent(a.pass),'X-Studio-Enc':'1'},body:JSON.stringify(payload)});
     const d=await r.json().catch(()=>({}));
     if(r.ok&&d.ok) return d;
     if(r.status===503&&t<4){ for(let s=20;s>0;s--){ $('msg').className='msg'; $('msg').textContent=`AI가 붐벼서 ${s}초 뒤 자동으로 다시 시도합니다 (${t+1}/4)...`; await new Promise(o=>setTimeout(o,1000)); } continue; }
@@ -240,12 +240,20 @@ $('pick').onclick=async()=>{
       let base=PromoPick.order(PromoPick.select(DATA.rows,brands,[],$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o.ord,false);
       let capped=false; if(base.length>450){ base=base.slice(0,450); capped=true; }
       const keep=new Set();
-      for(let i=0;i<base.length;i+=150){
-        $('msg').className='msg'; $('msg').textContent=`AI가 고르는 중... ${Math.min(i+150,base.length)} / ${base.length}`;
-        const items=base.slice(i,i+150).map((r,k)=>({i:i+k,n:r.name+(r.cat?' ['+r.cat+']':'')}));
-        const d=await callAI({mode:'select',request:$('req').value.trim(),items});
-        d.keep.forEach(n=>keep.add(n));
-      }
+      // 100개씩 나눠 3묶음을 동시에 AI에게 보낸다 (순서대로 하는 것보다 약 3배 빠름)
+      const chunks=[]; for(let i=0;i<base.length;i+=100) chunks.push(i);
+      let done=0, next=0;
+      const upd=()=>{ $('msg').className='msg'; $('msg').textContent=`AI가 고르는 중... ${Math.min(done*100,base.length)} / ${base.length}`; };
+      upd();
+      const worker=async()=>{
+        while(next<chunks.length){
+          const i=chunks[next++];
+          const items=base.slice(i,i+100).map((r,k)=>({i:i+k,n:r.name+(r.cat?' ['+r.cat+']':'')}));
+          const d=await callAI({mode:'select',request:$('req').value.trim(),items});
+          d.keep.forEach(n=>keep.add(n)); done++; upd();
+        }
+      };
+      await Promise.all([worker(),worker(),worker()]);
       PICKED=applyOrder(base.filter((r,k)=>keep.has(k)),o);
       if(capped) $('msg').dataset.cap='브랜드 상품이 많아 앞 450개만 AI가 봤습니다. ';
     } else {

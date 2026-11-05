@@ -146,16 +146,18 @@ async function callGemini(env, system, userText, images, opts = {}) {
     contents: [{ role: "user", parts: [...images.map((i) => ({ inline_data: { mime_type: i.mime, data: i.b64 } })), { text: userText }] }],
     generationConfig: { temperature: 0.7, maxOutputTokens: opts.maxTokens || 4096, responseMimeType: "application/json" },
   };
+  if (opts.fast) payload.generationConfig.thinkingConfig = { thinkingBudget: 0 }; // 짧은 선별 작업은 '생각' 없이 바로 답하게 (훨씬 빠름)
   let r, d;
-  for (let attempt = 0; attempt < 2; attempt++) { // 일시 과부하는 한 번만 더 시도하고 다른 AI 로 넘어간다
+  for (let attempt = 0; attempt < 3; attempt++) { // 일시 과부하는 한 번만 더 시도하고 다른 AI 로 넘어간다
     if (attempt) await sleep(1200);
+    if (attempt === 2) delete payload.generationConfig.thinkingConfig; // 이 모델이 thinkingConfig 를 거부하면 빼고 재시도
     try {
       r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
         method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": String(env.GEMINI_API_KEY).trim() }, body: JSON.stringify(payload),
       });
     } catch (_) { if (attempt < 1) continue; throw new ProviderError("Gemini", 502, "연결 실패"); }
     d = await r.json().catch(() => ({}));
-    if (r.status !== 500 && r.status !== 503) break;
+    if (r.status !== 500 && r.status !== 503 && !(r.status === 400 && opts.fast && attempt < 2)) break;
   }
   if (!r.ok) throw new ProviderError("Gemini", r.status, String((d && d.error && d.error.message) || "").slice(0, 140));
   return { text: ((((d.candidates || [])[0] || {}).content || {}).parts || []).map((c) => c.text || "").join("") };
@@ -329,7 +331,7 @@ async function runJson(env, system, userText, opts = {}) {
   for (const k of order) {
     const p = PROVIDERS[k];
     try {
-      const res = await p.call(env, system, userText, [], { maxTokens: p.compact ? 700 : (opts.maxTokens || 2048) });
+      const res = await p.call(env, system, userText, [], { fast: true, maxTokens: p.compact ? 700 : (opts.maxTokens || 2048) });
       const txt = res.text.replace(/<think>[\s\S]*?<\/think>/g, "");
       const m = /\{[\s\S]*\}/.exec(txt);
       return { data: JSON.parse(m ? m[0] : txt), by: p.name, fellBack: errs.length ? errs : undefined };
