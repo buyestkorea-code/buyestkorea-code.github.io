@@ -356,7 +356,8 @@ $('convert').onclick=async()=>{
     $('cmsg').textContent=`${m.mall} 기준: 바뀐 상품 ${CONV.matched.length.toLocaleString()}개 / 제외·미등록 ${CONV.skipped.length.toLocaleString()}개 (고른 상품 ${PICKED.length.toLocaleString()}개)`+(mallAge(m.asOf)>=MALL_WARN_DAYS?' · ⚠️ 쇼핑몰 자료가 오래됐어요':'');
     const sk=CONV.skipped; const by={}; sk.forEach(s=>by[s.reason]=(by[s.reason]||0)+1);
     $('skipNote').hidden=!sk.length;
-    $('skipNote').innerHTML=sk.length?'제외·미등록 내역: '+Object.entries(by).map(([r,n])=>`${esc(r)} ${n}개`).join(' · ')+' — 엑셀의 "제외·미등록" 시트에 목록이 들어갑니다.':'';
+    const notReg=sk.filter(x=>x.reason==='이 쇼핑몰에 등록 안 됨');
+    $('skipNote').innerHTML=sk.length?(notReg.length?`⚠️ <b>${esc(m.mall)} 자료에 없는 상품 ${notReg.length.toLocaleString()}개</b> — 쇼핑몰 자료가 실시간이 아니라서(자료 기준일 ${esc(mallFmtAsOf(m.asOf))}), 그 뒤에 새로 등록한 상품이거나 이 쇼핑몰에 아직 올리지 않은 상품일 수 있어요. 변환 결과 엑셀에는 들어가지 않습니다.<details style="margin-top:6px"><summary style="cursor:pointer">없는 상품 목록 보기</summary><div style="max-height:200px;overflow:auto;margin-top:6px;font-size:12px">${notReg.map(x=>esc(x.code)+' · '+esc(x.name)).join('<br>')}</div></details><br>`:'')+'제외·미등록 내역: '+Object.entries(by).map(([r,n])=>`${esc(r)} ${n}개`).join(' · ')+' — 엑셀의 "제외·미등록" 시트에 목록이 들어갑니다.':'';
     $('dl2').disabled=!CONV.matched.length&&!sk.length;
   }catch(err){ $('cmsg').className='msg err'; $('cmsg').textContent='오류: '+err.message; }
   finally{ updateConvBtn(); }
