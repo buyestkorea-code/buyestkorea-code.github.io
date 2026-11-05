@@ -85,9 +85,23 @@
   <div class="tw" id="tw" hidden><table><thead><tr><th>사방넷코드</th><th>상품명</th><th>브랜드</th></tr></thead><tbody id="tb"></tbody></table></div>
 </div>
 
-<div class="note">다음 단계: 플랫폼(롯데온 등)을 고르면 이 엑셀을 플랫폼 코드와 현판매가로 바꿔 최종 엑셀을 만드는 기능이 이어집니다. (준비 중)</div>
+<div class="box" id="mallBox">
+  <div class="step">④ 플랫폼에 맞게 바꾸기</div>
+  <div class="f"><label class="l">쇼핑몰 자료 (사방넷 &gt; 쇼핑몰관리 &gt; 쇼핑몰상품수정 &gt; 다운로드 엑셀)</label>
+    <div class="row"><button class="btn btn-out" type="button" id="mallPick">파일 올리기 (여러 개 가능)</button><input type="file" id="mallFile" accept=".xlsx" multiple hidden><span class="hint" id="mallBusy" style="margin:0"></span></div>
+    <div class="hint">연도별로 나뉜 파일(2020~2023, 2024, 2025 …)을 모두 올리면 쇼핑몰별로 합쳐 이 브라우저에 보관합니다. 새 파일을 다시 올리면 같은 상품은 더 최근 자료로 바뀌고, 없던 상품은 추가돼요.</div>
+    <div class="tw" id="mallListW" hidden style="max-height:240px"><table><thead><tr><th>쇼핑몰</th><th>ID</th><th>상품 수</th><th>자료 기준일</th><th></th></tr></thead><tbody id="mallList"></tbody></table></div></div>
+  <div class="f"><label class="l" for="mallSel">플랫폼 선택</label>
+    <select id="mallSel" style="font:14px var(--font);padding:10px 12px;border:1px solid var(--line);border-radius:8px;min-width:280px"><option value="">— 쇼핑몰 자료를 먼저 올려 주세요 —</option></select></div>
+  <div class="f"><label class="chip" for="exPaused" style="display:inline-flex"><input type="checkbox" id="exPaused" checked> 그 쇼핑몰에서 일시중지된 상품은 제외</label></div>
+  <div class="row"><button class="btn btn-pri" id="convert" disabled>플랫폼 양식으로 바꾸기</button><button class="btn btn-out" id="dl2" disabled>최종 엑셀 다운로드</button></div>
+  <div class="msg" id="cmsg"></div>
+  <div class="tw" id="ctw" hidden><table><thead><tr><th>쇼핑몰상품코드</th><th>품번코드</th><th>상품명(송신)</th><th>브랜드명</th><th>상태</th><th>판매가</th></tr></thead><tbody id="ctb"></tbody></table></div>
+  <div class="note" id="skipNote" hidden style="margin-top:10px"></div>
+</div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/xlsx-fast.js"></script>
 <script src="promo-pick-logic.js"></script>
 <script>
 const $=id=>document.getElementById(id);
@@ -164,10 +178,14 @@ const WK='https://buyest-namegen.buyest.workers.dev';
 function auth(){ try{ const a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return a&&a.id&&a.pass?a:null; }catch(e){ return null; } }
 async function callAI(payload){
   const a=auth(); if(!a) throw new Error('툴킷에 로그인해야 AI를 쓸 수 있어요');
-  const r=await fetch(WK+'/api/promo',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':encodeURIComponent(a.id),'X-Studio-Pass':encodeURIComponent(a.pass),'X-Studio-Enc':'1'},body:JSON.stringify(payload)});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok||!d.ok) throw new Error(d.error||('AI 서버 오류 '+r.status));
-  return d;
+  // AI가 붐비면(503) 사용자가 다시 누르지 않아도 알아서 잠깐 쉬었다가 최대 4번까지 다시 시도
+  for(let t=0;;t++){
+    const r=await fetch(WK+'/api/promo',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':encodeURIComponent(a.id),'X-Studio-Pass':encodeURIComponent(a.pass),'X-Studio-Enc':'1'},body:JSON.stringify(payload)});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.ok) return d;
+    if(r.status===503&&t<4){ for(let s=20;s>0;s--){ $('msg').className='msg'; $('msg').textContent=`AI가 붐벼서 ${s}초 뒤 자동으로 다시 시도합니다 (${t+1}/4)...`; await new Promise(o=>setTimeout(o,1000)); } continue; }
+    throw new Error(d.error||('AI 서버 오류 '+r.status));
+  }
 }
 $('aiState').textContent=auth()?'':'로그인하지 않아 규칙 방식으로만 동작합니다';
 
@@ -249,6 +267,86 @@ $('dl').onclick=()=>{
   const d=new Date(),p=n=>String(n).padStart(2,'0');
   XLSX.writeFile(wb,`기획전_사방넷코드_상품명_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.xlsx`);
 };
+
+// ───────── ④ 플랫폼 변환 ─────────
+const MALL_WARN_DAYS=3;
+function mallFmtAsOf(s){ return s? s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8)+' '+(s.slice(9,14)||'') : '-'; }
+function mallAge(s){ if(!s) return 999; const t=new Date(s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8)+'T'+(s.slice(9,14)||'00:00')).getTime(); return Math.max(0,(Date.now()-t)/86400000); }
+let MALLS={}, MALLMAP=null, CONV=null;
+async function loadMallIndex(){ MALLS=(await idbGet('malls'))||{}; renderMalls(); }
+function renderMalls(){
+  const keys=Object.keys(MALLS).sort((a,b)=>MALLS[b].n-MALLS[a].n);
+  $('mallListW').hidden=!keys.length;
+  $('mallList').innerHTML=keys.map(k=>{ const m=MALLS[k], age=mallAge(m.asOf); const old=age>=MALL_WARN_DAYS;
+    return `<tr><td>${esc(m.mall)}</td><td>${esc(m.id)}</td><td>${m.n.toLocaleString()}</td><td>${esc(mallFmtAsOf(m.asOf))}</td><td style="color:${old?'var(--warn)':'var(--ok)'}">${old?'⚠️ '+Math.floor(age)+'일 전 — 새 파일 권장':'최신'}</td></tr>`; }).join('');
+  const cur=$('mallSel').value;
+  $('mallSel').innerHTML=keys.length?'<option value="">— 플랫폼을 고르세요 —</option>'+keys.map(k=>`<option value="${esc(k)}">${esc(MALLS[k].mall)} · ${esc(MALLS[k].id)} (${MALLS[k].n.toLocaleString()}개)</option>`).join(''):'<option value="">— 쇼핑몰 자료를 먼저 올려 주세요 —</option>';
+  if(cur&&MALLS[cur]) $('mallSel').value=cur;
+  updateConvBtn();
+}
+function updateConvBtn(){ $('convert').disabled=!($('mallSel').value && PICKED.length); $('cmsg').className='msg'; if(!PICKED.length && $('mallSel').value) $('cmsg').textContent='먼저 위 ③에서 상품을 고르세요.'; else if($('cmsg').textContent==='먼저 위 ③에서 상품을 고르세요.') $('cmsg').textContent=''; }
+$('mallSel').onchange=updateConvBtn;
+$('mallPick').onclick=()=>$('mallFile').click();
+$('mallFile').onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
+  $('mallPick').disabled=true;
+  try{
+    for(let i=0;i<files.length;i++){
+      const f=files[i];
+      $('mallBusy').textContent=`(${i+1}/${files.length}) ${f.name} 읽는 중...`;
+      const r=await XlsxFast.readColumns(f,PromoPick.MALL_COLS);
+      const groups=PromoPick.groupMalls(r.rows);
+      const ks=Object.keys(groups);
+      for(let j=0;j<ks.length;j++){
+        const k=ks[j]; $('mallBusy').textContent=`(${i+1}/${files.length}) ${f.name} 저장 중... ${j+1}/${ks.length}`;
+        const old=await idbGet('mall:'+k);
+        const merged=PromoPick.mergeMap(old,groups[k]);
+        const ok=await idbSet('mall:'+k,merged);
+        if(!ok) throw new Error('브라우저 저장 공간이 부족합니다');
+        const [mall,id]=k.split('|');
+        MALLS[k]={mall,id:k.slice(mall.length+1),n:Object.keys(merged).length,asOf:PromoPick.mapAsOf(merged),updatedAt:Date.now()};
+      }
+      await idbSet('malls',MALLS);
+    }
+    $('mallBusy').textContent=`✅ ${files.length}개 파일을 반영했습니다.`;
+    MALLMAP=null; renderMalls();
+  }catch(err){ $('mallBusy').textContent='오류: '+err.message; }
+  finally{ $('mallPick').disabled=false; }
+};
+$('convert').onclick=async()=>{
+  const k=$('mallSel').value; if(!k||!PICKED.length) return;
+  $('convert').disabled=true; $('cmsg').className='msg'; $('cmsg').textContent='바꾸는 중...';
+  try{
+    const map=await idbGet('mall:'+k); if(!map) throw new Error('이 쇼핑몰 자료를 불러오지 못했습니다. 파일을 다시 올려 주세요.');
+    CONV=PromoPick.convert(PICKED,map,$('exPaused').checked);
+    const m=MALLS[k];
+    $('ctb').innerHTML=CONV.matched.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[3])}</td><td>${esc(r[6])}</td><td>${esc(r[10])}</td><td>${r[12].toLocaleString()}</td></tr>`).join('');
+    $('ctw').hidden=!CONV.matched.length;
+    $('cmsg').className=CONV.matched.length?'msg ok':'msg err';
+    $('cmsg').textContent=`${m.mall} 기준: 바뀐 상품 ${CONV.matched.length.toLocaleString()}개 / 제외·미등록 ${CONV.skipped.length.toLocaleString()}개 (고른 상품 ${PICKED.length.toLocaleString()}개)`+(mallAge(m.asOf)>=MALL_WARN_DAYS?' · ⚠️ 쇼핑몰 자료가 오래됐어요':'');
+    const sk=CONV.skipped; const by={}; sk.forEach(s=>by[s.reason]=(by[s.reason]||0)+1);
+    $('skipNote').hidden=!sk.length;
+    $('skipNote').innerHTML=sk.length?'제외·미등록 내역: '+Object.entries(by).map(([r,n])=>`${esc(r)} ${n}개`).join(' · ')+' — 엑셀의 "제외·미등록" 시트에 목록이 들어갑니다.':'';
+    $('dl2').disabled=!CONV.matched.length&&!sk.length;
+  }catch(err){ $('cmsg').className='msg err'; $('cmsg').textContent='오류: '+err.message; }
+  finally{ updateConvBtn(); }
+};
+$('dl2').onclick=()=>{
+  if(!CONV) return;
+  const m=MALLS[$('mallSel').value]||{mall:'플랫폼'};
+  const a1=[PromoPick.OUT_HEAD]; CONV.matched.forEach(r=>a1.push([r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12]]));
+  const ws1=XLSX.utils.aoa_to_sheet(a1);
+  ws1['!cols']=[{wch:16},{wch:10},{wch:12},{wch:56},{wch:30},{wch:24},{wch:14},{wch:14},{wch:10},{wch:8},{wch:12},{wch:10},{wch:12}];
+  const a2=[['품번코드','상품명(기획전 선별)','사유']]; CONV.skipped.forEach(s=>a2.push([s.code,s.name,s.reason]));
+  const ws2=XLSX.utils.aoa_to_sheet(a2); ws2['!cols']=[{wch:12},{wch:56},{wch:28}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws1,('변환결과 '+m.mall).replace(/[\/?*\[\]:]/g,'').slice(0,31)); XLSX.utils.book_append_sheet(wb,ws2,'제외·미등록');
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  XLSX.writeFile(wb,`기획전_${m.mall}_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.xlsx`);
+};
+// 상품을 새로 고르면 변환 단추 상태 갱신
+const _pickOrig=$('pick').onclick;
+$('pick').onclick=async function(){ await _pickOrig.apply(this,arguments); CONV=null; $('dl2').disabled=true; $('ctw').hidden=true; $('skipNote').hidden=true; updateConvBtn(); };
+loadMallIndex();
 </script>
 </body>
 </html>

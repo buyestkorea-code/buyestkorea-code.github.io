@@ -139,12 +139,12 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 // ── AI 서비스 호출 (각각 { text } 를 돌려주고, 실패하면 ProviderError) ─────
 class ProviderError extends Error { constructor(provider, status, message) { super(message); this.provider = provider; this.status = status; } }
 
-async function callGemini(env, system, userText, images) {
+async function callGemini(env, system, userText, images, opts = {}) {
   const model = env.GEMINI_MODEL || "gemini-3.8-flash";
   const payload = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [...images.map((i) => ({ inline_data: { mime_type: i.mime, data: i.b64 } })), { text: userText }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 4096, responseMimeType: "application/json" },
+    generationConfig: { temperature: 0.7, maxOutputTokens: opts.maxTokens || 4096, responseMimeType: "application/json" },
   };
   let r, d;
   for (let attempt = 0; attempt < 2; attempt++) { // 일시 과부하는 한 번만 더 시도하고 다른 AI 로 넘어간다
@@ -162,10 +162,10 @@ async function callGemini(env, system, userText, images) {
 }
 
 // Groq: OpenAI 호환 주소. 사진을 읽는 모델(기본 Llama 4 Scout)을 쓴다.
-async function callGroq(env, system, userText, images) {
+async function callGroq(env, system, userText, images, opts = {}) {
   const model = env.GROQ_MODEL || "qwen/qwen3.8-27b";
   const payload = {
-    model, temperature: 0.7, max_tokens: 6000, response_format: { type: "json_object" },
+    model, temperature: 0.7, max_tokens: opts.maxTokens || 6000, response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
       { role: "user", content: [...images.slice(0, 1).map((i) => ({ type: "image_url", image_url: { url: i.url } })), { type: "text", text: userText }] },
@@ -320,14 +320,16 @@ const PROMO_SYSTEM = `당신은 해외 명품 병행수입 쇼핑몰의 MD 보�
 - 상품 종류는 한국 쇼핑몰 상품명에 실제로 쓰이는 한글 단어로 바꿉니다. 예) 패딩 → 패딩, 다운, 푸퍼, 퀄팅 / 코트 → 코트 / 가방 → 백, 토트, 숄더, 크로스.
 - 시즌, 세일, 11월 같은 말은 상품 종류가 아니므로 words 에 넣지 않습니다.`;
 
-async function runJson(env, system, userText) {
-  const order = providerOrder(env);
+async function runJson(env, system, userText, opts = {}) {
+  // 기획전은 답이 짧다: 출력 한도를 작게(Groq 무료 분당 출력 1000토큰 한도 회피) + 한도 넉넉한 Gemini 를 먼저 쓴다
+  const base = providerOrder(env);
+  const order = opts.first ? [...base.filter((k) => k === opts.first), ...base.filter((k) => k !== opts.first)] : base;
   if (!order.length) throw new HttpError(503, "AI 키가 아직 등록되지 않았습니다. 관리자에게 알려 주세요.");
   const errs = [];
   for (const k of order) {
     const p = PROVIDERS[k];
     try {
-      const res = await p.call(env, system, userText, []);
+      const res = await p.call(env, system, userText, [], { maxTokens: p.compact ? 700 : (opts.maxTokens || 2048) });
       const txt = res.text.replace(/<think>[\s\S]*?<\/think>/g, "");
       const m = /\{[\s\S]*\}/.exec(txt);
       return { data: JSON.parse(m ? m[0] : txt), by: p.name, fellBack: errs.length ? errs : undefined };
@@ -350,7 +352,7 @@ async function handlePromo(request, env) {
   if (body.mode === "parse") {
     const brands = (Array.isArray(body.brands) ? body.brands : []).map((b) => clean(b, 40)).filter(Boolean).slice(0, 500);
     const userText = `[MD 요청]\n${req}\n\n[브랜드 목록]\n${brands.join("\n")}\n\n출력: {"brands":["목록에 있는 이름 그대로"],"words":["상품명에 들어갈 한글 단어"],"note":"한 줄 해석"}`;
-    const { data, by, fellBack } = await runJson(env, PROMO_SYSTEM, userText);
+    const { data, by, fellBack } = await runJson(env, PROMO_SYSTEM, userText, { first: "gemini" });
     const allow = new Set(brands);
     const outB = (Array.isArray(data.brands) ? data.brands : []).map((b) => clean(b, 40)).filter((b) => allow.has(b));
     const outW = (Array.isArray(data.words) ? data.words : []).map((w) => clean(w, 20)).filter(Boolean).slice(0, 20);
@@ -362,7 +364,7 @@ async function handlePromo(request, env) {
       .map((x) => ({ i: Number(x && x.i), n: clean(x && x.n, 90) })).filter((x) => Number.isInteger(x.i) && x.n);
     if (!items.length) return json({ ok: true, keep: [], version: VERSION });
     const userText = `[MD 요청]\n${req}\n\n아래 상품 중 요청 취지에 맞는 상품의 번호만 고르세요. 애매하면 제외합니다.\n[상품]\n${items.map((x) => x.i + ": " + x.n).join("\n")}\n\n출력: {"keep":[번호,...]}`;
-    const { data, by, fellBack } = await runJson(env, PROMO_SYSTEM, userText);
+    const { data, by, fellBack } = await runJson(env, PROMO_SYSTEM, userText, { first: "gemini" });
     const allow = new Set(items.map((x) => x.i));
     const keep = (Array.isArray(data.keep) ? data.keep : []).map(Number).filter((n) => allow.has(n));
     return json({ ok: true, keep: [...new Set(keep)], by, fellBack, version: VERSION });
