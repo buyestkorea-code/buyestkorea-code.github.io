@@ -1,0 +1,25 @@
+# BUYEST 상품명 AI 자동생성 Worker
+name = "buyest-namegen"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# 임시 저장소(KV): 구글 이미지 검색에 넘길 사진을 10분만 맡겨 두는 곳 + 직원별 하루 사용 횟수 기록.
+# id 를 안 적으면 `npx wrangler deploy` 가 알아서 만들어 연결한다 (안 되면: npx wrangler kv namespace create NAMEGEN_KV → 나온 id 를 아래에 추가)
+[[kv_namespaces]]
+binding = "NAMEGEN_KV"
+
+[vars]
+# 모델 이름 (바뀌면 여기만 고치면 됩니다)
+GEMINI_MODEL = "gemini-3.8-flash"
+# Groq 사진 읽기 모델 (바뀌면 여기만 고치면 됩니다)
+GROQ_MODEL = "qwen/qwen3.8-27b"
+# 시도 순서 (키가 등록된 것만 사용)
+PROVIDERS = "groq,gemini"
+# 직원 1명 하루 생성 횟수 (KV 를 연결했을 때만 적용)
+LIMIT_PER_DAY = "150"
+# 학습자료 주소 (툴킷 사이트에 올라간 namebook.json)
+NAMEBOOK_URL = "https://buyestkorea-code.github.io/assets/photo-auto/namebook.json"
+
+# 구글 Gemini 는 일부 지역(예: 홍콩)에서 오는 호출을 막는다 → Worker 를 미국에서 실행
+[placement]
+region = "aws:us-east-1"
