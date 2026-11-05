@@ -169,6 +169,57 @@
     return st;
   }
 
-  var api = { seasonOf: seasonOf, seasonRank: seasonRank, order: order, brandStats: brandStats, parseSabangnet: parseSabangnet, parseRequest: parseRequest, select: select, KIND_MAP: KIND_MAP };
+  // ───────── 플랫폼(쇼핑몰) 변환 ─────────
+  // 사방넷 "쇼핑몰상품수정 다운로드" 한 줄 = 한 쇼핑몰(+ID)에 등록된 상품 1개.
+  // 우리가 쓰는 열(순서 고정): 쇼핑몰명, 쇼핑몰ID, 쇼핑몰상품코드, 품번코드, 자체상품코드, 상품명(송신), 모델명, 모델NO, 브랜드명, 제조사, 배송비구분, 배송비, 상품상태(송신), 재고관리여부, 판매가(송신), 수정송신일시
+  var MALL_COLS = ['쇼핑몰명', '쇼핑몰ID', '쇼핑몰상품코드', '품번코드', '자체상품코드', '상품명(송신)', '모델명', '모델NO', '브랜드명', '제조사', '배송비구분', '배송비', '상품상태(송신)', '재고관리여부', '판매가(송신)', '수정송신일시'];
+  // 변환 결과 엑셀의 열 (사용자가 정한 순서)
+  var OUT_HEAD = ['쇼핑몰상품코드', '품번코드', '자체상품코드', '상품명(송신)', '모델명', '모델NO', '브랜드명', '제조사', '배송비구분', '배송비', '상품상태(송신)', '재고관리여부', '판매가(송신)'];
+
+  // 엑셀에서 읽은 행 → 저장용 레코드 (배열). 판매가는 숫자, 나머지는 문자열.
+  function mallRecord(r) {
+    var price = parseFloat(r[14]);
+    return [r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], isNaN(price) ? 0 : Math.round(price), r[15]];
+  }
+  function mallKey(r) { return r[0] + '|' + r[1]; }
+  // 읽은 행들을 {쇼핑몰키: {품번코드: 레코드}} 로 묶는다
+  function groupMalls(rows) {
+    var g = {};
+    rows.forEach(function (r) {
+      if (!r[3]) return; // 품번코드 없는 줄 제외
+      var k = mallKey(r);
+      (g[k] || (g[k] = {}))[r[3]] = mallRecord(r);
+    });
+    return g;
+  }
+  // 이미 저장된 쇼핑몰 자료에 새 자료를 합친다. 같은 품번이면 수정송신일시가 더 최근(같으면 새 파일)인 쪽이 이긴다.
+  function mergeMap(oldMap, newMap) {
+    var out = oldMap || {};
+    Object.keys(newMap).forEach(function (code) {
+      var o = out[code], n = newMap[code];
+      if (!o || (n[13] || '') >= (o[13] || '')) out[code] = n;
+    });
+    return out;
+  }
+  function mapAsOf(map) {
+    var m = '';
+    Object.keys(map).forEach(function (c) { var d = map[c][13] || ''; if (d > m) m = d; });
+    return m; // 예: "20261030 16:59"
+  }
+  // 고른 상품(picked: [{code,name}]) → 쇼핑몰 자료(map)에서 찾아 바꾼다.
+  // 결과: { matched:[레코드...], skipped:[{code,name,reason}] }
+  function convert(picked, map, excludePaused) {
+    var matched = [], skipped = [], seen = {};
+    picked.forEach(function (p) {
+      if (seen[p.code]) return; seen[p.code] = true;
+      var rec = map[p.code];
+      if (!rec) { skipped.push({ code: p.code, name: p.name, reason: '이 쇼핑몰에 등록 안 됨' }); return; }
+      if (excludePaused && rec[10] !== '공급중') { skipped.push({ code: p.code, name: p.name, reason: '쇼핑몰 상태: ' + (rec[10] || '알 수 없음') }); return; }
+      matched.push(rec);
+    });
+    return { matched: matched, skipped: skipped };
+  }
+
+  var api = { MALL_COLS: MALL_COLS, OUT_HEAD: OUT_HEAD, mallRecord: mallRecord, groupMalls: groupMalls, mergeMap: mergeMap, mapAsOf: mapAsOf, convert: convert, seasonOf: seasonOf, seasonRank: seasonRank, order: order, brandStats: brandStats, parseSabangnet: parseSabangnet, parseRequest: parseRequest, select: select, KIND_MAP: KIND_MAP };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PromoPick = api;
 })(typeof window !== 'undefined' ? window : this);
