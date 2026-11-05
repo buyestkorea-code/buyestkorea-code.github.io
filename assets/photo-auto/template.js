@@ -59,7 +59,7 @@ function build(ExcelJS,v){
   var tiers=v.tiers||[], cats=v.cats||[];
 
   /* 제목·범례 */
-  cell('C2','상품정보 기본양식','title'); ws.getCell('C2').font={name:'맑은 고딕',size:14,bold:true};
+  cell('C2',v.tplName?('상품정보 기본양식 · '+v.tplName):'상품정보 기본양식','title'); ws.getCell('C2').font={name:'맑은 고딕',size:14,bold:true};
   cell('D2','사진 자동화 ②에 올리면 ③ 상세 정보와 ④ 사이트 등록에 같이 쓰입니다','note');
   cell('C3','범례','label'); cell('D3','입력칸 (여기에 적기)','input'); cell('E3','구역 제목','title'); cell('F3','항목 이름','label'); cell('G3','필수 입력','req');
   cell('H3','회색 글씨 = 설명','note');
@@ -95,16 +95,26 @@ function build(ExcelJS,v){
 
   /* ===== 2. 상세페이지 정보 (사진 자동화 전용) ===== */
   var detail=v.detail||{};
-  var dvals={'브랜드한글':v.brandKo,'품목(카테고리 단어)':v.categoryWord,'수입여부':v.imported,'제조년월':v.mfg,'색상':v.color,'구성품':v.parts,'수납공간':v.storage};
+  var dvals={'브랜드한글':v.brandKo,'품목(카테고리 단어)':v.categoryWord,'수입여부':v.imported,'제조년월':v.mfg,'색상':v.color,'구성품':v.parts||(v.defaults&&v.defaults['구성품'])||'','수납공간':v.storage};
   cell('C26','상세페이지 정보 (사진 자동화)','title'); cell('D26','▼ 상세페이지 Information 표에 들어갑니다. 비워둔 칸은 화면에서 직접 입력하거나 상품명에서 자동으로 채워져요','note');
-  DETAIL_ROWS.forEach(function(d,i){ var r=27+i; cell('C'+r,d[0],'label'); cell('D'+r,dvals[d[0]],'input'); cell('E'+r,d[1],'note'); });
+  var shown=DETAIL_ROWS.filter(function(d){ return !(v.infoRows&&d[0]==='제조년월'&&v.infoRows.indexOf('제조년월')<0); });
+  shown.forEach(function(d,i){ var r=27+i; cell('C'+r,d[0],'label'); cell('D'+r,dvals[d[0]],'input'); cell('E'+r,d[1],'note'); });
 
   /* ===== 3. 추가 항목 ===== */
   cell('C35','추가 항목 (상품 종류별)','title'); cell('D35','▼ 의류의 핏·세탁방법, 신발의 굽높이 등 — 항목 이름과 값을 적으면 화면 ③에 항목이 새로 생겨요','note');
   cell('C36','추가항목','label'); cell('D36','항목 이름','label'); cell('E36','값','label');
   var ex=v.extras||{}, exKeys=Object.keys(ex).filter(function(k){ return ex[k]; });
+  (v.extraNames||[]).forEach(function(n){ if(exKeys.indexOf(n)<0) exKeys.push(n); });
   for(var i=0;i<EXTRA_N;i++){ var r=37+i; cell('C'+r,'추가항목 '+(i+1),'label'); cell('D'+r,exKeys[i],'input'); cell('E'+r,exKeys[i]?ex[exKeys[i]]:'','input'); }
   cell('F37','예) 핏 | 레귤러핏',"note"); cell('F38','예) 세탁방법 | 드라이클리닝','note');
+
+  /* ===== 4. 실측표 (템플릿에 실측표가 있을 때만) — 읽기는 register.js parseSheet1Detail 의 '사이즈 ↓' 규칙 ===== */
+  if(v.sizeCols&&v.sizeCols.length){
+    cell('C44','실측표 (cm)','title'); cell('D44','▼ 사이즈별 실측값을 적으세요. 비워 둔 칸은 화면 ③에서 직접 입력해도 돼요','note');
+    cell('C45','사이즈 ↓ '+(v.sizeCorner||''),'label');
+    v.sizeCols.slice(0,6).forEach(function(h,i){ cell(COLS[i]+'45',h,'label'); });
+    (v.sizeRows||[]).slice(0,10).forEach(function(sz,j){ var r=46+j; cell('C'+r,sz,'label'); v.sizeCols.slice(0,6).forEach(function(h,i){ cell(COLS[i]+r,'','input'); }); });
+  }
 
   /* ===== 참고 메뉴 목록 (J~L열) — 복사해서 붙여넣기용 ===== */
   cell('J2','◀ 참고용 메뉴 목록 (필요한 것을 복사해서 왼쪽 칸에 붙여넣기)','note');

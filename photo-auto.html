@@ -339,7 +339,14 @@ function wireDrop(box,input,handler){
 }
 $('xBlank').addEventListener('click',function(){
   $('xSum').textContent='기본양식을 만드는 중…';
-  PhotoTemplate.download({},'상품정보_기본양식.xlsx').then(function(){ $('xSum').textContent='기본양식을 내려받았어요. 노란 칸은 항목 이름, 파란 칸에 값을 적어 ②에 다시 올리세요.'; })
+  var t=state.tplId?TPL.tpl(state.tplId):null, v={}, fn='상품정보_기본양식.xlsx';
+  if(t){
+    var it=t.items?TPL.item(t.items):null;
+    v={tplName:t.name,infoRows:t.rows,defaults:t.defaults,extraNames:(t.rows.indexOf('굽높이')>=0?['굽높이']:[])};
+    if(it&&t.chart==='full'){ v.sizeCorner=it.corner; v.sizeCols=it.cols; v.sizeRows=it.rows; }
+    fn='상품정보_기본양식_'+t.name.replace(/\s*\(.*$/,'').replace(/[\/:*?"<>|\s]+/g,'_')+'.xlsx';
+  }
+  PhotoTemplate.download(v,fn).then(function(){ $('xSum').textContent=(t?'['+t.name+'] ':'')+'기본양식을 내려받았어요. 노란 칸은 항목 이름, 파란 칸에 값을 적어 ②에 다시 올리세요.'; })
     .catch(function(e){ $('xSum').textContent='기본양식을 만들지 못했어요: '+e.message; });
 });
 wireDrop($('dropX'),$('fileX'),function(fs){ var f=fs.filter(function(f){return /\.xlsx?$/i.test(f.name);})[0]; if(f) setXlsx(f); });
