@@ -390,7 +390,7 @@
   // ── 서버 상태 ────────────────────────────────────
   async function wapi(path, body) {
     let r;
-    try { r = await fetch(WK + path, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", "X-Studio-User": AUTH.id, "X-Studio-Pass": AUTH.pass }, body: body ? JSON.stringify(body) : undefined }); }
+    try { r = await fetch(WK + path, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", "X-Studio-User": encodeURIComponent(AUTH.id), "X-Studio-Pass": encodeURIComponent(AUTH.pass), "X-Studio-Enc": "1" }, body: body ? JSON.stringify(body) : undefined }); }
     catch (_) { const e = new Error("AI 서버에 연결하지 못했습니다"); e.status = 0; throw e; }
     let d = null; try { d = await r.json(); } catch (_) {}
     if (!r.ok) { const e = new Error((d && d.error) || `AI 서버 오류 (${r.status})`); e.status = r.status; throw e; }

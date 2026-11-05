@@ -172,7 +172,7 @@
   async function wapi(path, opts = {}) {
     let r;
     try {
-      r = await fetch(WORKER + path, { method: opts.method || "GET", headers: { "Content-Type": "application/json", "X-Studio-User": AUTH.id, "X-Studio-Pass": AUTH.pass, ...(opts.headers || {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+      r = await fetch(WORKER + path, { method: opts.method || "GET", headers: { "Content-Type": "application/json", "X-Studio-User": encodeURIComponent(AUTH.id), "X-Studio-Pass": encodeURIComponent(AUTH.pass), "X-Studio-Enc": "1", ...(opts.headers || {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined });
     } catch (_) { const e = new Error("AI 서버에 연결하지 못했습니다"); e.status = 0; throw e; }
     let data = null; try { data = await r.json(); } catch (_) {}
     if (!r.ok) { const e = new Error((data && data.error) || `AI 서버 오류 (${r.status})`); e.status = r.status; throw e; }
