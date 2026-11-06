@@ -79,7 +79,7 @@
     <label class="l" for="maxN" style="margin:0">최대 개수</label><input type="text" id="maxN" inputmode="numeric" placeholder="전체" style="width:90px">
     <label class="chip" for="balance" style="display:inline-flex"><input type="checkbox" id="balance"> 브랜드별로 고르게 섞기</label></div>
     <div class="hint">개수를 정하면 위 정렬 기준으로 앞에서부터 자릅니다. "고르게 섞기"를 켜면 한 브랜드가 다 차지하지 않게 브랜드를 번갈아 뽑아요.</div></div>
-  <div class="f" id="stockWrap" hidden><label class="chip" for="stockOnly" style="display:inline-flex"><input type="checkbox" id="stockOnly" checked> 현재고가 있는 상품만</label></div>
+  <div class="f" id="stockWrap" hidden><label class="chip" for="stockOnly" style="display:inline-flex"><input type="checkbox" id="stockOnly"> 이카운트 재고가 있는 상품만 <span style="opacity:.6">(꺼 두면 재고 0 상품도 엑셀에 나오고 빨간색으로 표시)</span></label></div>
   <div class="f"><label class="chip" for="aiSel" style="display:inline-flex"><input type="checkbox" id="aiSel"> AI 정밀 선별 (상품명을 AI가 하나씩 보고 고름 · 느리지만 단어로 못 잡는 상품까지 찾음)</label>
   <div class="f" id="modelBox" style="font-size:12px;color:var(--mute,#666)">🧪 AI 모델 시험:
     <select id="aiModel"><option value="">현재 기본 모델</option><option value="gemini-3.8-flash">Gemini 3.8 Flash</option><option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option><option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option><option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option></select>
@@ -88,7 +88,7 @@
     <div class="hint">체크하면 선택한 브랜드의 상품(최대 450개)을 AI가 요청 취지에 맞는지 판단합니다. 체크 안 하면 위 단어로만 거릅니다.</div></div>
   <div class="row"><button class="btn btn-pri" id="pick">상품 고르기</button><button class="btn btn-out" id="dl" disabled>엑셀 다운로드</button></div>
   <div class="msg" id="msg"></div>
-  <div class="tw" id="tw" hidden><table><thead><tr><th>사방넷코드</th><th>상품명</th><th>브랜드</th></tr></thead><tbody id="tb"></tbody></table></div>
+  <div class="tw" id="tw" hidden><table><thead><tr><th>사방넷코드</th><th>상품명</th><th>브랜드</th><th>이카운트 총재고</th><th>사이즈별 재고</th></tr></thead><tbody id="tb"></tbody></table></div>
 </div>
 
 <div class="box" id="mallBox">
@@ -114,6 +114,8 @@
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
 <script src="assets/xlsx-fast.js"></script>
+<script src="assets/ec-cache.js"></script>
+<script src="assets/libs/exceljs-4.4.0.min.js"></script>
 <script src="promo-pick-logic.js"></script>
 <script>
 const $=id=>document.getElementById(id);
@@ -342,7 +344,10 @@ $('pick').onclick=async()=>{
   const words=$('words').value.split(/[,\n]+/).map(s=>s.trim()).filter(Boolean);
   if(!brands.length && !words.length){ $('msg').className='msg err'; $('msg').textContent='브랜드나 단어 중 하나는 있어야 합니다.'; return; }
   $('pick').disabled=true; $('dl').disabled=true;
+  let ecNote='';
   try{
+    try{ $('msg').className='msg'; $('msg').textContent='이카운트 최신 재고를 불러오는 중...'; await ensureEcStock(); ecNote=' · '+ecStampText(); }
+    catch(e){ ecNote=' ⚠️ 이카운트 재고를 못 불러와 사방넷 파일의(옛) 재고 기준입니다: '+e.message; }
     if($('aiSel').checked){
       if(!brands.length) throw new Error('AI 정밀 선별은 브랜드를 먼저 골라야 합니다');
       const o=getOpts();
@@ -357,21 +362,108 @@ $('pick').onclick=async()=>{
       PICKED=applyOrder(PromoPick.select(DATA.rows,brands,words,$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o);
       if(o.ord==='new'&&!HASREG) $('msg').dataset.cap='(등록일 정보가 없는 파일이라 신상 순은 적용되지 않았어요) ';
     }
-    $('tb').innerHTML=PICKED.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.brand)}</td></tr>`).join('');
+    $('tb').innerHTML=PICKED.map(r=>{ const e=EC.idx?ecOf(r):null, z=e&&e.found&&e.total===0; return `<tr${z?' style="background:var(--badbg);color:var(--bad)"':''}><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.brand)}</td><td>${e?(e.found?e.total.toLocaleString():'-'):''}</td><td style="font-size:11.5px">${e?esc(ecSizesText(e)):''}</td></tr>`; }).join('');
     $('tw').hidden=!PICKED.length;
     $('msg').className=PICKED.length?'msg ok':'msg';
-    $('msg').textContent=(PICKED.length?`✅ ${PICKED.length.toLocaleString()}개 상품을 골랐습니다.`:'조건에 맞는 상품이 없습니다.')+($('aiSel').checked?' (AI 정밀 선별) '+($('msg').dataset.t||''):' ')+($('msg').dataset.cap||'');
+    const zeroN=PICKED.filter(r=>{ const e=ecOf(r); return EC.idx&&e.found&&e.total===0; }).length;
+    $('msg').textContent=(PICKED.length?`✅ ${PICKED.length.toLocaleString()}개 상품을 골랐습니다.`:'조건에 맞는 상품이 없습니다.')+($('aiSel').checked?' (AI 정밀 선별) '+($('msg').dataset.t||''):' ')+($('msg').dataset.cap||'')+(zeroN?` 재고 0인 상품 ${zeroN}개는 빨간색으로 표시됩니다.`:'')+ecNote;
     $('msg').dataset.cap=''; $('msg').dataset.t='';
     $('dl').disabled=!PICKED.length;
   }catch(err){ $('msg').className='msg err'; $('msg').textContent='오류: '+err.message+' — AI 정밀 선별을 끄고 다시 눌러 보세요.'; }
   finally{ $('pick').disabled=false; }
 };
-$('dl').onclick=()=>{
-  const aoa=[['사방넷코드','상품명']]; PICKED.forEach(r=>aoa.push([r.code,r.name]));
-  const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:14},{wch:60}];
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'기획전상품');
-  const d=new Date(),p=n=>String(n).padStart(2,'0');
-  XLSX.writeFile(wb,`기획전_사방넷코드_상품명_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.xlsx`);
+// ───────── 이카운트 최신 재고 (사방넷 파일의 재고는 올린 시점 값이라 쓰지 않는다) ─────────
+// 서버가 크론으로 모아 둔 이카운트 재고(ECCache 'master')를, 품절도구(MD품절)와 같은 규칙으로 사방넷 상품에 붙인다:
+// 상품명 끝의 품번이 같고 · 하자/스크래치 라벨이 같고 · 키즈/여성 구분이 안 어긋나는 이카운트 품목 중, 이름이 가장 비슷한 것(시즌 표기가 같으면 우선)만 쓰고 규격(사이즈)별로 합산.
+const EC={idx:null,asOf:0,stamp:'',stale:false};
+function ecCodeSuffix(name){ const cleaned=String(name||'').replace(/\s*\([^)]*\)\s*$/,''); const t=cleaned.trim().split(/\s+/).filter(Boolean); let i=t.length; while(i>0&&!/[가-힣]/.test(t[i-1])) i--; return t.slice(i).join(' '); }
+function ecLabelParts(text){ const t=String(text||'').trim().replace(/^\[|\]$/g,''); for(const w of ['하자','스크래치']){ if(t.indexOf(w)===0){ const m=/(\d+)\s*$/.exec(t.slice(w.length)); return {base:w,num:m?m[1]:''}; } } return null; }
+const ecLabelE=n=>{ const m=/^\[([^\]]+)\]/.exec(String(n||'').trim()); return m?ecLabelParts(m[1]):null; };
+const ecLabelS=n=>ecLabelParts((String(n||'').trim().split(/\s+/)[0])||'');
+function ecGender(n){ const t=String(n||'').replace(/\[[^\]]*\]/g,' ').split(/[\s\/&,()]+/), o={}; ['키즈','여성','남성','남아','여아'].forEach(w=>{ if(t.indexOf(w)!==-1) o[w]=1; }); return Object.keys(o); }
+function ecGenderOk(a,b){ const A=ecGender(a),B=ecGender(b); if(!A.length||!B.length) return true; return A.every(x=>B.indexOf(x)!==-1)||B.every(x=>A.indexOf(x)!==-1); }
+function ecSeasonTag(n){ const t=(String(n||'').trim().split(/\s+/)[0]||'').toUpperCase(); return /^(\d{2}(SS|FW|S\/S|F\/W)|\d+주년)$/.test(t)?t.replace('/',''):''; }
+function ecTok(n){ const o={}; String(n||'').toUpperCase().replace(/[\/&,()\[\]]/g,' ').split(/\s+/).filter(Boolean).forEach(x=>o[x]=1); return o; }
+function ecScore(a,b){ const A=ecTok(a),B=ecTok(b); let i=0,u=0,k; for(k in A){u++; if(B[k]) i++;} for(k in B){ if(!A[k]) u++; } return u?i/u:0; }
+function ecNormSpec(v){ let s=String(v==null?'':v).trim().toUpperCase().replace(/[()]/g,' ').replace(/\s+/g,' ').trim(); s=s.replace(/^(\d+)Y$/,'$1A'); return s===''?'TU':s; }
+const EC_SIZE_ORDER=['XXXS','XXS','XS','S','M','L','XL','XXL','XXXL','TU','FREE','F'];
+function ecSizeKey(s){ const i=EC_SIZE_ORDER.indexOf(s); if(i>=0) return [1,i,s]; const n=parseFloat(s); return isNaN(n)?[2,0,s]:[0,n,s]; }
+function ecSizeCmp(a,b){ const x=ecSizeKey(a),y=ecSizeKey(b); return x[0]-y[0]||x[1]-y[1]||(x[2]<y[2]?-1:x[2]>y[2]?1:0); }
+async function ecLoad(){
+  if(EC.idx) return EC;
+  const d=await ECCache.load('master');
+  const idx={}; d.rows.forEach(r=>{ const nm=r[1]||''; if(nm.indexOf('시즌변경')!==-1) return; const k=ecCodeSuffix(nm); if(!k) return; (idx[k]=idx[k]||[]).push({code:r[0],name:nm,spec:r[2],qty:Number(r[3])||0}); });
+  const t=new Date(d.as_of*1000),p=n=>String(n).padStart(2,'0');
+  EC.idx=idx; EC.asOf=d.as_of; EC.stale=!!d.stale; EC.stamp=`${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
+  return EC;
+}
+// 사방넷 상품명 → {found, total, sizes:[{spec,qty}]}
+function ecStock(name){
+  const none={found:false,total:0,sizes:[]};
+  const cand=EC.idx&&EC.idx[ecCodeSuffix(name)]; if(!cand) return none;
+  const sl=ecLabelS(name), slb=sl?sl.base:null;
+  const ok=cand.filter(it=>{ const el=ecLabelE(it.name); if((el?el.base:null)!==slb) return false; if(el&&sl&&el.num&&sl.num&&el.num!==sl.num) return false; return ecGenderOk(it.name,name); });
+  if(!ok.length) return none;
+  let names=[...new Set(ok.map(x=>x.name))];
+  const tag=ecSeasonTag(name); if(tag){ const same=names.filter(n=>ecSeasonTag(n)===tag); if(same.length) names=same; }
+  const sc=names.map(n=>({n,s:ecScore(name,n)})), best=Math.max(...sc.map(x=>x.s));
+  const keep=new Set(sc.filter(x=>x.s>=best-1e-4).map(x=>x.n));
+  const m={}; ok.forEach(it=>{ if(!keep.has(it.name)) return; const k=ecNormSpec(it.spec); m[k]=(m[k]||0)+it.qty; });
+  const sizes=Object.keys(m).sort(ecSizeCmp).map(k=>({spec:k,qty:m[k]}));
+  return {found:sizes.length>0,total:sizes.reduce((t,x)=>t+x.qty,0),sizes};
+}
+// 뽑기 전에: 모든 상품의 재고를 이카운트 값으로 바꿔 둔다(재고 있는 것만·재고 많은 순·브랜드 옆 숫자가 전부 이카운트 기준이 됨)
+async function ensureEcStock(){
+  await ecLoad();
+  if(DATA.ecAsOf===EC.asOf) return;
+  DATA.rows.forEach(r=>{ if(r.stock0===undefined) r.stock0=r.stock; r.ec=ecStock(r.name); r.stock=r.ec.found?r.ec.total:0; });
+  DATA.ecAsOf=EC.asOf; DATA.hasStock=true;
+  window.BSTAT=PromoPick.brandStats(DATA.rows);
+  window.BORDER=Object.keys(BSTAT).sort((a,b)=>BSTAT[b].stock-BSTAT[a].stock);
+  $('stockWrap').hidden=false;
+}
+function ecOf(r){ return r.ec||(EC.idx?ecStock(r.name):{found:false,total:0,sizes:[]}); }
+function ecSizesText(e){ return e.found?e.sizes.map(x=>x.spec+':'+x.qty).join('  '):'이카운트에 없음'; }
+function ecStampText(){ return EC.stamp?`이카운트 재고 기준 ${EC.stamp}${EC.stale?' (오래된 자료)':''}`:''; }
+
+// ───────── 엑셀(ExcelJS): 재고 0은 빨간색 ─────────
+const RED_FILL={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFC7CE'}}, RED_FONT={color:{argb:'FF9C0006'},bold:true}, GREY_FONT={color:{argb:'FF8A8F98'}};
+// 사이즈별 재고 시트 데이터: 상품마다 사이즈 줄을 펼친다. 반환 {rows, redCells:[[r,c]], redRows:[r], greyRows:[r]} (r,c 는 1부터, 머리글이 1행)
+function stockSheet(list){
+  const head=['사방넷코드','상품명','브랜드','사이즈','이카운트 재고','상품 총재고','재고 기준시각'];
+  const rows=[head], redCells=[], redRows=[], greyRows=[];
+  list.forEach(p=>{
+    const e=ecOf(p), at=EC.stamp;
+    if(!e.found){ rows.push([p.code,p.name,p.brand||'','','이카운트에 없음','',at]); greyRows.push(rows.length); return; }
+    e.sizes.forEach(s=>{ rows.push([p.code,p.name,p.brand||'',s.spec,s.qty,e.total,at]); const r=rows.length; if(e.total===0) redRows.push(r); else if(s.qty===0) redCells.push([r,4],[r,5]); });
+  });
+  return {rows,redCells,redRows,greyRows,widths:[14,56,16,10,14,12,20]};
+}
+function tsName(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; }
+async function saveBook(filename,sheets){
+  const wb=new ExcelJS.Workbook();
+  sheets.forEach(sh=>{
+    const ws=wb.addWorksheet(sh.name.replace(/[\/?*\[\]:]/g,'').slice(0,31));
+    sh.rows.forEach(r=>ws.addRow(r));
+    (sh.widths||[]).forEach((w,i)=>ws.getColumn(i+1).width=w);
+    const h=ws.getRow(1); h.font={bold:true}; h.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF1F1EE'}}; ws.views=[{state:'frozen',ySplit:1}];
+    (sh.redRows||[]).forEach(r=>{ ws.getRow(r).eachCell({includeEmpty:true},c=>{ c.fill=RED_FILL; c.font=RED_FONT; }); });
+    (sh.redCells||[]).forEach(([r,c])=>{ const cell=ws.getCell(r,c); cell.fill=RED_FILL; cell.font=RED_FONT; });
+    (sh.greyRows||[]).forEach(r=>{ ws.getRow(r).font=GREY_FONT; });
+  });
+  const buf=await wb.xlsx.writeBuffer();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+$('dl').onclick=async()=>{
+  $('dl').disabled=true;
+  try{
+    let note='';
+    try{ await ecLoad(); }catch(e){ note=' (이카운트 재고를 못 불러와 재고 열이 비었습니다: '+e.message+')'; }
+    if(EC.idx){ const ss=stockSheet(PICKED); await saveBook(`기획전_사방넷코드_재고_${tsName()}.xlsx`,[Object.assign({name:'기획전상품'},ss)]); }
+    else { const aoa=[['사방넷코드','상품명']]; PICKED.forEach(r=>aoa.push([r.code,r.name])); await saveBook(`기획전_사방넷코드_상품명_${tsName()}.xlsx`,[{name:'기획전상품',rows:aoa,widths:[14,60]}]); }
+    if(note) $('msg').textContent+=note;
+  }catch(err){ $('msg').className='msg err'; $('msg').textContent='엑셀 만들기 오류: '+err.message; }
+  finally{ $('dl').disabled=!PICKED.length; }
 };
 
 // ───────── ④ 플랫폼 변환 ─────────
@@ -482,17 +574,26 @@ $('convert').onclick=async()=>{
   }catch(err){ $('cmsg').className='msg err'; $('cmsg').textContent='오류: '+err.message; }
   finally{ updateConvBtn(); }
 };
-$('dl2').onclick=()=>{
+$('dl2').onclick=async()=>{
   if(!CONV) return;
-  const m=MALLS[$('mallSel').value]||{mall:'플랫폼'};
-  const a1=[PromoPick.OUT_HEAD]; CONV.matched.forEach(r=>a1.push([r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12]]));
-  const ws1=XLSX.utils.aoa_to_sheet(a1);
-  ws1['!cols']=[{wch:16},{wch:10},{wch:12},{wch:56},{wch:30},{wch:24},{wch:14},{wch:14},{wch:10},{wch:8},{wch:12},{wch:10},{wch:12}];
-  const a2=[['품번코드','상품명(기획전 선별)','사유']]; CONV.skipped.forEach(s=>a2.push([s.code,s.name,s.reason]));
-  const ws2=XLSX.utils.aoa_to_sheet(a2); ws2['!cols']=[{wch:12},{wch:56},{wch:28}];
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws1,('변환결과 '+m.mall).replace(/[\/?*\[\]:]/g,'').slice(0,31)); XLSX.utils.book_append_sheet(wb,ws2,'제외·미등록');
-  const d=new Date(),p=n=>String(n).padStart(2,'0');
-  XLSX.writeFile(wb,`기획전_${m.mall}_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.xlsx`);
+  $('dl2').disabled=true;
+  try{
+    const m=MALLS[$('mallSel').value]||{mall:'플랫폼'};
+    const a1=[PromoPick.OUT_HEAD]; CONV.matched.forEach(r=>a1.push([r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12]]));
+    const a2=[['품번코드','상품명(기획전 선별)','사유']]; CONV.skipped.forEach(s=>a2.push([s.code,s.name,s.reason]));
+    const sheets=[{name:'변환결과 '+m.mall,rows:a1,widths:[16,10,12,56,30,24,14,14,10,8,12,10,12]}];
+    let note='';
+    try{ await ecLoad(); }catch(e){ note=e.message; }
+    if(EC.idx){
+      // 변환된 상품(품번코드 기준)만, 이카운트 최신 재고를 사이즈별로 펼쳐서 별도 시트로
+      const ok=new Set(CONV.matched.map(r=>String(r[1])));
+      const list=PICKED.filter(p=>ok.has(String(p.code))||ok.has(String(p.code).split('-')[0]));
+      sheets.push(Object.assign({name:'이카운트 재고(사이즈별)'},stockSheet(list)));
+    } else if(note) $('cmsg').textContent+=' (이카운트 재고 시트는 못 넣었어요: '+note+')';
+    sheets.push({name:'제외·미등록',rows:a2,widths:[12,56,28]});
+    await saveBook(`기획전_${m.mall}_${tsName()}.xlsx`,sheets);
+  }catch(err){ $('cmsg').className='msg err'; $('cmsg').textContent='엑셀 만들기 오류: '+err.message; }
+  finally{ $('dl2').disabled=!CONV||(!CONV.matched.length&&!CONV.skipped.length); }
 };
 // 상품을 새로 고르면 변환 단추 상태 갱신
 const _pickOrig=$('pick').onclick;
