@@ -85,7 +85,7 @@
     <select id="aiModel"><option value="">현재 기본 모델</option><option value="gemini-3.8-flash">Gemini 3.8 Flash</option><option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option><option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option><option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option></select>
     <button class="btn btn-out" type="button" id="cmpBtn" style="padding:4px 10px">두 모델 비교하기</button>
     <span id="cmpOut"></span></div>
-    <div class="hint">체크하면 선택한 브랜드의 상품(최대 450개)을 AI가 요청 취지에 맞는지 판단합니다. 체크 안 하면 위 단어로만 거릅니다.</div></div>
+    <div class="hint">체크하면 단어로 확실한 상품은 바로 넣고, 나머지 후보 전부(개수 제한 없음)를 AI가 요청 취지에 맞는지 판단합니다. 체크 안 하면 위 단어로만 거릅니다.</div></div>
   <div class="row"><button class="btn btn-pri" id="pick">상품 고르기</button><button class="btn btn-out" id="dl" disabled>엑셀 다운로드</button></div>
   <div class="msg" id="msg"></div>
   <div class="tw" id="tw" hidden><table><thead><tr><th>사방넷코드</th><th>상품명</th><th>브랜드</th><th>이카운트 총재고</th><th>사이즈별 재고</th></tr></thead><tbody id="tb"></tbody></table></div>
@@ -293,7 +293,9 @@ $('analyze').onclick=async()=>{
   const text=$('req').value.trim();
   if(!text){ $('aiState').textContent='요청 문장을 먼저 붙여넣어 주세요'; return; }
   const rule=PromoPick.parseRequest(text,ALLB);
-  $('analyze').disabled=true; $('aiState').textContent='AI가 읽는 중...';
+  // 속도: 규칙으로 브랜드를 찾았으면 AI(약 15초)를 부르지 않고 바로 보여준다. 브랜드를 못 찾았을 때만 AI가 읽는다.
+  if(rule.brands.length){ $('aiState').textContent='규칙으로 바로 찾았습니다 (브랜드 '+rule.brands.length+'개'+(rule.kinds.length?' · 종류 '+rule.kinds.join(', '):'')+')'; showCond(rule.brands,rule.words,'',rule.audiences); return; }
+  $('analyze').disabled=true; $('aiState').textContent='브랜드를 못 찾아 AI가 읽는 중...';
   try{
     // 브랜드 전체(수백 개)를 보내면 글이 길어 AI가 느려지고 무료 한도에 걸림 → 상위 120개 + 규칙으로 찾은 브랜드만 보냄. 실패하면 바로 규칙 결과 사용
     const cand=[...new Set([...rule.brands,...ALLB.slice(0,120)])];
@@ -310,17 +312,17 @@ $('analyze').onclick=async()=>{
 // 50개씩 나눠 4묶음을 동시에 AI에게 보낸다. model 을 주면 그 모델로만 (시험용). 결과: {keep:Set, ms, model}
 async function aiSelect(base,model,onProg){
   const keep=new Set(), t0=Date.now(), req=$('req').value.trim();
-  const chunks=[]; for(let i=0;i<base.length;i+=50) chunks.push(i);
+  const CH=80, chunks=[]; for(let i=0;i<base.length;i+=CH) chunks.push(i);
   let done=0,next=0; onProg&&onProg(0);
   const worker=async()=>{
     while(next<chunks.length){
       const i=chunks[next++];
-      const items=base.slice(i,i+50).map((r,k)=>({i:i+k,n:r.name+(r.cat?' ['+r.cat+']':'')}));
+      const items=base.slice(i,i+CH).map((r,k)=>({i:i+k,n:r.name+(r.cat?' ['+r.cat+']':'')}));
       const d=await callAI({mode:'select',request:req,items,model:model||undefined});
-      d.keep.forEach(n=>keep.add(n)); done++; onProg&&onProg(Math.min(done*50,base.length));
+      d.keep.forEach(n=>keep.add(n)); done++; onProg&&onProg(Math.min(done*CH,base.length));
     }
   };
-  await Promise.all([worker(),worker(),worker(),worker()]);
+  await Promise.all([worker(),worker(),worker(),worker(),worker(),worker()]);
   return {keep,ms:Date.now()-t0,model};
 }
 $('cmpBtn').onclick=async()=>{
@@ -351,12 +353,18 @@ $('pick').onclick=async()=>{
     if($('aiSel').checked){
       if(!brands.length) throw new Error('AI 정밀 선별은 브랜드를 먼저 골라야 합니다');
       const o=getOpts();
-      let base=PromoPick.order(PromoPick.select(DATA.rows,brands,[],$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o.ord,false);
-      let capped=false; if(base.length>450){ base=base.slice(0,450); capped=true; }
-      const R=await aiSelect(base,$('aiModel').value,n=>{ $('msg').className='msg'; $('msg').textContent=`AI가 고르는 중... ${n} / ${base.length}`; });
-      const keep=R.keep; $('msg').dataset.t=`(${R.model||'기본 모델'} · ${(R.ms/1000).toFixed(1)}초) `;
-      PICKED=applyOrder(base.filter((r,k)=>keep.has(k)),o);
-      if(capped) $('msg').dataset.cap='브랜드 상품이 많아 앞 450개만 AI가 봤습니다. ';
+      const all=PromoPick.order(PromoPick.select(DATA.rows,brands,[],$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o.ord,false);
+      // 속도: 상품명에 고른 단어(패딩·다운 등)가 확실히 들어 있는 상품은 AI 없이 바로 포함하고,
+      // AI는 나머지 중 "이 종류가 있을 만한 구역"(예: 패딩 요청이면 상의류)의 후보만 본다. 개수 제한 없이 전부 본다.
+      const kinds=PromoPick.parseRequest($('req').value,ALLB).kinds;
+      const sure=words.length?all.filter(r=>{ const h=r.name+' '+(r.cat||''); return words.some(w=>h.indexOf(w)>=0); }):[];
+      const sureSet=new Set(sure);
+      const cand=all.filter(r=>!sureSet.has(r)&&PromoPick.catOkForKinds(r,kinds)&&!PromoPick.excludedByKinds(r,kinds));
+      const R=cand.length?await aiSelect(cand,$('aiModel').value,n=>{ $('msg').className='msg'; $('msg').textContent=`AI가 고르는 중... ${n} / ${cand.length} (단어로 확실한 ${sure.length}개는 바로 포함)`; }):{keep:new Set(),ms:0,model:''};
+      const chosen=new Set(sure); cand.forEach((r,k)=>{ if(R.keep.has(k)) chosen.add(r); });
+      $('msg').dataset.t=`(${R.model||'기본 모델'} · ${(R.ms/1000).toFixed(1)}초) `;
+      PICKED=applyOrder(all.filter(r=>chosen.has(r)),o);
+      $('msg').dataset.cap=`단어로 확실한 ${sure.length.toLocaleString()}개 + AI가 후보 ${cand.length.toLocaleString()}개를 보고 ${chosen.size-sure.length}개 추가. `;
     } else {
       const o=getOpts();
       PICKED=applyOrder(PromoPick.select(DATA.rows,brands,words,$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o);

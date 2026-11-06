@@ -4,9 +4,11 @@
 
   // 상품 종류 말 → 상품명에서 찾을 단어들
   var KIND_MAP = {
-    '패딩': ['패딩', '다운', '푸퍼'], '다운': ['패딩', '다운', '푸퍼'], '푸퍼': ['패딩', '다운', '푸퍼'],
-    '코트': ['코트'], '자켓': ['자켓', '재킷'], '재킷': ['자켓', '재킷'], '점퍼': ['점퍼', '자켓'],
-    '니트': ['니트', '스웨터'], '스웨터': ['니트', '스웨터'], '후드': ['후드'], '맨투맨': ['맨투맨', '스웨트'],
+    '패딩': ['패딩', '다운', '푸퍼', '퍼퍼', '구스다운', '덕다운'], '다운': ['패딩', '다운', '푸퍼', '퍼퍼', '구스다운', '덕다운'], '푸퍼': ['패딩', '다운', '푸퍼', '퍼퍼', '구스다운', '덕다운'],
+    '롱패딩': ['패딩', '다운', '푸퍼', '퍼퍼', '구스다운', '덕다운'], '경량패딩': ['패딩', '다운', '푸퍼', '퍼퍼', '구스다운', '덕다운'], '구스': ['구스다운', '다운', '패딩'], '덕다운': ['덕다운', '다운', '패딩'],
+    '코트': ['코트', '트렌치', '체스터'], '트렌치': ['트렌치'], '자켓': ['자켓', '재킷', '블루종', '블레이저', '봄버'], '재킷': ['자켓', '재킷', '블루종', '블레이저', '봄버'], '점퍼': ['점퍼', '자켓', '블루종', '봄버'],
+    '블레이저': ['블레이저'], '무스탕': ['무스탕', '시어링'], '파카': ['파카'], '가디건': ['가디건', '카디건'],
+    '니트': ['니트', '스웨터', '풀오버'], '스웨터': ['니트', '스웨터', '풀오버'], '후드': ['후드'], '맨투맨': ['맨투맨', '스웨트'],
     '셔츠': ['셔츠'], '티셔츠': ['티셔츠'], '팬츠': ['팬츠', '바지'], '청바지': ['데님', '진'],
     '스커트': ['스커트'], '원피스': ['원피스', '드레스'], '가방': ['백', '가방', '토트', '숄더', '크로스'],
     '지갑': ['지갑', '월렛'], '스니커즈': ['스니커즈', '운동화'], '부츠': ['부츠'], '신발': ['스니커즈', '부츠', '로퍼', '샌들', '슈즈'],
@@ -220,6 +222,37 @@
     return { matched: matched, skipped: skipped };
   }
 
-  var api = { MALL_COLS: MALL_COLS, OUT_HEAD: OUT_HEAD, mallRecord: mallRecord, groupMalls: groupMalls, mergeMap: mergeMap, mapAsOf: mapAsOf, convert: convert, seasonOf: seasonOf, seasonRank: seasonRank, order: order, brandStats: brandStats, parseSabangnet: parseSabangnet, parseRequest: parseRequest, select: select, KIND_MAP: KIND_MAP };
+  // 상품 종류(kinds) → 사이트 상품분류에서 볼 구역. 분류가 '상의/하의/가방/신발…' 수준으로 굵어서 종류까지는 못 가르고,
+  // "AI에게 물어볼 후보"의 범위를 좁히는 데만 쓴다(예: 패딩 요청이면 가방·신발·모자는 AI에게 묻지 않는다).
+  var KIND_CAT = {
+    '패딩': 'TOP', '다운': 'TOP', '푸퍼': 'TOP', '코트': 'TOP', '자켓': 'TOP', '재킷': 'TOP', '점퍼': 'TOP', '니트': 'TOP', '스웨터': 'TOP',
+    '후드': 'TOP', '맨투맨': 'TOP', '셔츠': 'TOP', '티셔츠': 'TOP', '가디건': 'TOP', '블레이저': 'TOP', '무스탕': 'TOP', '파카': 'TOP', '트렌치': 'TOP', '베스트': 'TOP',
+    '팬츠': 'BOTTOM', '청바지': 'BOTTOM', '스커트': 'BOTTOM', '원피스': 'CLOTH',
+    '가방': '가방', '지갑': '지갑', '스니커즈': '신발', '부츠': '신발', '신발': '신발', '머플러': '머플러', '목도리': '머플러'
+  };
+  function catOkForKinds(r, kinds) {
+    if (!kinds || !kinds.length || !r.cat) return true;
+    var c = r.cat;
+    return kinds.some(function (k) {
+      var g = KIND_CAT[k];
+      if (!g) return true;                                   // 모르는 종류는 거르지 않는다
+      if (g === 'TOP') return c.indexOf('의류') >= 0 && c.indexOf('하의') < 0;
+      if (g === 'BOTTOM') return c.indexOf('의류') >= 0 && c.indexOf('상의') < 0;
+      if (g === 'CLOTH') return c.indexOf('의류') >= 0;
+      return c.indexOf(g) >= 0;
+    });
+  }
+  // 이 종류가 "아닌 게 확실한" 상품명 단어 — AI에게 물어볼 후보에서 뺀다(예: 패딩 요청에 '티셔츠'·'니트'·'팬츠'는 묻지 않음).
+  var PADDING_EXCL = ['티셔츠', '셔츠', '블라우스', '니트', '스웨터', '가디건', '카디건', '팬츠', '바지', '스커트', '원피스', '드레스', '맨투맨', '후드티', '폴로', '탑', '민소매', '반팔', '슬리브리스', '반바지', '쇼츠', '레깅스', '청바지', '진 '];
+  var KIND_EXCL = { '패딩': PADDING_EXCL, '다운': PADDING_EXCL, '푸퍼': PADDING_EXCL, '롱패딩': PADDING_EXCL, '경량패딩': PADDING_EXCL };
+  function excludedByKinds(r, kinds) {
+    if (!kinds || !kinds.length) return false;
+    var n = r.name || '';
+    return kinds.every(function (k) {
+      var ex = KIND_EXCL[k]; if (!ex) return false;
+      return ex.some(function (w) { return n.indexOf(w) >= 0; });
+    });
+  }
+  var api = { excludedByKinds: excludedByKinds, catOkForKinds: catOkForKinds, MALL_COLS: MALL_COLS, OUT_HEAD: OUT_HEAD, mallRecord: mallRecord, groupMalls: groupMalls, mergeMap: mergeMap, mapAsOf: mapAsOf, convert: convert, seasonOf: seasonOf, seasonRank: seasonRank, order: order, brandStats: brandStats, parseSabangnet: parseSabangnet, parseRequest: parseRequest, select: select, KIND_MAP: KIND_MAP };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PromoPick = api;
 })(typeof window !== 'undefined' ? window : this);
