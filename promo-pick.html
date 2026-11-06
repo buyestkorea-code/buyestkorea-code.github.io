@@ -62,10 +62,11 @@
 </div>
 
 <div class="box" id="condBox" hidden>
-  <div class="step">③ 찾은 조건 확인 (고쳐도 됩니다)</div>
+  <div class="step">③ 조건 고르기 — 여기서 직접 골라도 되고, ②에 요청을 넣고 AI로 찾아도 됩니다 (AI가 찾은 것은 이미 고른 조건에 더해져요)</div>
   <div class="f"><label class="l">브랜드 <span class="hint" id="brandHint"></span></label><div class="chips" id="brandChips"></div>
     <div class="row" style="margin-top:8px"><button class="btn btn-out" type="button" id="topBrands">재고 많은 상위 5개만 선택</button><button class="btn btn-out" type="button" id="clearBrands">선택 해제</button></div>
     <div class="hint">브랜드 옆 숫자는 상품 수 · 재고 합계입니다(재고 많은 순). 체크한 브랜드만 대상이 돼요.</div></div>
+  <div class="f"><label class="l">상품 종류 <span class="hint">— 눌러서 고르면 아래 단어 칸이 자동으로 채워져요 (유의어 포함)</span></label><div class="chips" id="kindChips"></div></div>
   <div class="f"><label class="l" for="words">상품명에 들어갈 단어 (하나라도 있으면 포함)</label>
     <input type="text" id="words" placeholder="패딩, 다운, 푸퍼">
     <div class="hint">비워두면 선택한 브랜드의 모든 상품이 나옵니다. 쉼표로 구분하세요.</div></div>
@@ -231,6 +232,7 @@ function applyBase(d,meta,restored){
   $('fileMsg').textContent=`✅ 상품 ${d.rows.length.toLocaleString()}개, 브랜드 ${ALLB.length.toLocaleString()}개`+(restored?' (이전에 올린 파일을 불러왔습니다)':'를 읽었습니다.')+(d.hasBrand?'':' (브랜드명 열이 없어 브랜드 조건은 쓸 수 없습니다)');
   $('stockWrap').hidden=!d.hasStock;
   applyTags();
+  if($('condBox').hidden) showCond([],[],'',['여성','남성'],[]);   // 요청 문장 없이도 바로 조건을 고를 수 있게
   const age=ageDays(d,meta), asOfTxt=d.asOf?`파일 기준 ${d.asOf.slice(0,16)}`:'기준일 없음 — 올린 시각으로 계산';
   const info=`${asOfTxt} · 올린 시각 ${fmt(meta.uploadedAt)} · ${age<1?'오늘':Math.floor(age)+'일 전'} 자료`;
   if(age>=STALE_BLOCK_DAYS){
@@ -328,8 +330,30 @@ $('clearBrands').onclick=()=>renderBrands([]);
 function getOpts(){ const n=parseInt(($('maxN').value||'').replace(/[^0-9]/g,''),10); return {ord:document.querySelector('input[name=ord]:checked').value,max:n>0?n:0,balance:$('balance').checked,seasons:getSeasons()}; }
 function applyOrder(rows,o){ let out=PromoPick.order(rows,o.ord,o.balance); if(o.max&&out.length>o.max) out=out.slice(0,o.max); return out; }
 function getAud(){ return DATA&&DATA.hasCat?[...$('audChips').querySelectorAll('input:checked')].map(i=>i.value):[]; }
-function showCond(brands,words,msg,aud){
-  $('condBox').hidden=false; renderBrands(brands); renderAud(aud||['여성','남성']); renderSeasons(); $('words').value=words.join(', ');
+const KIND_LIST=['패딩','코트','자켓','니트','후드','맨투맨','셔츠','티셔츠','팬츠','스커트','원피스','가방','지갑','신발','머플러'];
+function getKindChips(){ return [...$('kindChips').querySelectorAll('input:checked')].map(i=>i.value); }
+function getKinds(){ return [...new Set([...getKindChips(),...PromoPick.parseRequest($('req').value,ALLB).kinds])]; }
+function syncWordsFromKinds(){
+  const all=new Set(); Object.keys(PromoPick.KIND_MAP).forEach(k=>PromoPick.KIND_MAP[k].forEach(w=>all.add(w)));
+  const w=$('words').value.split(/[,\n]+/).map(x=>x.trim()).filter(Boolean).filter(x=>!all.has(x));
+  getKindChips().forEach(k=>(PromoPick.KIND_MAP[k]||[k]).forEach(x=>{ if(w.indexOf(x)<0) w.push(x); }));
+  $('words').value=w.join(', ');
+}
+function renderKinds(sel){
+  const set=new Set(sel);
+  $('kindChips').innerHTML=KIND_LIST.map(k=>`<label class="chip ${set.has(k)?'on':''}"><input type="checkbox" value="${k}" ${set.has(k)?'checked':''}> ${k}</label>`).join('');
+  $('kindChips').querySelectorAll('input').forEach(i=>i.onchange=()=>{ i.parentElement.classList.toggle('on',i.checked); syncWordsFromKinds(); });
+}
+function showCond(brands,words,msg,aud,kinds){
+  // 이미 고른 조건이 있으면 그 위에 더한다 (AI/규칙이 찾은 것을 합침)
+  const open=!$('condBox').hidden;
+  const curB=open?[...$('brandChips').querySelectorAll('input:checked')].map(i=>i.value):[];
+  const curK=open?getKindChips():[];
+  const curW=open?$('words').value.split(/[,\n]+/).map(x=>x.trim()).filter(Boolean):[];
+  const curA=open&&DATA&&DATA.hasCat?[...$('audChips').querySelectorAll('input:checked')].map(i=>i.value):null;
+  brands=[...new Set([...curB,...brands])]; words=[...new Set([...curW,...words])];
+  const k2=[...new Set([...curK,...(kinds||[])])];
+  $('condBox').hidden=false; renderBrands(brands); renderAud(open&&curA&&curA.length?curA:(aud||['여성','남성'])); renderSeasons(); renderKinds(k2); $('words').value=words.join(', ');
   $('msg').className='msg'; $('msg').textContent=msg||''; $('tw').hidden=true; $('dl').disabled=true; PICKED=[];
 }
 $('analyze').onclick=async()=>{
@@ -338,7 +362,7 @@ $('analyze').onclick=async()=>{
   if(!text){ $('aiState').textContent='요청 문장을 먼저 붙여넣어 주세요'; return; }
   const rule=PromoPick.parseRequest(text,ALLB);
   // 속도: 규칙으로 브랜드를 찾았으면 AI(약 15초)를 부르지 않고 바로 보여준다. 브랜드를 못 찾았을 때만 AI가 읽는다.
-  if(rule.brands.length){ $('aiState').textContent='규칙으로 바로 찾았습니다 (브랜드 '+rule.brands.length+'개'+(rule.kinds.length?' · 종류 '+rule.kinds.join(', '):'')+')'; showCond(rule.brands,rule.words,'',rule.audiences); return; }
+  if(rule.brands.length){ $('aiState').textContent='규칙으로 바로 찾았습니다 (브랜드 '+rule.brands.length+'개'+(rule.kinds.length?' · 종류 '+rule.kinds.join(', '):'')+')'; showCond(rule.brands,rule.words,'',rule.audiences,rule.kinds); return; }
   $('analyze').disabled=true; $('aiState').textContent='브랜드를 못 찾아 AI가 읽는 중...';
   try{
     // 브랜드 전체(수백 개)를 보내면 글이 길어 AI가 느려지고 무료 한도에 걸림 → 상위 120개 + 규칙으로 찾은 브랜드만 보냄. 실패하면 바로 규칙 결과 사용
@@ -346,10 +370,10 @@ $('analyze').onclick=async()=>{
     const d=await callAI({mode:'parse',request:text,brands:cand},1);
     const brands=d.brands.length?d.brands:rule.brands, words=d.words.length?d.words:rule.words;
     $('aiState').textContent='AI('+(d.by||'')+')가 읽었습니다'+(d.note?' — '+d.note:'');
-    showCond(brands,words,'',rule.audiences);
+    showCond(brands,words,'',rule.audiences,rule.kinds);
   }catch(err){
     $('aiState').textContent='AI를 못 써서 규칙 방식으로 찾았습니다 ('+err.message+')';
-    showCond(rule.brands,rule.words,'',rule.audiences);
+    showCond(rule.brands,rule.words,'',rule.audiences,rule.kinds);
   }finally{ $('analyze').disabled=false; }
 };
 
@@ -400,7 +424,7 @@ $('pick').onclick=async()=>{
       const all=PromoPick.order(PromoPick.select(DATA.rows,brands,[],$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o.ord,false);
       // 속도: 상품명에 고른 단어(패딩·다운 등)가 확실히 들어 있는 상품은 AI 없이 바로 포함하고,
       // AI는 나머지 중 "이 종류가 있을 만한 구역"(예: 패딩 요청이면 상의류)의 후보만 본다. 개수 제한 없이 전부 본다.
-      const kinds=PromoPick.parseRequest($('req').value,ALLB).kinds;
+      const kinds=getKinds();
       const sure=words.length?all.filter(r=>{ const h=r.name+' '+(r.cat||'')+' '+(r.tg||''); return words.some(w=>h.indexOf(w)>=0); }):[];
       const sureSet=new Set(sure);
       const cand=all.filter(r=>!sureSet.has(r)&&!(kinds.length&&r.tg)&&PromoPick.catOkForKinds(r,kinds)&&!PromoPick.excludedByKinds(r,kinds));   // 태그가 이미 붙은 상품은 AI에게 다시 묻지 않는다
