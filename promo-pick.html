@@ -128,9 +128,21 @@ $('file').onchange=async e=>{
     const buf=await f.arrayBuffer();
     const wb=XLSX.read(buf,{type:'array'});
     const aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
-    const d=PromoPick.parseSabangnet(aoa);
-    const meta={fileName:f.name,uploadedAt:Date.now()};
+    const dNew=PromoPick.parseSabangnet(aoa);
+    // 누적: 서버에 이미 있는 기준 자료와 합친다. 같은 상품코드는 새 파일 값으로 갱신, 새 상품은 추가, 이번 파일에 없는 기존 상품은 그대로 둔다.
+    $('fileMsg').textContent='서버 자료와 합치는 중...'; await srvList(true);
+    const prev=await idbGet('base'), od=prev&&prev.data;
+    let d=dNew, add=dNew.rows.length, upd=0, keep=0;
+    if(od&&od.rows){
+      const byCode={}; od.rows.forEach(r=>byCode[r.code]=r);
+      upd=dNew.rows.filter(r=>byCode[r.code]).length; add=dNew.rows.length-upd;
+      const inNew=new Set(dNew.rows.map(r=>r.code));
+      const kept=od.rows.filter(r=>!inNew.has(r.code)); keep=kept.length;
+      d=Object.assign({},dNew,{rows:dNew.rows.concat(kept),hasBrand:dNew.hasBrand||od.hasBrand,hasStock:dNew.hasStock||od.hasStock,hasCat:dNew.hasCat||od.hasCat,asOf:(dNew.asOf||'')>(od.asOf||'')?dNew.asOf:od.asOf});
+    }
+    const meta={fileName:f.name+(od?` (누적 · 기존 ${od.rows.length.toLocaleString()}개에 합침)`:''),uploadedAt:Date.now()};
     applyBase(d,meta,false);
+    if(od) $('fileMsg').textContent+=` 이번 파일: 새 상품 ${add.toLocaleString()}개 추가 · 기존 상품 ${upd.toLocaleString()}개 갱신 · 이번 파일에 없던 기존 상품 ${keep.toLocaleString()}개 유지.`;
     const saved=await idbSet('base',{data:d,meta});
     if(!saved) $('ageMsg').textContent+=' (서버에 저장하지 못해 다른 PC에서는 보이지 않습니다 — 로그인과 네트워크를 확인해 다시 올려 주세요)';
   }catch(err){ DATA=null; $('fileMsg').className='msg err'; $('fileMsg').textContent='오류: '+err.message; }
