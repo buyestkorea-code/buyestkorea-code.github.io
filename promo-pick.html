@@ -50,6 +50,8 @@
   </div>
   <div class="msg" id="fileMsg"></div>
   <div class="msg" id="ageMsg"></div>
+  <div class="row" style="margin-top:10px"><button class="btn btn-out" type="button" id="tagBtn" disabled>상품 태그 붙이기 (AI)</button><button class="btn btn-out" type="button" id="tagStop" hidden>멈추기</button><span class="hint" id="tagInfo" style="margin:0"></span></div>
+  <div class="hint">AI가 상품명을 읽고 종류(패딩·코트…)와 특징(롱·경량·구스다운…)을 한 번만 적어 서버에 저장해 둡니다. 새 상품이 올라오면 그 상품만 다시 붙이면 되고, 태그가 있는 상품은 기획전을 뽑을 때 AI를 거치지 않아 빠릅니다. 도중에 닫아도 이어서 할 수 있어요.</div>
 </div>
 
 <div class="box">
@@ -228,6 +230,7 @@ function applyBase(d,meta,restored){
   $('fileMsg').className='msg ok';
   $('fileMsg').textContent=`✅ 상품 ${d.rows.length.toLocaleString()}개, 브랜드 ${ALLB.length.toLocaleString()}개`+(restored?' (이전에 올린 파일을 불러왔습니다)':'를 읽었습니다.')+(d.hasBrand?'':' (브랜드명 열이 없어 브랜드 조건은 쓸 수 없습니다)');
   $('stockWrap').hidden=!d.hasStock;
+  applyTags();
   const age=ageDays(d,meta), asOfTxt=d.asOf?`파일 기준 ${d.asOf.slice(0,16)}`:'기준일 없음 — 올린 시각으로 계산';
   const info=`${asOfTxt} · 올린 시각 ${fmt(meta.uploadedAt)} · ${age<1?'오늘':Math.floor(age)+'일 전'} 자료`;
   if(age>=STALE_BLOCK_DAYS){
@@ -241,7 +244,48 @@ function applyBase(d,meta,restored){
     $('analyze').disabled=false;
   }
 }
-(async()=>{ await READY; const s=await idbGet('base'); if(s&&s.data&&s.meta){ try{ applyBase(s.data,s.meta,true); }catch(e){} } })();
+(async()=>{ await READY; const s=await idbGet('base'); if(s&&s.data&&s.meta){ try{ applyBase(s.data,s.meta,true); }catch(e){} } try{ await loadTags(); }catch(e){} })();
+
+// ───────── 상품 태그 (AI가 한 번 붙여 서버에 저장) ─────────
+let TAGS={};   // {사방넷코드: [종류, 태그...]}
+function applyTags(){ if(!DATA) return; DATA.rows.forEach(r=>{ const t=TAGS[r.code]; r.tg=t?t.join(' '):''; }); updateTagInfo(); }
+function updateTagInfo(){
+  if(!DATA||!$('tagInfo')) return;
+  const n=DATA.rows.length, done=DATA.rows.filter(r=>TAGS[r.code]).length;
+  $('tagInfo').textContent=`상품 태그 ${done.toLocaleString()} / ${n.toLocaleString()}개`+(done<n?` · 태그 없는 ${(n-done).toLocaleString()}개를 붙일 수 있어요`:' · ✅ 모두 붙어 있습니다');
+  if(!TAGBUSY) $('tagBtn').disabled=!(n-done);
+}
+async function loadTags(){ await srvList(); TAGS=(await idbGet('tags'))||{}; applyTags(); }
+let TAGBUSY=false, TAGSTOP=false;
+$('tagStop').onclick=()=>{ TAGSTOP=true; $('tagInfo').textContent='멈추는 중... (지금 처리 중인 묶음까지만 마칩니다)'; };
+$('tagBtn').onclick=async()=>{
+  if(!DATA||TAGBUSY) return;
+  if(!auth()){ $('tagInfo').textContent='툴킷에 로그인해야 AI를 쓸 수 있어요'; return; }
+  const todo=DATA.rows.filter(r=>!TAGS[r.code]); if(!todo.length) return;
+  TAGBUSY=true; TAGSTOP=false; $('tagBtn').disabled=true; $('tagStop').hidden=false;
+  const CH=80, chunks=[]; for(let i=0;i<todo.length;i+=CH) chunks.push(i);
+  let next=0, done=0, fail=0, lastErr='', saved=0, saveP=Promise.resolve();
+  const save=()=>{ saveP=saveP.then(async()=>{ try{ await srvList(true); const cur=(await idbGet('tags'))||{}; Object.assign(cur,TAGS); if(await idbSet('tags',cur)) saved=done; }catch(e){ lastErr='저장 실패: '+e.message; } }); return saveP; };
+  const worker=async()=>{
+    while(next<chunks.length&&!TAGSTOP){
+      const i=chunks[next++];
+      try{
+        const items=todo.slice(i,i+CH).map((r,k)=>({i:i+k,n:r.name+(r.cat?' ['+r.cat.split('>').slice(-1)[0].trim()+']':'')}));
+        const d=await callAI({items},2,'/api/promo-tag');
+        d.tags.forEach(t=>{ const r=todo[t.i]; if(r) TAGS[r.code]=[t.k].concat(t.t||[]); });
+      }catch(e){ fail++; lastErr=e.message; if(/한도/.test(e.message)) TAGSTOP=true; }
+      done++;
+      applyTags();
+      $('tagInfo').textContent=`태그 붙이는 중... ${Math.min(done*CH,todo.length).toLocaleString()} / ${todo.length.toLocaleString()}`+(fail?` (실패 ${fail}묶음)`:'');
+      if(done%10===0) save();
+    }
+  };
+  try{ await Promise.all([worker(),worker(),worker()]); await save(); }
+  finally{
+    TAGBUSY=false; $('tagStop').hidden=true; applyTags();
+    if(fail||lastErr) $('tagInfo').textContent+=` — ${lastErr||'일부 실패'} (다시 누르면 남은 것부터 이어서 합니다)`;
+  }
+};
 
 function renderBrands(sel){
   const set=new Set(sel);
@@ -254,11 +298,11 @@ function renderBrands(sel){
 }
 const WK='https://buyest-namegen.buyest.workers.dev';
 function auth(){ try{ const a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return a&&a.id&&a.pass?a:null; }catch(e){ return null; } }
-async function callAI(payload,maxRetry=4){
+async function callAI(payload,maxRetry=4,path='/api/promo'){
   const a=auth(); if(!a) throw new Error('툴킷에 로그인해야 AI를 쓸 수 있어요');
   // AI가 붐비면(503) 사용자가 다시 누르지 않아도 알아서 잠깐 쉬었다가 최대 4번까지 다시 시도
   for(let t=0;;t++){
-    const r=await fetch(WK+'/api/promo',{signal:AbortSignal.timeout(90000),method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':encodeURIComponent(a.id),'X-Studio-Pass':encodeURIComponent(a.pass),'X-Studio-Enc':'1'},body:JSON.stringify(payload)});
+    const r=await fetch(WK+path,{signal:AbortSignal.timeout(90000),method:'POST',headers:{'Content-Type':'application/json','X-Studio-User':encodeURIComponent(a.id),'X-Studio-Pass':encodeURIComponent(a.pass),'X-Studio-Enc':'1'},body:JSON.stringify(payload)});
     const d=await r.json().catch(()=>({}));
     if(r.ok&&d.ok) return d;
     if(r.status===503&&t<maxRetry){ for(let s=20;s>0;s--){ $('msg').className='msg'; $('msg').textContent=`AI가 붐벼서 ${s}초 뒤 자동으로 다시 시도합니다 (${t+1}/${maxRetry})...`; await new Promise(o=>setTimeout(o,1000)); } continue; }
@@ -357,9 +401,9 @@ $('pick').onclick=async()=>{
       // 속도: 상품명에 고른 단어(패딩·다운 등)가 확실히 들어 있는 상품은 AI 없이 바로 포함하고,
       // AI는 나머지 중 "이 종류가 있을 만한 구역"(예: 패딩 요청이면 상의류)의 후보만 본다. 개수 제한 없이 전부 본다.
       const kinds=PromoPick.parseRequest($('req').value,ALLB).kinds;
-      const sure=words.length?all.filter(r=>{ const h=r.name+' '+(r.cat||''); return words.some(w=>h.indexOf(w)>=0); }):[];
+      const sure=words.length?all.filter(r=>{ const h=r.name+' '+(r.cat||'')+' '+(r.tg||''); return words.some(w=>h.indexOf(w)>=0); }):[];
       const sureSet=new Set(sure);
-      const cand=all.filter(r=>!sureSet.has(r)&&PromoPick.catOkForKinds(r,kinds)&&!PromoPick.excludedByKinds(r,kinds));
+      const cand=all.filter(r=>!sureSet.has(r)&&!(kinds.length&&r.tg)&&PromoPick.catOkForKinds(r,kinds)&&!PromoPick.excludedByKinds(r,kinds));   // 태그가 이미 붙은 상품은 AI에게 다시 묻지 않는다
       const R=cand.length?await aiSelect(cand,$('aiModel').value,n=>{ $('msg').className='msg'; $('msg').textContent=`AI가 고르는 중... ${n} / ${cand.length} (단어로 확실한 ${sure.length}개는 바로 포함)`; }):{keep:new Set(),ms:0,model:''};
       const chosen=new Set(sure); cand.forEach((r,k)=>{ if(R.keep.has(k)) chosen.add(r); });
       $('msg').dataset.t=`(${R.model||'기본 모델'} · ${(R.ms/1000).toFixed(1)}초) `;

@@ -328,7 +328,7 @@ const PROMO_MODELS = ["gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-3.5-f
 async function runJson(env, system, userText, opts = {}) {
   // 기획전은 답이 짧다: 출력 한도를 작게(Groq 무료 분당 출력 1000토큰 한도 회피) + 한도 넉넉한 Gemini 를 먼저 쓴다
   const base = providerOrder(env);
-  const order = opts.model ? base.filter((k) => k === "gemini") : opts.first ? [...base.filter((k) => k === opts.first), ...base.filter((k) => k !== opts.first)] : base;
+  const order = (opts.model || opts.geminiOnly) ? base.filter((k) => k === "gemini") : opts.first ? [...base.filter((k) => k === opts.first), ...base.filter((k) => k !== opts.first)] : base;
   if (!order.length) throw new HttpError(503, "AI 키가 아직 등록되지 않았습니다. 관리자에게 알려 주세요.");
   const errs = [];
   for (const k of order) {
@@ -381,6 +381,49 @@ async function handlePromo(request, env) {
   throw new HttpError(400, "mode 가 올바르지 않습니다.");
 }
 
+// ── 기획전 상품 태그 붙이기 (상품명 텍스트만) ───────────────
+// 상품 {i,n} 목록 → 상품마다 종류(k)와 특징 태그(t). 결과는 화면이 서버 공유 저장소에 저장해 두고 계속 쓴다.
+// 이 작업은 한꺼번에 많이 돌려야 해서 하루 한도를 따로 센다 (TAG_LIMIT_PER_DAY, 기본 800회 / 일반 한도 LIMIT_PER_DAY 와 별개).
+const TAG_KINDS = ["패딩", "코트", "자켓", "니트", "가디건", "티셔츠", "셔츠", "맨투맨", "후드", "팬츠", "스커트", "원피스", "가방", "지갑", "스니커즈", "부츠", "로퍼", "샌들", "슈즈", "모자", "머플러", "벨트", "주얼리", "기타"];
+const TAG_SYSTEM = `당신은 해외 명품 병행수입 쇼핑몰의 상품 분류 보조입니다. 상품명을 보고 상품 종류와 특징 태그를 붙입니다.
+규칙:
+- 반드시 JSON 만 출력합니다. 설명 문장 금지.
+- k(종류)는 반드시 다음 중 하나만: ${TAG_KINDS.join(", ")}. 상품명으로 종류를 확실히 알 수 없으면 "기타".
+- t(특징 태그)는 상품명에 근거가 있는 한글 단어만 최대 5개. 예) 길이: 롱/숏/미디/크롭, 무게: 경량/헤비, 소재: 울/캐시미어/구스다운/덕다운/가죽/데님/실크/퍼/트위드/니트, 디테일: 후드/벨티드/더블/퀼팅/오버사이즈/체크/로고. 상품명에 없는 것을 지어내지 않습니다.
+- 시즌 표기(26FW), 영문 모델명, 색상, 품번은 태그가 아닙니다.`;
+
+async function spendTag(env, user) {
+  if (!env.NAMEGEN_KV) return;
+  const limit = Number(env.TAG_LIMIT_PER_DAY) || 800;
+  const day = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const key = `tag:${day}:${user}`;
+  const used = Number(await env.NAMEGEN_KV.get(key)) || 0;
+  if (used + 1 > limit) throw new HttpError(429, `오늘 태그 붙이기 한도(${limit}회)를 넘었습니다. 내일 이어서 해 주세요.`);
+  await env.NAMEGEN_KV.put(key, String(used + 1), { expirationTtl: 2 * 86400 });
+}
+
+async function handlePromoTag(request, env) {
+  const user = await requireStaff(request);
+  let body;
+  try { body = await request.json(); } catch (_) { throw new HttpError(400, "요청 형식이 올바르지 않습니다."); }
+  const items = (Array.isArray(body.items) ? body.items : []).slice(0, 100)
+    .map((x) => ({ i: Number(x && x.i), n: clean(x && x.n, 90) })).filter((x) => Number.isInteger(x.i) && x.n);
+  if (!items.length) return json({ ok: true, tags: [], version: VERSION });
+  await spendTag(env, user);
+  const userText = `[상품]\n${items.map((x) => x.i + ": " + x.n).join("\n")}\n\n출력: {"tags":[{"i":번호,"k":"종류","t":["태그",...]}, ...]}  (모든 상품 번호에 대해 한 줄씩)`;
+  const { data, by, fellBack } = await runJson(env, TAG_SYSTEM, userText, { geminiOnly: true, maxTokens: 6000 });
+  const allow = new Set(items.map((x) => x.i)), seen = new Set(), tags = [];
+  for (const t of (Array.isArray(data.tags) ? data.tags : [])) {
+    const i = Number(t && t.i);
+    if (!allow.has(i) || seen.has(i)) continue;
+    seen.add(i);
+    const k = TAG_KINDS.includes(t.k) ? t.k : "기타";
+    const tt = (Array.isArray(t.t) ? t.t : []).map((w) => clean(w, 12)).filter(Boolean).slice(0, 5);
+    tags.push({ i, k, t: tt });
+  }
+  return json({ ok: true, tags, by, fellBack, version: VERSION });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -390,6 +433,7 @@ export default {
       if (request.method === "GET" && url.pathname.startsWith("/i/")) return await serveTempImage(env, url.pathname.slice(3));
       if (url.pathname === "/api/names" && request.method === "POST") return await handleNames(request, env);
       if (url.pathname === "/api/promo" && request.method === "POST") return await handlePromo(request, env);
+      if (url.pathname === "/api/promo-tag" && request.method === "POST") return await handlePromoTag(request, env);
       throw new HttpError(404, "없는 주소입니다.");
     } catch (e) {
       if (e instanceof HttpError) return json({ ok: false, error: e.message }, e.status);

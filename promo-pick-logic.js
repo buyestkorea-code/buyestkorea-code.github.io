@@ -134,7 +134,7 @@
       if (brands.length && !bset[r.brand]) return false;
       if (words.length) {
         var ok = false;
-        var hay = r.name + ' ' + (r.cat || ''); // 상품분류(카테고리)가 있으면 그것도 함께 본다
+        var hay = r.name + ' ' + (r.cat || '') + ' ' + (r.tg || ''); // 상품분류(카테고리)와 AI가 붙인 태그(r.tg)도 함께 본다
         for (var i = 0; i < words.length; i++) { if (hay.indexOf(words[i]) >= 0) { ok = true; break; } }
         if (!ok) return false;
       }

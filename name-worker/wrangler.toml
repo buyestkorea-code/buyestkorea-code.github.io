@@ -17,6 +17,8 @@ GROQ_MODEL = "qwen/qwen3.8-27b"
 PROVIDERS = "groq,gemini"
 # 직원 1명 하루 생성 횟수 (KV 를 연결했을 때만 적용)
 LIMIT_PER_DAY = "150"
+# 기획전 상품 태그 붙이기 전용 하루 횟수 (일반 한도와 별개, 1회 = 상품 약 80개)
+TAG_LIMIT_PER_DAY = "800"
 # 학습자료 주소 (툴킷 사이트에 올라간 namebook.json)
 NAMEBOOK_URL = "https://buyestkorea-code.github.io/assets/photo-auto/namebook.json"
 
