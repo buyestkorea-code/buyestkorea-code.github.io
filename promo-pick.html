@@ -100,7 +100,7 @@
     <div class="msg" id="manMsg"></div></div>
   <div class="f"><label class="l">쇼핑몰 자료 (사방넷 &gt; 쇼핑몰관리 &gt; 쇼핑몰상품수정 &gt; 다운로드 엑셀)</label>
     <div class="row dz" id="dz2"><button class="btn btn-out" type="button" id="mallPick">파일 올리기 또는 여기로 끌어놓기 (여러 개 가능)</button><input type="file" id="mallFile" accept=".xlsx" multiple hidden><span class="hint" id="mallBusy" style="margin:0"></span></div>
-    <div class="hint">연도별로 나뉜 파일(2020~2023, 2024, 2025 …)을 모두 올리면 쇼핑몰별로 합쳐 이 브라우저에 보관합니다. 새 파일을 다시 올리면 같은 상품은 더 최근 자료로 바뀌고, 없던 상품은 추가돼요.</div>
+    <div class="hint">연도별로 나뉜 파일(2020~2023, 2024, 2025 …)을 모두 올리면 쇼핑몰별로 합쳐 서버에 보관합니다(모든 PC가 같은 자료를 씁니다). 새 파일을 다시 올리면 같은 상품은 더 최근 자료로 바뀌고, 없던 상품은 추가돼요.</div>
     <div class="hint" id="mallStamp" style="font-weight:600"></div>
     <div class="tw" id="mallListW" hidden style="max-height:240px"><table><thead><tr><th>쇼핑몰</th><th>ID</th><th>상품 수</th><th>자료 기준일(파일 속)</th><th>마지막 업데이트(올린 시각)</th><th></th></tr></thead><tbody id="mallList"></tbody></table></div></div>
   <div class="f"><label class="l" for="mallSel">플랫폼 선택</label>
@@ -132,7 +132,7 @@ $('file').onchange=async e=>{
     const meta={fileName:f.name,uploadedAt:Date.now()};
     applyBase(d,meta,false);
     const saved=await idbSet('base',{data:d,meta});
-    if(!saved) $('ageMsg').textContent+=' (이 브라우저에는 저장하지 못해 다음에 다시 올려야 합니다)';
+    if(!saved) $('ageMsg').textContent+=' (서버에 저장하지 못해 다른 PC에서는 보이지 않습니다 — 로그인과 네트워크를 확인해 다시 올려 주세요)';
   }catch(err){ DATA=null; $('fileMsg').className='msg err'; $('fileMsg').textContent='오류: '+err.message; }
 };
 
@@ -140,8 +140,60 @@ $('file').onchange=async e=>{
 // 기준 날짜 = 파일 안 "수정일시"의 가장 최근 값 (없으면 올린 시각). 3일 넘으면 경고, 7일 넘으면 더 강하게 경고한다 (막지는 않음).
 const STALE_WARN_DAYS=3, STALE_BLOCK_DAYS=7;
 function idbOpen(){ return new Promise((ok,no)=>{ const q=indexedDB.open('promoPick',1); q.onupgradeneeded=()=>q.result.createObjectStore('kv'); q.onsuccess=()=>ok(q.result); q.onerror=()=>no(q.error); }); }
-async function idbSet(k,v){ try{ const db=await idbOpen(); return await new Promise(ok=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(v,k); t.oncomplete=()=>ok(true); t.onerror=()=>ok(false); }); }catch(e){ return false; } }
-async function idbGet(k){ try{ const db=await idbOpen(); return await new Promise(ok=>{ const q=db.transaction('kv').objectStore('kv').get(k); q.onsuccess=()=>ok(q.result||null); q.onerror=()=>ok(null); }); }catch(e){ return null; } }
+async function lSet(k,v){ try{ const db=await idbOpen(); return await new Promise(ok=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(v,k); t.oncomplete=()=>ok(true); t.onerror=()=>ok(false); }); }catch(e){ return false; } }
+async function lGet(k){ try{ const db=await idbOpen(); return await new Promise(ok=>{ const q=db.transaction('kv').objectStore('kv').get(k); q.onsuccess=()=>ok(q.result||null); q.onerror=()=>ok(null); }); }catch(e){ return null; } }
+
+// ── 서버 공유 저장소 ──────────────────────────────────────────────────
+// 올린 자료는 서버(promo_pick_store_api.php)에 gzip 으로 보관해 모든 PC 가 같이 쓴다. 이 브라우저(IndexedDB)는 내려받은 사본(캐시)일 뿐이다.
+// 캐시 항목 모양: {__m:서버 mtime, v:값}. 서버 mtime 이 같으면 다시 내려받지 않는다.
+const STORE='https://buyest.co.kr/promo_pick_store_api.php';
+function actorId(){ try{ const a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return a&&a.id?String(a.id):''; }catch(e){ return ''; } }
+let SRV=null;
+async function srvList(force){
+  if(SRV&&!force) return SRV;
+  const id=actorId(); if(!id) throw new Error('툴킷에 로그인해야 공유 자료를 쓸 수 있어요');
+  const r=await fetch(STORE+'?action=list&actor='+encodeURIComponent(id),{cache:'no-store'});
+  const d=await r.json().catch(()=>({})); if(!r.ok||!d.ok) throw new Error(d.error||('서버 오류 '+r.status));
+  SRV={}; (d.keys||[]).forEach(m=>SRV[m.key]=m); return SRV;
+}
+async function gzipJson(v){ return await new Response(new Blob([JSON.stringify(v)]).stream().pipeThrough(new CompressionStream('gzip'))).blob(); }
+async function gunzipJson(buf){ return JSON.parse(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text()); }
+async function idbSet(k,v){
+  try{
+    const id=actorId(); if(!id) return false;
+    const r=await fetch(STORE+'?action=put&actor='+encodeURIComponent(id)+'&key='+encodeURIComponent(k),{method:'POST',body:await gzipJson(v),headers:{'Content-Type':'application/octet-stream'}});
+    const d=await r.json().catch(()=>({})); if(!r.ok||!d.ok) return false;
+    SRV=SRV||{}; SRV[k]={key:k,size:d.size,mtime:d.mtime,actor:id};
+    await lSet(k,{__m:d.mtime,v}); return true;
+  }catch(e){ return false; }
+}
+async function idbGet(k){
+  const loc=await lGet(k); const rec=loc&&loc.__m!==undefined?loc:null;
+  try{
+    const L=await srvList(); const sm=L[k]; if(!sm) return null;
+    if(rec&&rec.__m===sm.mtime) return rec.v;
+    const r=await fetch(STORE+'?action=get&actor='+encodeURIComponent(actorId())+'&key='+encodeURIComponent(k),{cache:'no-store'});
+    if(!r.ok) throw new Error('서버 오류 '+r.status);
+    const v=await gunzipJson(await r.arrayBuffer()); await lSet(k,{__m:sm.mtime,v}); return v;
+  }catch(e){ return rec?rec.v:null; }   // 서버가 안 될 때는 이 브라우저에 받아 둔 사본으로
+}
+// 처음 한 번: 서버가 비어 있고 이 브라우저에 예전(PC 개별 저장) 자료가 있으면 서버로 옮긴다
+async function initStore(){
+  try{
+    const L=await srvList(true);
+    if(L['base']||L['malls']) return;
+    const raw=async k=>{ const x=await lGet(k); return x&&x.__m!==undefined?x.v:x; };
+    const base=await raw('base'), malls=await raw('malls');
+    if(!base&&!malls) return;
+    const put=async(k,v)=>{ if(v&&!(await idbSet(k,v))) throw new Error(k+' 업로드 실패'); };
+    const say=t=>{ const el=document.getElementById('mallBusy'); if(el) el.textContent=t; };
+    if(malls){ const ks=Object.keys(malls); for(let i=0;i<ks.length;i++){ say(`이 PC의 자료를 서버로 옮기는 중... 쇼핑몰 ${i+1}/${ks.length}`); await put('mall:'+ks[i],await raw('mall:'+ks[i])); } }
+    say('이 PC의 자료를 서버로 옮기는 중... 마무리');
+    await put('base',base); await put('malls',malls);
+    say('✅ 이 PC에 있던 자료를 서버로 옮겼습니다. 이제 다른 PC에서도 같은 자료를 씁니다.');
+  }catch(e){ const el=document.getElementById('mallBusy'); if(el) el.textContent='서버로 옮기지 못했습니다: '+e.message; }
+}
+const READY=initStore();
 function fmt(ts){ const d=new Date(ts),p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 function ageDays(d,meta){
   const base=d.asOf?new Date(d.asOf.replace(' ','T')).getTime():meta.uploadedAt;
@@ -175,7 +227,7 @@ function applyBase(d,meta,restored){
     $('analyze').disabled=false;
   }
 }
-(async()=>{ const s=await idbGet('base'); if(s&&s.data&&s.meta){ try{ applyBase(s.data,s.meta,true); }catch(e){} } })();
+(async()=>{ await READY; const s=await idbGet('base'); if(s&&s.data&&s.meta){ try{ applyBase(s.data,s.meta,true); }catch(e){} } })();
 
 function renderBrands(sel){
   const set=new Set(sel);
@@ -350,6 +402,7 @@ $('mallFile').onchange=async e=>{
   const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
   $('mallPick').disabled=true;
   try{
+    await srvList(true); MALLS=(await idbGet('malls'))||{};   // 다른 PC 가 먼저 올린 내용이 있으면 그 위에 합친다
     for(let i=0;i<files.length;i++){
       const f=files[i];
       $('mallBusy').textContent=`(${i+1}/${files.length}) ${f.name} 읽는 중...`;
@@ -361,7 +414,7 @@ $('mallFile').onchange=async e=>{
         const old=await idbGet('mall:'+k);
         const merged=PromoPick.mergeMap(old,groups[k]);
         const ok=await idbSet('mall:'+k,merged);
-        if(!ok) throw new Error('브라우저 저장 공간이 부족합니다');
+        if(!ok) throw new Error('서버에 저장하지 못했습니다 (로그인·네트워크 확인)');
         const [mall,id]=k.split('|');
         MALLS[k]={mall,id:k.slice(mall.length+1),n:Object.keys(merged).length,asOf:PromoPick.mapAsOf(merged),updatedAt:Date.now()};
       }
@@ -432,7 +485,7 @@ $('dl2').onclick=()=>{
 // 상품을 새로 고르면 변환 단추 상태 갱신
 const _pickOrig=$('pick').onclick;
 $('pick').onclick=async function(){ MANUAL=false; await _pickOrig.apply(this,arguments); CONV=null; $('dl2').disabled=true; $('ctw').hidden=true; $('skipNote').hidden=true; updateConvBtn(); };
-loadMallIndex();
+READY.then(loadMallIndex);
 </script>
 </body>
 </html>
