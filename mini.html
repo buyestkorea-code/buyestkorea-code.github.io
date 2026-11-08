@@ -226,7 +226,18 @@
       if(!r || !r.ok){ loginError.textContent = (r && r.error) || '입장에 실패했습니다.'; loginError.hidden = false; passInput.value = ''; return; }
       setToken(r.token); passInput.value = ''; nickBox.value = '';
       enter(r.user);
-    }).catch(function(){ loginBtn.disabled = false; loginError.textContent = '서버에 연결할 수 없습니다.'; loginError.hidden = false; });
+    }).catch(function(err){
+      loginBtn.disabled = false;
+      // 진단용: 실제 원인을 같이 보여준다 (같은 서버의 다른 API로도 연결되는지 확인)
+      var why = (err && (err.name + ': ' + err.message)) || '알 수 없음';
+      if(!navigator.onLine) why = '폰이 오프라인 상태';
+      loginError.textContent = '서버에 연결할 수 없습니다. [' + why + '] 확인 중...'; loginError.hidden = false;
+      fetch('https://buyest.co.kr/sync_status_api.php', {cache:'no-store'}).then(function(r){
+        loginError.textContent = '서버에 연결할 수 없습니다. [' + why + '] — 서버 자체는 켜져 있음(' + r.status + '), 채팅 API만 실패';
+      }).catch(function(e2){
+        loginError.textContent = '서버에 연결할 수 없습니다. [' + why + '] — buyest.co.kr 자체에 접속 불가(' + (e2 && e2.message) + ')';
+      });
+    });
   }
   loginBtn.addEventListener('click', doLogin);
   nickBox.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); nickBox.blur(); } });
