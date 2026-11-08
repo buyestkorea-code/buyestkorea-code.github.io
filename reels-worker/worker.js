@@ -49,7 +49,7 @@ async function hmac(key, msg) {
 const loginCache = new Map();
 async function requireStaff(request) {
   let user = (request.headers.get("X-Studio-User") || "").trim();
-  let pass = request.headers.get("X-Studio-Pass,X-Studio-Enc") || "";
+  let pass = request.headers.get("X-Studio-Pass") || "";
   // 한글 ID/비밀번호는 헤더에 그대로 못 실으므로 클라이언트가 URL 인코딩해서 보냄 (X-Studio-Enc: 1)
   if (request.headers.get("X-Studio-Enc") === "1") {
     try { user = decodeURIComponent(user).trim(); pass = decodeURIComponent(pass); } catch (e) {}
