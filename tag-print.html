@@ -410,5 +410,6 @@ function calInfo() {
 [['calYa', 'ya'], ['calYb', 'yb'], ['calXa', 'xa'], ['calXb', 'xb']].forEach(([id, k]) => $(id).addEventListener('input', () => { const v = parseFloat($(id).value); if (v > 0) { L.cal[k] = v; saveLayout(); calInfo(); } }));
 syncSettings(); syncCal();
 </script>
+<script src="paste-upload.js"></script>
 </body>
 </html>

@@ -686,5 +686,6 @@ const _pickOrig=$('pick').onclick;
 $('pick').onclick=async function(){ MANUAL=false; await _pickOrig.apply(this,arguments); CONV=null; $('dl2').disabled=true; $('ctw').hidden=true; $('skipNote').hidden=true; updateConvBtn(); };
 READY.then(loadMallIndex);
 </script>
+<script src="paste-upload.js"></script>
 </body>
 </html>
