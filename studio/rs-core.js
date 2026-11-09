@@ -283,7 +283,8 @@
     if (cur) segs.push(cur);
     const merged = []; segs.forEach((s) => { const last = merged[merged.length - 1]; if (last && s.start - last.end < o.minSilence) last.end = s.end; else merged.push({ start: s.start, end: s.end }); });
     const dur = buf.duration;
-    const padded = merged.filter((s) => s.end - s.start >= o.minSeg).map((s) => ({ start: Math.max(0, s.start - o.pad), end: Math.min(dur, s.end + o.pad) }));
+    const padEnd = o.padEnd != null ? o.padEnd : o.pad * 1.5; // 말끝은 소리가 서서히 줄어서 뒤 여유를 조금 더 준다
+    const padded = merged.filter((s) => s.end - s.start >= o.minSeg).map((s) => ({ start: Math.max(0, s.start - o.pad), end: Math.min(dur, s.end + padEnd) }));
     const out = []; padded.forEach((s) => { const l = out[out.length - 1]; if (l && s.start <= l.end) l.end = Math.max(l.end, s.end); else out.push(s); }); // 여유를 붙이다 겹치면 하나로
     return out;
   }

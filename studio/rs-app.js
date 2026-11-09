@@ -756,9 +756,14 @@
     for (const mid of mids) {
       msg.textContent = "말소리를 글로 바꾸는 중… (영상 길이에 따라 수십 초)"; const tr = await aeTranscribe(M[mid]), lines = RS.subtitleLines(tr, Number($("#aeLine").value));
       P.texts = P.texts.filter((x) => x.auto !== mid);
-      ts.filter((c) => c.mediaId === mid).forEach((c) => {
-        const hi = c.in + c.dur * c.speed;
-        lines.forEach((l) => { if (l.start < c.in - 0.02 || l.start >= hi) return; const te = Math.min(l.end, hi); P.texts.push(RS.newText({ text: l.text, start: c.start + (l.start - c.in) / c.speed, dur: Math.max(0.6, (te - l.start) / c.speed + 0.15), style: $("#aeStyle").value, size: 66, y: 0.74, anim: "fade", auto: mid })); made++; });
+      // 자막 줄은 겹치는 시간이 가장 긴 컷 하나에만 붙인다 (인식기는 첫 단어 시작을 0초로 주기도 해서, 컷 시작보다 앞서면 컷 시작에 맞춘다)
+      const mine = ts.filter((c) => c.mediaId === mid);
+      lines.forEach((l) => {
+        let best = null, bo = 0;
+        mine.forEach((c) => { const ov = Math.min(l.end, c.in + c.dur * c.speed) - Math.max(l.start, c.in); if (ov > bo) { bo = ov; best = c; } });
+        if (!best || bo < 0.15) return;
+        const hi = best.in + best.dur * best.speed, s0 = Math.max(l.start, best.in), e0 = Math.min(l.end, hi);
+        P.texts.push(RS.newText({ text: l.text, start: best.start + (s0 - best.in) / best.speed, dur: Math.max(0.6, (e0 - s0) / best.speed + 0.15), style: $("#aeStyle").value, size: 66, y: 0.74, anim: "fade", auto: mid })); made++;
       });
     }
     commit(); msg.textContent = made ? `자막 ${made}줄을 넣었습니다. 타임라인의 글자 줄에서 문구와 위치를 고칠 수 있어요.` : "인식된 말이 없습니다. 영상에 말소리가 있는지 확인해 주세요."; return made;
