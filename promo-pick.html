@@ -91,7 +91,7 @@
     <div class="hint">체크하면 단어로 확실한 상품은 바로 넣고, 나머지 후보 전부(개수 제한 없음)를 AI가 요청 취지에 맞는지 판단합니다. 체크 안 하면 위 단어로만 거릅니다.</div></div>
   <div class="row"><button class="btn btn-pri" id="pick">상품 고르기</button><button class="btn btn-out" id="dl" disabled>엑셀 다운로드</button></div>
   <div class="msg" id="msg"></div>
-  <div class="tw" id="tw" hidden><table><thead><tr><th>사방넷코드</th><th>상품명</th><th>브랜드</th><th>이카운트 총재고</th><th>사이즈별 재고</th></tr></thead><tbody id="tb"></tbody></table></div>
+  <div class="tw" id="tw" hidden><table><thead><tr><th>사방넷코드</th><th>상품명</th><th>브랜드</th><th>상품분류</th><th>사방넷 판매가</th><th>이카운트 총재고</th><th>사이즈별 재고</th></tr></thead><tbody id="tb"></tbody></table></div>
 </div>
 
 <div class="box" id="mallBox">
@@ -438,7 +438,7 @@ $('pick').onclick=async()=>{
       PICKED=applyOrder(PromoPick.select(DATA.rows,brands,words,$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o);
       if(o.ord==='new'&&!HASREG) $('msg').dataset.cap='(등록일 정보가 없는 파일이라 신상 순은 적용되지 않았어요) ';
     }
-    $('tb').innerHTML=PICKED.map(r=>{ const e=EC.idx?ecOf(r):null, z=e&&e.found&&e.total===0; return `<tr${z?' style="background:var(--badbg);color:var(--bad)"':''}><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.brand)}</td><td>${e?(e.found?e.total.toLocaleString():'-'):''}</td><td style="font-size:11.5px">${e?esc(ecSizesText(e)):''}</td></tr>`; }).join('');
+    $('tb').innerHTML=PICKED.map(r=>{ const e=EC.idx?ecOf(r):null, z=e&&e.found&&e.total===0; return `<tr${z?' style="background:var(--badbg);color:var(--bad)"':''}><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.brand)}</td><td style="font-size:11.5px">${esc(r.cat||'')}</td><td>${r.price?Number(r.price).toLocaleString():''}</td><td>${e?(e.found?e.total.toLocaleString():'-'):''}</td><td style="font-size:11.5px">${e?esc(ecSizesText(e)):''}</td></tr>`; }).join('');
     $('tw').hidden=!PICKED.length;
     $('msg').className=PICKED.length?'msg ok':'msg';
     const zeroN=PICKED.filter(r=>{ const e=ecOf(r); return EC.idx&&e.found&&e.total===0; }).length;
@@ -506,14 +506,14 @@ function ecStampText(){ return EC.stamp?`이카운트 재고 기준 ${EC.stamp}$
 const RED_FILL={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFC7CE'}}, RED_FONT={color:{argb:'FF9C0006'},bold:true}, GREY_FONT={color:{argb:'FF8A8F98'}};
 // 사이즈별 재고 시트 데이터: 상품마다 사이즈 줄을 펼친다. 반환 {rows, redCells:[[r,c]], redRows:[r], greyRows:[r]} (r,c 는 1부터, 머리글이 1행)
 function stockSheet(list){
-  const head=['사방넷코드','상품명','브랜드','사이즈','이카운트 재고','상품 총재고','재고 기준시각'];
+  const head=['사방넷코드','상품명','브랜드','상품분류','사방넷 판매가','사이즈','이카운트 재고','상품 총재고','재고 기준시각'];
   const rows=[head], redCells=[], redRows=[], greyRows=[];
   list.forEach(p=>{
-    const e=ecOf(p), at=EC.stamp;
-    if(!e.found){ rows.push([p.code,p.name,p.brand||'','','이카운트에 없음','',at]); greyRows.push(rows.length); return; }
-    e.sizes.forEach(s=>{ rows.push([p.code,p.name,p.brand||'',s.spec,s.qty,e.total,at]); const r=rows.length; if(e.total===0) redRows.push(r); else if(s.qty===0) redCells.push([r,4],[r,5]); });
+    const e=ecOf(p), at=EC.stamp, pre=[p.code,p.name,p.brand||'',p.cat||'',p.price||''];
+    if(!e.found){ rows.push([...pre,'','이카운트에 없음','',at]); greyRows.push(rows.length); return; }
+    e.sizes.forEach(s=>{ rows.push([...pre,s.spec,s.qty,e.total,at]); const r=rows.length; if(e.total===0) redRows.push(r); else if(s.qty===0) redCells.push([r,6],[r,7]); });
   });
-  return {rows,redCells,redRows,greyRows,widths:[14,56,16,10,14,12,20]};
+  return {rows,redCells,redRows,greyRows,widths:[14,56,16,30,14,10,14,12,20],fmtCols:[5]};
 }
 function tsName(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; }
 async function saveBook(filename,sheets){
@@ -522,6 +522,7 @@ async function saveBook(filename,sheets){
     const ws=wb.addWorksheet(sh.name.replace(/[\/?*\[\]:]/g,'').slice(0,31));
     sh.rows.forEach(r=>ws.addRow(r));
     (sh.widths||[]).forEach((w,i)=>ws.getColumn(i+1).width=w);
+    (sh.fmtCols||[]).forEach(c=>{ ws.getColumn(c).numFmt='#,##0'; });
     const h=ws.getRow(1); h.font={bold:true}; h.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF1F1EE'}}; ws.views=[{state:'frozen',ySplit:1}];
     (sh.redRows||[]).forEach(r=>{ ws.getRow(r).eachCell({includeEmpty:true},c=>{ c.fill=RED_FILL; c.font=RED_FONT; }); });
     (sh.redCells||[]).forEach(([r,c])=>{ const cell=ws.getCell(r,c); cell.fill=RED_FILL; cell.font=RED_FONT; });
@@ -536,7 +537,7 @@ $('dl').onclick=async()=>{
     let note='';
     try{ await ecLoad(); }catch(e){ note=' (이카운트 재고를 못 불러와 재고 열이 비었습니다: '+e.message+')'; }
     if(EC.idx){ const ss=stockSheet(PICKED); await saveBook(`기획전_사방넷코드_재고_${tsName()}.xlsx`,[Object.assign({name:'기획전상품'},ss)]); }
-    else { const aoa=[['사방넷코드','상품명']]; PICKED.forEach(r=>aoa.push([r.code,r.name])); await saveBook(`기획전_사방넷코드_상품명_${tsName()}.xlsx`,[{name:'기획전상품',rows:aoa,widths:[14,60]}]); }
+    else { const aoa=[['사방넷코드','상품명','브랜드','상품분류','사방넷 판매가']]; PICKED.forEach(r=>aoa.push([r.code,r.name,r.brand||'',r.cat||'',r.price||''])); await saveBook(`기획전_사방넷코드_상품명_${tsName()}.xlsx`,[{name:'기획전상품',rows:aoa,widths:[14,60,16,30,14],fmtCols:[5]}]); }
     if(note) $('msg').textContent+=note;
   }catch(err){ $('msg').className='msg err'; $('msg').textContent='엑셀 만들기 오류: '+err.message; }
   finally{ $('dl').disabled=!PICKED.length; }
@@ -612,7 +613,7 @@ function applyManual(codes){
   const seen=new Set(), list=[];
   codes.forEach(c=>{ c=String(c).trim(); if(c&&!seen.has(c)){ seen.add(c); list.push(c); } });
   const byCode={}; if(DATA) DATA.rows.forEach(r=>byCode[r.code]=r);
-  PICKED=list.map(c=>{ const r=byCode[c]||byCode[c.split('-')[0]]; return {code:c,name:r?r.name:'',brand:r?r.brand:'',cat:r?r.cat:''}; });
+  PICKED=list.map(c=>{ const r=byCode[c]||byCode[c.split('-')[0]]; return {code:c,name:r?r.name:'',brand:r?r.brand:'',cat:r?r.cat:'',price:r?r.price:0}; });
   MANUAL=true; CONV=null; $('dl2').disabled=true; $('ctw').hidden=true; $('skipNote').hidden=true;
   $('manMsg').className=PICKED.length?'msg ok':'msg err';
   $('manMsg').textContent=PICKED.length?`✅ 코드 ${PICKED.length.toLocaleString()}개를 받았습니다. 아래에서 플랫폼을 고르고 "플랫폼 양식으로 바꾸기"를 누르세요.`:'코드를 찾지 못했습니다';
@@ -655,17 +656,26 @@ $('dl2').onclick=async()=>{
   $('dl2').disabled=true;
   try{
     const m=MALLS[$('mallSel').value]||{mall:'플랫폼'};
-    const a1=[PromoPick.OUT_HEAD]; CONV.matched.forEach(r=>a1.push([r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12]]));
-    const a2=[['품번코드','상품명(기획전 선별)','사유']]; CONV.skipped.forEach(s=>a2.push([s.code,s.name,s.reason]));
-    const sheets=[{name:'변환결과 '+m.mall,rows:a1,widths:[16,10,12,56,30,24,14,14,10,8,12,10,12]}];
     let note='';
     try{ await ecLoad(); }catch(e){ note=e.message; }
+    // 변환결과 시트: 플랫폼 양식 13열 + 상품분류·사방넷 판매가·이카운트 총재고 (고른 상품의 값을 품번코드로 이어 붙임)
+    const byCode={}; PICKED.forEach(p=>{ byCode[String(p.code)]=p; });
+    const pickOf=code=>byCode[String(code)]||byCode[String(code).split('-')[0]]||null;
+    const a1=[PromoPick.OUT_HEAD.concat(['상품분류','사방넷 판매가','이카운트 총재고'])], redCells=[];
+    CONV.matched.forEach(r=>{
+      const p=pickOf(r[1]), e=EC.idx&&p?ecOf(p):null;
+      const tot=e?(e.found?e.total:'이카운트에 없음'):'';
+      a1.push([r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],p?(p.cat||''):'',p?(p.price||''):'',tot]);
+      if(e&&e.found&&e.total===0) redCells.push([a1.length,16]);
+    });
+    const a2=[['품번코드','상품명(기획전 선별)','사유']]; CONV.skipped.forEach(s=>a2.push([s.code,s.name,s.reason]));
+    const sheets=[{name:'변환결과 '+m.mall,rows:a1,widths:[16,10,12,56,30,24,14,14,10,8,12,10,12,30,14,14],fmtCols:[15],redCells}];
     if(EC.idx){
-      // 변환된 상품(품번코드 기준)만, 이카운트 최신 재고를 사이즈별로 펼쳐서 별도 시트로
+      // 변환된 상품만, 이카운트 최신 재고를 사이즈별로 펼쳐서 별도 시트로
       const ok=new Set(CONV.matched.map(r=>String(r[1])));
       const list=PICKED.filter(p=>ok.has(String(p.code))||ok.has(String(p.code).split('-')[0]));
       sheets.push(Object.assign({name:'이카운트 재고(사이즈별)'},stockSheet(list)));
-    } else if(note) $('cmsg').textContent+=' (이카운트 재고 시트는 못 넣었어요: '+note+')';
+    } else if(note) $('cmsg').textContent+=' (이카운트 재고는 못 넣었어요: '+note+')';
     sheets.push({name:'제외·미등록',rows:a2,widths:[12,56,28]});
     await saveBook(`기획전_${m.mall}_${tsName()}.xlsx`,sheets);
   }catch(err){ $('cmsg').className='msg err'; $('cmsg').textContent='엑셀 만들기 오류: '+err.message; }
