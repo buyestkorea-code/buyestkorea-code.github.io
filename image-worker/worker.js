@@ -12,7 +12,7 @@
  */
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const ASPECTS = { "4:5": "1024x1280", "3:4": "960x1280", "9:16": "864x1536", "1:1": "1024x1024", "16:9": "1536x864" }; // 새 모델은 16의 배수 사이즈를 직접 받는다 → 잘림 없이 정확한 비율
 // 대략적인 1장 비용(USD) — 화면 안내용. 실제 청구는 각 회사 콘솔에서 확인.
 const COST = { gemini: 0.04, openai: 0.06 };
@@ -210,6 +210,72 @@ async function openaiMany(env, prompt, refs, aspect, n) {
   return out;
 }
 
+// ── 릴스 스토리보드: 프롬프트 + 사진 → 컷 리스트(JSON) ───────────────
+// 글 모델은 Gemini 먼저, 막히면 OpenAI. 모델 이름은 STORY_MODEL / OPENAI_TEXT_MODEL 로 바꿀 수 있다.
+const STORY_SYSTEM = `너는 인스타그램 릴스 전문 편집 기획자다. 패션 쇼핑몰(BUYEST: 병행수입 명품·부티크 / BUYEST Kids: 키즈 명품) 상품 영상의 컷 구성표를 만든다.
+반드시 아래 JSON 하나만 출력한다 (설명·마크다운 금지).
+{"hook":"첫 화면 한 줄(공백 포함 18자 이내)","mood":"bright|calm|emotional|hype 중 하나","cuts":[{"role":"hook|intro|detail|style|proof|cta 중 하나","sec":3~15 정수,"photo":사진 번호(0부터),"mode":"ai|photo","motion":"영어로 쓴 카메라·피사체 움직임 한 문장(영상 안에 글자·로고 새로 만들지 말 것)","narration":"한국어 나레이션 1~2문장","caption":"화면 자막 한 줄(공백 포함 16자 이내)"}]}
+규칙:
+- 전체 길이(sec 합)는 요청한 목표 길이의 ±15% 안. 컷 수는 목표 길이÷6 정도(최소 4, 최대 14). 첫 컷은 5초 이하 훅, 마지막 컷은 행동 유도(cta).
+- 나레이션 글자 수는 컷 sec × 4 이하 (한국어 읽는 속도). 나레이션 없이 분위기만 둘 컷은 narration 을 빈 문자열로.
+- mode "ai": 모델이 움직이거나 소재가 흔들리는 장면처럼 움직임이 가치 있는 컷. mode "photo": 지퍼·로고·택·소재 클로즈업처럼 AI가 모양을 바꾸면 안 되는 디테일 컷.
+- 사진은 가능한 한 모두 한 번 이상 쓰고, 같은 사진을 연달아 쓰지 않는다. photo 는 주어진 사진 수 범위 안.
+- 사용자가 준 상품 정보에 없는 사실(소재·가격·할인·재고·정품 보증)은 지어내지 않는다. 다른 브랜드 이름을 끌어와 비교하지 않는다. 과장·허위 표현 금지.
+- 말투: 사장님이 직접 말하듯 담백하고 구체적으로. 광고 문구 투의 상투어("지금 바로!", "놓치지 마세요")는 마지막 컷 외에는 쓰지 않는다.`;
+function extractJson(txt) {
+  const s = String(txt || ""); const a = s.indexOf("{"), b = s.lastIndexOf("}");
+  if (a < 0 || b <= a) throw new HttpError(502, "스토리보드 응답을 읽지 못했습니다");
+  try { return JSON.parse(s.slice(a, b + 1)); } catch (_) { throw new HttpError(502, "스토리보드 응답 형식이 올바르지 않습니다"); }
+}
+async function storyGemini(env, text, refs) {
+  const key = String(env.GEMINI_API_KEY).trim();
+  const models = [env.STORY_MODEL, "gemini-2.5-flash"].filter(Boolean);
+  let lastErr = "";
+  for (const model of models) {
+    let r;
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: STORY_SYSTEM }] },
+          contents: [{ role: "user", parts: [{ text }, ...refs.map((x) => ({ inline_data: { mime_type: x.mime, data: x.b64 } }))] }],
+          generationConfig: { temperature: 0.8, responseMimeType: "application/json" },
+        }),
+      });
+    } catch (_) { lastErr = "Gemini 서버에 연결하지 못했습니다."; continue; }
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) { const t = d?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || ""; if (t) return extractJson(t); lastErr = "Gemini 가 빈 응답을 돌려줬습니다."; continue; }
+    lastErr = `Gemini(${model}) ${r.status} ${String(d?.error?.message || "").slice(0, 120)}`;
+  }
+  throw new HttpError(502, lastErr || "Gemini 스토리보드 실패");
+}
+async function storyOpenAI(env, text) {
+  let r;
+  try {
+    r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${String(env.OPENAI_API_KEY).trim()}` },
+      body: JSON.stringify({ model: env.OPENAI_TEXT_MODEL || "gpt-4.1-mini", temperature: 0.8, response_format: { type: "json_object" }, messages: [{ role: "system", content: STORY_SYSTEM }, { role: "user", content: text }] }),
+    });
+  } catch (_) { throw new HttpError(502, "OpenAI 서버에 연결하지 못했습니다."); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new HttpError(r.status === 429 ? 429 : 502, `OpenAI 스토리보드 실패 (${r.status}) ${String(d?.error?.message || "").slice(0, 140)}`);
+  return extractJson(d?.choices?.[0]?.message?.content);
+}
+const MOODS = ["bright", "calm", "emotional", "hype"], ROLES = ["hook", "intro", "detail", "style", "proof", "cta"];
+function normalizeBoard(raw, targetSec, nPhotos) {
+  const cuts = (Array.isArray(raw?.cuts) ? raw.cuts : []).slice(0, 16).map((c, i) => ({
+    role: ROLES.includes(c?.role) ? c.role : i === 0 ? "hook" : "detail",
+    sec: Math.min(15, Math.max(3, Math.round(Number(c?.sec) || 6))),
+    photo: Math.min(nPhotos - 1, Math.max(0, Math.round(Number(c?.photo) || 0))),
+    mode: c?.mode === "photo" ? "photo" : "ai",
+    motion: String(c?.motion || "Slow cinematic push-in with gentle natural motion.").slice(0, 400),
+    narration: String(c?.narration || "").slice(0, 200),
+    caption: String(c?.caption || "").slice(0, 40),
+  }));
+  if (cuts.length < 2) throw new HttpError(502, "스토리보드에 컷이 부족합니다. 다시 시도해 주세요.");
+  return { hook: String(raw?.hook || "").slice(0, 40), mood: MOODS.includes(raw?.mood) ? raw.mood : "bright", cuts, targetSec };
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: cors() });
@@ -242,6 +308,27 @@ export default {
           out = await ttsOpenAI(env, text, voice); provider = "openai";
         }
         return json({ ...out, voice, provider, fallbackReason: provider === "openai" ? note : "" });
+      }
+      if (url.pathname === "/api/storyboard" && request.method === "POST") {
+        if (!env.GEMINI_API_KEY && !env.OPENAI_API_KEY) throw new HttpError(503, "글 모델 키(GEMINI_API_KEY 또는 OPENAI_API_KEY)가 아직 등록되지 않았습니다.");
+        const b = await request.json().catch(() => ({}));
+        const prompt = String(b.prompt || "").trim().slice(0, 2000);
+        if (!prompt) throw new HttpError(400, "릴스 프롬프트가 비어 있습니다");
+        const nPhotos = Math.min(10, Math.max(1, Math.round(Number(b.photoCount) || 1)));
+        const targetSec = Math.min(120, Math.max(15, Math.round(Number(b.targetSec) || 45)));
+        const p = b.product || {};
+        const text = [
+          `브랜드: ${b.brand === "kids" ? "BUYEST Kids" : "BUYEST"}${b.brandName ? ` · 상품 브랜드 ${String(b.brandName).slice(0, 60)}` : ""}`,
+          `목표 길이: ${targetSec}초`, `사진 수: ${nPhotos}장 (0~${nPhotos - 1}번, 첨부된 순서)`,
+          p.name ? `상품명: ${String(p.name).slice(0, 120)}` : "", p.price ? `가격: ${String(p.price).slice(0, 40)}` : "",
+          p.features ? `특징:\n${String(p.features).slice(0, 600)}` : "", p.cta ? `마지막 요청: ${String(p.cta).slice(0, 80)}` : "",
+          `사장님 요청(릴스 프롬프트):\n${prompt}`,
+        ].filter(Boolean).join("\n");
+        const refs = (Array.isArray(b.images) ? b.images.slice(0, 8) : []).map((u) => { try { return parseDataUrl(u); } catch (_) { return null; } }).filter(Boolean);
+        let raw = null, note = "";
+        if (env.GEMINI_API_KEY) { try { raw = await storyGemini(env, text, refs); } catch (e) { if (!env.OPENAI_API_KEY) throw e; note = String(e.message || "").slice(0, 160); } }
+        if (!raw) raw = await storyOpenAI(env, text);
+        return json({ board: normalizeBoard(raw, targetSec, nPhotos), provider: note ? "openai" : env.GEMINI_API_KEY ? "gemini" : "openai", fallbackReason: note });
       }
       if (url.pathname === "/api/generate" && request.method === "POST") {
         const b = await request.json().catch(() => ({}));
