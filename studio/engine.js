@@ -387,5 +387,51 @@
     };
   }
 
-  window.SE = { W, H, FPS, SAFE, THEMES, themeOf, CAPTION_THEMES, buildClipScene, decodeAudio, loadMedia, loadImage, ensureFonts, renderToMp4, supported, wrap };
+  // ── 여러 장 릴스: 사진/AI 클립을 순서대로 이어 붙이고, 훅·자막·가격 화면을 얹는다 ──
+  // segs: [{ el, isVideo, duration, frames }]  (사진은 무료 확대/이동 효과, AI 클립은 그대로 재생하고 모자라면 마지막 장면 유지)
+  // P: { brand, brandName, productName, hook, captions[](장면 순서대로 한 줄씩), price, cta, capTheme, outro }
+  function buildSequenceScene(P, segs) {
+    const T = themeOf(P.brand), theme = P.capTheme || "box";
+    const hook = String(P.hook || "").trim();
+    const starts = []; let acc = 0;
+    segs.forEach((s) => { starts.push(acc); acc += s.frames; });
+    const mainFrames = acc;
+    const outroOn = !!P.outro && !!(P.price || P.cta || P.productName);
+    const total = mainFrames + (outroOn ? Math.round(2.5 * FPS) : 0);
+    const hookFrames = hook ? Math.min(Math.round(1.8 * FPS), segs[0] ? segs[0].frames : 0) : 0;
+    const caps = (P.captions || []).map((x) => String(x).trim());
+    const brandName = String(P.brandName || "").toUpperCase();
+    const segAt = (f) => { let k = 0; for (let i = 0; i < segs.length; i++) if (f >= starts[i]) k = i; return k; };
+    // 사진 효과: 장면 번호에 따라 천천히 확대 / 축소 / 좌우 이동을 번갈아
+    const kb = (k, p) => {
+      const m = k % 3;
+      if (m === 0) return { zoom: 1 + 0.12 * p, dx: 0, dy: 0 };
+      if (m === 1) return { zoom: 1.12 - 0.1 * p, dx: 0, dy: 0 };
+      return { zoom: 1.1, dx: (k % 2 ? -1 : 1) * (p - 0.5) * 46, dy: 0 };
+    };
+    return {
+      frames: total, fps: FPS, mainFrames,
+      async prepare(frame) {
+        if (frame >= mainFrames) return;
+        const k = segAt(frame), s = segs[k];
+        if (s && s.isVideo) await seekVideo(s.el, Math.min((frame - starts[k]) / FPS, Math.max(0, (s.duration || 5) - 0.05)));
+      },
+      draw(ctx, frame) {
+        ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H); ctx.textBaseline = "alphabetic";
+        if (frame >= mainFrames) { drawOutro(ctx, T, { productName: P.productName, price: P.price, cta: P.cta }, brandName, (s2) => easeOut((frame - mainFrames - s2) / 20)); return; }
+        const k = segAt(frame), s = segs[k], local = frame - starts[k], p = s.frames > 1 ? local / (s.frames - 1) : 0;
+        if (s.isVideo) drawCover(ctx, s.el, 0, 0, W, H, 1, 0, 0);
+        else { const e = kb(k, p); drawCover(ctx, s.el, 0, 0, W, H, e.zoom, e.dx, e.dy); }
+        if (k > 0 && local < 7) { ctx.save(); ctx.globalAlpha = 1 - local / 7; ctx.fillStyle = T.bg; ctx.fillRect(0, 0, W, H); ctx.restore(); } // 장면이 바뀔 때 부드럽게
+        if (hook && frame < hookFrames) { drawHook(ctx, T, hook, theme); return; }
+        const text = caps[k];
+        if (text) {
+          const t0 = k === 0 ? hookFrames : 0, lc = local - t0, span = Math.max(8, s.frames - t0);
+          if (lc >= 0) drawCaption(ctx, { text, x: SAFE.left, y: SAFE_BOX.y + SAFE_BOX.h, anchor: "bottom", maxW: SAFE_BOX.w, size: 68, T, theme, p: Math.min(easeOut(lc / 20), interp(lc, [span - 6, span], [1, 0])) });
+        }
+      },
+    };
+  }
+
+  window.SE = { W, H, FPS, SAFE, THEMES, themeOf, CAPTION_THEMES, buildClipScene, buildSequenceScene, decodeAudio, loadMedia, loadImage, ensureFonts, renderToMp4, supported, wrap };
 })();

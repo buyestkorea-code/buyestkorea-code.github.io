@@ -10,9 +10,9 @@ compatibility_date = "2025-01-01"
 # id = "여기에_KV_id"
 
 [vars]
-# 영상 1건 예상 비용이 이 금액(USD)을 넘으면 서버가 거절 (실수로 큰 영상을 만드는 것 방지)
-MAX_USD_PER_REQUEST = "4"
+# 영상 클립 1개 예상 비용이 이 금액(USD)을 넘으면 서버가 거절 (실수로 큰 영상을 만드는 것 방지)
+MAX_USD_PER_REQUEST = "1"
 # 직원 1명 하루 생성 횟수 (KV 를 연결했을 때만 적용)
-LIMIT_GEN_PER_DAY = "15"
+LIMIT_GEN_PER_DAY = "40"
 # 한 번에 보낼 수 있는 사진 수 (모델 한도 안에서)
 MAX_IMAGES = "8"

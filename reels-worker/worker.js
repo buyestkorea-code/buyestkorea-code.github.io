@@ -5,7 +5,7 @@
  *
  *   GET  /api/health      설정 상태 (키가 있는지 여부만)
  *   POST /api/upload-url  사진 올릴 임시 주소 발급 → 브라우저가 사진을 직접 올림 (Worker 는 사진을 안 거침)
- *   POST /api/estimate    같은 설정의 정확한 예상 비용 (무료 조회)
+ *   POST /api/estimate    같은 설정의 예상 비용 (가격표 기준, 무료)
  *   POST /api/generate    영상 생성 요청 (유료, 성공한 건만 과금)
  *   GET  /api/status      생성 상태 확인 → 끝나면 영상 주소
  *   GET  /api/media       만들어진 영상 중계 (이 Worker 가 서명한 주소만)
@@ -18,13 +18,15 @@
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const HF = "https://api.higgsfield.ai";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "3.0.0";
+const VERSION = "4.0.0";
 
-// 쓸 수 있는 모델 (문서 확인: docs.higgsfield.ai · reference-to-video)
+// 쓸 수 있는 모델 — 사진 1장 → 짧은 클립 (Kling). 비싼 Seedance 는 뺐다 (2.0 도 5초 $1.5).
+// usdPerSec: 실제 청구와 공식 가격표(open.higgsfield.ai/pricing)로 잡은 초당 예상 금액 (견적 API 가 이 키로 안 열려 가격표로 상한을 건다)
 const MODELS = {
-  seedance25: { label: "Seedance 2.5 (고품질, 최대 30초)", path: "bytedance/seedance-2.5/reference-to-video", minSec: 4, maxSec: 30, maxImages: 30 },
-  seedance20: { label: "Seedance 2.0 (표준, 최대 15초)", path: "bytedance/seedance-2.0/reference-to-video", minSec: 4, maxSec: 15, maxImages: 9 },
+  kling25: { label: "Kling 2.5 Turbo (기본 · 5초 약 $0.21)", path: "kling-video/v2.5-turbo/standard/image-to-video", durations: [5, 10], minSec: 5, maxSec: 10, usdPerSec: 0.045, negative: true },
+  kling3: { label: "Kling 3.0 표준 (5초 약 $0.32)", path: "kling-video/v3.0/std/image-to-video", minSec: 3, maxSec: 15, usdPerSec: 0.065, sound: true },
 };
+const DEFAULT_MODEL = "kling25";
 const RESOLUTIONS = ["480p", "720p", "1080p"];
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
@@ -49,7 +51,7 @@ async function hmac(key, msg) {
 const loginCache = new Map();
 async function requireStaff(request) {
   let user = (request.headers.get("X-Studio-User") || "").trim();
-  let pass = request.headers.get("X-Studio-Pass,X-Studio-Enc") || "";
+  let pass = request.headers.get("X-Studio-Pass") || "";
   // 한글 ID/비밀번호는 헤더에 그대로 못 실으므로 클라이언트가 URL 인코딩해서 보냄 (X-Studio-Enc: 1)
   if (request.headers.get("X-Studio-Enc") === "1") {
     try { user = decodeURIComponent(user).trim(); pass = decodeURIComponent(pass); } catch (e) {}
@@ -99,20 +101,20 @@ async function hf(env, method, path, body, extraHeaders) {
   return data;
 }
 
-// 화면에서 온 설정 → 검증 → Higgsfield 요청 본문
+// 화면에서 온 설정 → 검증 → Higgsfield 요청 본문 (사진 1장 = 클립 1개)
 function buildRequest(env, b) {
-  const m = MODELS[b.model] || MODELS.seedance25;
-  const maxImages = Math.min(m.maxImages, Number(env.MAX_IMAGES) || 8);
-  const images = (Array.isArray(b.images) ? b.images : []).filter((u) => typeof u === "string" && /^https:\/\//.test(u)).slice(0, maxImages);
-  if (!images.length) throw new HttpError(400, "사진이 필요합니다");
-  const prompt = String(b.prompt || "").trim().slice(0, 2500);
-  if (!prompt) throw new HttpError(400, "프롬프트(기획서)를 입력해 주세요");
-  const duration = Math.min(m.maxSec, Math.max(m.minSec, Math.round(Number(b.duration) || 10)));
-  const resolution = RESOLUTIONS.includes(b.resolution) ? b.resolution : "720p";
-  return {
-    path: m.path,
-    body: { prompt, image_urls: images, duration, resolution, aspect_ratio: "9:16", generate_audio: b.audio !== false, bitrate_mode: "high" },
-  };
+  const m = MODELS[b.model] || MODELS[DEFAULT_MODEL];
+  const first = typeof b.image === "string" ? b.image : (Array.isArray(b.images) ? b.images[0] : "");
+  if (typeof first !== "string" || !/^https:\/\//.test(first)) throw new HttpError(400, "사진 주소가 필요합니다");
+  const prompt = String(b.prompt || "").trim().slice(0, 2400);
+  if (!prompt) throw new HttpError(400, "움직임 설명(프롬프트)이 필요합니다");
+  let duration = Math.round(Number(b.duration) || 5);
+  duration = m.durations ? (m.durations.includes(duration) ? duration : m.durations[0]) : Math.min(m.maxSec, Math.max(m.minSec, duration));
+  const body = { prompt, image_url: first, duration };
+  if (m.negative) body.negative_prompt = "text, captions, subtitles, watermark, logo distortion, deformed product, extra objects";
+  if (m.sound) body.sound = "off";
+  const usd = Math.round(duration * m.usdPerSec * 1000) / 1000;
+  return { path: m.path, body, usd };
 }
 
 export default {
@@ -121,7 +123,7 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/api/health") {
-        return json({ ok: true, version: VERSION, higgsfield: !!env.HF_API_KEY, limits: !!env.STUDIO_KV, maxUsd: Number(env.MAX_USD_PER_REQUEST) || 4, models: Object.entries(MODELS).map(([id, m]) => ({ id, label: m.label, minSec: m.minSec, maxSec: m.maxSec })) });
+        return json({ ok: true, version: VERSION, higgsfield: !!env.HF_API_KEY, limits: !!env.STUDIO_KV, maxUsd: Number(env.MAX_USD_PER_REQUEST) || 1, defaultModel: DEFAULT_MODEL, models: Object.entries(MODELS).map(([id, m]) => ({ id, label: m.label, minSec: m.minSec, maxSec: m.maxSec, durations: m.durations || null, usdPerSec: m.usdPerSec })) });
       }
 
       // 영상 중계: 서명된 주소만 (로그인 헤더 없이 <video> 가 받을 수 있게)
@@ -155,23 +157,20 @@ export default {
       }
 
       if (url.pathname === "/api/estimate") {
-        const { path, body: req } = buildRequest(env, body);
-        const d = await hf(env, "POST", `estimate/${path}`, req);
-        return json({ usd: Number(d.usd), credits: Number(d.credits), duration: req.duration, resolution: req.resolution });
+        const { body: req, usd } = buildRequest(env, body);
+        return json({ usd, duration: req.duration, approx: true });
       }
 
       if (url.pathname === "/api/generate") {
-        const { path, body: req } = buildRequest(env, body);
-        // 요청 1건 최대 비용 — 예상 비용이 넘으면 거절
-        const maxUsd = Number(env.MAX_USD_PER_REQUEST) || 4;
-        let est = null;
-        try { est = Number((await hf(env, "POST", `estimate/${path}`, req)).usd); } catch (e) { if (e.status === 402 || e.status === 503) throw e; }
-        if (est != null && est > maxUsd) throw new HttpError(400, `이 설정은 예상 비용이 $${est.toFixed(2)} 로 1건 한도($${maxUsd})를 넘습니다. 길이나 해상도를 줄여 주세요.`);
-        await spend(env, user, Number(env.LIMIT_GEN_PER_DAY) || 15);
+        const { path, body: req, usd } = buildRequest(env, body);
+        // 클립 1개 최대 비용 — 가격표 기준 예상이 넘으면 거절
+        const maxUsd = Number(env.MAX_USD_PER_REQUEST) || 1;
+        if (usd > maxUsd) throw new HttpError(400, `이 설정은 예상 비용이 $${usd.toFixed(2)} 로 클립 1개 한도($${maxUsd})를 넘습니다. 길이를 줄여 주세요.`);
+        await spend(env, user, Number(env.LIMIT_GEN_PER_DAY) || 40);
         const idem = request.headers.get("Idempotency-Key");
         const d = await hf(env, "POST", path, req, idem ? { "Idempotency-Key": idem.slice(0, 80) } : undefined);
         if (!d.request_id) throw new HttpError(502, "Higgsfield 응답에 요청 번호가 없습니다");
-        return json({ request_id: d.request_id, status: d.status || "queued", estimate_usd: est });
+        return json({ request_id: d.request_id, status: d.status || "queued", estimate_usd: usd });
       }
 
       throw new HttpError(404, "알 수 없는 경로입니다");

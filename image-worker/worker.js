@@ -12,7 +12,7 @@
  */
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const ASPECTS = { "4:5": "1024x1280", "3:4": "960x1280", "9:16": "864x1536", "1:1": "1024x1024", "16:9": "1536x864" }; // 새 모델은 16의 배수 사이즈를 직접 받는다 → 잘림 없이 정확한 비율
 // 대략적인 1장 비용(USD) — 화면 안내용. 실제 청구는 각 회사 콘솔에서 확인.
 const COST = { gemini: 0.04, openai: 0.06 };
@@ -34,7 +34,7 @@ const sha256 = async (s) => hex(await crypto.subtle.digest("SHA-256", new TextEn
 const loginCache = new Map();
 async function requireStaff(request) {
   let user = (request.headers.get("X-Studio-User") || "").trim();
-  let pass = request.headers.get("X-Studio-Pass,X-Studio-Enc") || "";
+  let pass = request.headers.get("X-Studio-Pass") || "";
   // 한글 ID/비밀번호는 헤더에 그대로 못 실으므로 클라이언트가 URL 인코딩해서 보냄 (X-Studio-Enc: 1)
   if (request.headers.get("X-Studio-Enc") === "1") {
     try { user = decodeURIComponent(user).trim(); pass = decodeURIComponent(pass); } catch (e) {}
@@ -118,6 +118,71 @@ async function geminiOne(env, prompt, refs, aspect) {
   throw new HttpError(502, `Gemini 요청 실패 · 새 방식(${r.status}): ${String(d?.error?.message || "").slice(0, 110)} · 예전 방식(${r2.r.status}): ${String(r2.d?.error?.message || "").slice(0, 110)}`);
 }
 
+// ── Gemini 음성(TTS): 릴스 나레이션 ───────────────────
+const TTS_VOICES = [
+  { id: "Kore", label: "Kore · 단단하고 또렷한" },
+  { id: "Sulafat", label: "Sulafat · 따뜻한" },
+  { id: "Achird", label: "Achird · 친근한" },
+  { id: "Puck", label: "Puck · 경쾌한" },
+  { id: "Charon", label: "Charon · 차분한 설명" },
+  { id: "Zephyr", label: "Zephyr · 밝은" },
+];
+const TTS_STYLE = "warm, confident and clear Korean shopping-promo narration at a natural, slightly brisk pace";
+async function ttsOne(env, text, voice, style) {
+  const key = String(env.GEMINI_API_KEY).trim();
+  const model = env.TTS_MODEL || "gemini-3.8-flash-tts";
+  const body = {
+    model,
+    input: [{ type: "user_input", content: [{ type: "text", text, annotations: [{ type: "speech_metadata", style: style || TTS_STYLE }] }] }],
+    response_format: { type: "audio", mime_type: "audio/wav" },
+    generation_config: { speech_config: [{ voice }] },
+  };
+  let r;
+  try { r = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) }); }
+  catch (_) { throw new HttpError(502, "Gemini 서버에 연결하지 못했습니다."); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = String(d?.error?.message || "").slice(0, 200);
+    if (r.status === 401 || r.status === 403) throw new HttpError(503, `Gemini 키가 올바르지 않거나 권한이 없습니다. (${msg})`);
+    if (r.status === 429) throw new HttpError(429, "Gemini 사용량 한도에 걸렸습니다. 잠시 뒤 다시 시도해 주세요.");
+    throw new HttpError(502, `Gemini 음성 요청 실패 (${r.status}) ${msg}`);
+  }
+  const find = (o, depth = 0) => {
+    if (!o || typeof o !== "object" || depth > 8) return null;
+    if (o.type === "audio" && typeof o.data === "string" && o.data.length > 200) return o.data;
+    const inl = o.inlineData || o.inline_data;
+    if (inl && typeof inl.data === "string" && /audio/i.test(inl.mimeType || inl.mime_type || "")) return inl.data;
+    for (const v of Array.isArray(o) ? o : Object.values(o)) { const f = find(v, depth + 1); if (f) return f; }
+    return null;
+  };
+  const b64 = find(d);
+  if (!b64) throw new HttpError(422, "Gemini 가 음성을 돌려주지 않았습니다. 문장을 바꿔 다시 시도해 주세요.");
+  const bytes = Math.floor((b64.length * 3) / 4);
+  return { audio: `data:audio/wav;base64,${b64}`, seconds: Math.max(0, (bytes - 44) / (24000 * 2)) };
+}
+
+// OpenAI 음성 (Gemini 가 지역 제한 등으로 막힐 때 자동으로 쓰는 예비)
+const OPENAI_VOICE = { Kore: "alloy", Sulafat: "coral", Achird: "nova", Puck: "shimmer", Charon: "onyx", Zephyr: "sage" };
+async function ttsOpenAI(env, text, voice) {
+  let r;
+  try {
+    r = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${String(env.OPENAI_API_KEY).trim()}` },
+      body: JSON.stringify({ model: env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts", voice: OPENAI_VOICE[voice] || "coral", input: text, instructions: "Warm, confident, clear Korean shopping-promo narration at a natural, slightly brisk pace.", response_format: "wav" }),
+    });
+  } catch (_) { throw new HttpError(502, "OpenAI 서버에 연결하지 못했습니다."); }
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new HttpError(r.status === 429 ? 429 : 502, `OpenAI 음성 요청 실패 (${r.status}) ${String(d?.error?.message || "").slice(0, 160)}`);
+  }
+  const buf = new Uint8Array(await r.arrayBuffer());
+  let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  const dv = new DataView(buf.buffer);
+  const byteRate = buf.length > 44 ? dv.getUint32(28, true) : 48000;
+  return { audio: `data:audio/wav;base64,${btoa(bin)}`, seconds: Math.max(0, (buf.length - 44) / (byteRate || 48000)) };
+}
+
 // ── OpenAI ────────────────────────────────────────────
 async function openaiMany(env, prompt, refs, aspect, n) {
   const fd = new FormData();
@@ -152,7 +217,7 @@ export default {
     try {
       if (url.pathname === "/api/health") {
         return json({
-          ok: true, version: VERSION, limits: !!env.STUDIO_KV, maxN: Number(env.MAX_N) || 2, maxRefs: Number(env.MAX_REFS) || 6,
+          ok: true, version: VERSION, tts: !!(env.GEMINI_API_KEY || env.OPENAI_API_KEY), voices: TTS_VOICES, limits: !!env.STUDIO_KV, maxN: Number(env.MAX_N) || 2, maxRefs: Number(env.MAX_REFS) || 6,
           providers: [
             { id: "gemini", label: "Gemini (구글)", ready: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || "gemini-nano-banana-2.1", usd: COST.gemini },
             { id: "openai", label: "OpenAI (GPT 이미지)", ready: !!env.OPENAI_API_KEY, model: env.OPENAI_MODEL || "gpt-image-2.5-sunburst", usd: COST.openai },
@@ -160,6 +225,24 @@ export default {
         });
       }
       const user = await requireStaff(request);
+      if (url.pathname === "/api/tts" && request.method === "POST") {
+        if (!env.GEMINI_API_KEY && !env.OPENAI_API_KEY) throw new HttpError(503, "음성 키(GEMINI_API_KEY 또는 OPENAI_API_KEY)가 아직 등록되지 않았습니다.");
+        const b = await request.json().catch(() => ({}));
+        const text = String(b.text || "").trim().slice(0, 900);
+        if (!text) throw new HttpError(400, "읽을 문장이 비어 있습니다");
+        const voice = TTS_VOICES.some((v) => v.id === b.voice) ? b.voice : "Kore";
+        const style = typeof b.style === "string" && b.style.trim() ? b.style.trim().slice(0, 200) : "";
+        let out = null, provider = "gemini", note = "";
+        if (env.GEMINI_API_KEY && b.provider !== "openai") {
+          try { out = await ttsOne(env, text, voice, style); }
+          catch (e) { if (!env.OPENAI_API_KEY) throw e; note = String(e.message || "").slice(0, 120); }
+        }
+        if (!out) {
+          if (!env.OPENAI_API_KEY) throw new HttpError(503, "OpenAI 키가 없어 예비 음성을 쓸 수 없습니다.");
+          out = await ttsOpenAI(env, text, voice); provider = "openai";
+        }
+        return json({ ...out, voice, provider, fallbackReason: provider === "openai" ? note : "" });
+      }
       if (url.pathname === "/api/generate" && request.method === "POST") {
         const b = await request.json().catch(() => ({}));
         const provider = b.provider === "openai" ? "openai" : "gemini";
