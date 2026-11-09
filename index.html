@@ -2383,8 +2383,33 @@ window.__loadLib = (function(){
     function api(action, extra){
       var body = {action:action, user:(AUTH&&AUTH.id)||'', pass:(AUTH&&AUTH.pass)||''};
       if(extra) for(var k in extra) body[k] = extra[k];
-      return fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
-        .then(function(r){ return r.json(); });
+      return apiQueued(body);
+    }
+    // 화면이 열릴 때 호출이 한꺼번에 수십 개 나가면 서버 속도제한(429)에 걸려 IP가 차단된다.
+    // 동시에 3개까지만 보내고 429가 오면 잠시 뒤 재시도한다.
+    var apiRunning = 0, apiWaiting = [];
+    function apiNext(){
+      while(apiRunning < 3 && apiWaiting.length){
+        (function(job){
+          apiRunning++;
+          var tries = 0;
+          (function attempt(){
+            fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body:job.body})
+              .then(function(r){
+                if(r.status === 429 && tries < 3){ tries++; setTimeout(attempt, 1500 * tries); return null; }
+                return r.json().then(function(d){ finish(); job.ok(d); });
+              })
+              .catch(function(e){ finish(); job.fail(e); });
+          })();
+          function finish(){ apiRunning--; apiNext(); }
+        })(apiWaiting.shift());
+      }
+    }
+    function apiQueued(body){
+      return new Promise(function(ok, fail){
+        apiWaiting.push({body:JSON.stringify(body), ok:ok, fail:fail});
+        apiNext();
+      });
     }
 
     // 다른 도구(사방넷 매칭, 재고 불일치 등)가 결과를 다 계산한 뒤 이 함수 하나만 부르면
