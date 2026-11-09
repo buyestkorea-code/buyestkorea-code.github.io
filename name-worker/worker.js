@@ -7,13 +7,14 @@
  * AI 는 PROVIDERS(기본 "groq,gemini") 순서대로 시도하고, 붐비거나 막히면 다음 AI 로 자동으로 넘어간다.
  *
  *   GET  /api/health    설정 상태 (키가 있는지 여부만)
+ *   POST /api/cs        { q, prod, shop, label, facts, draft }  →  { answer, needs_staff, reason }   (고객 문의 답변 초안 — 문의 답변 도우미)
  *   POST /api/names     { images:[dataURL...], brand, season, code, kind:"auto|adult|kids", hint }  →  { candidates:[{name, note}], usage }
  *
  * 접근 통제: 헤더 X-Studio-User / X-Studio-Pass 를 buyest.co.kr 툴키트 로그인으로 확인한다 (health 제외).
  */
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 
 const cors = () => ({
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -144,7 +145,7 @@ async function callGemini(env, system, userText, images, opts = {}) {
   const payload = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [...images.map((i) => ({ inline_data: { mime_type: i.mime, data: i.b64 } })), { text: userText }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: opts.maxTokens || 4096, responseMimeType: "application/json" },
+    generationConfig: { temperature: opts.temperature != null ? opts.temperature : 0.7, maxOutputTokens: opts.maxTokens || 4096, responseMimeType: "application/json" },
   };
   if (opts.fast) payload.generationConfig.thinkingConfig = { thinkingBudget: 0 }; // 짧은 선별 작업은 '생각' 없이 바로 답하게 (훨씬 빠름)
   let r, d;
@@ -335,7 +336,7 @@ async function runJson(env, system, userText, opts = {}) {
     const p = PROVIDERS[k];
     if (p.compact && system.length + userText.length > 4500) { errs.push(`${p.name} 건너뜀(글이 길어 무료 한도 초과)`); continue; } // Groq 무료: 분당 입력 7000토큰
     try {
-      const res = await p.call(env, system, userText, [], { fast: true, model: opts.model, maxTokens: p.compact ? 700 : (opts.maxTokens || 2048) });
+      const res = await p.call(env, system, userText, [], { fast: true, model: opts.model, temperature: opts.temperature, maxTokens: p.compact ? 700 : (opts.maxTokens || 2048) });
       const txt = res.text.replace(/<think>[\s\S]*?<\/think>/g, "");
       const m = /\{[\s\S]*\}/.exec(txt);
       return { data: JSON.parse(m ? m[0] : txt), by: p.name, fellBack: errs.length ? errs : undefined };
@@ -424,6 +425,73 @@ async function handlePromoTag(request, env) {
   return json({ ok: true, tags, by, fellBack, version: VERSION });
 }
 
+// ── 고객 문의 답변 초안 (문의 답변 도우미) ───────────────────
+// 화면이 이름·전화·주문번호를 가린 문의 + 이미 확인된 사실(재고·실측)을 보내면, 바이스트 말투의 답변 초안 한 개를 돌려준다.
+// 사실을 모르면 지어내지 않고 needs_staff 로 돌려보낸다. 사방넷에는 직원이 직접 붙여넣으므로 자동 발송은 없다.
+const CS_SYSTEM = `당신은 해외 명품 병행수입 쇼핑몰 "바이스트"의 고객 문의 답변 담당입니다. 고객 문의에 대한 답변 초안을 한국어 존댓말로 씁니다.
+[절대 규칙]
+1. [확인된 사실]에 적힌 것과 아래 [판매 정책]에 있는 것만 말합니다. 재고·실측 치수·소재·색상·배송 상태·가격은 [확인된 사실]에 없으면 절대 지어내지 않습니다. 모르면 needs_staff 를 true 로 하고 answer 는 빈 문자열로 둡니다.
+2. "회수접수했습니다", "환불 처리했습니다", "출고했습니다", "취소했습니다"처럼 이미 처리했다는 말, 보상·할인·무상 수선 약속은 쓰지 않습니다. 직원이 실제로 처리해야 하는 문의는 needs_staff 를 true 로 합니다.
+3. 한 문의에 질문이 여러 개면 모두 답합니다. 답하지 못하는 질문이 하나라도 있으면 needs_staff 를 true 로 하고, 답할 수 있는 부분만 answer 에 씁니다.
+4. 형식: "안녕하세요 고객님 ! " 로 시작해서 " 감사합니다." 로 끝납니다. 2~4문장, 이모지 금지, 과장 금지.
+[판매 정책]
+- 모든 제품은 정식통관을 거쳐 수입된 100% 정품, 새상품입니다(병행수입). 자체택(검은색띠)과 자체보증서가 제공됩니다. 브랜드 정품보증서·영수증·브랜드 쇼핑백·선물포장은 제공되지 않습니다.
+- 매장·백화점 A/S는 불가합니다. 판매처로 연락 주시면 수선 가능한 범위 내에서 유상으로 도와드립니다.
+- 재입고·입고 예정은 정확하지 않아 안내가 어렵습니다. 신상품이 수시로 들어오니 판매자 홈을 봐 달라고 안내합니다.
+- 재고가 1~2개면 "소량 보유중으로 빠른 결제 추천, 선결제건이 있으면 품절 안내를 받을 수 있다"고 안내합니다. 평일 오후 4시 이전 결제 시 당일 발송입니다.
+- 사이즈 추천은 하되 "고객님마다 체형이 달라 정확한 추천은 어렵고, 상세페이지의 사이즈별 실측 치수를 참고해 달라"고 덧붙입니다. 사이즈가 안 맞으면 교환·환불 가능하나 택배비는 고객 부담입니다.
+- 교환·반품 조건: 상품택·자체택 제거 안 함, 외부 착용 안 함, 받은 상태 그대로, 수령일 7일 이내. 반품 배송비 10,000원.
+- 카드 할인·포인트·쿠폰·결제·환불 입금 문의는 구매하신 사이트 고객센터로 안내합니다.
+- 수작업으로 제작되어 마감·박음질이 정교하지 못한 것은 제품 하자가 아닙니다.
+- 키즈 12A~14A는 성인 여성 마른 44 사이즈까지 착용 가능하나 체형에 따라 다릅니다.
+[답변 예시]
+문의: 38사이즈 재고 있나요? / 사실: 38 재고 1개 → 안녕하세요 고객님 ! 문의 주신 제품 38사이즈 재고 1개 확인되었습니다. 소량 보유중으로 빠른 결제 추천드리며, 선결제건 있을 경우 품절안내 받으실 수 있는 점 참고 부탁드립니다. 감사합니다.
+문의: M사이즈 재입고 안될까요? → 안녕하세요 고객님 ! 죄송하게도 현재 입고 예정은 정확하지 않아 답변드리기 어려운 점 양해부탁드립니다. 상품 재입고시 빠른 업데이트 할 수 있도록 하겠으며 판매자 홈 보시면 신상 제품들도 준비되어 있으니 많은 관심 부탁드립니다. 감사합니다.
+문의: 백화점에서 AS되나요? → 안녕하세요 고객님 ! 병행수입 제품 구매 시 매장 및 백화점 수선 불가능하며, 판매처 쪽으로 연락 주시면 수선 가능한 범위내에서 유상으로 처리 도와드리고 있습니다. 감사합니다.
+문의: 원단이 비침 있나요? / 사실: 없음 → {"answer":"","needs_staff":true,"reason":"소재·비침 정보가 없어 상품 상세를 확인해야 해요"}
+문의: 언제 배송되나요? / 사실: 없음 → {"answer":"","needs_staff":true,"reason":"주문의 출고·송장 상태를 확인해야 해요"}
+출력은 JSON 한 개만: {"answer":"답변 초안","needs_staff":true|false,"reason":"직원이 확인할 것(없으면 빈 문자열)"}`;
+
+async function spendCs(env, user) {
+  if (!env.NAMEGEN_KV) return;
+  const limit = Number(env.CS_LIMIT_PER_DAY) || 400;
+  const day = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const key = `cs:${day}:${user}`;
+  const used = Number(await env.NAMEGEN_KV.get(key)) || 0;
+  if (used + 1 > limit) throw new HttpError(429, `오늘 문의 AI 초안 한도(${limit}회)를 넘었습니다. 내일 이어서 해 주세요.`);
+  await env.NAMEGEN_KV.put(key, String(used + 1), { expirationTtl: 2 * 86400 });
+}
+
+// 화면에서 이미 가리지만, 혹시 남은 개인정보를 한 번 더 지운다 (AI 서비스로 나가기 전 마지막 관문)
+function maskPii(s) {
+  return String(s || "")
+    .replace(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g, "{전화}")
+    .replace(/(?:ORD)?\d{10,}/gi, "{번호}")
+    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, "{이메일}")
+    .replace(/(회원명|성함|이름|고객명)\s*[:：]?\s*[가-힣A-Za-z]{2,6}/g, "$1: {이름}");
+}
+// 직원이 확인하지 않으면 안 되는 "이미 처리했다/약속" 표현
+const CS_PROMISE = /(회수|수거|반품)\s*(접수|처리)\s*(했|하였|완료|되었)|환불\s*(처리|완료|진행)\s*(했|하였|되었|완료)|출고\s*(했|하였|완료)|취소\s*(처리|완료)\s*(했|하였)|200\s*%|보상|무상\s*(수선|교환|반품|A\/?S)|전액\s*환불/;
+
+async function handleCs(request, env) {
+  const user = await requireStaff(request);
+  let body;
+  try { body = await request.json(); } catch (_) { throw new HttpError(400, "요청 형식이 올바르지 않습니다."); }
+  const q = maskPii(clean(body.q, 900));
+  if (!q) throw new HttpError(400, "고객 문의가 비어 있습니다.");
+  const prod = maskPii(clean(body.prod, 120)), shop = clean(body.shop, 30), label = clean(body.label, 30);
+  const facts = maskPii(clean(body.facts, 700)), draft = maskPii(clean(body.draft, 700));
+  await spendCs(env, user);
+  const userText = `[쇼핑몰] ${shop || "-"}\n[상품] ${prod || "-"}\n[문의 분류(자동)] ${label || "-"}\n[확인된 사실]\n${facts || "없음"}\n[규칙으로 만든 초안(참고, 틀릴 수 있음)]\n${draft || "없음"}\n\n[고객 문의]\n${q}\n\n출력: {"answer":"...","needs_staff":false,"reason":""}`;
+  const { data, by, fellBack } = await runJson(env, CS_SYSTEM, userText, { first: "gemini", maxTokens: 900, temperature: 0.2 });
+  let answer = clean(data && data.answer, 900), needs = !!(data && data.needs_staff), reason = clean(data && data.reason, 160);
+  if (answer && CS_PROMISE.test(answer)) { needs = true; reason = (reason ? reason + " / " : "") + "이미 처리했다는 표현이 있어요. 실제 처리 여부를 확인하세요"; }
+  if (answer && !/^안녕하세요/.test(answer)) answer = "안녕하세요 고객님 ! " + answer;
+  if (answer && !/감사합니다[.!^ ]*$/.test(answer)) answer = answer.replace(/\s*$/, "") + " 감사합니다.";
+  if (!answer) needs = true;
+  return json({ ok: true, answer, needs_staff: needs, reason, by, fellBack, version: VERSION });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -432,6 +500,7 @@ export default {
       if (url.pathname === "/api/health") return json({ ok: true, ready: providerOrder(env).length > 0, providers: providerOrder(env), version: VERSION });
       if (request.method === "GET" && url.pathname.startsWith("/i/")) return await serveTempImage(env, url.pathname.slice(3));
       if (url.pathname === "/api/names" && request.method === "POST") return await handleNames(request, env);
+      if (url.pathname === "/api/cs" && request.method === "POST") return await handleCs(request, env);
       if (url.pathname === "/api/promo" && request.method === "POST") return await handlePromo(request, env);
       if (url.pathname === "/api/promo-tag" && request.method === "POST") return await handlePromoTag(request, env);
       throw new HttpError(404, "없는 주소입니다.");
