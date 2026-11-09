@@ -220,7 +220,9 @@ const STORY_SYSTEM = `너는 인스타그램 릴스 전문 편집 기획자다. 
 - 나레이션 글자 수는 컷 sec × 4 이하 (한국어 읽는 속도). 나레이션 없이 분위기만 둘 컷은 narration 을 빈 문자열로.
 - mode "ai": 모델이 움직이거나 소재가 흔들리는 장면처럼 움직임이 가치 있는 컷. mode "photo": 지퍼·로고·택·소재 클로즈업처럼 AI가 모양을 바꾸면 안 되는 디테일 컷.
 - 사진은 가능한 한 모두 한 번 이상 쓰고, 같은 사진을 연달아 쓰지 않는다. photo 는 주어진 사진 수 범위 안.
-- 사용자가 준 상품 정보에 없는 사실(소재·가격·할인·재고·정품 보증)은 지어내지 않는다. 다른 브랜드 이름을 끌어와 비교하지 않는다. 과장·허위 표현 금지.
+- 나레이션·자막은 ① 사용자가 준 상품 정보 ② 사진에서 눈으로 확인되는 것(색, 모양, 후드, 고글 같은 디자인) ③ 사이즈 문의 유도 같은 일반 안내, 이 셋으로만 쓴다. 소재·보온성·기능·착용감·안전·품질·정품 보증·할인·재고처럼 입력에 없는 설명은 절대 쓰지 않는다 (예: "부드러운 소재", "튼튼한 지퍼", "안전 보장"은 금지).
+- 다른 브랜드 이름을 끌어와 비교하지 않는다. 과장·허위 표현 금지. 쓸 근거가 부족하면 나레이션을 짧게 하거나 빈 문자열로 둔다.
+- sec 합은 목표 길이의 90~105% 로 맞춘다 (목표보다 짧게 끝내지 않는다).
 - 말투: 사장님이 직접 말하듯 담백하고 구체적으로. 광고 문구 투의 상투어("지금 바로!", "놓치지 마세요")는 마지막 컷 외에는 쓰지 않는다.`;
 function extractJson(txt) {
   const s = String(txt || ""); const a = s.indexOf("{"), b = s.lastIndexOf("}");
@@ -229,7 +231,7 @@ function extractJson(txt) {
 }
 async function storyGemini(env, text, refs) {
   const key = String(env.GEMINI_API_KEY).trim();
-  const models = [env.STORY_MODEL, "gemini-2.5-flash"].filter(Boolean);
+  const models = [env.STORY_MODEL, "gemini-3.8"].filter(Boolean); // 2.5 는 신규 사용자에게 닫힘 (404 안내: gemini-3.8 로 바꾸라고 함)
   let lastErr = "";
   for (const model of models) {
     let r;
@@ -249,12 +251,13 @@ async function storyGemini(env, text, refs) {
   }
   throw new HttpError(502, lastErr || "Gemini 스토리보드 실패");
 }
-async function storyOpenAI(env, text) {
+async function storyOpenAI(env, text, refs) {
   let r;
+  const content = refs && refs.length ? [{ type: "text", text }, ...refs.map((x) => ({ type: "image_url", image_url: { url: `data:${x.mime};base64,${x.b64}`, detail: "low" } }))] : text;
   try {
     r = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${String(env.OPENAI_API_KEY).trim()}` },
-      body: JSON.stringify({ model: env.OPENAI_TEXT_MODEL || "gpt-4.1-mini", temperature: 0.8, response_format: { type: "json_object" }, messages: [{ role: "system", content: STORY_SYSTEM }, { role: "user", content: text }] }),
+      body: JSON.stringify({ model: env.OPENAI_TEXT_MODEL || "gpt-4.1-mini", temperature: 0.7, response_format: { type: "json_object" }, messages: [{ role: "system", content: STORY_SYSTEM }, { role: "user", content }] }),
     });
   } catch (_) { throw new HttpError(502, "OpenAI 서버에 연결하지 못했습니다."); }
   const d = await r.json().catch(() => ({}));
@@ -262,6 +265,20 @@ async function storyOpenAI(env, text) {
   return extractJson(d?.choices?.[0]?.message?.content);
 }
 const MOODS = ["bright", "calm", "emotional", "hype"], ROLES = ["hook", "intro", "detail", "style", "proof", "cta"];
+// 입력에 없는 단정·보증 표현은 코드에서 한 번 더 걸러낸다 (AI가 프롬프트를 어겨도 막히게)
+const RISKY = ["정품", "보장", "보증", "안전", "튼튼", "부드러", "보온", "따뜻", "최고", "100%", "완벽", "최저가", "할인", "고급", "프리미엄"];
+function scrub(board, sourceText) {
+  let removed = 0; const src = String(sourceText || "");
+  const bad = RISKY.filter((w) => !src.includes(w));
+  const hit = (s) => bad.some((w) => s.includes(w));
+  board.cuts.forEach((c) => {
+    const parts = c.narration.split(/(?<=[.!?。])\s*/).filter(Boolean), keep = parts.filter((s) => !hit(s));
+    if (keep.length !== parts.length) { removed += parts.length - keep.length; c.narration = keep.join(" ").trim(); }
+    if (hit(c.caption)) { c.caption = ""; removed++; }
+  });
+  if (hit(board.hook)) { board.hook = ""; removed++; }
+  board.removed = removed; return board;
+}
 function normalizeBoard(raw, targetSec, nPhotos) {
   const cuts = (Array.isArray(raw?.cuts) ? raw.cuts : []).slice(0, 16).map((c, i) => ({
     role: ROLES.includes(c?.role) ? c.role : i === 0 ? "hook" : "detail",
@@ -273,6 +290,9 @@ function normalizeBoard(raw, targetSec, nPhotos) {
     caption: String(c?.caption || "").slice(0, 40),
   }));
   if (cuts.length < 2) throw new HttpError(502, "스토리보드에 컷이 부족합니다. 다시 시도해 주세요.");
+  // 총 길이가 목표의 90~105% 밖이면 컷 길이를 비례해서 맞춘다 (컷당 3~15초 안에서)
+  const sum = cuts.reduce((s, c) => s + c.sec, 0);
+  if (sum < targetSec * 0.9 || sum > targetSec * 1.05) { const k = targetSec / sum; cuts.forEach((c) => { c.sec = Math.min(15, Math.max(3, Math.round(c.sec * k))); }); }
   return { hook: String(raw?.hook || "").slice(0, 40), mood: MOODS.includes(raw?.mood) ? raw.mood : "bright", cuts, targetSec };
 }
 
@@ -309,6 +329,12 @@ export default {
         }
         return json({ ...out, voice, provider, fallbackReason: provider === "openai" ? note : "" });
       }
+      if (url.pathname === "/api/story-models" && request.method === "GET") { // 진단: 이 키로 글 생성이 되는 Gemini 모델 목록
+        if (!env.GEMINI_API_KEY) throw new HttpError(503, "Gemini 키가 없습니다");
+        const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": String(env.GEMINI_API_KEY).trim() } });
+        const d = await r.json().catch(() => ({}));
+        return json({ status: r.status, models: (d.models || []).filter((m) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m) => m.name.replace("models/", "")).slice(0, 80), error: d?.error?.message || "" });
+      }
       if (url.pathname === "/api/storyboard" && request.method === "POST") {
         if (!env.GEMINI_API_KEY && !env.OPENAI_API_KEY) throw new HttpError(503, "글 모델 키(GEMINI_API_KEY 또는 OPENAI_API_KEY)가 아직 등록되지 않았습니다.");
         const b = await request.json().catch(() => ({}));
@@ -325,10 +351,12 @@ export default {
           `사장님 요청(릴스 프롬프트):\n${prompt}`,
         ].filter(Boolean).join("\n");
         const refs = (Array.isArray(b.images) ? b.images.slice(0, 8) : []).map((u) => { try { return parseDataUrl(u); } catch (_) { return null; } }).filter(Boolean);
-        let raw = null, note = "";
-        if (env.GEMINI_API_KEY) { try { raw = await storyGemini(env, text, refs); } catch (e) { if (!env.OPENAI_API_KEY) throw e; note = String(e.message || "").slice(0, 160); } }
-        if (!raw) raw = await storyOpenAI(env, text);
-        return json({ board: normalizeBoard(raw, targetSec, nPhotos), provider: note ? "openai" : env.GEMINI_API_KEY ? "gemini" : "openai", fallbackReason: note });
+        // Gemini 는 Cloudflare 서버 위치 제한("User location is not supported")에 걸려 쓸 수 없는 경우가 많아 OpenAI 를 먼저 쓴다
+        let raw = null, note = "", provider = "";
+        if (env.OPENAI_API_KEY) { try { raw = await storyOpenAI(env, text, refs); provider = "openai"; } catch (e) { if (!env.GEMINI_API_KEY) throw e; note = String(e.message || "").slice(0, 160); } }
+        if (!raw && env.GEMINI_API_KEY) { raw = await storyGemini(env, text, refs); provider = "gemini"; }
+        if (!raw) throw new HttpError(502, "스토리보드를 만들지 못했습니다");
+        return json({ board: scrub(normalizeBoard(raw, targetSec, nPhotos), text), provider, fallbackReason: note });
       }
       if (url.pathname === "/api/generate" && request.method === "POST") {
         const b = await request.json().catch(() => ({}));
