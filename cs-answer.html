@@ -60,6 +60,8 @@
   .real{margin-top:10px;font-size:12.5px;} .real summary{cursor:pointer;color:var(--sub);} .real div{background:#f4f4f1;border-radius:8px;padding:10px 12px;margin-top:6px;line-height:1.6;white-space:pre-wrap;}
   .ainote{color:var(--blue);font-weight:600;} .ainote:empty{display:none;} .ainote.warn{color:var(--warn);}
   .btn-ai{border-color:#c9d6fb;background:var(--bluebg);color:var(--blue);} .btn-ai:disabled{opacity:.6;}
+  .sim{margin-top:8px;} .sim .it{background:#f4f4f1;border-radius:8px;padding:8px 10px;margin-top:6px;font-size:12.5px;line-height:1.6;} .sim .it b{color:var(--sub);font-weight:600;} .sim .it .btn{margin-top:4px;font-size:12px;padding:4px 9px;}
+  .learn{font-size:12.5px;color:var(--sub);margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;} .learn.off{color:var(--warn);}
   .empty{text-align:center;color:var(--sub);padding:36px 0;}
   .asof{font-size:12.5px;color:var(--sub);} .asof.warn{color:var(--warn);font-weight:600;}
   @media (max-width:640px){body{padding:10px;}.meta{margin-left:0;}}
@@ -77,6 +79,7 @@
   </div>
   <div class="msg" id="fileMsg"></div>
   <div class="asof" id="stockMsg"></div>
+  <div class="learn" id="learnMsg"></div>
 </div>
 
 <div id="work" hidden>
@@ -105,7 +108,8 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 const LS = { get(k, d){ try{ const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const DONE = LS.get('cs.done', {});            // 문의순번 → 1 (복사 완료)
 const USERMEAS = LS.get('cs.meas', {});        // 상품코드 → 실측값 (이 PC)
-const measOf = k => USERMEAS[k] || (window.CS_MEAS || {})[k] || '';
+let SERVERMEAS = {};
+const measOf = k => USERMEAS[k] || SERVERMEAS[k] || (window.CS_MEAS || {})[k] || '';
 const KIND = { auto: '자동 초안', check: '확인 후 복사', manual: '직접 작성', platform: '플랫폼 알림' };
 let CARDS = [], FILTER = 'todo', SHOWN = 80, STOCKFN = null, FILENAME = '';
 
@@ -127,7 +131,9 @@ async function load(f){
     if(!rows) return msg('"문의내용" 열을 찾지 못했어요. 스케줄러가 받은 문의사항답변 엑셀이 맞는지 확인해 주세요.', 'err');
     if(!rows.length) return msg('문의가 한 건도 없어요.', 'err');
     await loadStock();
+    await initLearn();
     build(rows);
+    offerSabang();
     msg(`✅ 문의 ${rows.length.toLocaleString()}건을 읽었어요.`, 'ok');
   }catch(e){ msg('엑셀을 읽지 못했어요: ' + e.message, 'err'); }
 }
@@ -154,7 +160,8 @@ function build(rows){
     const c = CSAnswer.classify(r, { stock: STOCKFN, meas: measOf });
     const slotVal = c.slot ? (c.slot.value || '') : '';
     const k = r.no || ('r' + r.idx);
-    return { r, c, key: k, slotVal, text: CSAnswer.applySlot(c, slotVal), edited: false, answered: !!(r.a && r.a.trim()) };
+    const t0 = CSAnswer.applySlot(c, slotVal);
+    return { r, c, key: k, slotVal, text: t0, machine: t0, aiUsed: false, edited: false, answered: !!(r.a && r.a.trim()) };
   });
   const shops = [...new Set(CARDS.map(x => x.r.shop).filter(Boolean))].sort();
   $('shopSel').innerHTML = '<option value="">쇼핑몰 전체</option>' + shops.map(s => `<option>${esc(s)}</option>`).join('');
@@ -208,8 +215,8 @@ function cardHtml(x){
     body = `<p class="note">${esc(c.note)}</p>`;
   } else {
     const slot = c.slot ? `<div class="slot"><label>${esc(c.slot.label)}</label><input type="text" data-slot="${k}" value="${esc(x.slotVal)}" placeholder="${esc(c.slot.placeholder || '')}">${c.slot.saveable ? `<label class="hint"><input type="checkbox" data-save="${k}" checked> 이 상품에 저장</label>` : ''}</div>` : '';
-    const btns = c.buttons && c.buttons.length ? `<div class="btns">${c.buttons.map((b, i) => `<button class="btn btn-out" type="button" data-ins="${k}" data-i="${i}">+ ${esc(b.label)}</button>`).join('')}<button class="btn btn-out" type="button" data-redo="${k}">↺ 초안 다시</button><button class="btn btn-ai" type="button" data-ai="${k}">✨ AI 초안</button></div>` : `<div class="btns"><button class="btn btn-out" type="button" data-redo="${k}">↺ 초안 다시</button><button class="btn btn-ai" type="button" data-ai="${k}">✨ AI 초안</button></div>`;
-    body = `${c.note ? `<p class="note">${esc(c.note)}</p>` : ''}<p class="note ainote${x.aiWarn ? ' warn' : ''}" data-ainote="${k}">${esc(x.aiNote || '')}</p>${stockHtml(x)}${slot}<textarea data-ta="${k}" placeholder="직접 작성하거나, 아래 문구를 눌러 넣으세요">${esc(x.text)}</textarea>${btns}`;
+    const btns = c.buttons && c.buttons.length ? `<div class="btns">${c.buttons.map((b, i) => `<button class="btn btn-out" type="button" data-ins="${k}" data-i="${i}">+ ${esc(b.label)}</button>`).join('')}<button class="btn btn-out" type="button" data-redo="${k}">↺ 초안 다시</button><button class="btn btn-ai" type="button" data-ai="${k}">✨ AI 초안</button><button class="btn btn-out" type="button" data-sim="${k}">비슷한 과거 답변</button></div>` : `<div class="btns"><button class="btn btn-out" type="button" data-redo="${k}">↺ 초안 다시</button><button class="btn btn-ai" type="button" data-ai="${k}">✨ AI 초안</button><button class="btn btn-out" type="button" data-sim="${k}">비슷한 과거 답변</button></div>`;
+    body = `${c.note ? `<p class="note">${esc(c.note)}</p>` : ''}<p class="note ainote${x.aiWarn ? ' warn' : ''}" data-ainote="${k}">${esc(x.aiNote || '')}</p>${stockHtml(x)}${slot}<textarea data-ta="${k}" placeholder="직접 작성하거나, 아래 문구를 눌러 넣으세요">${esc(x.text)}</textarea>${btns}<div class="sim" data-simbox="${k}">${simHtml(x)}</div>`;
   }
   const act = c.kind === 'platform'
     ? `<button class="btn btn-pri" data-ok="${k}">${done ? '확인함 ✓' : '확인했어요'}</button>`
@@ -238,7 +245,7 @@ function appendBody(cur, body){
   return cur + ' ' + body + END;
 }
 function setDone(x, v){ if(v) DONE[x.key] = 1; else delete DONE[x.key]; LS.set('cs.done', DONE); }
-function redraft(x){ x.text = CSAnswer.applySlot(x.c, x.slotVal); x.edited = false; const ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`); if(ta){ ta.value = x.text; fit(ta); } }
+function redraft(x){ x.text = CSAnswer.applySlot(x.c, x.slotVal); x.machine = x.text; x.aiUsed = false; x.edited = false; const ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`); if(ta){ ta.value = x.text; fit(ta); } }
 
 document.addEventListener('click', async e => {
   const t = e.target.closest('button,.sz'); if(!t) return;
@@ -249,6 +256,8 @@ document.addEventListener('click', async e => {
   if(t.dataset.ins){ const x = byKey(t.dataset.ins), b = x.c.buttons[+t.dataset.i], ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`); x.text = appendBody(ta.value, b.text); x.edited = true; ta.value = x.text; fit(ta); return; }
   if(t.dataset.redo){ const x = byKey(t.dataset.redo); x.aiNote = ''; x.aiWarn = false; const n = document.querySelector(`[data-ainote="${cssq(x.key)}"]`); if(n) n.textContent = ''; return redraft(x); }
   if(t.dataset.ai){ return askAI(byKey(t.dataset.ai)); }
+  if(t.dataset.sim){ return showSimilar(byKey(t.dataset.sim)); }
+  if(t.dataset.simuse){ const parts = t.dataset.simuse.split('|'), x = byKey(parts[0]), it = x.sim && x.sim[+parts[1]]; if(it){ x.text = it.a; x.edited = true; x.aiUsed = false; const ta = document.querySelector('[data-ta="' + cssq(x.key) + '"]'); ta.value = x.text; fit(ta); } return; }
   if(t.dataset.ok){ const x = byKey(t.dataset.ok); setDone(x, !DONE[x.key]); return render(); }
   if(t.dataset.copy){
     const x = byKey(t.dataset.copy), ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`), text = (ta ? ta.value : x.text).trim();
@@ -258,7 +267,8 @@ document.addEventListener('click', async e => {
     try{ await copyText(text); }catch(_){ st.textContent = '복사에 실패했어요. 글상자에서 직접 복사해 주세요.'; st.style.color = 'var(--bad)'; return; }
     // 실측값 저장
     const sv = document.querySelector(`[data-save="${cssq(x.key)}"]`);
-    if(sv && sv.checked && x.slotVal.trim() && x.c.measKey){ USERMEAS[x.c.measKey] = x.slotVal.trim(); LS.set('cs.meas', USERMEAS); }
+    if(sv && sv.checked && x.slotVal.trim() && x.c.measKey){ USERMEAS[x.c.measKey] = x.slotVal.trim(); LS.set('cs.meas', USERMEAS); saveMeas(x.c.measKey, x.slotVal.trim()); }
+    saveAnswer(x, text);
     setDone(x, true);
     const card = document.querySelector(`[data-card="${cssq(x.key)}"]`); if(card) card.classList.add('done');
     t.textContent = '복사됨 ✓'; st.textContent = '사방넷에 붙여넣으세요.'; st.style.color = 'var(--ok)';
@@ -267,15 +277,82 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('input', e => {
   const t = e.target;
-  if(t.dataset.slot){ const x = byKey(t.dataset.slot); x.slotVal = t.value; if(!x.edited){ x.text = CSAnswer.applySlot(x.c, x.slotVal); const ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`); ta.value = x.text; fit(ta); } }
+  if(t.dataset.slot){ const x = byKey(t.dataset.slot); x.slotVal = t.value; if(!x.edited){ x.text = CSAnswer.applySlot(x.c, x.slotVal); x.machine = x.text; const ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`); ta.value = x.text; fit(ta); } }
   else if(t.dataset.ta){ const x = byKey(t.dataset.ta); x.text = t.value; x.edited = true; fit(t); }
 });
+
+/* ---------- 학습 저장소 (buyest.co.kr/cs_learn_api.php) ---------- */
+const LEARN = 'https://buyest.co.kr/cs_learn_api.php';
+let LEARN_ON = false;
+async function lapi(action, payload, timeout){
+  const a = authInfo(); if(!a) throw new Error('로그인이 필요해요');
+  const r = await fetch(LEARN, { method: 'POST', signal: AbortSignal.timeout(timeout || 8000), headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action, user: a.id, pass: a.pass }, payload || {})) });
+  const d = await r.json();
+  if(!d.ok) throw new Error(d.error || '저장소 오류');
+  return d;
+}
+function learnMsg(t, off){ const el = $('learnMsg'); el.className = 'learn' + (off ? ' off' : ''); el.textContent = t; }
+async function initLearn(){
+  LEARN_ON = false;
+  if(!authInfo()){ learnMsg('학습 저장소 꺼짐 — 툴킷에 로그인하면 확정한 답변이 저장되고 AI가 참고해요.', true); return; }
+  try{
+    const res = await Promise.all([lapi('meas_all', {}, 6000), lapi('stats', {}, 6000)]);
+    const m = res[0], st = res[1];
+    SERVERMEAS = m.meas || {}; LEARN_ON = true;
+    learnMsg('학습 저장소 연결됨 · 직원이 확정한 답변 ' + st.copy + '건 (AI 초안 ' + st.ai + ' · 직접 고침 ' + st.edited + ') · 사방넷 답변 ' + st.sabang + '건 · 상품 실측 ' + st.meas + '개');
+    flushPending();
+  }catch(e){ learnMsg('학습 저장소에 연결하지 못했어요 (' + e.message + '). 복사는 그대로 되고, 저장은 나중에 다시 시도해요.', true); }
+}
+function pendingGet(){ return LS.get('cs.pending', []); }
+function pendingAdd(items){ LS.set('cs.pending', pendingGet().concat(items).slice(-300)); }
+async function flushPending(){
+  const p = pendingGet(); if(!p.length || !LEARN_ON) return;
+  try{ for(let i = 0; i < p.length; i += 50) await lapi('save', { items: p.slice(i, i + 50) }); LS.set('cs.pending', []); }catch(_){}
+}
+function questionOf(x){ return (x.r.q && x.r.q !== 'null') ? x.r.q : CSAnswer.cleanTitle(x.r.title); }
+function itemOf(x, finalText, src){
+  return { no: x.r.no, shop: x.r.shop, prod_key: x.c.measKey || CSAnswer.measKey(x.r.prod), prod: maskPii(x.r.prod), q: maskPii(questionOf(x)), label: x.c.label, intent: x.c.intent, kind: x.c.kind,
+    draft: src === 'copy' ? maskPii(x.machine) : '', final: maskPii(finalText), ai: x.aiUsed ? 1 : 0, src: src, actor: src === 'sabang' ? (x.r.ans || '') : '' };
+}
+async function saveAnswer(x, finalText){
+  if(!x.r.no || x.c.kind === 'platform') return;
+  const it = itemOf(x, finalText, 'copy');
+  try{ if(!LEARN_ON) throw new Error('off'); await lapi('save', { items: [it] }); }catch(_){ pendingAdd([it]); }
+}
+async function saveMeas(key, text){ SERVERMEAS[key] = text; try{ if(LEARN_ON) await lapi('meas_set', { key: key, text: text }); }catch(_){} }
+function sabangList(){ return CARDS.filter(x => x.answered && x.r.no && x.c.kind !== 'platform' && (x.r.a || '').trim().length >= 3); }
+function offerSabang(){
+  const n = sabangList().length;
+  if(!n || !LEARN_ON) return;
+  $('learnMsg').insertAdjacentHTML('beforeend', ' <button class="btn btn-out" id="sbSave" type="button">이 파일에 있는 사방넷 답변 ' + n + '건을 학습 데이터로 저장</button><span class="hint" id="sbProg"></span>');
+  $('sbSave').onclick = async () => {
+    const list = sabangList().map(x => itemOf(x, x.r.a, 'sabang'));
+    $('sbSave').disabled = true; let ok = 0;
+    try{
+      for(let i = 0; i < list.length; i += 50){ const d = await lapi('save', { items: list.slice(i, i + 50) }, 20000); ok += d.saved; $('sbProg').textContent = Math.min(i + 50, list.length) + ' / ' + list.length + '건 보내는 중…'; }
+      $('sbProg').textContent = '저장 완료 (' + ok + '건 — 이미 있던 건은 갱신)';
+    }catch(e){ $('sbProg').textContent = '저장 중 멈췄어요: ' + e.message; $('sbSave').disabled = false; }
+  };
+}
+function simHtml(x){
+  if(!x.sim) return '';
+  if(!x.sim.length) return '<div class="it"><b>비슷한 과거 답변이 아직 없어요.</b></div>';
+  return x.sim.map((it, i) => '<div class="it"><b>' + (it.src === 'copy' ? '직원 확정' : '사방넷') + ' · 비슷함 ' + Math.round(it.score * 100) + '%</b><br>문의: ' + esc(it.q) + '<br>답변: ' + esc(it.a) + '<br><button class="btn btn-out" type="button" data-simuse="' + esc(x.key) + '|' + i + '">이 답변 넣기</button></div>').join('');
+}
+async function showSimilar(x){
+  const box = document.querySelector('[data-simbox="' + cssq(x.key) + '"]'); if(!box) return;
+  if(!LEARN_ON){ box.innerHTML = '<div class="it"><b>학습 저장소에 연결되어 있지 않아요 (로그인 필요).</b></div>'; return; }
+  box.innerHTML = '<div class="it"><b>찾는 중…</b></div>';
+  try{ const d = await lapi('similar', { q: maskPii(questionOf(x)), intent: x.c.intent, prod_key: x.c.measKey || CSAnswer.measKey(x.r.prod), k: 3 }, 6000); x.sim = d.items || []; }
+  catch(e){ box.innerHTML = '<div class="it"><b>못 찾았어요: ' + esc(e.message) + '</b></div>'; return; }
+  box.innerHTML = simHtml(x);
+}
 
 /* ---------- AI 초안 (name-worker /api/cs) ---------- */
 const WK = 'https://buyest-namegen.buyest.workers.dev';
 function authInfo(){ try{ const a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); return (a && a.id && a.pass) ? a : null; }catch(e){ return null; } }
 function maskPii(s){
-  return String(s || '').replace(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g, '{전화}').replace(/(?:ORD)?\d{10,}/gi, '{번호}')
+  return String(s || '').replace(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g, '{전화}').replace(/(?:ORD)?\d{12,}/gi, '{번호}')
     .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '{이메일}').replace(/(회원명|성함|이름|고객명)\s*[:：]?\s*[가-힣A-Za-z]{2,6}/g, '$1: {이름}');
 }
 function factsOf(x){
@@ -302,12 +379,14 @@ async function askAI(x){
   x.aiBusy = true; setAiUi(x);
   try{
     const q = (x.r.q && x.r.q !== 'null') ? x.r.q : CSAnswer.cleanTitle(x.r.title);
+    let examples = [];
+    if(LEARN_ON){ try{ const sm = await lapi('similar', { q: maskPii(q), intent: x.c.intent, prod_key: x.c.measKey || CSAnswer.measKey(x.r.prod), k: 4 }, 5000); examples = (sm.items || []).map(e => ({ q: e.q, a: e.a })); }catch(_){} }
     const r = await fetch(WK + '/api/cs', { method: 'POST', signal: AbortSignal.timeout(60000),
       headers: { 'Content-Type': 'application/json', 'X-Studio-User': encodeURIComponent(a.id), 'X-Studio-Pass': encodeURIComponent(a.pass), 'X-Studio-Enc': '1' },
-      body: JSON.stringify({ q: maskPii(q), prod: maskPii(x.r.prod), shop: x.r.shop, label: x.c.label, facts: factsOf(x), draft: maskPii(x.text) }) });
+      body: JSON.stringify({ q: maskPii(q), prod: maskPii(x.r.prod), shop: x.r.shop, label: x.c.label, facts: factsOf(x), draft: maskPii(x.text), examples }) });
     const d = await r.json().catch(() => ({}));
     if(!d.ok) throw new Error(d.error || ('서버 응답 ' + r.status));
-    if(d.answer){ x.text = d.answer; x.edited = true; }
+    if(d.answer){ x.text = d.answer; x.machine = d.answer; x.aiUsed = true; x.edited = false; }
     x.aiWarn = !!d.needs_staff;
     x.aiNote = d.needs_staff ? '✨ AI가 확신하지 못했어요 — ' + (d.reason || '직접 확인해 주세요') : '✨ AI 초안이에요. 재고·실측 같은 사실이 맞는지 확인하고 복사하세요.';
   }catch(e){

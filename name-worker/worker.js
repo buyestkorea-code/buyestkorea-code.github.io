@@ -7,14 +7,14 @@
  * AI 는 PROVIDERS(기본 "groq,gemini") 순서대로 시도하고, 붐비거나 막히면 다음 AI 로 자동으로 넘어간다.
  *
  *   GET  /api/health    설정 상태 (키가 있는지 여부만)
- *   POST /api/cs        { q, prod, shop, label, facts, draft }  →  { answer, needs_staff, reason }   (고객 문의 답변 초안 — 문의 답변 도우미)
+ *   POST /api/cs        { q, prod, shop, label, facts, draft, examples:[{q,a}] }  →  { answer, needs_staff, reason }   (고객 문의 답변 초안 — 문의 답변 도우미)
  *   POST /api/names     { images:[dataURL...], brand, season, code, kind:"auto|adult|kids", hint }  →  { candidates:[{name, note}], usage }
  *
  * 접근 통제: 헤더 X-Studio-User / X-Studio-Pass 를 buyest.co.kr 툴키트 로그인으로 확인한다 (health 제외).
  */
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "1.2.0";
+const VERSION = "1.3.0";
 
 const cors = () => ({
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -445,6 +445,7 @@ const CS_SYSTEM = `당신은 해외 명품 병행수입 쇼핑몰 "바이스트"
 - 수작업으로 제작되어 마감·박음질이 정교하지 못한 것은 제품 하자가 아닙니다.
 - 키즈 12A~14A는 성인 여성 마른 44 사이즈까지 착용 가능하나 체형에 따라 다릅니다.
 [답변 예시]
+(아래 "참고 답변"이 따로 주어지면 그 문체·표현을 우선 따릅니다. 단, 참고 답변 속의 재고·사이즈·상품 사실은 가져다 쓰지 않습니다.)
 문의: 38사이즈 재고 있나요? / 사실: 38 재고 1개 → 안녕하세요 고객님 ! 문의 주신 제품 38사이즈 재고 1개 확인되었습니다. 소량 보유중으로 빠른 결제 추천드리며, 선결제건 있을 경우 품절안내 받으실 수 있는 점 참고 부탁드립니다. 감사합니다.
 문의: M사이즈 재입고 안될까요? → 안녕하세요 고객님 ! 죄송하게도 현재 입고 예정은 정확하지 않아 답변드리기 어려운 점 양해부탁드립니다. 상품 재입고시 빠른 업데이트 할 수 있도록 하겠으며 판매자 홈 보시면 신상 제품들도 준비되어 있으니 많은 관심 부탁드립니다. 감사합니다.
 문의: 백화점에서 AS되나요? → 안녕하세요 고객님 ! 병행수입 제품 구매 시 매장 및 백화점 수선 불가능하며, 판매처 쪽으로 연락 주시면 수선 가능한 범위내에서 유상으로 처리 도와드리고 있습니다. 감사합니다.
@@ -466,7 +467,7 @@ async function spendCs(env, user) {
 function maskPii(s) {
   return String(s || "")
     .replace(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g, "{전화}")
-    .replace(/(?:ORD)?\d{10,}/gi, "{번호}")
+    .replace(/(?:ORD)?\d{12,}/gi, "{번호}")
     .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, "{이메일}")
     .replace(/(회원명|성함|이름|고객명)\s*[:：]?\s*[가-힣A-Za-z]{2,6}/g, "$1: {이름}");
 }
@@ -481,8 +482,12 @@ async function handleCs(request, env) {
   if (!q) throw new HttpError(400, "고객 문의가 비어 있습니다.");
   const prod = maskPii(clean(body.prod, 120)), shop = clean(body.shop, 30), label = clean(body.label, 30);
   const facts = maskPii(clean(body.facts, 700)), draft = maskPii(clean(body.draft, 700));
+  // 직원이 실제로 확정해서 보낸 비슷한 문의의 답변 (화면이 서버 저장소에서 찾아 보냄). 문체·표현을 배우는 용도.
+  const examples = (Array.isArray(body.examples) ? body.examples : []).slice(0, 4)
+    .map((e) => ({ q: maskPii(clean(e && e.q, 200)), a: maskPii(clean(e && e.a, 450)) })).filter((e) => e.q && e.a);
+  const exText = examples.length ? "\n[참고 답변 — 우리 직원이 실제로 보낸 비슷한 문의]\n" + examples.map((e, i) => `${i + 1}) 문의: ${e.q}\n   답변: ${e.a}`).join("\n") + "\n" : "";
   await spendCs(env, user);
-  const userText = `[쇼핑몰] ${shop || "-"}\n[상품] ${prod || "-"}\n[문의 분류(자동)] ${label || "-"}\n[확인된 사실]\n${facts || "없음"}\n[규칙으로 만든 초안(참고, 틀릴 수 있음)]\n${draft || "없음"}\n\n[고객 문의]\n${q}\n\n출력: {"answer":"...","needs_staff":false,"reason":""}`;
+  const userText = `[쇼핑몰] ${shop || "-"}\n[상품] ${prod || "-"}\n[문의 분류(자동)] ${label || "-"}\n[확인된 사실]\n${facts || "없음"}\n[규칙으로 만든 초안(참고, 틀릴 수 있음)]\n${draft || "없음"}\n${exText}\n[고객 문의]\n${q}\n\n출력: {"answer":"...","needs_staff":false,"reason":""}`;
   const { data, by, fellBack } = await runJson(env, CS_SYSTEM, userText, { first: "gemini", maxTokens: 900, temperature: 0.2 });
   let answer = clean(data && data.answer, 900), needs = !!(data && data.needs_staff), reason = clean(data && data.reason, 160);
   if (answer && CS_PROMISE.test(answer)) { needs = true; reason = (reason ? reason + " / " : "") + "이미 처리했다는 표현이 있어요. 실제 처리 여부를 확인하세요"; }
