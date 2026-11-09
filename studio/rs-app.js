@@ -708,6 +708,75 @@
   }
   $("#fxAll").addEventListener("change", renderFx);
 
+  // ══════════ 자동 편집 (말 없는 구간 자르기 · 자막 자동 생성) ══════════
+  let aePlan = null;
+  $("#aeStyle").innerHTML = RS.TEXT_STYLES.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
+  [["aeSil", "aeSilV", (v) => v + "초"], ["aePad", "aePadV", (v) => v + "초"], ["aeLine", "aeLineV", (v) => v + "자"]].forEach(([i, o, f]) => $("#" + i).addEventListener("input", () => { $("#" + o).textContent = f($("#" + i).value); }));
+  const aeVideoClips = () => P.clips.filter((c) => { const m = M[c.mediaId]; return m && m.isVideo && !c.pending && !c.ai && c.track === 0; });
+  function aeTargets() { const all = aeVideoClips(); if ($("#aeTarget").value === "all") return all; const c = sel && sel.k === "clip" ? selected() : null; return c && all.includes(c) ? [c] : []; }
+  async function aeAnalyze(targets) {
+    const ts = targets || aeTargets(), box = $("#aeResult"); box.className = "hint";
+    if (!ts.length) { box.textContent = "자를 영상 컷을 타임라인에서 고르거나, '영상 1 트랙의 모든 영상 컷'을 선택해 주세요. (AI 컷·사진은 제외)"; return null; }
+    box.textContent = "소리 분석 중…";
+    const items = []; let before = 0, after = 0, noAudio = 0;
+    for (const c of ts) {
+      const buf = await RS.ensureBuf(M, c.mediaId); if (!buf) { noAudio++; continue; }
+      const segs = RS.detectSpeech(buf, { minSilence: Number($("#aeSil").value), pad: Number($("#aePad").value), sens: Number($("#aeSens").value) });
+      const lo = c.in, hi = c.in + c.dur * c.speed;
+      const ranges = segs.map((s) => ({ s: Math.max(s.start, lo), e: Math.min(s.end, hi) })).filter((r) => r.e - r.s >= 0.2);
+      const keep = ranges.length ? ranges.reduce((a, r) => a + (r.e - r.s), 0) / c.speed : c.dur;
+      items.push({ id: c.id, start: c.start, ranges, before: c.dur, after: keep, cuts: ranges.length }); before += c.dur; after += keep;
+    }
+    aePlan = items.length ? { items, before, after } : null;
+    if (!aePlan) { box.textContent = noAudio ? "이 영상에는 소리가 없어 분석할 수 없습니다." : "분석할 영상이 없습니다."; $("#aeApply").disabled = true; return null; }
+    const cut = before - after;
+    box.innerHTML = cut < 0.2 ? "자를 만큼 조용한 구간이 없습니다. 위의 '조용하면 자름' 길이를 줄여 보세요." : `영상 <b>${before.toFixed(1)}초</b> → <b>${after.toFixed(1)}초</b> (${cut.toFixed(1)}초 제거, 컷 ${items.reduce((a, x) => a + x.cuts, 0)}개로 나뉨)`;
+    $("#aeApply").disabled = cut < 0.2; return aePlan;
+  }
+  function aeApply() {
+    if (!aePlan) return 0; let removed = 0, cnt = 0;
+    aePlan.items.slice().sort((a, b) => b.start - a.start).forEach((it) => { const c = find("clip", it.id); if (!c || !it.ranges.length) return; const r = RS.applyCuts(P, c, it.ranges); if (r) { removed += r.removed; cnt += r.count; } });
+    aePlan = null; $("#aeApply").disabled = true; sel = null; commit(); seekTo(0);
+    $("#aeResult").textContent = `적용했습니다 — ${removed.toFixed(1)}초 줄었고 ${cnt}개 컷이 됐습니다. 마음에 안 들면 되돌리기(Ctrl+Z)를 누르세요.`; return removed;
+  }
+  async function aeTranscribe(m) {
+    if (m.transcript) return m.transcript;
+    if (!AUTH) throw new Error("툴키트에 로그인한 뒤 이 화면을 새로고침해 주세요.");
+    const buf = await RS.ensureBuf(M, m.id); if (!buf) throw new Error("이 영상에는 소리가 없습니다.");
+    const fd = new FormData(); fd.append("file", await RS.wav16k(buf), "audio.wav");
+    let r; try { r = await fetch(LOOK + "/api/transcribe", { method: "POST", headers: { "X-Studio-User": encodeURIComponent(AUTH.id), "X-Studio-Pass": encodeURIComponent(AUTH.pass), "X-Studio-Enc": "1" }, body: fd }); } catch (_) { throw new Error("서버에 연결하지 못했습니다."); }
+    const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || `서버 오류 (${r.status})`);
+    m.transcript = d; spendAdd((buf.duration / 60) * 0.006); return d;
+  }
+  async function aeSubtitles(targets) {
+    const ts = targets || aeTargets(), msg = $("#aeMsg"); msg.className = "hint";
+    if (!ts.length) { msg.textContent = "자막을 넣을 영상 컷을 타임라인에서 고르거나, '모든 영상 컷'을 선택해 주세요."; return 0; }
+    let made = 0; const mids = [...new Set(ts.map((c) => c.mediaId))];
+    await SE.ensureFonts("가나다라마바사아자차카타파하");
+    for (const mid of mids) {
+      msg.textContent = "말소리를 글로 바꾸는 중… (영상 길이에 따라 수십 초)"; const tr = await aeTranscribe(M[mid]), lines = RS.subtitleLines(tr, Number($("#aeLine").value));
+      P.texts = P.texts.filter((x) => x.auto !== mid);
+      ts.filter((c) => c.mediaId === mid).forEach((c) => {
+        const hi = c.in + c.dur * c.speed;
+        lines.forEach((l) => { if (l.start < c.in - 0.02 || l.start >= hi) return; const te = Math.min(l.end, hi); P.texts.push(RS.newText({ text: l.text, start: c.start + (l.start - c.in) / c.speed, dur: Math.max(0.6, (te - l.start) / c.speed + 0.15), style: $("#aeStyle").value, size: 66, y: 0.74, anim: "fade", auto: mid })); made++; });
+      });
+    }
+    commit(); msg.textContent = made ? `자막 ${made}줄을 넣었습니다. 타임라인의 글자 줄에서 문구와 위치를 고칠 수 있어요.` : "인식된 말이 없습니다. 영상에 말소리가 있는지 확인해 주세요."; return made;
+  }
+  $("#aeAnalyze").addEventListener("click", () => aeAnalyze().catch((e) => { $("#aeResult").textContent = e.message; }));
+  $("#aeApply").addEventListener("click", aeApply);
+  $("#aeSubs").addEventListener("click", async () => { const b = $("#aeSubs"); b.disabled = true; try { await aeSubtitles(); } catch (e) { $("#aeMsg").textContent = e.message; $("#aeMsg").className = "hint errc"; } b.disabled = false; });
+  $("#aeAllBtn").addEventListener("click", async () => {
+    const ts = aeTargets(), prog = $("#aeProg"); if (!ts.length) { $("#aeResult").textContent = "자를 영상 컷을 타임라인에서 고르거나, '영상 1 트랙의 모든 영상 컷'을 선택해 주세요."; return; }
+    const mids = new Set(ts.map((c) => c.mediaId)), b = $("#aeAllBtn"); b.disabled = true; prog.textContent = "1/2 말 없는 구간 분석·자르기…";
+    try {
+      const p = await aeAnalyze(ts); if (p && p.before - p.after >= 0.2) aeApply();
+      prog.textContent = "2/2 자막 만드는 중…"; const after = P.clips.filter((c) => mids.has(c.mediaId) && c.track === 0 && !c.ai);
+      const n = await aeSubtitles(after); prog.textContent = `완료 — 영상 ${RS.projectDur(P).toFixed(1)}초, 자막 ${n}줄`;
+    } catch (e) { prog.innerHTML = `<span class="errc">${esc(e.message)}</span>`; }
+    b.disabled = false;
+  });
+
   // ══════════ 저장 · 프로젝트 ══════════
   const DB = {
     open() { return new Promise((res, rej) => { const r = indexedDB.open("buyest-reels-studio", 1); r.onupgradeneeded = () => r.result.createObjectStore("proj", { keyPath: "id" }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
@@ -803,5 +872,5 @@
   // 시작
   renderBgmList(); renderLib(); renderPhotos(); renderFx();
   SE.ensureFonts("가나다 BUYEST").then(() => { hist.s = [snap()]; hist.i = 0; updUndo(); renderTimeline(); renderInspector(); renderSublist(); draw(); });
-  window.__rs = { get P() { return P; }, M, RS, commit, select, seekTo, play, pause, draw, get board() { return board; }, set board(v) { board = v; renderBoard(); }, addToTimeline, photos: () => photos, addPhotos };
+  window.__rs = { ae: { analyze: aeAnalyze, apply: aeApply, subs: aeSubtitles }, get P() { return P; }, M, RS, commit, select, seekTo, play, pause, draw, get board() { return board; }, set board(v) { board = v; renderBoard(); }, addToTimeline, photos: () => photos, addPhotos };
 })();

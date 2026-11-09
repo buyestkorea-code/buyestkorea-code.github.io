@@ -331,6 +331,18 @@ export default {
         }
         return json({ ...out, voice, provider, fallbackReason: provider === "openai" ? note : "" });
       }
+      if (url.pathname === "/api/transcribe" && request.method === "POST") { // 영상 속 말소리 → 단어별 시간이 붙은 글 (자동 자막)
+        if (!env.OPENAI_API_KEY) throw new HttpError(503, "OpenAI 키가 없어 음성 인식을 쓸 수 없습니다.");
+        let fd; try { fd = await request.formData(); } catch (_) { throw new HttpError(400, "오디오 파일이 필요합니다"); }
+        const file = fd.get("file"); if (!file || typeof file === "string") throw new HttpError(400, "오디오 파일이 필요합니다");
+        if (file.size > 24 * 1024 * 1024) throw new HttpError(400, "오디오가 너무 큽니다 (최대 약 12분). 영상을 나눠서 시도해 주세요.");
+        const out = new FormData(); out.append("file", file, "audio.wav"); out.append("model", env.TRANSCRIBE_MODEL || "whisper-1"); out.append("language", "ko"); out.append("response_format", "verbose_json");
+        out.append("timestamp_granularities[]", "word"); out.append("timestamp_granularities[]", "segment");
+        let r; try { r = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { Authorization: `Bearer ${String(env.OPENAI_API_KEY).trim()}` }, body: out }); } catch (_) { throw new HttpError(502, "OpenAI 서버에 연결하지 못했습니다."); }
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new HttpError(r.status === 429 ? 429 : 502, `음성 인식 실패 (${r.status}) ${String(d?.error?.message || "").slice(0, 160)}`);
+        return json({ text: d.text || "", duration: d.duration || 0, segments: (d.segments || []).map((s) => ({ start: s.start, end: s.end, text: s.text })), words: (d.words || []).map((w) => ({ start: w.start, end: w.end, word: w.word })) });
+      }
       if (url.pathname === "/api/story-models" && request.method === "GET") { // 진단: 이 키로 글 생성이 되는 Gemini 모델 목록
         if (!env.GEMINI_API_KEY) throw new HttpError(503, "Gemini 키가 없습니다");
         const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": String(env.GEMINI_API_KEY).trim() } });

@@ -269,7 +269,64 @@
     return ph.map((s) => { const d = Math.max(0.8, (dur * s.length) / tot); const o = { text: s, start: t, dur: d }; t += d; return o; });
   }
 
+  // ══════ 자동 편집: 말하는 구간 찾기 · 무음 잘라내기 · 음성 인식용 파일 · 자막 줄 만들기 ══════
+  // 소리 크기(RMS)를 20ms 단위로 재서 "말하는 구간"을 찾는다. sens: 클수록 작은 소리도 무음으로 본다 (기본 1)
+  function detectSpeech(buf, o) {
+    o = Object.assign({ minSilence: 0.5, pad: 0.15, minSeg: 0.25, sens: 1 }, o || {});
+    const sr = buf.sampleRate, d = buf.getChannelData(0), hop = Math.max(1, Math.round(sr * 0.02)), n = Math.floor(d.length / hop), rms = new Float32Array(n);
+    for (let i = 0; i < n; i++) { let s = 0; const b = i * hop; for (let j = 0; j < hop; j++) { const v = d[b + j]; s += v * v; } rms[i] = Math.sqrt(s / hop); }
+    const sorted = Array.from(rms).sort((a, b) => a - b), p10 = sorted[Math.floor(n * 0.1)] || 0, p90 = sorted[Math.floor(n * 0.9)] || 0;
+    const thr = Math.max(p10 * 3, p90 * 0.08, 0.003) * o.sens, step = hop / sr;
+    // 1) 말소리 켜짐/꺼짐  2) 짧은 끊김은 이어 붙임  3) 너무 짧은 소리는 버림  4) 앞뒤 여유
+    let segs = [], cur = null;
+    for (let i = 0; i < n; i++) { const on = rms[i] > thr, t = i * step; if (on && !cur) cur = { start: t, end: t + step }; else if (on && cur) cur.end = t + step; else if (!on && cur) { segs.push(cur); cur = null; } }
+    if (cur) segs.push(cur);
+    const merged = []; segs.forEach((s) => { const last = merged[merged.length - 1]; if (last && s.start - last.end < o.minSilence) last.end = s.end; else merged.push({ start: s.start, end: s.end }); });
+    const dur = buf.duration;
+    const padded = merged.filter((s) => s.end - s.start >= o.minSeg).map((s) => ({ start: Math.max(0, s.start - o.pad), end: Math.min(dur, s.end + o.pad) }));
+    const out = []; padded.forEach((s) => { const l = out[out.length - 1]; if (l && s.start <= l.end) l.end = Math.max(l.end, s.end); else out.push(s); }); // 여유를 붙이다 겹치면 하나로
+    return out;
+  }
+  // 컷 하나를 "말하는 구간"만 남긴 여러 컷으로 바꾸고, 뒤의 컷은 빈 만큼 앞으로 당긴다. ranges: 원본 영상 시간 기준 [{s,e}]
+  function applyCuts(P, c, ranges) {
+    if (!ranges.length) return null;
+    let cur = c.start; const out = [];
+    ranges.forEach((r, i) => { const nc = JSON.parse(JSON.stringify(c)); nc.id = uid(); nc.in = r.s; nc.dur = (r.e - r.s) / c.speed; nc.start = cur; nc.trans = i === 0 ? c.trans : { type: "none", dur: 0.5 }; out.push(nc); cur += nc.dur; });
+    const removed = c.dur - (cur - c.start);
+    P.clips = P.clips.filter((x) => x !== c);
+    P.clips.forEach((x) => { if (x.track === c.track && x.start >= c.start + c.dur - 0.01) x.start = Math.max(0, x.start - removed); });
+    P.clips.push(...out); return { removed, count: out.length };
+  }
+  // 음성 인식용: 16kHz 모노 WAV (1분에 약 1.9MB)
+  async function wav16k(buf) {
+    const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext, sr = 16000, ctx = new OC(1, Math.max(1, Math.ceil(buf.duration * sr)), sr);
+    const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.start(0);
+    const r = await ctx.startRendering(), d = r.getChannelData(0), out = new DataView(new ArrayBuffer(44 + d.length * 2));
+    const wr = (o, s) => { for (let i = 0; i < s.length; i++) out.setUint8(o + i, s.charCodeAt(i)); };
+    wr(0, "RIFF"); out.setUint32(4, 36 + d.length * 2, true); wr(8, "WAVEfmt "); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+    out.setUint32(24, sr, true); out.setUint32(28, sr * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true); wr(36, "data"); out.setUint32(40, d.length * 2, true);
+    for (let i = 0; i < d.length; i++) { const v = clamp(d[i], -1, 1); out.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true); }
+    return new Blob([out.buffer], { type: "audio/wav" });
+  }
+  // 음성 인식 결과(단어별 시간) → 자막 줄 [{text,start,end}] (원본 영상 시간 기준). 단어가 없으면 문장을 글자 수 비례로 나눈다
+  function subtitleLines(tr, maxChars) {
+    maxChars = maxChars || 14; const lines = [];
+    if (tr && tr.words && tr.words.length) {
+      let cur = null;
+      tr.words.forEach((w) => {
+        const word = String(w.word || "").trim(); if (!word) return;
+        if (cur && ((cur.text + " " + word).length > maxChars || w.start - cur.end > 0.8 || /[.!?。…]$/.test(cur.text))) { lines.push(cur); cur = null; }
+        if (!cur) cur = { text: word, start: w.start, end: w.end }; else { cur.text += " " + word; cur.end = w.end; }
+      });
+      if (cur) lines.push(cur);
+    } else if (tr && tr.segments) {
+      tr.segments.forEach((s) => { const ph = splitPhrases(s.text, maxChars), tot = ph.reduce((a, x) => a + x.length, 0) || 1; let t = s.start; ph.forEach((p) => { const d = ((s.end - s.start) * p.length) / tot; lines.push({ text: p, start: t, end: t + d }); t += d; }); });
+    }
+    return lines.map((l) => ({ text: l.text.replace(/[.!?。]+$/, "").trim(), start: l.start, end: l.end })).filter((l) => l.text);
+  }
+
   window.RS = {
+    detectSpeech, applyCuts, wav16k, subtitleLines,
     FILTERS, TRANSITIONS, KENBURNS, TEXT_STYLES, TEXT_ANIMS, uid, newProject, newClip, newText, newAudio, projectDur,
     addMedia, dropMedia, ensureBuf, peaks, ac, prepareAudio, mixAudio, scheduleAll,
     activeClips, neededVideos, seekVideos, srcTime, drawFrame, exportMp4, splitPhrases, subtitleTimes,
