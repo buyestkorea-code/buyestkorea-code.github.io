@@ -373,6 +373,7 @@ export default {
           p.features ? `특징:\n${String(p.features).slice(0, 600)}` : "", p.cta ? `마지막 요청: ${String(p.cta).slice(0, 80)}` : "",
           b.reference && typeof b.reference === "object" ? `참고 릴스 구조 (리듬만 참고, 장면·문구 복제 금지):\n- 원본 길이 ${Number(b.reference.durationSec) || "?"}초, 컷 ${Number(b.reference.cuts) || "?"}개 (평균 ${Number(b.reference.avgCutSec) || "?"}초)\n- 구성: ${String(b.reference.structure || "").slice(0, 400)}\n- 리듬: ${String(b.reference.pacing || "").slice(0, 200)}\n- 훅: ${String(b.reference.hook || "").slice(0, 200)}\n- 글자: ${String(b.reference.text || "").slice(0, 100)} / 소리: ${String(b.reference.audio || "").slice(0, 100)}` : "",
           paceLine,
+          Array.isArray(b.kinds) && b.kinds.includes("video") ? `소재 종류: ${b.kinds.slice(0, 10).map((k, i) => `${i}번=${k === "video" ? "영상" : "사진"}`).join(", ")}. 영상 소재를 쓰는 컷에서 mode "ai" 는 AI 수정(영상→영상)이고 이때 motion 은 영상을 어떻게 바꿀지 영어 한 문장(예: change the background to a snowy street while keeping the subject and motion)으로 쓴다. mode "photo" 는 영상 원본 그대로 쓴다. 영상 소재의 컷 길이(sec)는 3~15초.` : "",
           `사장님 요청(릴스 프롬프트):\n${prompt}`,
         ].filter(Boolean).join("\n");
         const refs = (Array.isArray(b.images) ? b.images.slice(0, 8) : []).map((u) => { try { return parseDataUrl(u); } catch (_) { return null; } }).filter(Boolean);

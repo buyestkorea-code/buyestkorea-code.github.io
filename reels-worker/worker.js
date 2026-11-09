@@ -18,16 +18,20 @@
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const HF = "https://api.higgsfield.ai";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "5.0.0";
+const VERSION = "5.1.0";
 
 // 쓸 수 있는 모델 — 사진 1장 → 3~15초 클립. 릴스 스튜디오는 Kling 3.0 만 쓴다 (사장님 결정 2026-11-10, Seedance 제외).
 // usdPerSec: 실제 청구와 공식 가격표(open.higgsfield.ai/pricing)로 잡은 초당 예상 금액 (견적 API 가 이 키로 안 열려 가격표로 상한을 건다)
 const MODELS = {
   kling3: { label: "Kling 3.0 표준 (1초 약 $0.065)", path: "kling-video/v3.0/std/image-to-video", minSec: 3, maxSec: 15, usdPerSec: 0.065, sound: true },
+  // 영상을 입력으로 받는 Kling O3 (Kling 계열). 공식 문서에 가격이 없어 초당 금액은 "예상"이며 실제 청구는 힉스필드 콘솔에서 확인
+  o3edit: { label: "Kling O3 영상 수정 (예상)", path: "kling-video/o3/video-edit", kind: "edit", minSec: 3, maxSec: 15.5, usdPerSec: { std: 0.1, pro: 0.14 } },
+  o3ref: { label: "Kling O3 영상 참조 재생성 (예상)", path: "kling-video/o3/video-reference", kind: "ref", minSec: 3, maxSec: 10, usdPerSec: { std: 0.1, pro: 0.14 } },
 };
 const DEFAULT_MODEL = "kling3";
 const RESOLUTIONS = ["480p", "720p", "1080p"];
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MEDIA_TYPES = [...IMAGE_TYPES, "video/mp4"];
 
 const cors = () => ({
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -102,6 +106,23 @@ async function hf(env, method, path, body, extraHeaders) {
 
 // 화면에서 온 설정 → 검증 → Higgsfield 요청 본문 (사진 1장 = 클립 1개)
 function buildRequest(env, b) {
+  // 영상 입력 모드: kind "edit"(영상 수정) / "ref"(영상 참조 재생성)
+  if (b.kind === "edit" || b.kind === "ref") {
+    const m = b.kind === "edit" ? MODELS.o3edit : MODELS.o3ref;
+    const video = typeof b.video === "string" ? b.video : "";
+    if (!/^https:\/\//.test(video)) throw new HttpError(400, "영상 주소가 필요합니다");
+    const prompt = String(b.prompt || "").trim().slice(0, 2400);
+    if (!prompt) throw new HttpError(400, "어떻게 바꿀지 설명(프롬프트)이 필요합니다");
+    const mode = b.mode === "pro" ? "pro" : "std";
+    let duration = Number(b.duration) || (b.kind === "edit" ? 5 : 5);
+    duration = Math.min(m.maxSec, Math.max(m.minSec, duration));
+    const body = { prompt, video_urls: [video], mode };
+    if (b.kind === "ref") { duration = Math.round(duration); body.duration = duration; body.aspect_ratio = "9:16"; }
+    const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => typeof u === "string" && /^https:\/\//.test(u)).slice(0, 4);
+    if (imgs.length) body.image_urls = imgs;
+    const usd = Math.round(duration * m.usdPerSec[mode] * 1000) / 1000;
+    return { path: m.path, body, usd, duration };
+  }
   const m = MODELS[b.model] || MODELS[DEFAULT_MODEL];
   const first = typeof b.image === "string" ? b.image : (Array.isArray(b.images) ? b.images[0] : "");
   if (typeof first !== "string" || !/^https:\/\//.test(first)) throw new HttpError(400, "사진 주소가 필요합니다");
@@ -122,7 +143,7 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/api/health") {
-        return json({ ok: true, version: VERSION, higgsfield: !!env.HF_API_KEY, limits: !!env.STUDIO_KV, maxUsd: Number(env.MAX_USD_PER_REQUEST) || 5, defaultModel: DEFAULT_MODEL, models: Object.entries(MODELS).map(([id, m]) => ({ id, label: m.label, minSec: m.minSec, maxSec: m.maxSec, durations: m.durations || null, usdPerSec: m.usdPerSec })) });
+        return json({ ok: true, version: VERSION, higgsfield: !!env.HF_API_KEY, limits: !!env.STUDIO_KV, maxUsd: Number(env.MAX_USD_PER_REQUEST) || 5, defaultModel: DEFAULT_MODEL, videoAi: true, models: Object.entries(MODELS).map(([id, m]) => ({ id, label: m.label, minSec: m.minSec, maxSec: m.maxSec, durations: m.durations || null, usdPerSec: m.usdPerSec })) });
       }
 
       // 영상 중계: 서명된 주소만 (로그인 헤더 없이 <video> 가 받을 수 있게)
@@ -150,7 +171,7 @@ export default {
       const body = await request.json().catch(() => ({}));
 
       if (url.pathname === "/api/upload-url") {
-        const ct = IMAGE_TYPES.includes(body.content_type) ? body.content_type : "image/jpeg";
+        const ct = MEDIA_TYPES.includes(body.content_type) ? body.content_type : "image/jpeg";
         const d = await hf(env, "POST", "files/generate-upload-url", { content_type: ct });
         return json({ upload_url: d.upload_url, upload_headers: d.upload_headers || { "Content-Type": ct }, public_url: d.public_url, content_type: ct });
       }

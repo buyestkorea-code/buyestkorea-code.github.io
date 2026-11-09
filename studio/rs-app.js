@@ -8,7 +8,7 @@
   const W = SE.W, H = SE.H, FPS = SE.FPS;
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const REELS = "https://buyest-reels.buyest.workers.dev", LOOK = "https://buyest-lookbook.buyest.workers.dev";
-  const KRW = 1400, KLING_USD_SEC = 0.065, TTS_USD = 0.02;
+  const KRW = 1400, KLING_USD_SEC = 0.065, TTS_USD = 0.02, O3_USD = { std: 0.1, pro: 0.14 }; // O3(영상 수정·참조)는 공식 가격이 없어 예상치
   const usd = (v) => `$${v.toFixed(2)} (약 ${(Math.round((v * KRW) / 100) * 100).toLocaleString("ko-KR")}원)`;
   const fmt = (s) => { s = Math.max(0, s); const m = Math.floor(s / 60); return `${String(m).padStart(2, "0")}:${(s - m * 60).toFixed(1).padStart(4, "0")}`; };
   const SAFE_TXT = " The product's shape, colors, logos and patterns stay exactly unchanged. No text, captions or watermarks appear.";
@@ -321,6 +321,7 @@
         ta.addEventListener("input", () => { it.label = ta.value; }); ta.addEventListener("change", () => commit({ insp: false }));
         box.append(h("label", { class: "f" }, "움직임 프롬프트 (영어)"), ta, h("button", { class: "btn full", style: "margin-top:8px", onclick: () => regenClip(it) }, "이 컷만 다시 만들기"));
       }
+      if (m && m.isVideo) box.append(aiVideoPanel(it));
     } else if (sel.k === "text") {
       box.append(h("h2", {}, "글자", h("i", {}, "자막·제목")));
       const ta = h("textarea", { rows: 3 }); ta.value = it.text;
@@ -355,8 +356,8 @@
   async function addPhotos(files) {
     for (const f of files) {
       if (photos.length >= 10) { toast("사진은 최대 10장입니다."); break; }
-      if (!/^image\//.test(f.type)) continue;
-      try { const m = await RS.addMedia(M, f, f.name, "image"); photos.push(m.id); } catch (e) { toast("사진을 읽지 못했습니다: " + f.name); }
+      if (!/^(image|video)\//.test(f.type)) continue;
+      try { const m = await RS.addMedia(M, f, f.name, /^video\//.test(f.type) ? "video" : "image"); hookSeek(m); photos.push(m.id); } catch (e) { toast("파일을 읽지 못했습니다: " + f.name); }
     }
     renderPhotos(); renderLib();
   }
@@ -364,7 +365,7 @@
     const box = $("#photos"); box.innerHTML = ""; $("#photoCnt").textContent = photos.length + " / 10";
     photos.forEach((id, i) => {
       const m = M[id]; if (!m) return;
-      const d = h("div", { class: "th" }, h("img", { src: m.url, alt: "" }), h("b", {}, i + 1), h("button", { title: "빼기", onclick: () => { photos.splice(i, 1); renderPhotos(); } }, "✕"));
+      const d = h("div", { class: "th" }, h("img", { src: m.isVideo ? m.thumb : m.url, alt: "" }), h("b", {}, m.isVideo ? i + 1 + " 영상" : i + 1), h("button", { title: "빼기", onclick: () => { photos.splice(i, 1); renderPhotos(); } }, "✕"));
       box.append(d);
     });
   }
@@ -393,7 +394,7 @@
     try {
       const images = []; for (const id of photos.slice(0, 6)) images.push(await smallJpegUrl(M[id], 512));
       const ref = currentRef();
-      const d = await api(LOOK, "/api/storyboard", { method: "POST", body: { reference: ref ? { name: ref.name, durationSec: ref.durationSec, cuts: ref.cuts, avgCutSec: ref.avgCutSec, structure: ref.structure, pacing: ref.pacing, hook: ref.hook, text: ref.text, audio: ref.audio } : undefined, prompt, brand, brandName: $("#brandName").value.trim(), targetSec: target, photoCount: photos.length, images, product: { name: $("#productName").value.trim(), price: $("#price").value.trim(), features: $("#features").value.trim(), cta: $("#cta").value.trim() } } });
+      const d = await api(LOOK, "/api/storyboard", { method: "POST", body: { kinds: photos.map((id) => (M[id] && M[id].isVideo ? "video" : "image")), reference: ref ? { name: ref.name, durationSec: ref.durationSec, cuts: ref.cuts, avgCutSec: ref.avgCutSec, structure: ref.structure, pacing: ref.pacing, hook: ref.hook, text: ref.text, audio: ref.audio } : undefined, prompt, brand, brandName: $("#brandName").value.trim(), targetSec: target, photoCount: photos.length, images, product: { name: $("#productName").value.trim(), price: $("#price").value.trim(), features: $("#features").value.trim(), cta: $("#cta").value.trim() } } });
       board = d.board; msg.textContent = `컷 ${board.cuts.length}개를 짰어요 (${d.provider}). 아래에서 마음대로 고치세요.`;
     } catch (e) {
       board = localBoard(target); msg.textContent = `AI 기획을 쓰지 못해 기본 구성으로 만들었어요 (${e.message}). 아래에서 직접 고치세요.`; msg.className = "hint warn";
@@ -412,7 +413,7 @@
   fetch("viral-ref.json", { cache: "no-store" }).then((r) => r.json()).then((d) => { REFS = d.refs || []; $("#refSel").innerHTML = `<option value="">쓰지 않음</option>` + REFS.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join(""); renderRefInfo(); }).catch(() => {});
   $("#refSel").addEventListener("change", renderRefInfo);
   async function smallJpegUrl(m, max) {
-    const el = m.el, s = Math.min(1, max / Math.max(el.width, el.height)), c = document.createElement("canvas"); c.width = Math.round(el.width * s); c.height = Math.round(el.height * s);
+    const el = m.el, iw = m.isVideo ? el.videoWidth : el.width, ih = m.isVideo ? el.videoHeight : el.height, s = Math.min(1, max / Math.max(iw, ih)), c = document.createElement("canvas"); c.width = Math.round(iw * s); c.height = Math.round(ih * s);
     c.getContext("2d").drawImage(el, 0, 0, c.width, c.height); return c.toDataURL("image/jpeg", 0.8);
   }
   const ROLE_KO = { hook: "훅", intro: "소개", detail: "디테일", style: "스타일링", proof: "근거", cta: "마무리" };
@@ -424,7 +425,7 @@
       const m = M[photos[clamp(c.photo, 0, photos.length - 1)]];
       const sel2 = h("select", {}, photos.map((_, k) => h("option", { value: k, selected: k === c.photo }, `사진 ${k + 1}`)));
       sel2.addEventListener("change", () => { c.photo = Number(sel2.value); renderBoard(); });
-      const mode = h("select", {}, h("option", { value: "ai", selected: c.mode === "ai" }, "AI 영상"), h("option", { value: "photo", selected: c.mode === "photo" }, "사진 효과"));
+      const isV = !!(m && m.isVideo), mode = h("select", {}, h("option", { value: "ai", selected: c.mode === "ai" }, isV ? "AI 수정" : "AI 영상"), h("option", { value: "photo", selected: c.mode === "photo" }, isV ? "원본 그대로" : "사진 효과"));
       mode.addEventListener("change", () => { c.mode = mode.value; renderBoard(); });
       const sec = h("input", { type: "number", min: 2, max: 30, step: 1, value: c.sec }); sec.addEventListener("change", () => { c.sec = clamp(Number(sec.value) || 5, 2, 30); updCost(); });
       const mo = h("textarea", { rows: 2, placeholder: "움직임 (영어)" }); mo.value = c.motion; mo.addEventListener("input", () => { c.motion = mo.value; });
@@ -435,7 +436,7 @@
           h("button", { class: "mini", title: "위로", onclick: () => { if (i > 0) { [board.cuts[i - 1], board.cuts[i]] = [board.cuts[i], board.cuts[i - 1]]; renderBoard(); } } }, "▲"),
           h("button", { class: "mini", title: "아래로", onclick: () => { if (i < board.cuts.length - 1) { [board.cuts[i + 1], board.cuts[i]] = [board.cuts[i], board.cuts[i + 1]]; renderBoard(); } } }, "▼"),
           h("button", { class: "mini", title: "컷 지우기", onclick: () => { board.cuts.splice(i, 1); renderBoard(); } }, "✕")),
-        h("div", { class: "body" }, m ? h("img", { src: m.url, alt: "" }) : h("div"),
+        h("div", { class: "body" }, m ? h("img", { src: m.isVideo ? m.thumb : m.url, alt: "" }) : h("div"),
           h("div", {}, h("div", { class: "line" }, sel2, mode, sec, h("span", { class: "hint" }, "초")), c.mode === "ai" ? mo : null, na, ca))));
     });
     updCost();
@@ -445,15 +446,19 @@
   $("#bBoard").addEventListener("click", makeBoard);
   const aiReady = () => !!(AUTH && RH && RH.higgsfield) && !$("#dry").checked;
   function plan() {
-    if (!board) return { aiSec: 0, aiN: 0, voices: 0, total: 0 };
-    let aiSec = 0, aiN = 0, voices = 0, total = 0;
-    board.cuts.forEach((c) => { const v = c.narration.trim() ? Math.ceil(c.narration.length / 4.2) : 0; const dur = Math.max(c.sec, v ? v + 0.6 : 0); total += dur; if (c.mode === "ai" && aiReady()) { aiSec += clamp(Math.ceil(dur), 3, 15); aiN++; } if (c.narration.trim()) voices++; });
-    return { aiSec, aiN, voices, total };
+    if (!board) return { aiSec: 0, aiN: 0, o3Sec: 0, o3N: 0, voices: 0, total: 0 };
+    let aiSec = 0, aiN = 0, o3Sec = 0, o3N = 0, voices = 0, total = 0;
+    board.cuts.forEach((c) => {
+      const v = c.narration.trim() ? Math.ceil(c.narration.length / 4.2) : 0, dur = Math.max(c.sec, v ? v + 0.6 : 0), pm = M[photos[clamp(c.photo, 0, photos.length - 1)]]; total += dur;
+      if (c.mode === "ai" && aiReady()) { if (pm && pm.isVideo) { if (dur >= 3 && dur <= 15.5) { o3Sec += dur; o3N++; } } else { aiSec += clamp(Math.ceil(dur), 3, 15); aiN++; } }
+      if (c.narration.trim()) voices++;
+    });
+    return { aiSec, aiN, o3Sec, o3N, voices, total };
   }
   function updCost() {
-    if (!board) return; const p = plan(), cost = p.aiSec * KLING_USD_SEC + (AUTH ? p.voices * TTS_USD : 0);
+    if (!board) return; const p = plan(), cost = p.aiSec * KLING_USD_SEC + p.o3Sec * O3_USD.std + (AUTH ? p.voices * TTS_USD : 0);
     $("#boardSum").textContent = `약 ${Math.round(p.total)}초 · 컷 ${board.cuts.length}개`;
-    $("#costLine").innerHTML = aiReady() ? `AI 영상 ${p.aiN}컷 (${p.aiSec}초) · 나레이션 ${p.voices}컷 → 예상 <b>${usd(cost)}</b>` : (AUTH ? `AI 영상은 만들지 않습니다 (무료 테스트). 사진 효과 + 나레이션 약 ${usd(p.voices * TTS_USD)}` : `로그인하지 않아 AI·음성은 쓸 수 없고, 사진 효과로만 만들어집니다.`);
+    $("#costLine").innerHTML = aiReady() ? `AI 영상 ${p.aiN}컷 (${p.aiSec}초)${p.o3N ? ` · AI 수정 ${p.o3N}컷 (${Math.round(p.o3Sec)}초, 예상)` : ""} · 나레이션 ${p.voices}컷 → 예상 <b>${usd(cost)}</b>` : (AUTH ? `AI 영상은 만들지 않습니다 (무료 테스트). 사진 효과 + 나레이션 약 ${usd(p.voices * TTS_USD)}` : `로그인하지 않아 AI·음성은 쓸 수 없고, 사진 효과로만 만들어집니다.`);
   }
   $("#dry").addEventListener("change", updCost);
 
@@ -505,9 +510,9 @@
     if (genBusy || !board) return;
     if (!photos.length) { toast("사진을 먼저 올려 주세요."); return; }
     if (!SE.supported()) { alert("이 브라우저는 영상 만들기를 지원하지 않습니다. 최신 Chrome·Edge 로 열어 주세요."); return; }
-    const p = plan(), ai = aiReady(), voiceOn = !!AUTH && p.voices > 0, cost = p.aiSec * KLING_USD_SEC + (voiceOn ? p.voices * TTS_USD : 0);
+    const p = plan(), ai = aiReady(), voiceOn = !!AUTH && p.voices > 0, cost = p.aiSec * KLING_USD_SEC + p.o3Sec * O3_USD.std + (voiceOn ? p.voices * TTS_USD : 0);
     if (P.clips.length && !confirm("지금 타임라인에 있는 편집 내용이 새로 만든 릴스로 바뀝니다. 계속할까요?")) return;
-    if (ai && !confirm(`릴스 1편을 만듭니다.\n\nAI 영상 ${p.aiN}컷 (${p.aiSec}초) · 나레이션 ${p.voices}컷\n예상 금액 ${usd(cost)}\n\n보통 3~10분 걸리고, 실패한 AI 영상은 과금되지 않습니다.\n계속할까요?`)) return;
+    if (ai && !confirm(`릴스 1편을 만듭니다.\n\nAI 영상 ${p.aiN}컷 (${p.aiSec}초)${p.o3N ? ` · AI 영상 수정 ${p.o3N}컷 (${Math.round(p.o3Sec)}초, 예상가)` : ""} · 나레이션 ${p.voices}컷\n예상 금액 ${usd(cost)}\n\n보통 3~10분 걸리고, 실패한 AI 영상은 과금되지 않습니다.\n계속할까요?`)) return;
     genBusy = true; $("#bGen").disabled = true; $("#bBoard").disabled = true; genAbort = new AbortController();
     const prog = $("#prog"), lines = {}, notes = []; let spent = 0;
     const paint = (head, pct) => { prog.innerHTML = `<b>${esc(head)}</b><div class="bar"><i style="width:${pct || 0}%"></i></div>` + Object.keys(lines).map((k) => `<div>${esc(k)} ${esc(lines[k])}</div>`).join("") + (notes.length ? `<div class="warn">${notes.map(esc).join("<br>")}</div>` : "") + (ai ? `<button class="btn sm" id="bStop" style="margin-top:6px">기다리기 멈추기</button>` : ""); const s = $("#bStop"); if (s) s.onclick = () => genAbort.abort(); };
@@ -529,9 +534,9 @@
       let cur = 0; const jobs = [];
       board.cuts.forEach((c, i) => {
         const vm = voices[i], vd = vm ? vm.dur : 0, dur = Math.max(c.sec, vd ? vd + 0.6 : 0), pid = photos[clamp(c.photo, 0, photos.length - 1)];
-        const aiThis = ai && c.mode === "ai";
-        const clip = RS.newClip({ track: 0, mediaId: pid, start: cur, dur, kb: aiThis ? "none" : KB_CYCLE[i % 4], pending: aiThis, ai: aiThis, label: c.motion, srcPhoto: pid, trans: i > 0 ? { type: "fade", dur: 0.35 } : { type: "none", dur: 0.5 } });
-        P.clips.push(clip); if (aiThis) jobs.push({ clip, i, c });
+        const pm = M[pid], isVid = !!(pm && pm.isVideo), aiThis = ai && c.mode === "ai" && !isVid, editThis = ai && c.mode === "ai" && isVid && dur >= 3 && dur <= 15.5;
+        const clip = RS.newClip({ track: 0, mediaId: pid, start: cur, dur, kb: aiThis || isVid ? "none" : KB_CYCLE[i % 4], pending: aiThis, ai: aiThis, label: c.motion, srcPhoto: pid, vol: 0, trans: i > 0 ? { type: "fade", dur: 0.35 } : { type: "none", dur: 0.5 } });
+        P.clips.push(clip); if (aiThis) jobs.push({ clip, i, c, kind: "i2v" }); else if (editThis) jobs.push({ clip, i, c, kind: "edit" });
         if (vm) {
           P.audio.push(RS.newAudio({ kind: "voice", mediaId: vm.id, start: cur + 0.15, dur: vd, vol: 1, label: `나레이션 ${i + 1}`, text: c.narration.trim() }));
           RS.subtitleTimes(c.narration.trim(), cur + 0.15, vd).forEach((s) => P.texts.push(RS.newText({ text: s.text, start: s.start, dur: s.dur, style: "stroke", size: 66, y: 0.74, anim: "fade", sub: true })));
@@ -557,10 +562,11 @@
           const key = `컷 ${j.i + 1}`;
           if (stopAll) { lines[key] = "건너뜀 → 사진 효과"; j.clip.pending = false; j.clip.ai = false; j.clip.kb = KB_CYCLE[j.i % 4]; return; }
           try {
-            const res = await makeClipBlob(j.clip.srcPhoto, j.c.motion, j.clip.dur, (s) => { lines[key] = s; paint("AI 영상 만드는 중", 28 + (doneN / jobs.length) * 70); }, genAbort.signal);
+            const rep2 = (s) => { lines[key] = s; paint("AI 영상 만드는 중", 28 + (doneN / jobs.length) * 70); };
+            const res = j.kind === "edit" ? await editClipBlob(j.clip, j.c.motion, "std", rep2, genAbort.signal) : await makeClipBlob(j.clip.srcPhoto, j.c.motion, j.clip.dur, rep2, genAbort.signal);
             const m = await RS.addMedia(M, res.blob, `AI 컷 ${j.i + 1}.mp4`, "video"); hookSeek(m);
-            j.clip.mediaId = m.id; j.clip.pending = false; j.clip.in = 0; j.clip.speed = m.dur && m.dur < j.clip.dur && m.dur / j.clip.dur >= 0.85 ? m.dur / j.clip.dur : 1; j.clip.kb = "none"; j.clip.vol = 0;
-            spent += res.usd || j.clip.dur * KLING_USD_SEC; lines[key] = "완료 ✓";
+            j.clip.mediaId = m.id; j.clip.pending = false; j.clip.in = 0; j.clip.speed = m.dur && m.dur < j.clip.dur && m.dur / j.clip.dur >= 0.85 ? m.dur / j.clip.dur : 1; j.clip.kb = "none"; j.clip.vol = 0; j.clip.ai = true;
+            spent += res.usd || j.clip.dur * (j.kind === "edit" ? O3_USD.std : KLING_USD_SEC); lines[key] = "완료 ✓";
           } catch (e) {
             lines[key] = "실패 → 사진 효과로 대신합니다 (" + (e.message || e) + ")"; j.clip.pending = false; j.clip.ai = false; j.clip.kb = KB_CYCLE[j.i % 4]; notes.push(`컷 ${j.i + 1}의 AI 영상이 실패해 사진으로 대신했습니다.`);
             if (e.status === 402 || /잔액/.test(e.message)) { stopAll = true; notes.push("Higgsfield 잔액이 부족합니다. 콘솔에서 충전해 주세요."); }
@@ -595,6 +601,93 @@
       a.mediaId = m.id; a.dur = m.dur; a.in = 0; P.texts = P.texts.filter((x) => !(x.sub && x.start >= a.start - 0.01 && x.start < a.start + a.dur + 5 && false));
       commit({ insp: true }); toast("다시 읽었습니다. 자막이 필요하면 '텍스트' 탭에서 고치세요.");
     } catch (e) { toast("실패: " + e.message, 5000); }
+  }
+
+  // ══════════ 영상 AI 편집 · 재생성 (Kling O3 수정·참조 / Kling 3.0 이어 만들기) ══════════
+  let aiPrompt = "", aiMode = "std", aiVidBusy = false;
+  async function uploadBlob(blob, type) {
+    const u = await api(REELS, "/api/upload-url", { method: "POST", body: { content_type: type } });
+    let r; try { r = await fetch(u.upload_url, { method: "PUT", headers: u.upload_headers || { "Content-Type": type }, body: blob, credentials: "omit" }); } catch (_) { throw new Error("업로드 실패 (네트워크)"); }
+    if (!r.ok) throw new Error(`업로드 실패 (${r.status})`);
+    return u.public_url;
+  }
+  async function klingJob(body, report, signal) { // 요청 → 5초마다 확인 → 완료되면 영상 내려받기
+    const key = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+    const g = await api(REELS, "/api/generate", { method: "POST", body, headers: { "Idempotency-Key": key } });
+    const t0 = Date.now(); let st = { status: g.status };
+    while (Date.now() - t0 < 20 * 60 * 1000) {
+      if (signal && signal.aborted) throw new Error("멈췄습니다 (이미 시작된 영상은 요금이 나갈 수 있습니다)");
+      await sleep(5000);
+      try { st = await api(REELS, "/api/status?id=" + encodeURIComponent(g.request_id)); } catch (e) { if (e.status === 401 || e.status === 503) throw e; }
+      report(`${STATE_KO[st.status] || st.status} · ${Math.round((Date.now() - t0) / 1000)}초`);
+      if (["completed", "failed", "nsfw", "canceled"].includes(st.status)) break;
+    }
+    if (st.status !== "completed" || !st.video_url) throw new Error(`${STATE_KO[st.status] || st.status}${st.error ? " " + st.error : ""}`);
+    const v = await fetch(st.video_url); if (!v.ok) throw new Error("영상을 내려받지 못했습니다");
+    return { blob: await v.blob(), usd: g.estimate_usd };
+  }
+  async function frameBlob(m, time) { // 영상의 한 장면 → JPEG
+    pause(); const el = m.el; await SE.seekVideo(el, clamp(time, 0, Math.max(0, (m.dur || 1) - 0.05)));
+    const s = Math.min(1, 2048 / Math.max(el.videoWidth, el.videoHeight)), c = document.createElement("canvas"); c.width = Math.round(el.videoWidth * s); c.height = Math.round(el.videoHeight * s);
+    c.getContext("2d").drawImage(el, 0, 0, c.width, c.height);
+    const b = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.92)); scheduleDraw(); if (!b) throw new Error("장면을 추출하지 못했습니다"); return b;
+  }
+  let mp4Lock = Promise.resolve();
+  function clipToMp4(c) { // 컷 하나(범위·속도 반영, 효과는 뺀 원본 화면)를 mp4 로. 같은 영상 소재를 동시에 건드리지 않게 한 번에 하나씩
+    const run = async () => {
+      const tmp = RS.newProject(); tmp.brand = P.brand; const cc = JSON.parse(JSON.stringify(c));
+      Object.assign(cc, { track: 0, start: 0, trans: { type: "none", dur: 0.5 }, filter: "none", bright: 1, contrast: 1, sat: 1, zoom: 1, x: 0, y: 0, rot: 0, opacity: 1, layout: "full", kb: "none", vol: 1, pending: false });
+      tmp.clips.push(cc); return RS.exportMp4(tmp, M, {});
+    };
+    return (mp4Lock = mp4Lock.then(run, run));
+  }
+  async function editClipBlob(c, prompt, mode, report, signal) { // 컷 → AI 영상 수정 (Kling O3 video-edit)
+    if (c.dur < 3 || c.dur > 15.5) throw new Error("수정할 영상은 3~15.5초여야 합니다");
+    report("컷을 영상 파일로 만드는 중"); const mp4 = await clipToMp4(c); report("영상 올리는 중"); const url = await uploadBlob(mp4, "video/mp4");
+    return klingJob({ kind: "edit", video: url, prompt: (prompt || "Subtly improve the footage") + " Preserve the subject, its motion, and the product's shape, colors and logos.", mode, duration: c.dur }, report, signal);
+  }
+  function insertClipAfter(c, nc) { // c 바로 뒤에 새 컷을 끼우고, 같은 트랙 뒤쪽 컷은 그 길이만큼 민다
+    nc.start = c.start + c.dur; P.clips.forEach((x) => { if (x !== c && x.track === c.track && x.start >= nc.start - 0.01) x.start += nc.dur; }); P.clips.push(nc);
+  }
+  async function aiVideoAction(kind, c, opt) {
+    if (aiVidBusy || genBusy) { toast("다른 AI 작업이 진행 중입니다."); return; }
+    if (!aiReady()) { toast("AI 영상을 쓸 수 없는 상태입니다. 로그인·서버 연결을 확인하거나, AI 기획의 'AI 영상 만들지 않기'를 꺼 주세요."); return; }
+    const m = M[c.mediaId]; if (!m || !m.isVideo) { toast("영상 컷에서만 쓸 수 있습니다."); return; }
+    const prompt = String(opt.prompt || "").trim(), mode = opt.mode === "pro" ? "pro" : "std";
+    if ((kind === "edit" || kind === "ref") && !prompt) { toast("어떻게 바꿀지 설명을 적어 주세요."); return; }
+    let secs, cost, what;
+    if (kind === "edit") { secs = c.dur; if (secs < 3) { toast("수정할 영상은 3초 이상이어야 합니다. 컷 길이를 늘리거나 다른 컷을 고르세요."); return; } if (secs > 15.5) { toast("수정할 영상은 15.5초 이하여야 합니다. 먼저 S 키로 컷을 나눠 주세요."); return; } cost = secs * O3_USD[mode]; what = `이 컷(${secs.toFixed(1)}초)을 AI로 수정해서 바꿔치기합니다`; }
+    else if (kind === "ref") { secs = clamp(Math.round(c.dur), 3, 10); cost = secs * O3_USD[mode]; what = `이 컷의 움직임을 참고해 ${secs}초 새 영상을 만들어 뒤에 붙입니다`; }
+    else { secs = clamp(Math.round(opt.secs || 5), 3, 15); cost = secs * KLING_USD_SEC; what = kind === "extend" ? `이 컷 끝 장면에서 이어지는 ${secs}초 영상을 만들어 뒤에 붙입니다` : `재생 위치의 장면으로 새 ${secs}초 영상을 만들어 뒤에 붙입니다`; }
+    if (!confirm(`${what}.\n\n예상 금액 ${usd(cost)}${kind === "edit" || kind === "ref" ? "\n(O3 모델은 공식 가격이 없어 예상치입니다)" : ""}\n\n보통 3~10분 걸립니다. 계속할까요?`)) return;
+    aiVidBusy = true; const rep = (s) => toast(`AI 영상 · ${s}`, 6000);
+    try {
+      let res, nc = null;
+      if (kind === "edit") res = await editClipBlob(c, prompt, mode, rep, null);
+      else if (kind === "ref") {
+        rep("컷을 영상 파일로 만드는 중"); const url = await uploadBlob(await clipToMp4(Object.assign({}, c, { dur: Math.min(c.dur, 15) })), "video/mp4");
+        res = await klingJob({ kind: "ref", video: url, prompt: prompt + " Keep the product's shape, colors and logos unchanged.", mode, duration: secs }, rep, null);
+      } else {
+        const rel = t - c.start, srcT = kind === "extend" ? c.in + c.dur * c.speed - 0.06 : (rel >= 0 && rel <= c.dur ? c.in + rel * c.speed : c.in);
+        rep("장면을 추출하는 중"); const url = await uploadBlob(await frameBlob(m, srcT), "image/jpeg");
+        res = await klingJob({ model: "kling3", image: url, prompt: (prompt || "Continue the motion naturally with gentle camera movement.") + SAFE_TXT, duration: secs }, rep, null);
+      }
+      const nm = await RS.addMedia(M, res.blob, `AI ${kind}.mp4`, "video"); hookSeek(nm);
+      if (kind === "edit") { c.mediaId = nm.id; c.in = 0; c.speed = 1; c.ai = true; c.kb = "none"; c.label = prompt; c.vol = 0; }
+      else { nc = RS.newClip({ track: c.track, mediaId: nm.id, dur: nm.dur || secs, ai: true, label: prompt, vol: 0, trans: { type: "fade", dur: 0.35 } }); insertClipAfter(c, nc); sel = { k: "clip", id: nc.id }; }
+      spendAdd(res.usd || cost); renderLib(); commit({ insp: true }); toast(kind === "edit" ? "수정한 영상으로 바꿨습니다. 마음에 안 들면 되돌리기(Ctrl+Z)를 누르세요." : "새 영상을 뒤에 붙였습니다.", 4500);
+    } catch (e) { toast("AI 영상 실패: " + (e.message || e), 6000); console.error(e); }
+    aiVidBusy = false;
+  }
+  function aiVideoPanel(it) {
+    const wrap = h("div", {}, h("div", { class: "sec" }, "AI 영상 편집 · 재생성 (Kling)"));
+    const pr = h("textarea", { rows: 3, placeholder: "어떻게 바꿀지 적으세요. 예) 배경을 눈 내리는 겨울 거리로 바꿔줘 (피사체와 움직임은 그대로)" }); pr.value = aiPrompt; pr.addEventListener("input", () => { aiPrompt = pr.value; });
+    const md = h("select", {}, h("option", { value: "std" }, "표준 (1초 약 $0.10, 예상)"), h("option", { value: "pro" }, "프로 · 화질 좋음 (1초 약 $0.14, 예상)")); md.value = aiMode; md.addEventListener("change", () => { aiMode = md.value; });
+    const btn = (label, kind, extra) => h("button", { class: "btn full", style: "margin-top:6px", onclick: () => aiVideoAction(kind, it, Object.assign({ prompt: aiPrompt, mode: aiMode }, extra || {})) }, label);
+    wrap.append(pr, h("label", { class: "f" }, "수정·참조 화질"), md,
+      btn("AI로 수정하기 (이 컷 바꿔치기)", "edit"), btn("움직임 참고해 새로 만들기", "ref"), btn("끝에서 이어 만들기 (5초)", "extend", { secs: 5 }), btn("재생 위치 장면으로 새로 만들기 (5초)", "frame", { secs: 5 }),
+      h("p", { class: "hint", style: "margin:8px 0 0" }, "수정·참조는 Kling O3(공식 가격이 없어 금액은 예상), 이어 만들기·장면 재생성은 Kling 3.0(1초 $0.065)입니다. 영상은 3~15.5초 컷에서 쓸 수 있고, 되돌리기로 원본을 복구할 수 있어요."));
+    return wrap;
   }
 
   // 비용 기록 (이 브라우저)
@@ -877,5 +970,5 @@
   // 시작
   renderBgmList(); renderLib(); renderPhotos(); renderFx();
   SE.ensureFonts("가나다 BUYEST").then(() => { hist.s = [snap()]; hist.i = 0; updUndo(); renderTimeline(); renderInspector(); renderSublist(); draw(); });
-  window.__rs = { ae: { analyze: aeAnalyze, apply: aeApply, subs: aeSubtitles }, get P() { return P; }, M, RS, commit, select, seekTo, play, pause, draw, get board() { return board; }, set board(v) { board = v; renderBoard(); }, addToTimeline, photos: () => photos, addPhotos };
+  window.__rs = { ae: { analyze: aeAnalyze, apply: aeApply, subs: aeSubtitles }, vai: { act: aiVideoAction, frameBlob, clipToMp4, insertClipAfter },  get P() { return P; }, M, RS, commit, select, seekTo, play, pause, draw, get board() { return board; }, set board(v) { board = v; renderBoard(); }, addToTimeline, photos: () => photos, addPhotos };
 })();
