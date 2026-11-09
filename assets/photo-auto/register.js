@@ -8,20 +8,20 @@
 'use strict';
 
 /* ---------- 엑셀 만들기/읽기 (서버 자동등록 엑셀과 같은 칸 배치: 1번 시트 D6~D11, D17~F18, D20~H20, D23~H23) ---------- */
-var CAT_CELLS=['D20','E20','F20','G20','H20'];
+var CAT_CELLS=['D20','E20','F20','G20','H20','D23','E23','F23','G23','H23'];
 function buildInfoWorkbook(XLSX,v){
   var wb=XLSX.utils.book_new(), ws={}, d={};
   function put(sheet,addr,val){ if(val===''||val==null) return; sheet[addr]={t:'s',v:String(val)}; }
   var L={C6:'브랜드',C7:'소재',C8:'원산지',C9:'키즈 동시등록(Y/N)',C10:'키즈 가격',C11:'키즈 노출(Y/N)',
     C16:'옵션',D16:'옵션명',E16:'옵션값(쉼표로 구분)',F16:'실제 입고된 옵션값(쉼표)',C17:'옵션1',C18:'옵션2',
-    C19:'카테고리',D19:'1차',E19:'2차',F19:'3차',G19:'4차',H19:'5차',C20:'카테고리1~5'};
+    C19:'카테고리',D19:'1차',E19:'2차',F19:'3차',G19:'4차',H19:'5차',C20:'카테고리1~5',D22:'6차',E22:'7차',F22:'8차',G22:'9차',H22:'10차',C23:'카테고리6~10'};
   Object.keys(L).forEach(function(a){ put(ws,a,L[a]); });
   put(ws,'D6',v.brand); put(ws,'D7',v.material); put(ws,'D8',v.origin);
   put(ws,'D9',v.kids?'Y':'N');
   if(v.kids){ put(ws,'D10',String(v.kidsPrice||'').replace(/[^0-9]/g,'')); put(ws,'D11',v.kidsShow?'Y':'N'); }
   v.tiers.forEach(function(t,i){ var r=17+i; if(!t.name) return;
     put(ws,'D'+r,t.name); put(ws,'E'+r,t.values.join(',')); put(ws,'F'+r,t.real.join(',')); });
-  v.cats.forEach(function(c,i){ if(i<5) put(ws,CAT_CELLS[i],c); });
+  v.cats.forEach(function(c,i){ if(i<10) put(ws,CAT_CELLS[i],c); });
   ws['!ref']='A1:H23';
   ws['!cols']=[{wch:2},{wch:2},{wch:22},{wch:24},{wch:30},{wch:30},{wch:30},{wch:30}];
   // 2번 시트 '상세': 서버 자동등록은 읽지 않고, 사진 자동화 툴이 정보표·실측표를 채우는 데 사용
@@ -38,7 +38,7 @@ function buildInfoWorkbook(XLSX,v){
     var g={}, tips=[['기본양식 작성 방법'],[],
       ['1번 시트(Sheet1): 브랜드·소재·원산지, 키즈 여부, 옵션, 카테고리를 D열에 적습니다. 칸 위치는 서버 자동등록 엑셀과 같으니 옮기지 마세요.'],
       ['  · 옵션: 이름(예 사이즈) / 값(쉼표로 구분, 예 S,M,L 또는 단품) / 실제 입고된 값(비우면 전부 품절 등록)'],
-      ['  · 카테고리: 사이트 카테고리 전체 경로를 1~5차 칸에 하나씩 (예 WOMEN > 지갑/벨트 > 여성용지갑)'],
+      ['  · 카테고리: 사이트 카테고리 전체 경로를 1~10차 칸에 하나씩 (예 WOMEN > 지갑/벨트 > 여성용지갑)'],
       ['2번 시트(상세): 상세페이지 정보표에 들어갈 값 — 브랜드한글, 카테고리(품목 단어), 수입여부, 제조년월, 색상, 구성품, 수납공간, 실측(한 줄).'],
       ['  · 실측이 사이즈별 표이면 "실측표" 아래 줄에 첫 줄=항목(사이즈 총장 어깨…), 다음 줄부터 사이즈별로 칸을 나눠 적습니다.'],
       ['  · 정보 항목은 상품 종류마다 다릅니다(지갑=수납공간, 의류=핏·세탁방법 등). 필요한 항목 이름을 [항목] 칸 아래에 추가해 적으면 화면의 정보 항목에 자동으로 추가됩니다. 화면에서는 ③의 템플릿으로 항목 목록을 정합니다.'],
@@ -133,7 +133,7 @@ function collect(){
     var n=$('rT'+i+'n').value.trim(), vals=sortCsv(csv($('rT'+i+'v').value)), real=sortCsv(csv($('rT'+i+'s').value));
     if(n||vals.length) tiers.push({name:n,values:vals,real:real});
   });
-  var cats=[1,2,3,4,5].map(function(i){ return $('rC'+i).value.trim(); }).filter(Boolean);
+  var cats=[1,2,3,4,5,6,7,8,9,10].map(function(i){ return $('rC'+i).value.trim(); }).filter(Boolean);
   var f=PA.readF();
   return {brand:$('rBrand').value.trim(),material:$('rMaterial').value.trim(),origin:$('rOrigin').value.trim(),
     kids:$('rKids').checked,kidsPrice:$('rKidsPrice').value.trim(),kidsShow:$('rKidsShow').checked,
@@ -150,7 +150,7 @@ function fill(v){
   if(v.kids!=null){ $('rKids').checked=!!v.kids; $('rKidsPrice').value=v.kidsPrice||''; $('rKidsShow').checked=!!v.kidsShow; }
   if(v.tiers){ [1,2].forEach(function(i){ var t=v.tiers[i-1]||{name:'',values:[],real:[]};
     $('rT'+i+'n').value=t.name||''; $('rT'+i+'v').value=sortCsv(t.values||[]).join(','); $('rT'+i+'s').value=sortCsv(t.real||[]).join(','); }); }
-  if(v.cats){ [1,2,3,4,5].forEach(function(i){ $('rC'+i).value=v.cats[i-1]||''; }); }
+  if(v.cats){ [1,2,3,4,5,6,7,8,9,10].forEach(function(i){ $('rC'+i).value=v.cats[i-1]||''; }); }
   kidsToggle(); invalidate();
 }
 function kidsToggle(){ var on=$('rKids').checked; ['rKidsPrice','rKidsShowWrap'].forEach(function(id){ $(id).style.display=on?'':'none'; }); }
@@ -295,7 +295,7 @@ function init(){
       loadHistory()
     ]);
   }).catch(function(e){ msg('서버에 연결하지 못했어요: '+e.message,'bad'); });
-  ['rBrand','rMaterial','rOrigin','rKidsPrice','rT1n','rT1v','rT1s','rT2n','rT2v','rT2s','rC1','rC2','rC3','rC4','rC5'].forEach(function(id){ $(id).addEventListener('input',invalidate); });
+  ['rBrand','rMaterial','rOrigin','rKidsPrice','rT1n','rT1v','rT1s','rT2n','rT2v','rT2s','rC1','rC2','rC3','rC4','rC5','rC6','rC7','rC8','rC9','rC10'].forEach(function(id){ $(id).addEventListener('input',invalidate); });
   [['rBrand','브랜드'],['rMaterial','소재'],['rOrigin','제조국']].forEach(function(m){ $(m[0]).addEventListener('input',function(){ PA.setField(m[1],$(m[0]).value); }); });
   $('rKids').addEventListener('change',function(){ kidsToggle(); invalidate(); });
   $('rKidsShow').addEventListener('change',invalidate);

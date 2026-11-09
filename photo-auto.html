@@ -173,7 +173,7 @@
     </div>
     <div class="grid">
       <div><label>브랜드 (사이트 브랜드와 일치해야 함)</label><input type="text" id="rBrand" list="rBrandList" placeholder="예) BURBERRY 또는 버버리"></div>
-      <div><label>소재</label><input type="text" id="rMaterial" placeholder="예) 울 100%"></div>
+      <div><label>소재</label><textarea id="rMaterial" rows="2" style="min-height:0" placeholder="예) 울 100%&#10;여러 줄이면 Enter로 줄바꿈 (내피 / 외피 등)"></textarea></div>
       <div><label>원산지</label><input type="text" id="rOrigin" placeholder="예) 이탈리아"></div>
       <div><label>옵션1 이름</label><input type="text" id="rT1n" placeholder="사이즈"></div>
       <div><label>옵션1 값 (쉼표로 구분)</label><input type="text" id="rT1v" placeholder="단품 또는 S,M,L"></div>
@@ -181,9 +181,9 @@
       <div><label>옵션2 이름 (선택)</label><input type="text" id="rT2n" placeholder="색상"></div>
       <div><label>옵션2 값</label><input type="text" id="rT2v"></div>
       <div><label>옵션2 실제 입고된 값</label><input type="text" id="rT2s"></div>
-      <div class="wide"><label>카테고리 (목록에서 선택하거나 입력 · 1개 이상)</label>
+      <div class="wide"><label>카테고리 (목록에서 선택하거나 입력 · 1개 이상, 최대 10개)</label>
         <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
-          <input type="text" id="rC1" list="rCatList" placeholder="예) WOMEN > 패션잡화"><input type="text" id="rC2" list="rCatList"><input type="text" id="rC3" list="rCatList"><input type="text" id="rC4" list="rCatList"><input type="text" id="rC5" list="rCatList">
+          <input type="text" id="rC1" list="rCatList" placeholder="예) WOMEN > 패션잡화"><input type="text" id="rC2" list="rCatList"><input type="text" id="rC3" list="rCatList"><input type="text" id="rC4" list="rCatList"><input type="text" id="rC5" list="rCatList"><input type="text" id="rC6" list="rCatList"><input type="text" id="rC7" list="rCatList"><input type="text" id="rC8" list="rCatList"><input type="text" id="rC9" list="rCatList"><input type="text" id="rC10" list="rCatList">
         </div></div>
       <div class="wide row"><label class="hint"><input type="checkbox" id="rKids"> 키즈 사이트에도 동시 등록</label>
         <input type="text" id="rKidsPrice" placeholder="키즈 판매가(숫자)" style="width:180px;display:none">
@@ -212,6 +212,7 @@
     <div class="adjrow"><label>채도 <b id="v_sat">0</b></label><input type="range" id="s_sat" min="-100" max="100" value="0"></div>
     <div class="adjrow"><label>색온도 (왼쪽 차갑게 · 오른쪽 따뜻하게) <b id="v_temp">0</b></label><input type="range" id="s_temp" min="-100" max="100" value="0"></div>
     <div class="adjrow"><label>선명도 <b id="v_sharp">0</b></label><input type="range" id="s_sharp" min="0" max="100" value="0"></div>
+    <div class="adjrow"><label>사진 크기 (100 = 칸에 꽉 채움 · 줄이면 작아져요) <b id="v_size">100</b>%</label><input type="range" id="s_size" min="30" max="100" value="100"></div>
     <div class="row" style="margin:10px 0">
       <button class="btn btn-out btn-sm" id="adjAuto" type="button">자동 보정</button>
       <button class="btn btn-out btn-sm" id="adjReset" type="button">원래대로</button>
@@ -246,7 +247,7 @@ var fieldBox=$('fields');
 var ALWAYS_SHOWN=['브랜드한글'];
 function addFieldBox(k){
   var d=document.createElement('div'); d.setAttribute('data-wrap',k);
-  var lb=document.createElement('label'); lb.textContent=k; var inp=document.createElement('input'); inp.type='text'; inp.setAttribute('data-k',k);
+  var lb=document.createElement('label'); lb.textContent=k; var inp; if(k==='소재'){ inp=document.createElement('textarea'); inp.rows=2; inp.style.minHeight='0'; inp.placeholder='여러 줄이면 Enter로 줄바꿈 (내피 / 외피 등)'; } else { inp=document.createElement('input'); inp.type='text'; } inp.setAttribute('data-k',k);
   d.appendChild(lb); d.appendChild(inp); fieldBox.appendChild(d);
 }
 FIELD_KEYS.forEach(addFieldBox);
@@ -378,8 +379,10 @@ function drawPhotos(){
 }
 
 /* ---------- 사진 색상 보정 (밝기·대비·채도·색온도·선명도) ---------- */
-var ADJ0={br:0,ct:0,sat:0,temp:0,sharp:0};
+var ADJ0={br:0,ct:0,sat:0,temp:0,sharp:0,size:100};
 function isAdj(a){ return !!a&&!!(a.br||a.ct||a.sat||a.temp||a.sharp); }
+function hasAdj(a){ return isAdj(a)||(!!a&&!!a.size&&a.size!==100); }
+function sizePct(a){ var v=a&&a.size; return (v>=30&&v<100)?v:100; }
 function adjustCanvas(c,a){
   if(!isAdj(a)) return c;
   var w=c.width,h=c.height, ctx=c.getContext('2d',{willReadFrequently:true}), im=ctx.getImageData(0,0,w,h), d=im.data, n=d.length;
@@ -419,15 +422,15 @@ function openAdj(i){
     $('adjName').textContent=(i+1)+'. '+p.file.name; $('adjBg').classList.add('on'); adjSync(); adjDraw();
   }).catch(function(e){ alert('사진을 열 수 없어요: '+e.message); });
 }
-function adjSync(){ ['br','ct','sat','temp','sharp'].forEach(function(k){ $('s_'+k).value=adjCur[k]; $('v_'+k).textContent=adjCur[k]; }); }
+function adjSync(){ ['br','ct','sat','temp','sharp','size'].forEach(function(k){ $('s_'+k).value=adjCur[k]; $('v_'+k).textContent=adjCur[k]; }); }
 function adjDraw(){
   var c=document.createElement('canvas'); c.width=adjBase.width; c.height=adjBase.height; c.getContext('2d').drawImage(adjBase,0,0);
   adjustCanvas(c,adjCur); var v=$('adjCv'); v.width=c.width; v.height=c.height; v.getContext('2d').drawImage(c,0,0);
 }
 function adjSchedule(){ if(adjRaf) return; adjRaf=requestAnimationFrame(function(){ adjRaf=0; adjDraw(); }); }
-['br','ct','sat','temp','sharp'].forEach(function(k){ $('s_'+k).addEventListener('input',function(){ adjCur[k]=parseInt($('s_'+k).value,10)||0; $('v_'+k).textContent=adjCur[k]; adjSchedule(); }); });
+['br','ct','sat','temp','sharp','size'].forEach(function(k){ $('s_'+k).addEventListener('input',function(){ adjCur[k]=parseInt($('s_'+k).value,10)||0; $('v_'+k).textContent=adjCur[k]; adjSchedule(); }); });
 $('adjReset').addEventListener('click',function(){ adjCur=Object.assign({},ADJ0); adjSync(); adjDraw(); });
-$('adjAuto').addEventListener('click',function(){ adjCur=autoAdj(adjBase); adjSync(); adjDraw(); });
+$('adjAuto').addEventListener('click',function(){ adjCur=Object.assign({size:adjCur.size},autoAdj(adjBase)); adjSync(); adjDraw(); });
 function thumbOf(p,a){
   return loadImg(p.url).then(function(im){
     var k=Math.min(1,96/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement('canvas'); c.width=Math.max(1,Math.round(im.naturalWidth*k)); c.height=Math.max(1,Math.round(im.naturalHeight*k));
@@ -435,7 +438,7 @@ function thumbOf(p,a){
     adjustCanvas(c,a); p.thumb=isAdj(a)?c.toDataURL('image/jpeg',0.8):''; });
 }
 function adjClose(all){
-  var targets=all?state.photos:[state.photos[adjIdx]], a=isAdj(adjCur)?Object.assign({},adjCur):null;
+  var targets=all?state.photos:[state.photos[adjIdx]], a=hasAdj(adjCur)?Object.assign({},adjCur):null;
   $('adjBg').classList.remove('on');
   Promise.all(targets.filter(Boolean).map(function(p){ p.adj=a?Object.assign({},a):null; return thumbOf(p,a); })).then(function(){
     drawPhotos(); $('status').textContent='보정을 바꿨어요 — "상세페이지 만들기"를 다시 눌러 반영하세요.';
@@ -524,12 +527,12 @@ function resizeFrom(src,sx,sy,sw,sh,tw,th){
   var o=document.createElement('canvas'); o.width=tw; o.height=th;
   var ox=o.getContext('2d'); ox.imageSmoothingQuality='high'; ox.drawImage(cur,0,0,tw,th); return o;
 }
-function fitPhoto(c){
+function fitPhoto(c,pct){
   var b=trimBox(c), cw=b[2]-b[0], ch=b[3]-b[1], warn='';
   var full=cw>=c.width*0.97 && ch>=c.height*0.97;
   var s=Math.min(PHOTO_MAX_W/cw, SLOT_H/ch);
   if(s>1.25){ s=1.25; warn='해상도 낮음('+cw+'px)'; }
-  var tw=Math.max(1,Math.round(cw*s)), th=Math.max(1,Math.round(ch*s));
+  if(pct&&pct<100){ s*=pct/100; full=false; } var tw=Math.max(1,Math.round(cw*s)), th=Math.max(1,Math.round(ch*s));
   return {c:resizeFrom(c,b[0],b[1],cw,ch,tw,th), w:tw, h:th, full:full, warn:warn};
 }
 function makeZoom(c){
@@ -644,10 +647,11 @@ var hasLS=('letterSpacing' in cv);
 function setFont(ctx,weight,size){ ctx.font=weight+' '+size+'px PretendardPA'; }
 function measure(s,weight,size){ setFont(cv,weight,size); if(hasLS) cv.letterSpacing='0px'; return cv.measureText(s).width; }
 function wrap(text,maxW,weight,size){
-  var lines=[],cur=''; text.split(' ').forEach(function(w){
+  var lines=[]; String(text).split(/\r?\n/).forEach(function(par){ var cur=''; par.split(' ').forEach(function(w){
     var trial=(cur+' '+w).trim();
     if(measure(trial,weight,size)<=maxW||!cur) cur=trial; else { lines.push(cur); cur=w; } });
-  if(cur) lines.push(cur); return lines.length?lines:[''];
+    if(cur) lines.push(cur); });
+  return lines.length?lines:[''];
 }
 
 function drawOp(ctx,o,dx,dy){
@@ -883,11 +887,11 @@ $('go').addEventListener('click',function(){
     function next(){
       if(i>=state.photos.length) return Promise.resolve();
       var p=state.photos[i++]; $('status').textContent='사진 처리 중… ('+i+'/'+state.photos.length+')';
-      return loadImg(p.url).then(function(im){ var c=adjustCanvas(toWhiteCanvas(im),p.adj); if($('bgwhite').checked){ var bw=whitenBackdrop(c); if(bw===2) warns.push(p.file.name+': 배경이 균일한 회색이 아니라 배경 정리를 건너뜀 — 확인'); } seq.push({name:p.file.name,c:c}); }).then(function(){ return new Promise(function(r){setTimeout(r,0);}); }).then(next);
+      return loadImg(p.url).then(function(im){ var c=adjustCanvas(toWhiteCanvas(im),p.adj); if($('bgwhite').checked){ var bw=whitenBackdrop(c); if(bw===2) warns.push(p.file.name+': 배경이 균일한 회색이 아니라 배경 정리를 건너뜀 — 확인'); } seq.push({name:p.file.name,c:c,size:sizePct(p.adj)}); }).then(function(){ return new Promise(function(r){setTimeout(r,0);}); }).then(next);
     }
     return next().then(function(){
       var items=[seq[0]].concat(seq);                       /* 메인 + 상세(메인 포함 전부) */
-      var slots=items.map(function(s){ var r=fitPhoto(s.c); if(r.warn) warns.push(s.name+': '+r.warn); return r; });
+      var slots=items.map(function(s){ var r=fitPhoto(s.c,s.size); if(r.warn) warns.push(s.name+': '+r.warn); return r; });
       if($('zoom').checked){ var z=fitPhoto(makeZoom(seq[0].c)); z.full=true; slots.push(z); }
       $('status').textContent='조립 중…';
       state.chart=chart; state.slots=slots;
