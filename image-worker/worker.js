@@ -223,6 +223,7 @@ const STORY_SYSTEM = `너는 인스타그램 릴스 전문 편집 기획자다. 
 - 나레이션·자막은 ① 사용자가 준 상품 정보 ② 사진에서 눈으로 확인되는 것(색, 모양, 후드, 고글 같은 디자인) ③ 사이즈 문의 유도 같은 일반 안내, 이 셋으로만 쓴다. 소재·보온성·기능·착용감·안전·품질·정품 보증·할인·재고처럼 입력에 없는 설명은 절대 쓰지 않는다 (예: "부드러운 소재", "튼튼한 지퍼", "안전 보장"은 금지).
 - 다른 브랜드 이름을 끌어와 비교하지 않는다. 과장·허위 표현 금지. 쓸 근거가 부족하면 나레이션을 짧게 하거나 빈 문자열로 둔다.
 - sec 합은 목표 길이의 90~105% 로 맞춘다 (목표보다 짧게 끝내지 않는다). sec 는 2~15 정수.
+- "참고 릴스 구조"가 주어지면 위의 "컷 수는 목표 길이÷6" 규칙 대신 이 규칙이 우선한다: 참고 릴스의 평균 컷 길이의 약 2배(최소 2초, 최대 6초)로 컷을 잘게 나눈다 (컷 수 최대 20). 처음 컷은 상대적으로 길게, 뒤로 갈수록 짧게 가속하고, 마무리 컷은 상품명·행동 유도로 닫는다. 같은 사진을 연달아 쓰지는 않되 다른 사진을 돌려 쓴다. 컷이 짧으면(3초 이하) 나레이션은 비우거나 아주 짧게 쓴다.
 - "참고 릴스 구조"가 주어지면 그 릴스의 리듬(컷 길이가 변하는 방식, 훅을 여는 방식, 마무리 방식)만 목표 길이에 맞게 늘려서 따른다. 참고 릴스의 장면·문구·소재를 그대로 베끼지 않는다. 참고 릴스에 나레이션이 없어도 사장님 요청에 나레이션이 필요하면 쓴다.
 - 말투: 사장님이 직접 말하듯 담백하고 구체적으로. 광고 문구 투의 상투어("지금 바로!", "놓치지 마세요")는 마지막 컷 외에는 쓰지 않는다.`;
 function extractJson(txt) {
@@ -281,7 +282,7 @@ function scrub(board, sourceText) {
   board.removed = removed; return board;
 }
 function normalizeBoard(raw, targetSec, nPhotos) {
-  const cuts = (Array.isArray(raw?.cuts) ? raw.cuts : []).slice(0, 16).map((c, i) => ({
+  const cuts = (Array.isArray(raw?.cuts) ? raw.cuts : []).slice(0, 20).map((c, i) => ({
     role: ROLES.includes(c?.role) ? c.role : i === 0 ? "hook" : "detail",
     sec: Math.min(15, Math.max(2, Math.round(Number(c?.sec) || 6))),
     photo: Math.min(nPhotos - 1, Math.max(0, Math.round(Number(c?.photo) || 0))),
@@ -344,12 +345,22 @@ export default {
         const nPhotos = Math.min(10, Math.max(1, Math.round(Number(b.photoCount) || 1)));
         const targetSec = Math.min(120, Math.max(15, Math.round(Number(b.targetSec) || 45)));
         const p = b.product || {};
+        // 레퍼런스가 있으면 컷 수와 컷별 길이(점점 짧아지는 가속)를 서버가 정해서 모델에게 지시한다 (모델이 규칙을 무시하는 일을 막음)
+        let paceLine = "";
+        if (b.reference && typeof b.reference === "object") {
+          const avg = Math.min(4, Math.max(1, Number(b.reference.avgCutSec) || 2)), N = Math.min(20, Math.max(6, Math.round(targetSec / (avg * 2))));
+          const w = Array.from({ length: N }, (_, i) => 1.6 - (1.0 * i) / Math.max(1, N - 1)), ws = w.reduce((s, x) => s + x, 0);
+          const secs = w.map((x) => Math.min(8, Math.max(2, Math.round((x * targetSec) / ws))));
+          secs[N - 1] = Math.max(2, secs[N - 1] + (targetSec - secs.reduce((s, x) => s + x, 0)));
+          paceLine = `컷 구성 지시(반드시 지킬 것): 컷은 정확히 ${N}개, 각 컷의 sec 는 순서대로 [${secs.join(",")}] 로 한다. 이 지시가 위의 컷 수 규칙보다 우선한다.`;
+        }
         const text = [
           `브랜드: ${b.brand === "kids" ? "BUYEST Kids" : "BUYEST"}${b.brandName ? ` · 상품 브랜드 ${String(b.brandName).slice(0, 60)}` : ""}`,
           `목표 길이: ${targetSec}초`, `사진 수: ${nPhotos}장 (0~${nPhotos - 1}번, 첨부된 순서)`,
           p.name ? `상품명: ${String(p.name).slice(0, 120)}` : "", p.price ? `가격: ${String(p.price).slice(0, 40)}` : "",
           p.features ? `특징:\n${String(p.features).slice(0, 600)}` : "", p.cta ? `마지막 요청: ${String(p.cta).slice(0, 80)}` : "",
           b.reference && typeof b.reference === "object" ? `참고 릴스 구조 (리듬만 참고, 장면·문구 복제 금지):\n- 원본 길이 ${Number(b.reference.durationSec) || "?"}초, 컷 ${Number(b.reference.cuts) || "?"}개 (평균 ${Number(b.reference.avgCutSec) || "?"}초)\n- 구성: ${String(b.reference.structure || "").slice(0, 400)}\n- 리듬: ${String(b.reference.pacing || "").slice(0, 200)}\n- 훅: ${String(b.reference.hook || "").slice(0, 200)}\n- 글자: ${String(b.reference.text || "").slice(0, 100)} / 소리: ${String(b.reference.audio || "").slice(0, 100)}` : "",
+          paceLine,
           `사장님 요청(릴스 프롬프트):\n${prompt}`,
         ].filter(Boolean).join("\n");
         const refs = (Array.isArray(b.images) ? b.images.slice(0, 8) : []).map((u) => { try { return parseDataUrl(u); } catch (_) { return null; } }).filter(Boolean);
