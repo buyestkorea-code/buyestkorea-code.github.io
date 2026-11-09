@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>인보이스 재고추가(경호양식)</title>
+<style>
+  @import url("assets/fonts/pretendard/pretendard.css");
+  :root{--bg:#f6f6f4;--card:#fff;--ink:#15171a;--sub:#6a6f76;--line:#e4e4e0;--pri:#15171a;--ok:#0f766e;--okbg:#ecf8f5;--warn:#a15c07;--warnbg:#fdf3e0;--bad:#b42318;--badbg:#fdeceb;--blue:#1d4ed8;--font:"Pretendard Variable","Pretendard",-apple-system,"Malgun Gothic",sans-serif;--mono:ui-monospace,"Cascadia Mono",Consolas,monospace;}
+  *{box-sizing:border-box;}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);margin:0;padding:16px;font-size:14px;}
+  h1{font-size:19px;margin:0 0 4px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
+  h1 .badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--warnbg);color:var(--warn);}
+  .lead{color:var(--sub);font-size:13px;margin:0 0 14px;line-height:1.6;}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;}
+  .step{font-size:12px;font-weight:700;color:var(--sub);margin:0 0 10px;letter-spacing:.02em;}
+  label.l{display:block;font-weight:600;font-size:13px;margin:0 0 6px;}
+  input[type=text],input[type=date],input[type=number],textarea{font:14px var(--font);padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%;}
+  textarea{min-height:120px;resize:vertical;line-height:1.5;font-family:var(--mono);font-size:13px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .hint{font-size:12px;color:var(--sub);margin-top:6px;line-height:1.55;}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .btn{font:600 14px var(--font);padding:10px 16px;border:1px solid transparent;border-radius:8px;cursor:pointer;}
+  .btn-pri{background:var(--pri);color:#fff;} .btn-out{background:#fff;color:var(--ink);border-color:var(--line);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .msg{font-size:13px;margin-top:10px;line-height:1.6;} .msg.err{color:var(--bad);font-weight:600;} .msg.ok{color:var(--ok);font-weight:600;} .msg.warn{color:var(--warn);font-weight:600;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;} th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;}
+  th{background:#fafaf8;position:sticky;top:0;z-index:1;}
+  td input{padding:5px 7px;font-size:12.5px;border-radius:6px;} td input.num{text-align:right;width:84px;} td input.mdl{font-family:var(--mono);min-width:210px;}
+  .tw{max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff;margin-top:10px;}
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;white-space:nowrap;}
+  .t-ok{background:var(--okbg);color:var(--ok);} .t-warn{background:var(--warnbg);color:var(--warn);} .t-gray{background:#efefec;color:var(--sub);}
+  .raw{font-family:var(--mono);font-size:11.5px;color:var(--sub);}
+  .note{font-size:12px;color:var(--sub);background:#fafaf8;border:1px dashed var(--line);border-radius:10px;padding:10px 14px;line-height:1.6;}
+  .dz{border:2px dashed var(--line);border-radius:12px;padding:12px 14px;transition:.15s;}
+  .dz.over{border-color:#111;background:#f3f3f3;}
+  .sec{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:8px;background:#fff;}
+  .sec b{font-variant-numeric:tabular-nums;}
+  .x{border:0;background:none;color:var(--bad);cursor:pointer;font:600 13px var(--font);}
+</style>
+</head>
+<body>
+<h1>인보이스 → 재고추가(경호) <span class="badge">TEST</span></h1>
+<p class="lead">인보이스에서 읽은 <b>품번·수량·단가</b>를 올리면, 품번을 재고추가 양식에 맞게 띄어쓰기·정리하고 <b>(경호) 양식 엑셀</b>로 내려받을 수 있어요. 사이즈·시즌·작업여부는 물류팀이 채우므로 비워 둡니다.</p>
+
+<div class="box">
+  <div class="step">① 인보이스 정보</div>
+  <div class="grid">
+    <div><label class="l" for="fDate">도착 날짜</label><input type="date" id="fDate"></div>
+    <div><label class="l" for="fVendor">거래처</label><input type="text" id="fVendor" list="vendors" placeholder="예) 쿠미니"></div>
+    <div><label class="l" for="fNo">인보이스 번호</label><input type="text" id="fNo" placeholder="예) 441"></div>
+    <div><label class="l" for="fTotal">인보이스 합계금액 (선택)</label><input type="text" id="fTotal" inputmode="decimal" placeholder="예) 5873.06"></div>
+  </div>
+  <datalist id="vendors"><option>쿠미니</option><option>스타일</option><option>다니엘</option><option>갈리아노</option><option>비니</option><option>BABY</option><option>에랄도</option><option>베네레</option><option>그루뽀킴</option><option>BEAT</option><option>우노</option><option>디오네</option><option>콜로네제</option><option>구에라</option><option>비르바스</option><option>몬티</option></datalist>
+  <div class="hint">합계금액을 넣으면 읽은 수량×단가의 합과 맞는지 바로 확인해 드려요. 틀린 줄을 찾는 가장 빠른 방법입니다.</div>
+</div>
+
+<div class="box">
+  <div class="step">② 인보이스 내용 넣기</div>
+  <div class="dz" id="dz">
+    <div class="row">
+      <button class="btn btn-out" type="button" id="pickPack">쿠미니 패킹 엑셀 올리기</button><input type="file" id="packFile" accept=".xlsx,.xls" hidden>
+      <span class="hint" style="margin:0">쿠미니는 인보이스 PDF에 품번이 없어서 <b>패킹 엑셀</b>(Article·Colour)에서 읽어요. 파일을 여기로 끌어놓아도 됩니다.</span>
+    </div>
+  </div>
+  <div class="f" style="margin-top:12px">
+    <label class="l" for="paste">또는 줄 붙여넣기 — 한 줄에 <code>품번 | 수량 | 단가</code></label>
+    <textarea id="paste" spellcheck="false" placeholder="5NE851AEFXF0002 | 3 | 546.00&#10;8078779A7026 | 1 | 191.48&#10;L2S154100019S0019V0029 | 2 | 660.96"></textarea>
+    <div class="hint">스캔본은 이미지를 읽은 결과를 이렇게 붙여넣으면 됩니다. 구분은 <code>|</code> 또는 탭(엑셀 복사)이고, 4·5번째 칸에 원산지·소재를 넣을 수도 있어요. 단가의 쉼표 소수점(<code>546,00</code>)도 알아서 바꿉니다.</div>
+  </div>
+  <div class="row"><button class="btn btn-pri" id="run">정리하기</button><button class="btn btn-out" id="clear" type="button">비우기</button></div>
+  <div class="msg" id="msg"></div>
+</div>
+
+<div class="box" id="resBox" hidden>
+  <div class="step">③ 결과 확인 — 칸을 눌러 바로 고칠 수 있어요</div>
+  <div class="row" id="summary"></div>
+  <div class="tw"><table><thead><tr><th>상태</th><th>원본</th><th>품번 (경호)</th><th>수량</th><th>단가</th><th>원산지</th><th>소재</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+  <div class="row" style="margin-top:12px"><button class="btn btn-pri" id="addSec">이 인보이스를 파일에 담기</button></div>
+  <div class="hint">같은 품번·같은 단가인 줄은 수량을 합쳐요(예: 2+2=4). 상태가 <span class="tag t-gray">원본 유지</span>인 줄은 띄어쓰기 규칙을 못 찾은 품번이라, 정답 파일과 같은 모양인지 눈으로 확인해 주세요. 알파벳 <b>O</b>와 숫자 <b>0</b>은 스캔본에서 특히 헷갈립니다.</div>
+</div>
+
+<div class="box">
+  <div class="step">④ 담은 인보이스 → 엑셀 내려받기</div>
+  <div id="secList"><div class="hint" style="margin:0">아직 담은 인보이스가 없어요.</div></div>
+  <div class="row" style="margin-top:12px"><button class="btn btn-pri" id="dl" disabled>재고추가(경호) 엑셀 내려받기</button></div>
+  <div class="msg" id="dlMsg"></div>
+</div>
+
+<div class="note">시험판입니다. 이미지(스캔본) 자동 읽기는 아직 연결하지 않았고, 읽은 결과를 붙여넣는 방식이에요. 품번 정리 규칙은 2026년 1~10월 정답 5,882행에서 배운 것으로, 처음 보는 날짜 기준 약 80%가 정답과 같은 모양이었습니다. 나머지는 위 표에서 확인하고 고쳐 주세요.</div>
+
+<script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script>
+const SHAPES = {"AAAAAAAAA/AAAAA":[15],"AAAAAAAA/AAAAA":[14],"9AA999A999A9999":[6,4,5],"AA9999AAA9A99A99AA":[8,6,4],"AA9999AAA9A99AAAAA":[8,6,4],"9999999AAA999AA999":[9,5,4],"9A99999AAA99AAA999":[9,5,4],"9A999999AA999AA999":[9,5,4],"99999999AA999AA999":[9,5,4],"AA-A999-999-9":[13],"AAAAAA99999AAA":[5,6,3],"AAAAAA999":[6,3],"AAA999AA9A999A9AAA":[13,5],"9AA999AAAA9999":[6,3,5],"9AA999AA99A9999":[6,4,5],"9AA9999AAAA9999":[6,4,5],"9AA9999A9AA9999":[6,4,5],"9A9999AAAAA9AAA":[6,4,5],"999999AAA999999":[6,5,4],"99-9999999999":[7,6],"99-A999999999":[7,6],"AA9999AAA99999A9999":[9,6,4],"AA99999AA99999A9999":[9,6,4],"9A999A999A9999":[6,3,5],"9999999":[7],"AAA999AA99A9AAA":[6,4,5],"AAA9999A9A9AA9":[6,3,5],"AAA999AA99A9AA9":[6,4,5],"9999999999":[8,2],"9999999A9999A9999":[7,5,5],"9999999A9A99A999A":[7,5,5],"A999999A9999A999A":[7,10],"9999999A9A99A9999":[7,5,5],"AAA999AAAAA9AA9":[6,4,5],"AAA9999AAA9AA9":[6,3,5],"99-99999999999":[7,7],"99-A9999999999":[7,7],"AAA99AA999A9999A":[13,3],"AAA99999A99999999999":[8,7,5],"99A999AAA99AA":[9,4],"999999999A99AA":[10,4],"AA99AA99999AA":[9,4],"AAA99AA999A99999":[13,3],"999999AA999AA":[6,3,4],"999999AAA99AA":[9,4],"999999":[6],"AAA99A999A9999":[11,3],"A9A999A9AA99":[3,3,4,2],"A9A999A9AA999":[3,3,5,2],"A9A999AAAAAAA99":[3,4,6,2],"A9A999AA9AA99":[3,3,5,2],"99-A999":[7],"99-9999":[7],"AAA999A99999999":[7,5,3],"AAAAA999":[5,3],"AAAA999":[4,3],"AAAAAAA999":[7,3],"AAAAAAA":[7],"AA9AA9999A9999A9999":[9,5,5],"9A999AAAAA-AA99A9A99":[9,6,5],"A9A9999AAAAAA99":[3,4,6,2],"AAA999AA9999999":[7,5,3],"9999999AAA9999A999":[9,5,4],"AAAAAAA9999AAA9A99":[11,3,4],"9999999AA999999":[6,5,4],"999999AAA9A9999":[6,5,4],"999999AAAA99999":[6,5,4],"9AA9999AA9A9999":[6,4,5],"9AA999AAAAA9AAA":[6,4,5],"AAAAAAA9999AAAA999":[11,3,4],"9A9A9AA9AAA9AA":[8,3,3],"9AA9999AAAA9A9A":[6,4,5],"9A9999999999999":[5,2,5,3],"9A99999999AA999":[5,2,5,3],"AA9999AAA":[6,3],"AAAA":[4],"9AA999AAA9A9999":[6,4,5],"AA999999A99999A9999":[9,6,4],"AAAAAAAA999AAA9A99":[11,3,4],"99AAAA999A999999A999":[10,7,3],"AAAAAA999A999999A999":[10,7,3],"A9A99A999999A9999A9999":[5,7,5,5],"A9A999999999A9A99A9999":[5,7,5,5],"A9A999999999A9999A9999":[5,7,5,5],"A9A999999999A99A9A9999":[5,7,5,5],"A999AA999":[9],"9A999999999A999":[5,2,5,3],"9A9999999AAA999":[5,2,5,3],"9A9999999AA9999":[5,2,5,3],"9999999A9999A999A":[7,5,5],"AAA999AAA9999999":[6,10],"AAA99AAAA9999999":[6,10],"A9A99AAAA9999999":[6,10],"A99999999AA":[11],"99AAA999A999A999":[16],"AA9A99999A9A99999":[14,3],"AAA9999A9A9":[11],"AAA999AAAA99A":[13],"9999999999999":[10,3],"A99AA9999A9999A9999":[9,5,5],"AA9AA9999A9999AA999":[9,5,5],"AAA999AAA99A":[9,3],"999A999A9999999":[12,3],"9AA999AAA999":[9,3],"A9999AAAA99A":[9,3],"9A9999AAAAA9A9A":[6,4,5],"9999999AAAA9999":[6,5,4],"9A9999A99AA9AA9":[6,4,5],"9999999A9999999":[6,5,4],"999999A9AAA9999":[6,5,4],"AA9999AAA9999":[9,4],"AA9999AAA-A999999":[13,4],"AA999999A9999":[9,4],"AA99999A9999":[8,4],"9A99999999A999A":[5,2,5,3],"9A99999999AA99A":[5,2,5,3],"9A99999999A9999":[5,2,5,3],"9A999AAAAA9999":[6,3,5],"AAAAAAAA999":[8,3],"AAAAAAAAAA999":[10,3],"9AA9999AAAA9A99":[6,4,5],"9A999AA999A9999":[6,4,5],"999999AAAAA9999":[6,5,4],"9AA999AAAAA9999":[6,4,5],"999999999999":[9,3],"9AA999AA99A999A":[6,4,5],"99999999AAA9999":[6,5,4],"9AA999AAA9A9AAA":[6,4,5],"9A9999AAA9A9AA9":[15],"A999A9A99AAA9":[13],"A999A9A9999AA":[13],"99999999999":[8,3],"AA-A999-A9":[10],"AA99AA99999":[4,5,2],"AA-A999-9":[9],"AA999999AA99999AA999":[10,5,5],"AA999999AA99999A9999":[10,5,5],"A9A999A999A99999":[16],"999999999AAAA9":[14],"AA9999AA9":[6,3],"AA9AA9999AAA9":[13],"AA9A99A9999AA":[9,4],"AAA999AAA999":[12],"A99AA9999A9999A99":[17],"A99AA999AAA":[11],"999999999A9999A99":[17],"A9999999":[8],"AA999AAA99999A9999":[8,6,4],"9A99999A999999A":[5,2,5,3],"9A9999A99AA9A9A":[6,4,5],"9A9999AA99A9AA9":[6,4,5],"AAA999AAAAA99AA":[6,4,5],"A9A99AAA9999AAAAAA":[6,8,4],"A9A99AAA9999AA99AA":[6,8,4],"AAA99999-99AAAAA":[11,5],"9999999AA999A-A999":[8,6,4],"AAA99999-999AAAAA":[12,5],"AAA9999-999AAAAA":[11,5],"AAA999999-99AAAAA":[12,5],"AAA9999-99AAAAA":[10,5],"9A99999AAA999AA999":[9,5,4],"9999999AAAA9999-A999":[9,7,4],"AA99AAA999A9A9A":[4,6,5],"AA99AAA999A9AA9":[4,6,5],"AAAAAAA999A9AA9":[4,6,5],"AAA999AA9999":[7,5],"A9999A999A9":[8,3],"A9999A99999":[8,3],"AAAAAAAAA999":[9,3],"99AAAA999999999A999":[9,7,3],"99AAAA999A999999AA99":[10,7,3],"9AA9999AAAA999A":[6,4,5],"AAAAAAAAAAAA999":[12,3],"AAA99A999A99A9":[11,3],"9A9999999AAA99":[5,2,5,2],"9A99999A9999999":[5,2,5,3],"A9A999999999A9A99A999A":[5,7,5,5],"9999AAAAA":[4,5],"9999AAAAAAAAA":[4,4,5],"9999AAA":[4,3],"9999AAAAAAA":[4,2,5],"AAA999AAAAA9AAA":[6,4,5],"AAAAAAA999AAA99":[10,5],"999AAA999AA9999999":[3,6,6,3],"9AA9999AAAA9AAA":[6,4,5],"AAA99AA9A9999999":[6,10],"AAA999A9A9999999":[6,10],"A9AAAAAA999AA999":[11,5],"A9AAAAAA99999999":[11,5],"A9AAAAAA999999":[11,3],"9999AAAAAAAAAAAAAAA":[7,12],"9999AAAAAAAAAAA":[4,11],"9999AAAAAAAAAAAAAAAAAA":[10,12],"9999AAAAAAAAAAAAAAAAAAA":[11,12],"9999AAAAAAAAAAAAAAAAA":[4,17],"9999AAAAAAAAAAAAAA":[4,14],"A999999A9999A9999":[7,5,5],"AAA99999999A9AA999":[11,3,4],"AAA99999999AAAA999":[11,3,4],"AAA99999999A99A999":[11,3,4],"A999999AAAA99A":[14],"AA9999AAA9":[10],"A9A999999AAAA99":[10,5],"A999A9999AAA99":[9,5],"AA99A999999AA":[9,4],"AAA9999999999AA999":[11,3,4],"A99999AA9":[6,3],"99AA99999999":[9,3],"9999999A99A9AA999":[7,5,5],"AAA999999A9999":[6,3,5],"999AAAAA999AA99":[15],"AAA999A99AA9A9A":[6,4,5],"999AAA9999AA999999":[18],"A9999999999":[8,3],"A999999AA99":[7,4],"AA9999999":[6,3],"AAA999AAA":[9],"999999AAA9A":[11],"99999999A99999":[7,7],"9A99999999AA":[5,2,5],"AAA999AAAA":[6,4],"AAA999AAA9":[6,4],"AAAAAA9999":[10],"AAA9999AA":[6,3],"9A9999999A9A":[5,2,5],"9A9999999AAA":[5,2,5],"AAAAAAAAAA":[10],"AAA99AA9AA9":[6,5],"AAA999AAA99":[6,5],"AAAAAAA999AA999":[10,5],"AA9999999AA999":[9,5],"AA9999999AAA99":[9,5],"9999999999A999AAA999":[8,8,4],"A9A999999999A9999A999A":[5,7,5,5],"9A999A9AAAA9999":[6,4,5],"9A999A99AA9999":[6,3,5],"9A9999999A9A99A":[5,2,5,3],"999AAAAAAAAAAAAAAAA":[3,16],"AAA999AAAA999":[13],"999999A9AA99999":[6,5,4],"A9999AAAAAA99A":[14],"AAA999AA9AA9A9A":[6,4,5],"AA9AA999999AA":[13],"AA9AA9AAA99AA":[9,4],"999999999A":[10],"999999AAA":[9],"999A999A9999":[12],"9AA999999A99AA":[9,5],"AA99AA999AAAAA":[9,5],"AA99AA999AAA":[9,3],"AA99AA999AAAA":[9,4],"9AA999A99AAA9":[9,4],"999A99A99999999":[15],"9AA9999A99A9999":[6,4,5],"AA9999A9999AA":[9,4],"A9999AAAAA":[10],"9A9999999A9A999":[5,2,5,3],"A999999AAAA999":[14],"A999999AAAA9AA":[14],"AA9999AA9999AA999":[6,6,5],"9A9999999A99999":[5,2,5,3],"A9A999999999A99A9A9A9A":[5,7,5,5],"999A99999999":[9,3],"9A999999999999A":[5,2,5,3],"A999AA999999":[9,3],"AA9AA9A9999AA":[9,4],"AA9A9999A99AA":[9,4],"A9A999999AA999":[9,5],"AA99A9999AA9999":[10,5],"AA999AAA999A":[5,7],"99999AAA999":[5,3,3],"A9A999999AAA99":[9,5],"A9999999A9AA":[7,5],"A9999999AAAA":[7,5],"A99999999AAA":[7,5],"9AAA99AAA9999":[10,3],"9AAA99AAAA999":[10,3],"AAA999AAA9A9AAA":[6,4,5],"999999AAAAA":[6,5],"AAAAAAAA":[8],"9999999AA999AA999":[8,5,4],"9A999999A999AA999":[8,5,4],"9A99999AA999AA999":[8,5,4],"9999999AAA99AAA999":[18],"AAA999999999":[6,3,3],"A9A999AAA999999":[7,6,2],"AAA999999AA999A":[6,4,5],"AAA999999AA9999":[6,4,5],"999999999A9999A999A":[9,5,5],"AAA-99999AAAAA":[9,5],"AAAAAAA999A9999":[10,5],"99999AAAA99":[8,3],"99999AAA9999AAA9999":[6,9,4],"9AA9999AA9A99AA":[6,4,5],"9AA999AAAAA999A":[6,4,5],"AA999999A9999A9999":[9,5,4],"999999AA99999999":[6,5,5],"AAAAA999999999":[8,3,3],"AAA999AA9999A999":[6,6,4],"AAAAA999A999999":[8,4,3],"AAA999A999999":[6,4,3],"AAA999AAA9999A999":[7,6,4],"9AAA9999A99AA":[9,4],"9AA999AAAA999":[9,4],"9999999AA9A9999":[6,5,4],"A9A999999999A99A9AA999":[5,7,5,5],"999999A9999AA":[9,4],"A99999":[6],"999-AAA9999-AA9999":[18],"999-AAA999-AA9999":[17],"99999":[5],"A9999":[5],"A999999":[7],"A99999999AA9":[7,5],"9999999A99A9A9999":[7,5,5],"A9999AAAAA999":[10,3],"AA999AAA999AAAA":[12,3],"99A9999A9999999":[12,3],"999A99999":[9],"A9A999999999A99A9A999A":[5,7,5,5],"9A9999999AAAA99":[5,2,5,3],"9A9A9AA9AAAA99":[8,3,3],"AAA999A99AA9AA9":[6,4,5],"9AA9999AAAA99AA":[6,4,5],"99999999A999999A999":[7,12],"A9999AAA999AAAA":[5,7,3],"99999999A99AAA999":[8,5,4],"99AA999A9999A999":[12,4],"A9999AAAAAA999":[10,4],"99A999AA999AA":[9,4],"999999999":[6,3],"9A999999A99AAA999":[8,5,4],"9A99999AA99AAA999":[8,5,4],"99AAA9999AAA9A99A99AA":[3,8,6,4],"99AAA9999AAA9A99AAAAA":[3,8,6,4],"99999999":[5,3],"99999999AA9999A999":[9,5,4],"AAAAAAA9999A9AA999":[11,3,4],"99A999A9999AA":[9,4],"999999AAAA9999":[5,5,4],"9AA9999AAA":[6,4],"AA99AA999":[9],"9999999A99AAA9999":[7,5,5],"AAA99AA":[3,4],"AA999AA":[3,4],"A99AAA9":[3,4],"A999AAA":[4,3],"9999999A999":[7,4],"9A9999999":[5,4],"A99999999":[9],"A9A9999999A9999A9999":[5,5,5,5],"A9A9999999A9999A999A":[5,5,5,5],"A9A9999999A9A99A9999":[5,5,5,5],"AA-A9999":[7,1],"999-AAA9999-AA9999999":[18,3],"999-AAA999-AA9999|999999":[21,3],"999-AAA9999-AA9999|999999":[22,3],"999AA999999A":[12],"A9A999A999A|99999999":[6,9,5],"A99999.9AAAA999":[12,3],"AA.A9999":[7,1],"A99AA999|999AAAAA":[12,5],"A99AA999|999AAA":[12,3],"A99AA999AAAAA":[8,5],"AA.AA.AAAA.A":[12],"999AAA999AA9999|999":[3,6,10],"A9A999999999A9999":[5,7,5],"A99AA9999A99999999":[9,6,3],"AAA999999":[9],"A9A999A9AA999A":[6,8],"A9A999A9AA9999":[6,6,2],"A9999999A99":[8,3],"99999999A99":[5,3,3],"A9A999999999A99AAA9999":[5,7,5,5],"9A999999999AA999":[6,2,5,3],"9A9999999A9999A":[5,2,5,3],"A99AAA9A999AAAA":[11,4],"A99AAA9A999AAAAA":[11,5],"9999999AAA99A9A999":[9,5,4],"9A99999AAA9999A999":[9,5,4],"9999999AAAA999AA999":[9,6,4],"9999AAAA":[4,4],"A9999A99A99":[8,3],"A9999A999AA":[8,3],"A99999A99A99":[9,3],"AAA99AA999A999A":[12,3],"AAA999AA9AA9AA9":[6,4,5],"A999AA9A999999":[14],"A999A99A999999":[10,4],"A999999A999999":[14],"999999999AAA9":[13],"AA999AAA9A9AAA":[5,4,5],"A9A99999999A9999A9999":[5,6,5,5],"AAA99AA999A999A9":[13,3],"9999A999999":[8,3],"AAA999999AA/AA":[9,5],"AAA999999A/AAA":[9,5],"AAA99999A/AAA":[8,5],"AAA999999AAAAA":[9,5],"AAA999999AAA":[9,3],"AAA999999AAAA":[9,4],"AA99999AA9999A999":[13,4],"AA99999AA9999A99":[13,3],"AA9AA999AA":[10],"AAA999999A999":[9,4],"AA9999999AA999A":[6,4,5],"AA9999999AA9A9A":[6,4,5],"9A9999AA9AA9A9A":[6,4,5],"9A9999AAA9A9A99":[6,4,5],"99-9999-999999":[14],"99-A999-999999":[14],"A99999A99AA9A999":[6,5,5],"A9999999A":[9],"A99999A99A99A999":[6,5,5],"A999AAA99AA9A999":[6,5,5],"A99999A99AA9A99A":[6,5,5],"9999999AAAA9999A999":[10,5,4],"AA99999AAA9999":[5,4,5],"99A9999999999":[6,7],"999999AA9999999":[6,5,4],"AAA999/A9A9999999":[17],"9A99999999AA/99A":[16],"AA99/AAAAAAAAAAAAA":[18],"AA99/AAAAAAAAAAAAAAAA":[21],"A9999/AAAAAAAAAAA":[17],"AA99/AAAAAAAAAAAA":[17],"AA99/AAAAAAAAAA":[15],"AA99/AAAAAAAAAAAAAAA":[20],"AAAAAA/AAAAAAAAAAA":[18],"AA99/AAAAAAAAAAAAAA":[19],"9999AAA/AAAAAAAAAAAAAAAA":[24],"A9/AAAAAAAAAAAAAAAA":[19],"9999999/A9999A9999":[18],"A999999/A9999A9999":[18],"9999999/A9999A999A":[18],"A999AA99999":[7,4],"AA99AA999999999":[15],"AA99AAA99999999":[15],"AA99AA99AA99999":[15],"AA999999AAA99":[8,5],"999A99A99999":[8,4],"9A99999AAA9A99":[6,3,5],"AA-A999-999AAAAA":[11,5],"AA-A999-999AAA":[11,3],"AA9999??":[6,2],"9AAA99AAAA":[10],"A99AAAA99999":[12],"99AAAA999A":[10],"AA9AA9999A9999":[9,5],"AA9AA9999A99999999":[9,6,3],"A999A99AAA9999":[10,4],"AA99A999-AAA999999":[15,3],"AAA999AAA9A9AA9":[6,4,5],"AA9AA99A9999999":[7,5,3],"999999AAAAA99999":[6,5,5],"9A9A9AA9AAAAAA":[8,3,3],"9A9A9AA9AAA99A":[8,3,3],"9A9A9A99AAA9AA":[8,3,3],"9A9A9A99AAAA99":[8,3,3],"AAA99A99999AA9A999":[11,3,4],"AAA99A9AA99AA9A999":[11,3,4],"9A9A9999AAA9AA":[8,3,3],"9999999A":[8],"999999A":[7],"A99999A99":[9],"9AA99999999":[11],"AAA99999AAAAAAA":[8,7],"AAA99999AAAAAAA/AAAA":[8,12],"AAA99999AAAAAAA/AAAAAAAAA":[8,13,4],"AAA99999AAAAAAAAAAAAA/AAAAAAA":[8,6,15],"AAA99999AAAAAAA/AAAAA":[8,13],"AAAAA999A999":[12],"AAAAA999999":[11],"AAA999AAA9999":[13],"AAA999A999":[10],"AA9A99A9999999AA":[16],"AA-A999-9999":[12],"AAAA99A999999AAA":[16],"A99999A9999A9999":[16],"AAAA99A9999999AA":[16],"AA9A99A9999999":[14],"AAAA99A9999999":[14],"A999999AAAA99":[13],"A999999AAAA9AAA":[15],"A999999AAAA999A":[15],"99AAAA9AAAAA9999":[16],"AAA999AAAAA9A9A":[6,4,5],"AAA999AA99AAAAA":[6,4,5],"AA99999AAAAAA9":[6,3,5],"A9999999A99999A9999":[9,6,4],"AAAA999AA99AAA9999":[7,4,7],"9AA9999AA9A999A":[6,4,5],"9AA9999AA9A9A9A":[6,4,5],"A9999AAA999A9A999":[5,7,5],"AAA999AAAAA99A9":[6,4,5],"AA99A9A99A9999999":[9,5,3],"99A9999AA9A9999":[6,4,5],"99AAAA999A999999":[10,6],"AA9A9999A999999":[12,3],"999999A99AAA9":[9,4],"9A9999999AA99A9":[5,2,5,3],"A9A99A999999A9A99A9999":[5,7,5,5],"AA9A99A99AAA9":[9,4],"99A999A99AAA9":[9,4],"AA999AA999A9999":[10,5],"A9A999999AAA999":[10,5],"9A99999AAA9999":[6,3,5],"9A99999AAAA9999":[6,4,5],"AAAAAAAA999AAAA99":[11,3,3],"AAAAAAA9999AAA9A9":[11,3,3],"AAAAAAA9999A9AA99":[11,3,3],"AAAAAAAA999AAA9A9":[11,3,3],"9A9999A9999":[6,5],"A99AA9999A9999":[9,5],"A99999999AA999":[9,5],"999AAA999999AAAAAAAAAAA":[13,10],"999AAA999999AAAAAAAAAAAA":[13,11],"A999AA999AAAAAAAAA":[9,9],"A999AA999AAAAA":[9,5],"A999AA999AAAA":[9,4],"99AAAA999A-999999A999":[18,3],"9999999AA9999A9999":[8,5,5],"9999999A9A99A9A99":[7,5,5],"AA-A999-999-AAA":[15],"9999999AA9A99A999A":[8,5,5],"AA-9999AAAAAA":[8,2,3],"AA-9999AAA-A":[9,3],"AA999999A99999":[9,5],"AAA999A9999999":[7,4,3],"AAAAAA99999AAAA999":[11,3,4],"9A999AAA99A9999":[6,4,5],"9999999AAAAA":[7,5],"999999AAAAAA":[6,6],"AA999AAAA9999A999":[13,4],"AA99999AA99999999":[13,4],"A9999AAAAAAAAAAAA":[5,7,5],"A9999AAAAAAAAAAA":[5,6,5],"A9999AAAAAAAAAA":[5,6,4],"A9999AAAAAAAAAAAAAA":[5,9,5],"A9999AAAAAAAA":[5,4,4],"A9999AAAAAAAAA":[5,4,5],"A9999AAAAAAAAAAAAAAA":[5,10,5],"A9999AAAAAAAAAAAAA":[5,8,5],"9999.99AAAAAAAAA":[7,4,5],"9999.99AAAAAAAAAAAAA":[7,8,5],"999.99AAAAAAAAA":[6,4,5],"9999.9AAAAAAAAAAAA":[6,7,5],"9999.99AAAAAAAAAA":[7,5,5],"9999.99AAAAAAAAAAAA":[7,7,5],"9999.99AAAAAAAAAAA":[7,6,5],"999.99AAAAAAA":[6,3,4],"999.99AAAAAAAAAAAAA":[6,8,5],"999.99AAAAAAAAAAAA":[6,8,4],"A99AAA9A99AAAAA":[10,5],"A999AA99999A":[8,4],"AAA999A9AA999999":[6,7,3],"AA999999":[8],"99AAA9A9999AA":[9,4],"AA9999AAA9AA9A99AA":[8,6,4],"AA9999AAA9A99A999AA":[8,6,5],"9AA99999AAAA9999":[7,4,5],"AA-A999-999":[11],"AAA999A-99999999":[16],"AAAA99A-99999999":[16],"A9A9999AAAAAAAA":[7,6,2],"AA99999AAA9A99AAAAA":[9,6,4],"9A9999AAAA9999":[6,3,5],"9A999AA99A9999":[6,3,5],"AAA99A/AAA9999999":[17],"AAA999/AAA9999999":[17],"9AA999AAA":[6,3],"9AA999A99":[6,3],"9AA999AA9":[6,3],"9AA999A9A":[6,3],"9A999AAAA":[6,3],"9A999AA99":[6,3],"9AA9999A99":[6,4],"9A999AA999":[6,4],"9AA999A999":[6,4],"9AA999AAAA":[6,4],"9AA999AA99":[6,4],"9A99999A9AAA999":[5,2,5,3],"9A99999999AAA99":[5,2,5,3],"A9AAAAAA9999999":[11,4],"99-A99999999999":[8,7],"9AA999AAAAA9A99":[6,4,5],"AA9999AAA-A9999999A9999":[13,6,4],"9999999AAA":[7,3],"AA99999AAAAAA9AAAAA":[9,6,4],"AA9999AAAAAA9AAAAA":[8,6,4],"AAA9999AAA9AA9AAAAA":[9,6,4],"A9A999AAA9AA99":[8,4,2],"A9A999AAA999A99":[7,6,2],"A9A999A9AA9A":[6,4,2],"A9A999AAA9AA9999":[8,6,2],"A9A999AAA99999":[7,5,2],"A9A999999999A99A9A9A99":[5,7,5,5],"AAA999A9AAA9A9A":[6,4,5],"9A9999AAAA9A99":[6,3,5],"AAA999A9AAA9AA9":[6,4,5],"AAA9999999999":[6,3,4],"9999AAAA999":[8,3],"A99999999999A9999A9999":[5,7,5,5],"A99999999999A9A99A9999":[5,7,5,5],"A9A99A999999A99A9A9999":[5,7,5,5],"A9A99A999999A99A9A9A99":[5,7,5,5],"AA99999AA999999999":[9,5,4],"A99A999999A9A99A9999":[10,5,5],"AAAAAAAAAAAAAAAA":[6,10],"A9999AAAAAAAAAAAAAAAAA":[5,17],"A9999AAAAAAAAAAAAAAAAAA":[5,18],"AAAAAAAAAAAAAAA":[6,9],"99AAAAAAAAAAAAAAAAAAAAA":[5,18],"9999AAAAAAAA":[4,8],"9999AAAAAAAAAA":[4,10],"9999AAAAAAAAAAAAAAAA":[4,16],"9999AAAAAA":[4,6],"AAA999AAAAA9999":[6,4,5],"9999999AA99AAA999":[8,5,4],"9999999999A999A999":[8,6,4],"9999999A99A999A999":[8,6,4],"999999AA99A999A999":[8,6,4],"AAAAA99AA99999999":[13,4],"AAAAA99AA9999A999":[13,4],"AA999AAAA999":[12],"AA999AAAAA999":[13],"AA999AAA999":[11],"AA999AAA9999":[12],"AA999AAAAA99":[12],"AAAAAAAA999AAAA999":[11,3,4],"AAA999AA99999999":[7,5,4],"A99999A9999AA":[9,4],"A9A999A9AAA99":[3,3,5,2],"A9A99A999999A99A9A9A9A":[5,7,5,5],"9999999AAAA":[7,4],"A999A9AAA9A9999":[6,5,4],"99A9999999A999":[10,4],"AA999999A999999999":[9,5,4]};
+const HAND = [{"name":"L2S 4부","regex":"^(L[12]S\\w\\w)(\\w{7})(S\\w{4})(V\\w{4})$"},{"name":"프라다계 8+6+4","regex":"^([A-Z]{2}\\d{4}[A-Z]{2})([A-Z]\\d[A-Z]\\d{2}[A-Z])(\\w{4})$"},{"name":"20CM 10+7+3","regex":"^(\\d{2}[A-Z]{4}\\d{3}[A-Z])(\\d{6}[A-Z])(\\d{3})$"},{"name":"RC 10+7+3","regex":"^([A-Z]{6}\\d{3}[A-Z])(\\d{6}[A-Z])(\\d{3})$"},{"name":"L10xxx 접두 제거 5+2+5+3","regex":"^L1\\d{3}(\\d[A-Z]\\d{3})(\\d{2})(\\w{5})(\\d{3})$"},{"name":"5+2+5+3","regex":"^(\\d[A-Z]\\d{3})(\\d{2})(\\w{5})(\\d{3})$"},{"name":"8+7+5 (GWF류)","regex":"^([A-Z]{3}\\d{5})([A-Z]\\d{6})(\\d{5})$"},{"name":"6+4+5 (F00xx)","regex":"^(\\w{6})(\\w{4})(F\\d{4})$"},{"name":"9+5+4","regex":"^(\\d{7}[A-Z]{2})([A-Z]\\d{3}\\w)([A-Z]\\d{3})$"},{"name":"NN-XXXX 6~7","regex":"^(\\d{2}-\\w{4})(\\d{6,7})$"},{"name":"10+3","regex":"^(\\d{10})(\\d{3})$"},{"name":"9+3","regex":"^(\\d{9})(\\d{3})$"},{"name":"7자리+색상 제거","regex":"^(\\d{7})[A-Z]\\d{4}$"},{"name":"B126AC 9+3","regex":"^([A-Z]\\d{3}[A-Z]{2}\\d{3})(\\d{3})$"},{"name":"8+2","regex":"^(\\d{8})(\\d{2})$"},{"name":"S26001 6+5","regex":"^([A-Z]\\d{5})(\\d{3}[A-Z]{2})$"},{"name":"6+5+4 (3G001)","regex":"^(\\d{6})(\\d[A-Z]\\d{3})(\\d{4})$"},{"name":"9+3 (710P)","regex":"^(\\d{3}[A-Z]\\d{5})(\\d{3})$"},{"name":"6+5+4 (알파)","regex":"^(\\d{6})([A-Z]{5})(\\d{4})$"},{"name":"품번+색상명","regex":"^(\\d{4,6})([A-Z]{3,})$"},{"name":"PI0046 9+6+4","regex":"^([A-Z]{2}\\d{4}[A-Z]{3})(\\d{5}[A-Z])(\\d{4})$"},{"name":"FJT 7+5+3","regex":"^([A-Z]{3}\\d{3}[A-Z])(\\d{5})(\\d{3})$"},{"name":"6+3+5 (ASK)","regex":"^(\\d[A-Z]{2}\\d{3})([A-Z]{3})(F\\d{4})$"},{"name":"COHIZ 5+6+3","regex":"^([A-Z]{5})([A-Z]\\d{5})([A-Z]{3})$"},{"name":"S6MSJGSH 11+3","regex":"^([A-Z]\\d[A-Z]{4,6}\\d{3})(\\d{3})$"},{"name":"7+5+5","regex":"^(\\d{7})(S\\w{4})(V\\w{4})$"},{"name":"6+3","regex":"^(\\d{6})(\\d{3})$"},{"name":"OW06109 13+4","regex":"^([A-Z]{2}\\w{5}[A-Z]{2}\\d{4})([A-Z]\\d{3})$"},{"name":"L1/숫자+P68","regex":"^(L?\\d{7,8})([A-Z]\\d{2})$"}].map(r => ({name:r.name, rx:new RegExp(r.regex)}));
+const DESC_WORDS = /\s+(BORSA|BORSE|SCIARPE|SCIARPA|GILET|T-SHIRT|TSHIRT|STIVALETTI|STIVALI|SANDALI|GIUBBINI|GIUBBINO|FELPA|FELPE|CAPPELLI|CAPPELLO|PORTACHIAVI|SCARPE|COAT|SCARF|JACKET|CAMICIA|PANTALONI|GONNA|ABITO|MAGLIA|CINTURA|GUANTI|OCCHIALI|PELLETTERIA)\s*$/i;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let rows = [];      // 현재 정리 결과
+let sections = [];  // 담은 인보이스
+
+function shapeOf(c){ return c.replace(/[0-9]/g,'9').replace(/[A-Z]/g,'A'); }
+
+// 품번 정리: [결과, 상태, 설명]
+function normModel(raw){
+  let s = String(raw||'').trim().toUpperCase().replace(DESC_WORDS,'');
+  let c = s.replace(/\s+/g,'');
+  if(!c) return ['', 'asis', ''];
+  let fix='';
+  if(/^\d{7}O[A-Z]/.test(c)){ c = c.replace(/^(\d{7})O/,'$10'); fix='O→0 보정'; }   // 다니엘 5115002OW… → 51150020W…
+  const FIRST = ['7자리+색상 제거','L1/숫자+P68'];
+  for(const h of HAND){
+    if(FIRST.indexOf(h.name)<0) continue;
+    const m=c.match(h.rx);
+    if(m) return [m.slice(1).join(' '), fix?'fix':'rule', fix||h.name];
+  }
+  const lens = SHAPES[shapeOf(c)];
+  if(lens){ let i=0; const out=[]; for(const L of lens){ out.push(c.slice(i,i+L)); i+=L; } return [out.join(' '), fix?'fix':'rule', fix||'형태 학습']; }
+  for(const h of HAND){
+    const m = c.match(h.rx);
+    if(m) return [m.slice(1).join(' '), fix?'fix':'rule', fix||h.name];
+  }
+  return [s.replace(/\s+/g,' '), 'asis', '규칙 없음'];
+}
+
+function toNum(x){
+  if(typeof x==='number') return x;
+  let t = String(x==null?'':x).replace(/[€$\s]/g,'');
+  if(!t) return NaN;
+  const lc=t.lastIndexOf(','), ld=t.lastIndexOf('.');
+  if(lc>ld) t = t.replace(/\./g,'').replace(',','.');     // 1.638,00 / 546,00 (유럽식)
+  else t = t.replace(/,/g,'');                            // 1,638.00 / 2538.80
+  return parseFloat(t);
+}
+
+function parsePaste(text){
+  const out=[], bad=[];
+  text.split(/\r?\n/).forEach((ln,i)=>{
+    ln = ln.trim(); if(!ln) return;
+    let parts;
+    if(/[|\t]/.test(ln)) parts = ln.split(/\s*[|\t]\s*/);
+    else { const m = ln.match(/^(.+?)\s+(\d+)\s+([\d.,]+)$/); parts = m ? [m[1],m[2],m[3]] : null; }
+    if(!parts || parts.length<3){ bad.push(i+1); return; }
+    const q = toNum(parts[1]), p = toNum(parts[2]);
+    if(!isFinite(q)||!isFinite(p)){ bad.push(i+1); return; }
+    out.push({raw:parts[0].trim(), qty:q, price:p, origin:(parts[3]||'').trim(), mat:(parts[4]||'').trim()});
+  });
+  return {out,bad};
+}
+
+// 쿠미니 패킹 엑셀
+function parsePacking(ws){
+  const aoa = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  const out=[]; let total=0;
+  for(const r of aoa){
+    let ai=-1;
+    for(let i=0;i<r.length;i++){ const v=r[i]; if(v!=null && /^\d{12,13}$/.test(String(v).trim().replace(/\.0$/,''))){ ai=i; break; } }
+    if(ai<0) continue;
+    const art = String(r[ai]).trim().replace(/\.0$/,'');
+    let col=null; for(let j=ai+1;j<r.length;j++){ if(r[j]!=null && String(r[j]).trim()!==''){ col=String(r[j]).trim(); break; } }
+    if(col==null) continue;
+    if(/^\d{1,3}$/.test(col)) col = col.padStart(3,'0');
+    let qty=null; for(let j=0;j<ai;j++){ if(typeof r[j]==='number'){ qty=r[j]; break; } }
+    const nums=[]; for(let j=ai+1;j<r.length;j++) if(typeof r[j]==='number') nums.push(r[j]);
+    if(qty==null || nums.length<2) continue;
+    const unit = nums[nums.length-2], tot = nums[nums.length-1];
+    out.push({raw:art.slice(0,art.length-3)+' '+col, qty, price:Math.round(unit*100)/100, origin:'', mat:''});
+    total += tot;
+  }
+  return {out,total:Math.round(total*100)/100};
+}
+
+function build(items){
+  const merged=[];
+  for(const it of items){
+    const [m,st,why]=normModel(it.raw);
+    const key=m+'|'+it.price;
+    const ex=merged.find(x=>x.key===key);
+    if(ex){ ex.qty+=it.qty; ex.merged=true; ex.raws.push(it.raw); }
+    else merged.push({key,model:m,st,why,qty:it.qty,price:it.price,origin:it.origin,mat:it.mat,raws:[it.raw],merged:false});
+  }
+  return merged;
+}
+
+function render(){
+  $('resBox').hidden = rows.length===0;
+  $('tb').innerHTML = rows.map((r,i)=>{
+    const tag = r.st==='rule' ? `<span class="tag t-ok" title="${esc(r.why)}">규칙 적용</span>` : r.st==='fix' ? `<span class="tag t-warn" title="${esc(r.why)}">${esc(r.why)}</span>` : `<span class="tag t-gray">원본 유지</span>`;
+    const mg = r.merged ? ` <span class="tag t-warn">합산 ${r.raws.length}줄</span>` : '';
+    return `<tr data-i="${i}"><td>${tag}${mg}</td><td class="raw">${esc(r.raws.join(' / '))}</td>
+      <td><input class="mdl" data-f="model" value="${esc(r.model)}"></td>
+      <td><input class="num" data-f="qty" value="${r.qty}"></td>
+      <td><input class="num" data-f="price" value="${r.price}"></td>
+      <td><input class="num" data-f="origin" value="${esc(r.origin)}" style="width:80px"></td>
+      <td><input class="num" data-f="mat" value="${esc(r.mat)}" style="width:100px"></td>
+      <td><button class="x" data-del="${i}" type="button">삭제</button></td></tr>`;
+  }).join('');
+  summary();
+}
+function sums(){ let q=0,a=0; rows.forEach(r=>{ const n=+r.qty,p=+r.price; if(isFinite(n)){q+=n; if(isFinite(p)) a+=n*p;} }); return {q,a:Math.round(a*100)/100}; }
+function summary(){
+  const s=sums(); const tot=toNum($('fTotal').value);
+  let chk='';
+  if(isFinite(tot)){
+    const diff=Math.round((s.a-tot)*100)/100;
+    chk = Math.abs(diff)<=0.05*Math.max(1,rows.length) ? `<span class="msg ok" style="margin:0">합계 일치 (차이 ${diff})</span>` : `<span class="msg err" style="margin:0">합계가 달라요: 읽은 값 ${s.a.toLocaleString()} ↔ 인보이스 ${tot.toLocaleString()} (차이 ${diff}) — 수량·단가를 다시 확인하세요</span>`;
+  }
+  $('summary').innerHTML = `<span class="tag t-gray">${rows.length}줄</span><span class="tag t-gray">수량 합 ${s.q}</span><span class="tag t-gray">금액 합 ${s.a.toLocaleString()}</span>${chk}`;
+}
+
+$('tb').addEventListener('input',e=>{
+  const tr=e.target.closest('tr'); if(!tr) return; const r=rows[+tr.dataset.i], f=e.target.dataset.f;
+  if(f==='model'){ r.model=e.target.value; r.st='rule'; r.why='직접 수정'; }
+  else if(f==='qty'||f==='price'){ r[f]=toNum(e.target.value); }
+  else r[f]=e.target.value;
+  summary();
+});
+$('tb').addEventListener('click',e=>{ const d=e.target.dataset.del; if(d!=null){ rows.splice(+d,1); render(); } });
+$('fTotal').addEventListener('input',()=>{ if(rows.length) summary(); });
+
+$('run').onclick=()=>{
+  const {out,bad}=parsePaste($('paste').value);
+  if(!out.length){ $('msg').className='msg err'; $('msg').textContent = bad.length? `읽을 수 있는 줄이 없어요. "품번 | 수량 | 단가" 모양인지 확인해 주세요. (문제 줄: ${bad.slice(0,8).join(', ')})` : '붙여넣은 내용이 없어요.'; return; }
+  rows=build(out); render();
+  $('msg').className = bad.length?'msg warn':'msg ok';
+  $('msg').textContent = `${out.length}줄을 읽어 ${rows.length}줄로 정리했어요.` + (bad.length?` 읽지 못한 줄: ${bad.slice(0,8).join(', ')}번`:'');
+};
+$('clear').onclick=()=>{ $('paste').value=''; rows=[]; render(); $('msg').textContent=''; };
+
+function loadPacking(file){
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const wb=XLSX.read(fr.result,{type:'array'}); let res=null;
+      for(const n of wb.SheetNames){ const p=parsePacking(wb.Sheets[n]); if(p.out.length){ res=p; break; } }
+      if(!res){ $('msg').className='msg err'; $('msg').textContent='패킹 엑셀에서 Article(품번) 줄을 찾지 못했어요. 쿠미니 패킹 파일이 맞는지 확인해 주세요.'; return; }
+      $('paste').value = res.out.map(o=>`${o.raw} | ${o.qty} | ${o.price}`).join('\n');
+      if(!$('fVendor').value) $('fVendor').value='쿠미니';
+      const m=file.name.match(/(\d{2,5})\s*패킹/); if(m && !$('fNo').value) $('fNo').value=m[1];
+      if(!$('fTotal').value) $('fTotal').value=String(res.total);
+      rows=build(res.out); render();
+      $('msg').className='msg ok'; $('msg').textContent=`패킹 엑셀에서 ${res.out.length}줄을 읽었어요. 합계금액 ${res.total.toLocaleString()}도 채웠습니다.`;
+    }catch(err){ $('msg').className='msg err'; $('msg').textContent='엑셀을 읽지 못했어요: '+err.message; }
+  };
+  fr.readAsArrayBuffer(file);
+}
+$('pickPack').onclick=()=>$('packFile').click();
+$('packFile').onchange=e=>{ if(e.target.files[0]) loadPacking(e.target.files[0]); e.target.value=''; };
+const dz=$('dz');
+['dragover','dragenter'].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();dz.classList.add('over');}));
+['dragleave','drop'].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();dz.classList.remove('over');}));
+dz.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) loadPacking(f); });
+
+// ---- 담기 / 내려받기 ----
+function fmtDate(v){ return v? v.replace(/-/g,'.') : ''; }
+$('addSec').onclick=()=>{
+  const date=fmtDate($('fDate').value), vendor=$('fVendor').value.trim(), no=$('fNo').value.trim();
+  if(!date||!vendor){ $('msg').className='msg err'; $('msg').textContent='날짜와 거래처를 먼저 넣어 주세요.'; window.scrollTo(0,0); return; }
+  const items=rows.filter(r=>r.model && isFinite(+r.qty));
+  if(!items.length){ return; }
+  sections.push({title:[date,vendor,no].filter(Boolean).join(' '), items:items.map(r=>({model:r.model,qty:+r.qty,price:isFinite(+r.price)?+r.price:0,origin:r.origin,mat:r.mat}))});
+  rows=[]; $('paste').value=''; $('fNo').value=''; $('fTotal').value=''; render(); $('msg').className='msg ok'; $('msg').textContent='파일에 담았어요. 다음 인보이스를 이어서 넣을 수 있어요.'; drawSecs();
+};
+function drawSecs(){
+  $('secList').innerHTML = sections.length ? sections.map((s,i)=>`<div class="sec"><span><b>${esc(s.title)}</b> · ${s.items.length}줄 · 수량 ${s.items.reduce((a,b)=>a+b.qty,0)}</span><button class="x" data-rm="${i}" type="button">빼기</button></div>`).join('') : '<div class="hint" style="margin:0">아직 담은 인보이스가 없어요.</div>';
+  $('dl').disabled = !sections.length;
+}
+$('secList').addEventListener('click',e=>{ const d=e.target.dataset.rm; if(d!=null){ sections.splice(+d,1); drawSecs(); } });
+
+// (경호) 양식: 제목 2줄 병합, 특이사항/컨트롤자, 헤더, 품목(W=SUM(E:V), Y=X*W), 합계줄
+$('dl').onclick=()=>{
+  const ws={}, merges=[]; let r=2;
+  const put=(a,v,f)=>{ ws[a]= f? {t:'n',f:f} : (typeof v==='number'?{t:'n',v}:{t:'s',v:String(v)}); };
+  let maxRow=1;
+  for(const s of sections){
+    put('A'+r, s.title); merges.push({s:{r:r-1,c:0},e:{r:r,c:3}});
+    put('E'+r,'* 특이사항'); put('E'+(r+1),'컨트롤자 : ');
+    const h=r+3;
+    [['A','BRAND'],['B','BRAND'],['C','INV. QTY'],['D','MODEL'],['E','TU'],['W','TOTAL'],['X','UNIT PRICE'],['Y','EXTENDED PRICE '],['Z','시즌'],['AA','작업여부'],['AB','원산지'],['AC','소재'],['AD','비고'],['AE','비고']].forEach(([c,t])=>put(c+h,t));
+    let row=h+1; const first=row;
+    for(const it of s.items){
+      put('C'+row,it.qty); put('D'+row,it.model);
+      put('W'+row,null,`SUM(E${row}:V${row})`); put('X'+row,it.price); put('Y'+row,null,`X${row}*W${row}`);
+      if(it.origin) put('AB'+row,it.origin); if(it.mat) put('AC'+row,it.mat);
+      row++;
+    }
+    row++; // 빈 줄
+    put('C'+row,null,`SUM(C${first}:C${row-1})`); put('W'+row,null,`SUM(W${first}:W${row-1})`); put('Y'+row,null,`SUM(Y${first}:Y${row-1})`);
+    maxRow=row; r=row+6;
+  }
+  ws['!ref']='A1:AE'+(maxRow+2); ws['!merges']=merges;
+  ws['!cols']=[{wch:9},{wch:9},{wch:9},{wch:26},{wch:5}].concat(Array(17).fill({wch:4})).concat([{wch:9},{wch:11},{wch:15},{wch:11},{wch:10},{wch:11},{wch:11},{wch:10},{wch:10}]);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
+  const d=($('fDate').value||new Date().toISOString().slice(0,10)).replace(/-/g,'.');
+  const name=(sections[0].title.split(' ')[0]||d)+' 재고추가(경호).xlsx';
+  XLSX.writeFile(wb,name);
+  $('dlMsg').className='msg ok'; $('dlMsg').textContent=name+' 을 내려받았어요. (계산식은 엑셀에서 열면 자동으로 계산돼요)';
+};
+
+(function(){ const t=new Date(); $('fDate').value=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); })();
+</script>
+</body>
+</html>
