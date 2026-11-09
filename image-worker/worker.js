@@ -222,7 +222,8 @@ const STORY_SYSTEM = `너는 인스타그램 릴스 전문 편집 기획자다. 
 - 사진은 가능한 한 모두 한 번 이상 쓰고, 같은 사진을 연달아 쓰지 않는다. photo 는 주어진 사진 수 범위 안.
 - 나레이션·자막은 ① 사용자가 준 상품 정보 ② 사진에서 눈으로 확인되는 것(색, 모양, 후드, 고글 같은 디자인) ③ 사이즈 문의 유도 같은 일반 안내, 이 셋으로만 쓴다. 소재·보온성·기능·착용감·안전·품질·정품 보증·할인·재고처럼 입력에 없는 설명은 절대 쓰지 않는다 (예: "부드러운 소재", "튼튼한 지퍼", "안전 보장"은 금지).
 - 다른 브랜드 이름을 끌어와 비교하지 않는다. 과장·허위 표현 금지. 쓸 근거가 부족하면 나레이션을 짧게 하거나 빈 문자열로 둔다.
-- sec 합은 목표 길이의 90~105% 로 맞춘다 (목표보다 짧게 끝내지 않는다).
+- sec 합은 목표 길이의 90~105% 로 맞춘다 (목표보다 짧게 끝내지 않는다). sec 는 2~15 정수.
+- "참고 릴스 구조"가 주어지면 그 릴스의 리듬(컷 길이가 변하는 방식, 훅을 여는 방식, 마무리 방식)만 목표 길이에 맞게 늘려서 따른다. 참고 릴스의 장면·문구·소재를 그대로 베끼지 않는다. 참고 릴스에 나레이션이 없어도 사장님 요청에 나레이션이 필요하면 쓴다.
 - 말투: 사장님이 직접 말하듯 담백하고 구체적으로. 광고 문구 투의 상투어("지금 바로!", "놓치지 마세요")는 마지막 컷 외에는 쓰지 않는다.`;
 function extractJson(txt) {
   const s = String(txt || ""); const a = s.indexOf("{"), b = s.lastIndexOf("}");
@@ -282,7 +283,7 @@ function scrub(board, sourceText) {
 function normalizeBoard(raw, targetSec, nPhotos) {
   const cuts = (Array.isArray(raw?.cuts) ? raw.cuts : []).slice(0, 16).map((c, i) => ({
     role: ROLES.includes(c?.role) ? c.role : i === 0 ? "hook" : "detail",
-    sec: Math.min(15, Math.max(3, Math.round(Number(c?.sec) || 6))),
+    sec: Math.min(15, Math.max(2, Math.round(Number(c?.sec) || 6))),
     photo: Math.min(nPhotos - 1, Math.max(0, Math.round(Number(c?.photo) || 0))),
     mode: c?.mode === "photo" ? "photo" : "ai",
     motion: String(c?.motion || "Slow cinematic push-in with gentle natural motion.").slice(0, 400),
@@ -292,7 +293,7 @@ function normalizeBoard(raw, targetSec, nPhotos) {
   if (cuts.length < 2) throw new HttpError(502, "스토리보드에 컷이 부족합니다. 다시 시도해 주세요.");
   // 총 길이가 목표의 90~105% 밖이면 컷 길이를 비례해서 맞춘다 (컷당 3~15초 안에서)
   const sum = cuts.reduce((s, c) => s + c.sec, 0);
-  if (sum < targetSec * 0.9 || sum > targetSec * 1.05) { const k = targetSec / sum; cuts.forEach((c) => { c.sec = Math.min(15, Math.max(3, Math.round(c.sec * k))); }); }
+  if (sum < targetSec * 0.9 || sum > targetSec * 1.05) { const k = targetSec / sum; cuts.forEach((c) => { c.sec = Math.min(15, Math.max(2, Math.round(c.sec * k))); }); }
   return { hook: String(raw?.hook || "").slice(0, 40), mood: MOODS.includes(raw?.mood) ? raw.mood : "bright", cuts, targetSec };
 }
 
@@ -348,6 +349,7 @@ export default {
           `목표 길이: ${targetSec}초`, `사진 수: ${nPhotos}장 (0~${nPhotos - 1}번, 첨부된 순서)`,
           p.name ? `상품명: ${String(p.name).slice(0, 120)}` : "", p.price ? `가격: ${String(p.price).slice(0, 40)}` : "",
           p.features ? `특징:\n${String(p.features).slice(0, 600)}` : "", p.cta ? `마지막 요청: ${String(p.cta).slice(0, 80)}` : "",
+          b.reference && typeof b.reference === "object" ? `참고 릴스 구조 (리듬만 참고, 장면·문구 복제 금지):\n- 원본 길이 ${Number(b.reference.durationSec) || "?"}초, 컷 ${Number(b.reference.cuts) || "?"}개 (평균 ${Number(b.reference.avgCutSec) || "?"}초)\n- 구성: ${String(b.reference.structure || "").slice(0, 400)}\n- 리듬: ${String(b.reference.pacing || "").slice(0, 200)}\n- 훅: ${String(b.reference.hook || "").slice(0, 200)}\n- 글자: ${String(b.reference.text || "").slice(0, 100)} / 소리: ${String(b.reference.audio || "").slice(0, 100)}` : "",
           `사장님 요청(릴스 프롬프트):\n${prompt}`,
         ].filter(Boolean).join("\n");
         const refs = (Array.isArray(b.images) ? b.images.slice(0, 8) : []).map((u) => { try { return parseDataUrl(u); } catch (_) { return null; } }).filter(Boolean);

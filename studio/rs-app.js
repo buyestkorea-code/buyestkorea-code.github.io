@@ -392,7 +392,8 @@
     const target = Number($("#targetSec").value);
     try {
       const images = []; for (const id of photos.slice(0, 6)) images.push(await smallJpegUrl(M[id], 512));
-      const d = await api(LOOK, "/api/storyboard", { method: "POST", body: { prompt, brand, brandName: $("#brandName").value.trim(), targetSec: target, photoCount: photos.length, images, product: { name: $("#productName").value.trim(), price: $("#price").value.trim(), features: $("#features").value.trim(), cta: $("#cta").value.trim() } } });
+      const ref = currentRef();
+      const d = await api(LOOK, "/api/storyboard", { method: "POST", body: { reference: ref ? { name: ref.name, durationSec: ref.durationSec, cuts: ref.cuts, avgCutSec: ref.avgCutSec, structure: ref.structure, pacing: ref.pacing, hook: ref.hook, text: ref.text, audio: ref.audio } : undefined, prompt, brand, brandName: $("#brandName").value.trim(), targetSec: target, photoCount: photos.length, images, product: { name: $("#productName").value.trim(), price: $("#price").value.trim(), features: $("#features").value.trim(), cta: $("#cta").value.trim() } } });
       board = d.board; msg.textContent = `컷 ${board.cuts.length}개를 짰어요 (${d.provider}). 아래에서 마음대로 고치세요.`;
     } catch (e) {
       board = localBoard(target); msg.textContent = `AI 기획을 쓰지 못해 기본 구성으로 만들었어요 (${e.message}). 아래에서 직접 고치세요.`; msg.className = "hint warn";
@@ -400,6 +401,16 @@
     if (board.mood) $("#bgmMood").value = board.mood;
     btn.disabled = false; renderBoard();
   }
+  // 바이럴 레퍼런스: studio/viral-ref.json (HasData 조회 + ffmpeg 구조 분석 결과)
+  let REFS = [];
+  const currentRef = () => REFS.find((r) => r.id === $("#refSel").value) || null;
+  function renderRefInfo() {
+    const r = currentRef(), box = $("#refInfo");
+    if (!r) { box.textContent = REFS.length ? `분석된 레퍼런스 ${REFS.length}개 · 고르면 그 릴스의 컷 리듬을 스토리보드에 반영합니다 (장면·문구는 베끼지 않음).` : ""; return; }
+    box.innerHTML = `${esc(r.source)} · ${r.durationSec}초 · 컷 ${r.cuts}개 (평균 ${r.avgCutSec}초) · 좋아요 ${r.metrics.likes}<br>${esc(r.pacing)}<br><a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--gold2)">원본 릴스 보기</a>`;
+  }
+  fetch("viral-ref.json", { cache: "no-store" }).then((r) => r.json()).then((d) => { REFS = d.refs || []; $("#refSel").innerHTML = `<option value="">쓰지 않음</option>` + REFS.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join(""); renderRefInfo(); }).catch(() => {});
+  $("#refSel").addEventListener("change", renderRefInfo);
   async function smallJpegUrl(m, max) {
     const el = m.el, s = Math.min(1, max / Math.max(el.width, el.height)), c = document.createElement("canvas"); c.width = Math.round(el.width * s); c.height = Math.round(el.height * s);
     c.getContext("2d").drawImage(el, 0, 0, c.width, c.height); return c.toDataURL("image/jpeg", 0.8);
@@ -415,7 +426,7 @@
       sel2.addEventListener("change", () => { c.photo = Number(sel2.value); renderBoard(); });
       const mode = h("select", {}, h("option", { value: "ai", selected: c.mode === "ai" }, "AI 영상"), h("option", { value: "photo", selected: c.mode === "photo" }, "사진 효과"));
       mode.addEventListener("change", () => { c.mode = mode.value; renderBoard(); });
-      const sec = h("input", { type: "number", min: 3, max: 30, step: 1, value: c.sec }); sec.addEventListener("change", () => { c.sec = clamp(Number(sec.value) || 5, 3, 30); updCost(); });
+      const sec = h("input", { type: "number", min: 2, max: 30, step: 1, value: c.sec }); sec.addEventListener("change", () => { c.sec = clamp(Number(sec.value) || 5, 2, 30); updCost(); });
       const mo = h("textarea", { rows: 2, placeholder: "움직임 (영어)" }); mo.value = c.motion; mo.addEventListener("input", () => { c.motion = mo.value; });
       const na = h("textarea", { rows: 2, placeholder: "나레이션 (한국어, 비우면 소리 없음)" }); na.value = c.narration; na.addEventListener("input", () => { c.narration = na.value; });
       const ca = h("input", { placeholder: "화면 자막 (짧게)", value: c.caption }); ca.addEventListener("input", () => { c.caption = ca.value; });
