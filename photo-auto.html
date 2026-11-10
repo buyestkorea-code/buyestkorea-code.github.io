@@ -173,7 +173,7 @@
   <div class="row" style="margin-top:12px">
     <input type="checkbox" id="zoom" hidden>
     <label class="hint"><input type="checkbox" id="bgwhite" checked> 연한 회색 배경 사진은 흰 배경으로 자동 정리</label>
-    <label class="hint" style="margin-left:14px" title="브라우저 안에서 AI가 제품만 남기고 배경을 흰색으로 바꿉니다. 사진은 밖으로 나가지 않아요. 처음 한 번 모델(약 44MB)을 내려받고, 사진 한 장에 몇 초 걸립니다."><input type="checkbox" id="aicut"> AI 누끼 (어떤 배경이든 제품만 남기고 흰색 · 얇은 체인도 잡도록 사진을 나눠 10번 분석 · 사진 한 장에 10~20초)</label>
+    <label class="hint" style="margin-left:14px" title="브라우저 안에서 AI가 제품만 남기고 배경을 흰색으로 바꿉니다. 사진은 밖으로 나가지 않아요. 처음 한 번 모델(약 179MB)을 내려받고(이후엔 저장됨), 사진 한 장에 약 10초 걸립니다."><input type="checkbox" id="aicut"> AI 누끼 (어떤 배경이든 제품만 남기고 흰색 · 얇은 체인도 잡는 고성능 AI · 사진 한 장에 약 10초)</label>
     <label class="hint" style="margin-left:14px" title="JPG 전체 저장으로 나오는 3컷(1000×1000 두 장 · 960×1280 한 장)에서 상품이 차지하는 크기. 긴 쪽이 캔버스의 이 %까지 커집니다. 1000×1000에서 정한 상품 크기를 960×1280에도 똑같이 씁니다(비율이 바뀌어 길어 보이지 않게).">컷 사진 상품 크기 <input type="number" id="cutW" value="90" min="50" max="100" step="1" style="width:60px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> %</label>
     <label class="hint" style="margin-left:14px" title="Product Detail 아래 상세 사진들 사이의 세로 간격(px). 전체에 한 번에 적용됩니다">사진 사이 여백 <input type="number" id="photoGap" value="37" min="0" max="400" step="1" style="width:68px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> px
       <button class="btn btn-out btn-sm" type="button" data-gap="0">0</button><button class="btn btn-out btn-sm" type="button" data-gap="37">기본</button><button class="btn btn-out btn-sm" type="button" data-gap="80">80</button><button class="btn btn-out btn-sm" type="button" data-gap="150">150</button></label>
@@ -558,23 +558,29 @@ function toWhiteCanvas(im){
   var c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight;
   var x=c.getContext('2d',{willReadFrequently:true}); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0); return c;
 }
-/* ---------- AI 누끼 (브라우저 안에서 onnxruntime-web + silueta 모델 · 사진은 밖으로 나가지 않음) ---------- */
+/* ---------- AI 누끼 (브라우저 안에서 onnxruntime-web + isnet 모델 · 사진은 밖으로 나가지 않음) ---------- */
 var ortSess=null, cutCache={};
 function loadScriptOnce(src){ return new Promise(function(res,rej){ var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=function(){ rej(new Error('불러오기 실패: '+src)); }; document.head.appendChild(s); }); }
 function getCutSession(){
   if(ortSess) return ortSess;
   ortSess=(window.ort?Promise.resolve():loadScriptOnce('assets/libs/ort/ort.min.js')).then(function(){
     ort.env.wasm.wasmPaths='assets/libs/ort/'; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
-    return ort.InferenceSession.create('assets/photo-auto/models/silueta.onnx',{executionProviders:['wasm']});
+    /* isnet 모델(약 179MB)은 GitHub 파일 100MB 제한 때문에 2조각으로 올려 두었다 → 받아서 이어 붙인다 */
+    return Promise.all(['assets/photo-auto/models/isnet.part1','assets/photo-auto/models/isnet.part2'].map(function(u){
+      return fetch(u).then(function(r){ if(!r.ok) throw new Error('모델 내려받기 실패('+r.status+')'); return r.arrayBuffer(); });
+    })).then(function(p){
+      var buf=new Uint8Array(p[0].byteLength+p[1].byteLength); buf.set(new Uint8Array(p[0]),0); buf.set(new Uint8Array(p[1]),p[0].byteLength);
+      return ort.InferenceSession.create(buf,{executionProviders:['wasm']});
+    });
   }).catch(function(e){ ortSess=null; throw e; });
   return ortSess;
 }
 /* 사진 크기와 같은 0~255 투명도 배열(255=제품)을 돌려준다. 같은 사진은 한 번만 계산.
-   모델은 320×320 으로만 보기 때문에 얇은 체인·반짝이는 부분이 사라진다 → 전체 1번 + 사진을 3×3 으로 나눠(조금씩 겹쳐) 각각 더 크게 보고 합친다 */
+   isnet 은 1024×1024 로 보기 때문에 얇은 체인·반짝이는 부분도 한 번에 잡는다(예전 320 모델은 3×3 분할이 필요했음) */
 function runMaskRegion(sess,c,sx,sy,sw,sh,minmax){
-  var S=320, t=document.createElement('canvas'); t.width=t.height=S;
+  var S=1024, t=document.createElement('canvas'); t.width=t.height=S;
   var x=t.getContext('2d',{willReadFrequently:true}); x.fillStyle='#fff'; x.fillRect(0,0,S,S); x.imageSmoothingQuality='high'; x.drawImage(c,sx,sy,sw,sh,0,0,S,S);
-  var d=x.getImageData(0,0,S,S).data, f=new Float32Array(3*S*S), mx=1, i, ch, mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225];
+  var d=x.getImageData(0,0,S,S).data, f=new Float32Array(3*S*S), mx=1, i, ch, mean=[0.485,0.456,0.406], std=[1,1,1];
   for(i=0;i<d.length;i+=4){ if(d[i]>mx) mx=d[i]; if(d[i+1]>mx) mx=d[i+1]; if(d[i+2]>mx) mx=d[i+2]; }
   for(i=0;i<S*S;i++){ for(ch=0;ch<3;ch++) f[ch*S*S+i]=(d[i*4+ch]/mx-mean[ch])/std[ch]; }
   var feeds={}; feeds[sess.inputNames[0]]=new ort.Tensor('float32',f,[1,3,S,S]);
@@ -588,14 +594,13 @@ function runMaskRegion(sess,c,sx,sy,sw,sh,minmax){
 function aiMask(c,key){
   var hit=cutCache[key]; if(hit&&hit.w===c.width&&hit.h===c.height) return Promise.resolve(hit.a);
   return getCutSession().then(function(sess){
-    var W=c.width, H=c.height, k=Math.min(1,1600/Math.max(W,H)), mw=Math.max(8,Math.round(W*k)), mh=Math.max(8,Math.round(H*k)), M=new Float32Array(mw*mh), S=320;
+    var W=c.width, H=c.height, k=Math.min(1,1600/Math.max(W,H)), mw=Math.max(8,Math.round(W*k)), mh=Math.max(8,Math.round(H*k)), M=new Float32Array(mw*mh), S=1024;
     function merge(m,rx,ry,rw,rh,first){            /* 320×320 결과를 작업 해상도의 해당 영역에 최댓값으로 합침 */
       var x0=Math.floor(rx*k), y0=Math.floor(ry*k), x1=Math.min(mw,Math.ceil((rx+rw)*k)), y1=Math.min(mh,Math.ceil((ry+rh)*k)), x, y;
       for(y=y0;y<y1;y++){ var sy=Math.min(S-1,Math.floor((y/k-ry)*S/rh)); if(sy<0) sy=0;
         for(x=x0;x<x1;x++){ var sx=Math.min(S-1,Math.floor((x/k-rx)*S/rw)); if(sx<0) sx=0; var v=m[sy*S+sx], q=y*mw+x; if(first||v>M[q]) M[q]=v; } }
     }
-    var N=3, tw=W/N*1.25, th=H/N*1.25, jobs=[[0,0,W,H,true]], ty, tx;
-    for(ty=0;ty<N;ty++) for(tx=0;tx<N;tx++){ var x0=Math.max(0,Math.min(W-tw,tx*W/N-(tw-W/N)/2)), y0=Math.max(0,Math.min(H-th,ty*H/N-(th-H/N)/2)); jobs.push([x0,y0,tw,th,false]); }
+    var jobs=[[0,0,W,H,true]];
     var i=0;
     function next(){
       if(i>=jobs.length) return Promise.resolve();
