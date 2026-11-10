@@ -70,6 +70,9 @@
   .rchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px;align-items:center;}
   .rchip{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;padding:3px 4px 3px 10px;border-radius:999px;background:#eef3ff;color:#1d4ed8;}
   .rchip button{border:0;background:rgba(29,78,216,.15);color:#1d4ed8;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;padding:0;}
+  .rchip{cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;}
+  .rchip.drag{opacity:.85;box-shadow:0 4px 14px rgba(29,78,216,.35);cursor:grabbing;pointer-events:none;position:relative;z-index:5;}
+  .rchips.dragging{cursor:grabbing;}
   .rchips input{width:170px;padding:4px 9px;font-size:12.5px;}
   .prev .hl{position:absolute;pointer-events:none;border:1.5px dashed #2b6cb0;background:rgba(43,108,176,.10);border-radius:3px;}
   .prev .ed{position:absolute;box-sizing:border-box;padding:0 6px;border:2px solid #2b6cb0;border-radius:4px;background:#fff;color:#111;font-family:inherit;outline:none;z-index:3;}
@@ -141,7 +144,7 @@
     <label class="hint" style="display:block;margin-top:6px">정보 항목 목록 (쉼표로 구분 · 순서대로 상세페이지 Information 표에 들어갑니다 — 템플릿이 채워 주고, 직접 고쳐도 됩니다)</label>
     <input type="text" id="tplRows" placeholder="상품명,브랜드,카테고리,수입여부,제조년월,색상,제조국,구성품,소재">
     <div class="rchips" id="rowChips"></div>
-    <div class="rchips"><input type="text" id="rowAdd" placeholder="추가할 항목 이름 (예: 굽높이)"><button type="button" class="btn btn-out btn-sm" id="rowAddBtn">+ 항목 추가</button><span class="hint">칩의 ×로 항목을 지우고, 여기서 새 항목을 더할 수 있어요 (순서는 위 목록에서 바꿔요)</span></div>
+    <div class="rchips"><input type="text" id="rowAdd" placeholder="추가할 항목 이름 (예: 굽높이)"><button type="button" class="btn btn-out btn-sm" id="rowAddBtn">+ 항목 추가</button><span class="hint">칩의 ×로 항목을 지우고, 여기서 새 항목을 더할 수 있어요 칩을 끌어서 순서를 바꿀 수 있어요</span></div>
   </div>
   <div class="grid" id="fields"></div>
   <div class="grid" style="margin-top:12px" id="szBlock">
@@ -295,7 +298,40 @@ function renderRowChips(){
     var b=document.createElement('button'); b.type='button'; b.textContent='×'; b.title=k+' 항목 삭제';
     b.addEventListener('click',function(){ var r=curRows().filter(function(x){ return x!==k; }); if(r.length) setInfoRows(r); });
     c.appendChild(b); box.appendChild(c);
+    c.dataset.k=k; c.title='끌어서 순서 바꾸기';
+    c.addEventListener('pointerdown',function(e){ if(e.target===b||e.button>0) return; startChipDrag(e,c,box); });
   });
+}
+/* 칩 끌어서 순서 바꾸기 (마우스·터치 공통) — 놓으면 정보 항목 순서가 바뀌고 상세페이지 Information 표 순서도 같이 바뀜 */
+function startChipDrag(e,chip,box){
+  var sx=e.clientX, sy=e.clientY, moving=false, id=e.pointerId;
+  function over(x,y){
+    var chips=[].slice.call(box.querySelectorAll('.rchip')).filter(function(c){ return c!==chip; });
+    for(var i=0;i<chips.length;i++){
+      var r=chips[i].getBoundingClientRect();
+      if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){ box.insertBefore(chip, x<r.left+r.width/2?chips[i]:chips[i].nextSibling); return; }
+    }
+  }
+  function mv(ev){
+    if(ev.pointerId!==id) return;
+    if(!moving){
+      if(Math.abs(ev.clientX-sx)+Math.abs(ev.clientY-sy)<5) return;
+      moving=true; chip.classList.add('drag'); box.classList.add('dragging');
+    }
+    ev.preventDefault(); over(ev.clientX,ev.clientY);
+  }
+  function up(ev){
+    if(ev.pointerId!==id) return;
+    document.removeEventListener('pointermove',mv); document.removeEventListener('pointerup',up); document.removeEventListener('pointercancel',up);
+    chip.classList.remove('drag'); box.classList.remove('dragging');
+    if(!moving) return;
+    var order=[].slice.call(box.querySelectorAll('.rchip')).map(function(c){ return c.dataset.k; });
+    if(order.join('|')!==curRows().join('|')){
+      setInfoRows(order);
+      if(state.last){ state.stale=true; setApplyBtn(); }
+    }
+  }
+  document.addEventListener('pointermove',mv,{passive:false}); document.addEventListener('pointerup',up); document.addEventListener('pointercancel',up);
 }
 function addRowFromInput(){
   var v=$('rowAdd').value.trim(); if(!v) return; $('rowAdd').value='';
@@ -654,8 +690,8 @@ function resizeFrom(src,sx,sy,sw,sh,tw,th){
   var o=document.createElement('canvas'); o.width=tw; o.height=th;
   var ox=o.getContext('2d'); ox.imageSmoothingQuality='high'; ox.drawImage(cur,0,0,tw,th); return o;
 }
-function mvX(s){ var m=Math.abs(SLOT_W-s.w)/2; return Math.max(-m,Math.min(m,s.dx||0)); }
-function mvY(s,sh){ var m=Math.abs(sh-s.h)/2; return Math.max(-m,Math.min(m,s.dy||0)); }
+/* 사진은 가이드 칸(점선)을 넘어서도 옮길 수 있다 - 화면 안에서만 제한 */ function mvX(s){ return Math.max(-W,Math.min(W,s.dx||0)); }
+function mvY(s,sh){ return Math.max(-900,Math.min(900,s.dy||0)); }
 function fitPhoto(c,px,py){
   var b=trimBox(c), cw=b[2]-b[0], ch=b[3]-b[1], warn='';
   var full=cw>=c.width*0.97 && ch>=c.height*0.97;
@@ -810,7 +846,7 @@ function render(f,chart,slots,ov){
     var al=align||'left', w=s?measure(s,wt,size)+ls*s.length:0, x0=al==='center'?x-w/2:(al==='right'?x-w:x);
     ops.push({t:'text',s:s,x:x,base:base,size:size,wk:wk,wt:wt,ls:ls,color:color,align:al,id:id,ref:ref||null,bx:x0,bw:w});
   }
-  function img(im,x,yy,w,h,nm,sl,gr){ ops.push({t:'img',im:im,x:x,y:yy,w:w,h:h,nm:nm||'사진',sl:sl||null,gr:gr||null,sr:(gr&&(w>gr.w+0.5||h>gr.h+0.5))?gr:null}); }
+  function img(im,x,yy,w,h,nm,sl,gr){ ops.push({t:'img',im:im,x:x,y:yy,w:w,h:h,nm:nm||'사진',sl:sl||null,gr:gr||null,sr:null}); }
 
   var topH=Math.round(topImg.naturalHeight*W/topImg.naturalWidth);
   img(topImg,0,0,W,topH,'상단 안내(고정)');
@@ -978,9 +1014,7 @@ $('prev').addEventListener('click',function(e){
 });
 
 /* ---------- 사진 직접 이동·크기 조절 + 가이드선 (미리보기에서 사진을 누르면 파란 테두리) ---------- */
-function visRect(o){
-  var g=o.gr; if(!g) return {x:o.x,y:o.y,w:o.w,h:o.h};
-  var x0=Math.max(o.x,g.x), y0=Math.max(o.y,g.y), x1=Math.min(o.x+o.w,g.x+g.w), y1=Math.min(o.y+o.h,g.y+g.h);
+function visRect(o){ var x0=Math.max(o.x,0), y0=Math.max(o.y,0), x1=Math.min(o.x+o.w,W), y1=Math.min(o.y+o.h,state.canvas?state.canvas.height:1e9);
   return {x:x0,y:y0,w:Math.max(1,x1-x0),h:Math.max(1,y1-y0)};
 }
 function hitPhoto(e){

@@ -95,7 +95,7 @@ function parseSheet1Detail(XLSX,ws){
       hdr=hdr.slice(0,n+1);
       if(n){
         table.push(hdr);
-        for(var rr=r+1;rr<=r+12;rr++){
+        for(var rr=r+1;rr<=last;rr++){   /* 사이즈 줄 수 제한 없음(예전엔 12줄까지만 읽어 11 사이즈가 잘렸음) */
           var sz=cellStr(ws,'C'+rr); if(!sz||sz.length>20) continue;
           var row=[sz]; for(c=0;c<n;c++) row.push(cellStr(ws,COLS[c]+rr)); table.push(row);
         }
