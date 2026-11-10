@@ -230,7 +230,7 @@
 (function(){
 'use strict';
 var W=720, SLOT_X=33, SLOT_W=653, SLOT_H=653, PHOTO_MAX_W=650;
-var DARK='#191919', MID='#7c7c7c', LIGHT='#8c8c8c';
+var DARK='#191919', MID='#7c7c7c', LIGHT='#8c8c8c', VAL='#4a4a4a'; /* VAL: 정보 입력값·신발(MM) 실측값 — PSD(이거신발폰트바꾼거) Pretendard Medium #4A4A4A */
 var INFO_ROWS=['상품명','브랜드','카테고리','수입여부','제조년월','색상','제조국','구성품','수납공간','소재'];
 var FIELD_KEYS=['상품명','브랜드한글','브랜드','카테고리','수입여부','제조년월','색상','제조국','구성품','수납공간','소재'];
 var CATEGORY_WORDS=['카드지갑','반지갑','장지갑','중지갑','명함지갑','키지갑','동전지갑','지갑','벨트','키링','키홀더','숄더백','크로스백','토트백','백팩','클러치','파우치','버킷백','미니백','핸드백','가방','쇼퍼백','스니커즈','로퍼','부츠','샌들','슬리퍼','구두','플랫','티셔츠','맨투맨','후드티','후드','니트','스웨터','셔츠','자켓','재킷','코트','패딩','점퍼','바지','팬츠','청바지','스커트','원피스','가디건','조끼','머플러','스카프','모자','캡','비니','선글라스'].sort(function(a,b){return b.length-a.length;});
@@ -627,7 +627,7 @@ function buildSizeChart(){
 var fontsReady=null;
 function loadFonts(){
   if(fontsReady) return fontsReady;
-  var defs=[['Light',300],['Regular',400],['Bold',700]];
+  var defs=[['Light',300],['Regular',400],['Medium',500],['SemiBold',600],['Bold',700]];
   fontsReady=Promise.all(defs.map(function(d){
     var f=new FontFace('PretendardPA','url(assets/photo-auto/Pretendard-'+d[0]+'.woff2)',{weight:String(d[1])});
     return f.load().then(function(ff){document.fonts.add(ff);});
@@ -675,7 +675,7 @@ function render(f,chart,slots,ov){
   var ops=[], y, seq=0;
   function box(x,yy,w,h,bg){ ops.push({t:'box',x:x,y:yy,w:w,h:h,bg:bg,nm:'박스'}); }
   function text(s,x,base,size,wk,color,align,ref){
-    var wt={Light:300,Regular:400,Bold:700}[wk], ls=(wk==='Bold'?0.0145:(size===15?0.008:0.0125))*size, id;
+    var wt={Light:300,Regular:400,Medium:500,SemiBold:600,Bold:700}[wk], ls=(wk==='Bold'?0.0145:(size===15?0.008:0.0125))*size, id;
     if(ref) id=ref.id; else { id='t'+(seq++); if(ov[id]!=null) s=ov[id]; }
     var al=align||'left', w=s?measure(s,wt,size)+ls*s.length:0, x0=al==='center'?x-w/2:(al==='right'?x-w:x);
     ops.push({t:'text',s:s,x:x,base:base,size:size,wk:wk,wt:wt,ls:ls,color:color,align:al,id:id,ref:ref||null,bx:x0,bw:w});
@@ -695,7 +695,7 @@ function render(f,chart,slots,ov){
   var ROWS=activeRows(f);
   var rowTop=y+(2329-2162), n=ROWS.length;
   ROWS.forEach(function(k,i){
-    var val=f[k]||'', lines=val?wrap(val,450,300,18):[''];
+    var val=f[k]||'', lines=val?wrap(val,450,500,18):[''];
     var h=Math.max(40,16+24*lines.length), last=i===n-1;
     if(last) h=Math.max(63,h);
     var gap=last?2:1;
@@ -706,7 +706,7 @@ function render(f,chart,slots,ov){
     text(k,115,base0,18,'Regular',DARK,'center');
     var ref={id:'f:'+k,type:'field',name:k};
     lines.forEach(function(ln,j){
-      text(ln,216,base0+(lines.length>1?j*24-12*(lines.length-1):0),18,'Light',MID,'left',ref);
+      text(ln,216,base0+(lines.length>1?j*24-12*(lines.length-1):0),18,'Medium',VAL,'left',ref);
     });
     rowTop+=h;
   });
@@ -717,13 +717,13 @@ function render(f,chart,slots,ov){
   var scBase=infoBottom+(2837.84-2752);
   text('Size Chart',34.4,scBase,40,'Bold',DARK);
   text(chart.header.length===2&&chart.header[1]==='MM'?'단위 : MM':'단위 : CM',686,scBase+(2849.27-2837.84),12,'Light',MID,'right');
-  var hdrTop=scBase+(2858-2837.84), ncols=chart.header.length, colw=653/ncols;
+  var hdrTop=scBase+(2858-2837.84), ncols=chart.header.length, colw=653/ncols, isMM=(chart.header.length===2&&chart.header[1]==='MM');
   box(33,hdrTop,653,43,'#f5f5f5');
-  chart.header.forEach(function(lb,c){ text(lb,33+colw*(c+0.5),hdrTop+(2886.27-2858),18,'Regular',DARK,'center',{id:'h:'+c,type:'hdr',c:c}); });
+  chart.header.forEach(function(lb,c){ text(lb,33+colw*(c+0.5),hdrTop+(2886.27-2858),18,isMM?'SemiBold':'Regular',DARK,'center',{id:'h:'+c,type:'hdr',c:c}); });
   var rTop=hdrTop+43;
   chart.rows.forEach(function(r,ri){
     box(33,rTop+35,653,1,'#f0f0f0');
-    for(var c=0;c<ncols;c++) text(r[c]||'',33+colw*(c+0.5),rTop+(2924.27-2901),18,'Light',MID,'center',{id:'c:'+ri+':'+c,type:'cell',r:ri,c:c});
+    for(var c=0;c<ncols;c++) text(r[c]||'',33+colw*(c+0.5),rTop+(2924.27-2901),18,isMM?'Medium':'Light',isMM?VAL:MID,'center',{id:'c:'+ri+':'+c,type:'cell',r:ri,c:c});
     rTop+=37;
   });
   noticeTop=rTop-1;
@@ -828,7 +828,7 @@ $('prev').addEventListener('click',function(e){
 });
 
 /* ---------- PSD 저장 (글자는 글자 레이어로) ---------- */
-var PSNAME={Light:'Pretendard-Light',Regular:'Pretendard-Regular',Bold:'Pretendard-Bold'};
+var PSNAME={Light:'Pretendard-Light',Regular:'Pretendard-Regular',Medium:'Pretendard-Medium',SemiBold:'Pretendard-SemiBold',Bold:'Pretendard-Bold'};
 function hexRgb(h){ h=h.replace('#',''); return {r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)}; }
 function loadScript(src){ return new Promise(function(res,rej){ if(window.agPsd) return res();
   var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=function(){rej(new Error('PSD 모듈을 불러오지 못했습니다'));}; document.head.appendChild(s); }); }
