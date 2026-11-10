@@ -704,7 +704,7 @@ function render(f,chart,slots,ov){
     var base0=lines.length>1?rowTop+28.27+(h-40)/2:rowTop+28.27;
     if(last&&lines.length===1) base0=rowTop+35.3;
     text(k,115,base0,18,'Regular',DARK,'center');
-    var ref={id:'f:'+k,type:'field',name:k};
+    var ref={id:'i:'+k,type:'field',name:k}; /* 상단 브랜드 제목('f:브랜드')과 id가 겹치면 편집 박스가 위아래로 합쳐짐 */
     lines.forEach(function(ln,j){
       text(ln,216,base0+(lines.length>1?j*24-12*(lines.length-1):0),18,'Medium',VAL,'left',ref);
     });
