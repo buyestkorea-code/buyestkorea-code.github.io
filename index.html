@@ -1108,7 +1108,7 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h8l8 8-8 8-8-8Z"/><circle cx="8.5" cy="8.5" r="1.3"/></svg></span>
         TEST 택 출력<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
-      <button class="nav-item" data-nav="orderStock">
+      <button class="nav-item" data-nav="orderStock" hidden style="display:none">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/></svg></span>
         주문서 창고위치찾기<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
       </button>
@@ -1473,7 +1473,7 @@
             <h3>바코드 재고조회</h3>
             <p>휴대폰 카메라로 바코드를 찍으면 이카운트 실시간 재고수량을 바로 보여줍니다. 전용 스캐너 입력도 지원합니다.</p>
           </button>
-          <button class="tool-card" data-nav="orderStock">
+          <button class="tool-card" data-nav="orderStock" hidden style="display:none">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>주문서 창고위치찾기</h3>
             <p>사방넷 주문서의 상품명·쇼핑몰 표기를 정리하고, 상품코드·사이즈를 뽑아 현재 재고장과 매칭해 재고 위치를 찾아줍니다.</p>
@@ -1704,13 +1704,13 @@
         <div class="workspace">
           <div class="panel">
             <h2>이카운트-송장 재고매칭</h2>
-            <p class="sub">송장 엑셀과 이카운트 재고현황 엑셀을 올리면, J열 헤더가 "상품명"인 시트에서 상품명·사이즈를 이카운트 재고현황과 매칭해 J열 바로 오른쪽에 "이카운트품목코드" 열을 새로 만들어 채워 넣습니다. 그 외 시트나 서식은 그대로 유지됩니다. 매칭 실패는 대부분 프로그램 오류가 아니라 해당 사이즈·색상 재고가 없거나 이카운트에 아직 등록되지 않은 상품이라서입니다.</p>
+            <p class="sub">사방넷 주문서 엑셀(헤더에 "상품명"·"사이즈"가 있는 시트)을 올리면 상품명·사이즈를 이카운트 재고와 매칭해 "사이즈" 열 바로 오른쪽에 "이카운트품목코드"·"입고단가" 열을 채워 넣습니다. <b>키즈 재고장을 함께 올리면</b> 그 옆에 "현재위치(수량)" 열(예: 본(1),아(2))이 추가되고, 올리지 않으면 코드·단가까지만 나옵니다. 그 외 시트나 서식은 그대로 유지됩니다. 매칭 실패는 대부분 프로그램 오류가 아니라 해당 사이즈·색상 재고가 없거나 이카운트에 아직 등록되지 않은 상품이라서입니다.</p>
 
             <div class="dz-grid">
               <div class="dropzone" id="icmTInvoiceDrop" tabindex="0" role="button" aria-label="송장 파일 선택">
                 <div class="ic">&#128193;</div>
-                <div><strong id="icmTInvoiceTitle">1. 송장 엑셀을 올려주세요</strong></div>
-                <div class="status-line" id="icmTInvoiceDetail" style="margin-top:4px;">클릭하거나 파일을 끌어다 놓으세요 (여러 시트 가능, J열 헤더가 "상품명"인 시트만 처리)</div>
+                <div><strong id="icmTInvoiceTitle">1. 사방넷 주문서 엑셀을 올려주세요</strong></div>
+                <div class="status-line" id="icmTInvoiceDetail" style="margin-top:4px;">클릭하거나 파일을 끌어다 놓으세요 (헤더에 "상품명"·"사이즈"가 있는 시트만 처리)</div>
                 <input type="file" id="icmTInvoiceFile" accept=".xlsx" />
               </div>
               <div class="dropzone" id="icmTStockDrop" tabindex="0" role="button" aria-label="이카운트 재고현황 파일 선택">
@@ -1718,6 +1718,12 @@
                 <div><strong id="icmTStockTitle">2. 이카운트 재고 — 서버에서 자동으로 가져옵니다</strong></div>
                 <div class="status-line" id="icmTStockDetail" style="margin-top:4px;">송장을 올리면 자동으로 불러와요 (툴킷 로그인 필요). 서버를 못 쓸 때만 이 칸을 눌러 이카운트 재고현황 엑셀을 직접 올리세요</div>
                 <input type="file" id="icmTStockFile" accept=".xlsx" />
+              </div>
+              <div class="dropzone" id="icmTKidsDrop" tabindex="0" role="button" aria-label="키즈 재고장 선택 (선택사항)">
+                <div class="ic">&#128193;</div>
+                <div><strong id="icmTKidsTitle">3. 키즈 재고장 (선택)</strong></div>
+                <div class="status-line" id="icmTKidsDetail" style="margin-top:4px;">올리면 현재위치와 재고수량을 (1) 형태로 같이 표기해요. 안 올리면 이카운트코드·단가까지만 나옵니다. 여러 시트 가능</div>
+                <input type="file" id="icmTKidsFile" accept=".xlsx,.xls" />
               </div>
             </div>
 
@@ -1735,7 +1741,7 @@
             <div class="stat-row" id="icmTStats"></div>
             <div class="table-scroll"><table class="data" id="icmTTable"></table></div>
             <div class="btn-row" style="margin-top:14px;">
-              <button class="btn btn-primary" id="icmTDownload">품목코드 채운 송장 다운로드</button>
+              <button class="btn btn-primary" id="icmTDownload">품목코드 채운 주문서 다운로드</button>
             </div>
             <div class="status-line" id="icmTDownloadStatus" style="margin-top:8px;"></div>
           </div>
@@ -7054,7 +7060,7 @@ window.__loadLib = (function(){
      매칭 로직은 실제 운영 중인 파이썬 프로토타입(match_ecount_code.py)을 그대로 이식한 것이다.
      ========================================================= */
   (function(){
-    var state = { invoice:null, stock:null, stats:null, issues:null };
+    var state = { invoice:null, invoiceFile:null, stock:null, kids:null, stats:null, issues:null };
 
     function icmSetStatus(msg, isErr){
       var s = document.getElementById('icmTStatus');
@@ -7067,7 +7073,7 @@ window.__loadLib = (function(){
       s.classList.toggle('err', !!isErr);
     }
     function icmMarkDropzone(which, filename, detail, ok){
-      var prefix = which === 'invoice' ? 'icmTInvoice' : 'icmTStock';
+      var prefix = which === 'invoice' ? 'icmTInvoice' : (which === 'kids' ? 'icmTKids' : 'icmTStock');
       document.getElementById(prefix + 'Drop').classList.toggle('has-file', !!ok);
       document.getElementById(prefix + 'Title').textContent = filename;
       var d = document.getElementById(prefix + 'Detail');
@@ -7205,9 +7211,18 @@ window.__loadLib = (function(){
           var path = wb.sheetMap[name];
           var xml = toText(wb.zip.files[path]);
           var parsed = parseSheetSE(xml, wb.sharedStrings);
-          var headerVal = parsed.rows[1] ? parsed.rows[1][10] : null;
-          var isTarget = icmNormalizeText(headerVal) === '상품명';
-          parsedSheets[name] = {path:path, doc:parsed.doc, rows:parsed.rows, isTarget:isTarget};
+          // 헤더(1행)에서 "상품명"/"사이즈"/"수량" 열 위치를 찾는다 (양식이 바뀌어도 동작하게 열 위치 고정 안 함)
+          var nameCol = 0, sizeCol = 0, qtyCol = 0;
+          var hdr = parsed.rows[1] || {};
+          Object.keys(hdr).forEach(function(c){
+            var h = icmNormalizeText(hdr[c]);
+            var ci = parseInt(c, 10);
+            if(h === '상품명' && !nameCol) nameCol = ci;
+            else if(h === '사이즈' && !sizeCol) sizeCol = ci;
+            else if(h === '수량' && !qtyCol) qtyCol = ci;
+          });
+          var isTarget = !!(nameCol && sizeCol);
+          parsedSheets[name] = {path:path, doc:parsed.doc, rows:parsed.rows, isTarget:isTarget, nameCol:nameCol, sizeCol:sizeCol, qtyCol:qtyCol || 13, insertAt:sizeCol + 1, kids:!!state.kids};
         });
         // 송장에 "최종 / 미출고 / 키즈" 시트가 같이 있어도 실제 확인 대상은 "최종"뿐 — 최종 시트가 있으면 나머지는 처리하지 않는다
         var hasFinal = sheetNames.some(function(n){ return parsedSheets[n].isTarget && n.replace(/\s/g, '') === '최종'; });
@@ -7215,7 +7230,8 @@ window.__loadLib = (function(){
           sheetNames.forEach(function(n){ if(parsedSheets[n].isTarget && n.replace(/\s/g, '') !== '최종') parsedSheets[n].isTarget = false; });
         }
         var targetCount = sheetNames.filter(function(n){ return parsedSheets[n].isTarget; }).length;
-        if(targetCount === 0) throw new Error('J열 헤더가 "상품명"인 시트를 찾을 수 없습니다.');
+        if(targetCount === 0) throw new Error('헤더에 "상품명"과 "사이즈"가 모두 있는 시트를 찾을 수 없습니다.');
+        state.invoiceFile = file;
         state.invoice = {fileName:file.name, zip:wb.zip, sheetMap:wb.sheetMap, sheetNames:sheetNames, parsedSheets:parsedSheets};
         icmMarkDropzone('invoice', file.name, '시트 ' + sheetNames.length + '개 중 대상 시트 ' + targetCount + '개 인식' + (hasFinal ? ' ("최종" 시트만 처리, 나머지 시트는 건너뜀)' : ''), true);
       }catch(e){
@@ -7320,13 +7336,18 @@ window.__loadLib = (function(){
         }
       }
     }
-    var ICM_INSERT_COLS = 2; // 이카운트품목코드, 입고단가
+    var ICM_INSERT_COLS = 2; // 이카운트품목코드, 입고단가 (키즈 재고장이 있으면 현재위치(수량) 1열 추가)
+    function icmInsertCount(sheet){ return ICM_INSERT_COLS + (sheet.kids ? 1 : 0); }
+    function icmKidsText(name, size){
+      if(!state.kids || !window.__osKids) return '';
+      return window.__osKids.lookup(state.kids.map, name, size);
+    }
     function processIcmSheet(sheetName, sheet, exactLookup, fuzzyIndex, priceByCode, globalStats, globalIssues){
       var doc = sheet.doc, rows = sheet.rows;
       var rowIndexMap = buildRowIndexSE(doc);
       sheet._rowIdx = rowIndexMap;
-      var qtyCol = 13;
-      Object.keys(rows[1] || {}).forEach(function(c){ if(icmNormalizeText(rows[1][c]) === '수량') qtyCol = parseInt(c, 10); });
+      var qtyCol = sheet.qtyCol;
+      var nameCol = sheet.nameCol, sizeCol = sheet.sizeCol, insertAt = sheet.insertAt, nIns = icmInsertCount(sheet);
       var maxRow = 0;
       Object.keys(rows).forEach(function(k){ var n = parseInt(k,10); if(n > maxRow) maxRow = n; });
 
@@ -7334,53 +7355,57 @@ window.__loadLib = (function(){
       var matches = {};
       for(var r = 2; r <= maxRow; r++){
         var rd = rows[r];
-        var name = rd ? rd[10] : null;
-        var size = rd ? rd[11] : null;
+        var name = rd ? rd[nameCol] : null;
+        var size = rd ? rd[sizeCol] : null;
         if((name === null || name === undefined || name === '') && (size === null || size === undefined || size === '')) continue;
+        // 상품이 아닌 줄(예: "수선 요청", "*")은 건너뜀: 사이즈가 없고 품번 토큰도 없는 경우
+        if((size === null || size === undefined || size === '') && icmCodeTokens(name).length === 0) continue;
         globalStats.total++;
         var result = icmFindCode(name, size, exactLookup, fuzzyIndex);
         globalStats.counts[result.status] = (globalStats.counts[result.status] || 0) + 1;
         matches[r] = result;
         var qn = rd ? Number(rd[qtyCol]) : NaN;
+        var kidsLoc = icmKidsText(name, size);
+        result.kidsLoc = kidsLoc;
         globalStats.entries.push({sheet:sheetName, row:r, name:icmNormalizeText(name), size:icmNormalizeText(size),
-          qty:(isNaN(qn) || qn <= 0) ? 1 : qn, code:result.code || null, status:result.status, candidates:result.candidates || [], err:null});
+          qty:(isNaN(qn) || qn <= 0) ? 1 : qn, code:result.code || null, status:result.status, candidates:result.candidates || [], err:null, kidsLoc:kidsLoc});
         if(!result.code){
           var key = icmCleanProductName(name) + ' [' + icmNormalizeSize(size) + ']';
           globalIssues.push({sheet:sheetName, row:r, key:key, status:result.status});
         }
       }
 
-      // 2) 11번째 열(K)부터 오른쪽으로 두 칸씩 밀기 (K→M, L→N, M→O ...) - 이카운트품목코드,
-      //    입고단가 두 열이 새로 끼워지기 때문에 1칸이 아니라 2칸을 민다.
-      icmShiftColsElement(doc, 11, ICM_INSERT_COLS);
+      // 2) 사이즈 열 바로 오른쪽(insertAt)부터 오른쪽으로 nIns칸씩 밀기 - 이카운트품목코드, 입고단가(, 현재위치) 열이 새로 끼워진다.
+      icmShiftColsElement(doc, insertAt, nIns);
       Object.keys(rowIndexMap).forEach(function(rKey){
         var rowEl = rowIndexMap[rKey];
         var cells = Array.prototype.slice.call(rowEl.getElementsByTagName('c'));
         var toShift = cells.map(function(c){ return {el:c, col: colRowFromRef(c.getAttribute('r')).col}; })
-          .filter(function(x){ return x.col >= 11; })
+          .filter(function(x){ return x.col >= insertAt; })
           .sort(function(a,b){ return b.col - a.col; });
         toShift.forEach(function(x){
-          var newRef = colLetter(x.col+ICM_INSERT_COLS) + rowEl.getAttribute('r');
+          var newRef = colLetter(x.col+nIns) + rowEl.getAttribute('r');
           x.el.setAttribute('r', newRef);
         });
       });
 
-      // 3) 새 열(K=11 이카운트품목코드, L=12 입고단가) 채우기: 헤더 + 매칭된 코드/가격
+      // 3) 새 열(insertAt=이카운트품목코드, +1=입고단가, +2=현재위치(수량)) 채우기: 헤더 + 매칭된 코드/가격/위치
       var headerRowEl = rowIndexMap[1];
       if(headerRowEl){
-        setCellText(doc, headerRowEl, 11, '이카운트품목코드');
-        setCellText(doc, headerRowEl, 12, '입고단가');
+        setCellText(doc, headerRowEl, insertAt, '이카운트품목코드');
+        setCellText(doc, headerRowEl, insertAt + 1, '입고단가');
+        if(sheet.kids) setCellText(doc, headerRowEl, insertAt + 2, '현재위치(수량)');
       }
       Object.keys(matches).forEach(function(rKey){
         var result = matches[rKey];
+        var rowEl = rowIndexMap[rKey];
+        if(!rowEl) return;
         if(result.code){
-          var rowEl = rowIndexMap[rKey];
-          if(rowEl){
-            setCellText(doc, rowEl, 11, result.code);
-            var price = priceByCode[result.code];
-            if(typeof price === 'number' && !isNaN(price)) setCellNumber(doc, rowEl, 12, price);
-          }
+          setCellText(doc, rowEl, insertAt, result.code);
+          var price = priceByCode[result.code];
+          if(typeof price === 'number' && !isNaN(price)) setCellNumber(doc, rowEl, insertAt + 1, price);
         }
+        if(sheet.kids && result.kidsLoc) setCellText(doc, rowEl, insertAt + 2, result.kidsLoc);
       });
 
       updateDimensionSE(doc);
@@ -7417,15 +7442,15 @@ window.__loadLib = (function(){
       var rowEl = sheet && sheet._rowIdx ? sheet._rowIdx[entry.row] : null;
       if(!code){
         entry.code = null; entry.status = '매칭실패(재고없음/미등록)'; entry.err = null;
-        if(rowEl){ setCellText(sheet.doc, rowEl, 11, ''); setCellText(sheet.doc, rowEl, 12, ''); }
+        if(rowEl){ setCellText(sheet.doc, rowEl, sheet.insertAt, ''); setCellText(sheet.doc, rowEl, sheet.insertAt + 1, ''); }
         return;
       }
       var info = state.stock.byCode[code];
       if(!info){ entry.err = '이카운트 재고 목록에 없는 코드예요'; return; }
       entry.err = null; entry.code = code; entry.status = '수기입력';
       if(rowEl){
-        setCellText(sheet.doc, rowEl, 11, code);
-        if(typeof info.price === 'number' && !isNaN(info.price)) setCellNumber(sheet.doc, rowEl, 12, info.price);
+        setCellText(sheet.doc, rowEl, sheet.insertAt, code);
+        if(typeof info.price === 'number' && !isNaN(info.price)) setCellNumber(sheet.doc, rowEl, sheet.insertAt + 1, info.price);
       }
     }
 
@@ -7493,6 +7518,7 @@ window.__loadLib = (function(){
       table.innerHTML = '';
       table.parentNode.querySelectorAll('.icm-note').forEach(function(n){ n.parentNode.removeChild(n); });
       var cols = ['시트','행','상품명','사이즈','수량','이카운트코드','상태','이카운트 재고','재고 확인'];
+      if(state.kids) cols.push('현재위치(수량)');
       var thead = el('thead'); var htr = el('tr');
       cols.forEach(function(cName){
         htr.appendChild(el('th', (cName === '행' || cName === '수량' || cName === '이카운트 재고') ? {class:'num'} : null, [document.createTextNode(cName)]));
@@ -7550,6 +7576,7 @@ window.__loadLib = (function(){
         var jTd = el('td');
         if(jd) jTd.appendChild(el('span', {class:'chip ' + jd.cls}, [document.createTextNode(jd.text)]));
         tr.appendChild(jTd);
+        if(state.kids) tr.appendChild(td(e.kidsLoc || ''));
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
@@ -7597,8 +7624,8 @@ window.__loadLib = (function(){
           zeroBySheet[name].forEach(function(r){
             var rowEl = rowMap[r];
             if(!rowEl) return;
-            setCellText(outDoc, rowEl, 11, '');
-            setCellText(outDoc, rowEl, 12, '');
+            setCellText(outDoc, rowEl, sheet.insertAt, '');
+            setCellText(outDoc, rowEl, sheet.insertAt + 1, '');
           });
         }
         var serialized = new XMLSerializer().serializeToString(outDoc);
@@ -7633,8 +7660,11 @@ window.__loadLib = (function(){
     }
 
     function icmReset(){
-      state.invoice = null; state.stock = null; state.stats = null; state.issues = null; state.entries = null; icmFilter = 'all';
-      icmMarkDropzone('invoice', '1. 송장 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요 (여러 시트 가능, J열 헤더가 "상품명"인 시트만 처리)', false);
+      state.invoice = null; state.invoiceFile = null; state.kids = null; state.stock = null; state.stats = null; state.issues = null; state.entries = null; icmFilter = 'all';
+      icmMarkDropzone('invoice', '1. 사방넷 주문서 엑셀을 올려주세요', '클릭하거나 파일을 끌어다 놓으세요 (헤더에 "상품명"·"사이즈"가 있는 시트만 처리)', false);
+      icmMarkDropzone('kids', '3. 키즈 재고장 (선택)', '올리면 현재위치와 재고수량을 (1) 형태로 같이 표기해요. 안 올리면 이카운트코드·단가까지만 나옵니다. 여러 시트 가능', false);
+      document.getElementById('icmTKidsDrop').classList.remove('has-file');
+      document.getElementById('icmTKidsFile').value = '';
       document.getElementById('icmTInvoiceDrop').classList.remove('has-file');
       icmMarkDropzone('stock', '2. 이카운트 재고 — 서버에서 자동으로 가져옵니다', '송장을 올리면 자동으로 불러와요 (툴킷 로그인 필요). 서버를 못 쓸 때만 이 칸을 눌러 이카운트 재고현황 엑셀을 직접 올리세요', false);
       document.getElementById('icmTStockDrop').classList.remove('has-file');
@@ -7665,7 +7695,35 @@ window.__loadLib = (function(){
       });
     }
 
+    // ---------------- 키즈 재고장 (선택) ----------------
+    // 올리면 상품코드_사이즈로 키즈 재고장과 매칭해 "현재위치(수량)" 열을 추가한다. 안 올리면 기존과 동일.
+    async function handleIcmKidsFile(file){
+      icmSetStatus('키즈 재고장 읽는 중…');
+      try{
+        if(!window.__osKids) throw new Error('재고장 읽기 기능을 불러오지 못했어요. 새로고침 후 다시 시도해주세요.');
+        var buf = await file.arrayBuffer();
+        var wb = await XLSXW.read(buf, {type:'array'});
+        var map = window.__osKids.load(wb);
+        var n = Object.keys(map).length;
+        if(!n) throw new Error('인식된 재고 품목이 없습니다. (품목명·재고량 헤더가 있는 시트가 필요해요)');
+        state.kids = {map:map, fileName:file.name};
+        icmMarkDropzone('kids', file.name, '키즈 재고장 사용 · 시트 ' + wb.SheetNames.length + '개 · 품번_사이즈 ' + n.toLocaleString('ko-KR') + '개 인식 → 결과에 현재위치(수량) 열이 추가돼요', true);
+      }catch(e){
+        state.kids = null;
+        icmMarkDropzone('kids', file.name, '읽기 실패: ' + (e.message||e), false);
+      }
+      icmSetStatus('');
+      // 이미 매칭을 돌렸다면, 같은 주문서로 키즈 재고장을 반영해 다시 실행한다 (수기 입력은 초기화됨)
+      if(state.kids && state.invoiceFile && state.invoice && state.invoice.ran){
+        icmSetStatus('키즈 재고장을 반영해 다시 매칭하는 중… (수기로 넣은 코드는 초기화돼요)');
+        var f = state.invoiceFile;
+        state.invoice = null; state.entries = null;
+        await handleIcmInvoiceFile(f);
+      }
+    }
+
     wireDropzoneICM('icmTInvoiceDrop', 'input[type="file"]', handleIcmInvoiceFile);
+    wireDropzoneICM('icmTKidsDrop', 'input[type="file"]', handleIcmKidsFile);
     wireDropzoneICM('icmTStockDrop', 'input[type="file"]', handleIcmStockFile);
     document.getElementById('icmTRun').addEventListener('click', function(){
       icmSetStatus('매칭 실행 중…');
@@ -8572,6 +8630,19 @@ window.__loadLib = (function(){
       });
       return compareMap;
     }
+    // 이카운트-송장 재고매칭(TEST)에서 키즈 재고장 위치(수량)를 붙일 때 같은 규칙을 쓰도록 노출
+    window.__osKids = {
+      load: function(workbook){ return osLoadStockMap(workbook, null); },
+      lookup: function(map, name, size){
+        var code = osExtractProductCode(name);
+        if(!code) return '';
+        var matches = map[code + '_' + osNormalizeSize(size)] || [];
+        if(!matches.length) return '';
+        var order = [], sum = {};
+        matches.forEach(function(m){ if(!(m.location in sum)){ sum[m.location] = 0; order.push(m.location); } sum[m.location] += (m.qty||0); });
+        return order.map(function(l){ return l + '(' + sum[l] + ')'; }).join(',');
+      }
+    };
     function osTransformOrderAoa(orderAoa){
       var headerRow = orderAoa[0] || [];
       var colProduct = osFindColumn(headerRow, ['상품명']);
