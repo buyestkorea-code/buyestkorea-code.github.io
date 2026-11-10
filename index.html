@@ -8887,3 +8887,24 @@ window.__loadLib = (function(){
   setTimeout(tick,3000); setInterval(tick,300000);
 })();
 </script>
+
+<script>
+/* 안쪽 틀(iframe) 높이 자동 맞춤 — iframe 안의 도구(photo-auto.html 등)가 보내는 높이 메시지를 받아 틀을 내용만큼 늘려
+   스크롤바를 바깥 페이지 하나로 합친다. 메시지를 보내지 않는 도구는 영향 없음. */
+(function(){
+  function frameOf(w){ var r=null; document.querySelectorAll('iframe').forEach(function(f){ if(f.contentWindow===w) r=f; }); return r; }
+  function inset(){ var tb=document.querySelector('.topbar'); return tb?tb.getBoundingClientRect().height:0; }
+  function push(f){ try{ var r=f.getBoundingClientRect(); f.contentWindow.postMessage({type:'buyest-viewport',top:r.top,vh:window.innerHeight,inset:inset()},'*'); }catch(_){} }
+  window.addEventListener('message',function(e){
+    var d=e.data; if(!d||d.type!=='buyest-iframe-height'||e.origin!==location.origin) return;
+    var f=frameOf(e.source); if(!f) return;
+    var h=parseInt(d.h,10)||0; if(h<300||h>60000) return;
+    f.style.height=h+'px'; f.setAttribute('data-autoh','1');
+    try{ e.source.postMessage({type:'buyest-iframe-ack'},'*'); }catch(_){}
+    push(f);
+  });
+  var tick=0;
+  function onScroll(){ if(tick) return; tick=setTimeout(function(){ tick=0; document.querySelectorAll('iframe[data-autoh]').forEach(push); },16); }
+  window.addEventListener('scroll',onScroll,{passive:true}); window.addEventListener('resize',onScroll);
+})();
+</script>
