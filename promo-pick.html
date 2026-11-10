@@ -266,26 +266,30 @@ $('tagBtn').onclick=async()=>{
   const todo=DATA.rows.filter(r=>!TAGS[r.code]); if(!todo.length) return;
   TAGBUSY=true; TAGSTOP=false; $('tagBtn').disabled=true; $('tagStop').hidden=false;
   const CH=80, chunks=[]; for(let i=0;i<todo.length;i+=CH) chunks.push(i);
-  let next=0, done=0, fail=0, lastErr='', saved=0, saveP=Promise.resolve();
-  const save=()=>{ saveP=saveP.then(async()=>{ try{ await srvList(true); const cur=(await idbGet('tags'))||{}; Object.assign(cur,TAGS); if(await idbSet('tags',cur)) saved=done; }catch(e){ lastErr='저장 실패: '+e.message; } }); return saveP; };
+  let next=0, done=0, fail=0, okN=0, streak=0, lastErr='', saved=0, saveP=Promise.resolve();
+  const save=()=>{ saveP=saveP.then(async()=>{ try{ if(!Object.keys(TAGS).length) return; await srvList(true); const cur=(await idbGet('tags'))||{}; Object.assign(cur,TAGS); if(await idbSet('tags',cur)) saved=Object.keys(TAGS).length; else lastErr='서버에 저장하지 못했습니다'; }catch(e){ lastErr='저장 실패: '+e.message; } }); return saveP; };
   const worker=async()=>{
     while(next<chunks.length&&!TAGSTOP){
       const i=chunks[next++];
       try{
         const items=todo.slice(i,i+CH).map((r,k)=>({i:i+k,n:r.name+(r.cat?' ['+r.cat.split('>').slice(-1)[0].trim()+']':'')}));
         const d=await callAI({items},2,'/api/promo-tag');
-        d.tags.forEach(t=>{ const r=todo[t.i]; if(r) TAGS[r.code]=[t.k].concat(t.t||[]); });
-      }catch(e){ fail++; lastErr=e.message; if(/한도/.test(e.message)) TAGSTOP=true; }
+        let got=0; d.tags.forEach(t=>{ const r=todo[t.i]; if(r){ TAGS[r.code]=[t.k].concat(t.t||[]); got++; } });
+        if(!got) throw new Error('AI 가 태그를 한 개도 돌려주지 않았습니다');
+        okN++; streak=0;
+      }catch(e){ fail++; streak++; lastErr=e.message; if(/한도|quota|429/.test(e.message)||streak>=3) TAGSTOP=true; }   // 연달아 3번 실패하거나 한도 초과면 바로 멈춘다 (예전엔 실패해도 끝까지 돌며 '진행 중'처럼 보였음)
       done++;
       applyTags();
-      $('tagInfo').textContent=`태그 붙이는 중... ${Math.min(done*CH,todo.length).toLocaleString()} / ${todo.length.toLocaleString()}`+(fail?` (실패 ${fail}묶음)`:'');
+      $('tagInfo').textContent=`태그 붙이는 중... 붙인 상품 ${Object.keys(TAGS).length.toLocaleString()}개 (처리 ${Math.min(done*CH,todo.length).toLocaleString()} / ${todo.length.toLocaleString()})`+(fail?` · 실패 ${fail}묶음`:'');
       if(done%10===0) save();
     }
   };
   try{ await Promise.all([worker(),worker(),worker()]); await save(); }
   finally{
     TAGBUSY=false; $('tagStop').hidden=true; applyTags();
-    if(fail||lastErr) $('tagInfo').textContent+=` — ${lastErr||'일부 실패'} (다시 누르면 남은 것부터 이어서 합니다)`;
+    const n=Object.keys(TAGS).length;
+    if(fail||lastErr){ $('tagInfo').innerHTML=`⛔ <b>태그를 다 붙이지 못했습니다.</b> 지금 ${n.toLocaleString()} / ${DATA.rows.length.toLocaleString()}개만 붙어 있어요 (서버 저장 ${saved.toLocaleString()}개). 이유: ${esc(lastErr||'일부 실패')} — 해결 후 다시 누르면 남은 것부터 이어서 합니다.`; $('tagInfo').style.color='var(--err,#c0392b)'; }
+    else { $('tagInfo').style.color=''; if(saved<n) $('tagInfo').textContent+=' ⚠️ 서버 저장 확인 안 됨 — 다시 눌러 저장하세요'; }
   }
 };
 

@@ -71,6 +71,14 @@
   .rchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px;align-items:center;}
   .rchip{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;padding:3px 4px 3px 10px;border-radius:999px;background:#eef3ff;color:#1d4ed8;}
   .rchip button{border:0;background:rgba(29,78,216,.15);color:#1d4ed8;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;padding:0;}
+  .rchip{cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;padding:6px 6px 6px 8px;font-size:13.5px;gap:6px;border:1px solid transparent;transition:background .12s,border-color .12s;}
+  .rchip::before{content:'⋮⋮';font-size:12px;letter-spacing:-3px;opacity:.45;margin-right:2px;}
+  .rchip:hover{background:#dde7ff;border-color:#b9ccff;}
+  .rchip:focus-visible{outline:2px solid #1d4ed8;outline-offset:1px;}
+  .rchip button{width:20px;height:20px;}
+  .rchip.drag{position:fixed;z-index:99999;margin:0;opacity:.95;box-shadow:0 8px 22px rgba(29,78,216,.4);cursor:grabbing;pointer-events:none;transform:scale(1.06);background:#fff;border-color:#1d4ed8;}
+  .rchip-ph{display:inline-block;border:2px dashed #1d4ed8;border-radius:999px;background:rgba(29,78,216,.07);box-sizing:border-box;}
+  .rchips.dragging,.rchips.dragging *{cursor:grabbing !important;}
   .rchips input{width:170px;padding:4px 9px;font-size:12.5px;}
   .prev .hl{position:absolute;pointer-events:none;border:1.5px dashed #2b6cb0;background:rgba(43,108,176,.10);border-radius:3px;}
   .prev .ed{position:absolute;box-sizing:border-box;padding:0 6px;border:2px solid #2b6cb0;border-radius:4px;background:#fff;color:#111;font-family:inherit;outline:none;z-index:3;}
@@ -107,6 +115,7 @@
   <h2>① 템플릿 · 상품명</h2>
   <div class="row" style="margin-bottom:8px">
     <select id="tplSel" style="font:14px var(--font);padding:8px;border:1px solid var(--line);border-radius:8px;min-width:260px"><option value="">— 템플릿 선택 (의류 · 슈즈 · 브랜드별 …) —</option></select>
+    <button type="button" class="btn btn-out btn-sm" id="tplSave" title="지금 화면의 정보 항목 순서 · 실측표 방식 · 하단 안내 · 실측표 틀을 내 템플릿으로 저장합니다">💾 템플릿 저장</button><button type="button" class="btn btn-out btn-sm" id="tplDel" style="display:none">🗑 내 템플릿 삭제</button>
     <span id="rHints" class="row"></span>
   </div>
   <div class="row" style="margin-bottom:10px">
@@ -142,7 +151,7 @@
     <label class="hint" style="display:block;margin-top:6px">정보 항목 목록 (쉼표로 구분 · 순서대로 상세페이지 Information 표에 들어갑니다 — 템플릿이 채워 주고, 직접 고쳐도 됩니다)</label>
     <input type="text" id="tplRows" placeholder="상품명,브랜드,카테고리,수입여부,제조년월,색상,제조국,구성품,소재">
     <div class="rchips" id="rowChips"></div>
-    <div class="rchips"><input type="text" id="rowAdd" placeholder="추가할 항목 이름 (예: 굽높이)"><button type="button" class="btn btn-out btn-sm" id="rowAddBtn">+ 항목 추가</button><span class="hint">칩의 ×로 항목을 지우고, 여기서 새 항목을 더할 수 있어요 (순서는 위 목록에서 바꿔요)</span></div>
+    <div class="rchips"><input type="text" id="rowAdd" placeholder="추가할 항목 이름 (예: 굽높이)"><button type="button" class="btn btn-out btn-sm" id="rowAddBtn">+ 항목 추가</button><span class="hint">칩의 ×로 항목을 지우고, 여기서 새 항목을 더할 수 있어요 칩을 끌어서 순서를 바꿀 수 있어요</span></div>
   </div>
   <div class="grid" id="fields"></div>
   <div class="grid" style="margin-top:12px" id="szBlock">
@@ -211,7 +220,7 @@
         <label class="hint" id="rKidsShowWrap" style="display:none"><input type="checkbox" id="rKidsShow"> 키즈 사이트에 바로 노출</label></div>
     </div>
     <datalist id="rBrandList"></datalist><datalist id="rCatList"></datalist>
-    <div class="hint" style="margin-top:6px">목록 이미지(_01)는 <b>첫 번째 사진</b>, 오버 이미지(_02)는 <b>두 번째 사진</b>(1장이면 같은 사진)이 자동으로 쓰입니다. 상세 이미지(_00)는 위에서 만든 결과입니다.</div>
+    <div class="hint" style="margin-top:6px">목록 이미지(_01)는 <b>첫 번째 사진</b>, 오버 이미지(_02)는 <b>두 번째 사진</b>(1장이면 같은 사진)이 자동으로 쓰이며, 상품 가장자리를 잘라 1000×1000 가운데에 맞춘 컷으로 올라갑니다(목록에서 마우스를 올리면 바뀌는 이미지). 상세 이미지(_00)는 위에서 만든 결과입니다.</div>
     <div class="row" style="margin:12px 0 6px">
       <button class="btn btn-out" id="rPreviewBtn" type="button" disabled>미리보기 (저장 안 됨)</button>
       <button class="btn btn-pri" id="rRegBtn" type="button" disabled>사이트에 등록</button>
@@ -296,7 +305,61 @@ function renderRowChips(){
     var b=document.createElement('button'); b.type='button'; b.textContent='×'; b.title=k+' 항목 삭제';
     b.addEventListener('click',function(){ var r=curRows().filter(function(x){ return x!==k; }); if(r.length) setInfoRows(r); });
     c.appendChild(b); box.appendChild(c);
+    c.dataset.k=k; c.title='끌어서 순서 바꾸기 (선택 후 ◀ ▶ 키로도 이동)'; c.tabIndex=0;
+    c.addEventListener('keydown',function(e){ var d=e.key==='ArrowLeft'?-1:(e.key==='ArrowRight'?1:0); if(!d) return; e.preventDefault(); var r=curRows(), i=r.indexOf(k), j=i+d; if(j<0||j>=r.length) return; r.splice(i,1); r.splice(j,0,k); setInfoRows(r); if(state.last){ state.stale=true; setApplyBtn(); } var n=box.querySelector('.rchip[data-k="'+k+'"]'); if(n) n.focus(); });
+    c.addEventListener('pointerdown',function(e){ if(e.target===b||e.button>0) return; startChipDrag(e,c,box); });
   });
+}
+/* 칩 끌어서 순서 바꾸기 (마우스·터치 공통): 칩이 커서를 따라오고, 놓일 자리에 점선 빈칸이 생기며, 나머지 칩은 부드럽게 비켜난다. ◀▶ 키로도 옮길 수 있다 */
+function commitChipOrder(box){
+  var order=[].slice.call(box.querySelectorAll('.rchip')).map(function(c){ return c.dataset.k; });
+  if(order.join('|')!==curRows().join('|')){ setInfoRows(order); if(state.last){ state.stale=true; setApplyBtn(); } }
+}
+function flip(box,fn){
+  var els=[].slice.call(box.children), old=els.map(function(e){ return e.getBoundingClientRect(); });
+  fn();
+  els.forEach(function(e,i){
+    if(!e.parentNode||e.classList.contains('drag')) return;
+    var n=e.getBoundingClientRect(), dx=old[i].left-n.left, dy=old[i].top-n.top; if(!dx&&!dy) return;
+    e.style.transition='none'; e.style.transform='translate('+dx+'px,'+dy+'px)';
+    requestAnimationFrame(function(){ e.style.transition='transform .15s ease'; e.style.transform=''; });
+  });
+}
+function startChipDrag(e,chip,box){
+  var sx=e.clientX, sy=e.clientY, moving=false, id=e.pointerId, ph=null, offX=0, offY=0;
+  function over(x,y){
+    var list=[].slice.call(box.querySelectorAll('.rchip')).filter(function(c){ return c!==chip; });
+    var hit=null;
+    for(var i=0;i<list.length;i++){ var r=list[i].getBoundingClientRect(); if(x>=r.left-4&&x<=r.right+4&&y>=r.top-4&&y<=r.bottom+4){ hit=list[i]; break; } }
+    if(!hit) return;
+    var r2=hit.getBoundingClientRect(), after=x>r2.left+r2.width/2;
+    var ref=after?hit.nextSibling:hit; if(ref===ph||(ref&&ref===ph.nextSibling&&!after&&false)) return;
+    if(after&&hit.nextSibling===ph) return; if(!after&&hit.previousSibling===ph) return;
+    flip(box,function(){ box.insertBefore(ph,ref); });
+  }
+  function mv(ev){
+    if(ev.pointerId!==id) return;
+    if(!moving){
+      if(Math.abs(ev.clientX-sx)+Math.abs(ev.clientY-sy)<5) return;
+      moving=true; var r=chip.getBoundingClientRect(); offX=sx-r.left; offY=sy-r.top;
+      ph=document.createElement('span'); ph.className='rchip-ph'; ph.style.width=r.width+'px'; ph.style.height=r.height+'px';
+      box.insertBefore(ph,chip); chip.style.width=r.width+'px'; chip.style.height=r.height+'px';
+      chip.classList.add('drag'); document.body.appendChild(chip); box.classList.add('dragging');
+    }
+    ev.preventDefault();
+    chip.style.left=(ev.clientX-offX)+'px'; chip.style.top=(ev.clientY-offY)+'px';
+    over(ev.clientX,ev.clientY);
+  }
+  function up(ev){
+    if(ev.pointerId!==id) return;
+    document.removeEventListener('pointermove',mv); document.removeEventListener('pointerup',up); document.removeEventListener('pointercancel',up);
+    box.classList.remove('dragging');
+    if(!moving) return;
+    chip.classList.remove('drag'); chip.style.cssText='';
+    box.insertBefore(chip,ph); ph.remove();
+    commitChipOrder(box);
+  }
+  document.addEventListener('pointermove',mv,{passive:false}); document.addEventListener('pointerup',up); document.addEventListener('pointercancel',up);
 }
 function addRowFromInput(){
   var v=$('rowAdd').value.trim(); if(!v) return; $('rowAdd').value='';
@@ -380,7 +443,7 @@ function wireDrop(box,input,handler){
 }
 $('xBlank').addEventListener('click',function(){
   $('xSum').textContent='기본양식을 만드는 중…';
-  var t=state.tplId?TPL.tpl(state.tplId):null, v={}, fn='상품정보_기본양식.xlsx';
+  var t=state.tplId?getTpl(state.tplId):null, v={}, fn='상품정보_기본양식.xlsx';
   if(t){
     var it=t.items?TPL.item(t.items):null;
     v={tplName:t.name,infoRows:t.rows,defaults:t.defaults,extraNames:(t.rows.indexOf('굽높이')>=0?['굽높이']:[])};
@@ -676,8 +739,8 @@ function resizeFrom(src,sx,sy,sw,sh,tw,th){
   var o=document.createElement('canvas'); o.width=tw; o.height=th;
   var ox=o.getContext('2d'); ox.imageSmoothingQuality='high'; ox.drawImage(cur,0,0,tw,th); return o;
 }
-function mvX(s){ var m=Math.abs(SLOT_W-s.w)/2; return Math.max(-m,Math.min(m,s.dx||0)); }
-function mvY(s,sh){ var m=Math.abs(sh-s.h)/2; return Math.max(-m,Math.min(m,s.dy||0)); }
+/* 사진은 가이드 칸(점선)을 넘어서도 옮길 수 있다 - 화면 안에서만 제한 */ function mvX(s){ return Math.max(-W,Math.min(W,s.dx||0)); }
+function mvY(s,sh){ return Math.max(-900,Math.min(900,s.dy||0)); }
 function fitPhoto(c,px,py){
   var b=trimBox(c), cw=b[2]-b[0], ch=b[3]-b[1], warn='';
   var full=cw>=c.width*0.97 && ch>=c.height*0.97;
@@ -832,7 +895,7 @@ function render(f,chart,slots,ov){
     var al=align||'left', w=s?measure(s,wt,size)+ls*s.length:0, x0=al==='center'?x-w/2:(al==='right'?x-w:x);
     ops.push({t:'text',s:s,x:x,base:base,size:size,wk:wk,wt:wt,ls:ls,color:color,align:al,id:id,ref:ref||null,bx:x0,bw:w});
   }
-  function img(im,x,yy,w,h,nm,sl,gr){ ops.push({t:'img',im:im,x:x,y:yy,w:w,h:h,nm:nm||'사진',sl:sl||null,gr:gr||null,sr:(gr&&(w>gr.w+0.5||h>gr.h+0.5))?gr:null}); }
+  function img(im,x,yy,w,h,nm,sl,gr){ ops.push({t:'img',im:im,x:x,y:yy,w:w,h:h,nm:nm||'사진',sl:sl||null,gr:gr||null,sr:null}); }
 
   var topH=Math.round(topImg.naturalHeight*W/topImg.naturalWidth);
   img(topImg,0,0,W,topH,'상단 안내(고정)');
@@ -1000,9 +1063,7 @@ $('prev').addEventListener('click',function(e){
 });
 
 /* ---------- 사진 직접 이동·크기 조절 + 가이드선 (미리보기에서 사진을 누르면 파란 테두리) ---------- */
-function visRect(o){
-  var g=o.gr; if(!g) return {x:o.x,y:o.y,w:o.w,h:o.h};
-  var x0=Math.max(o.x,g.x), y0=Math.max(o.y,g.y), x1=Math.min(o.x+o.w,g.x+g.w), y1=Math.min(o.y+o.h,g.y+g.h);
+function visRect(o){ var x0=Math.max(o.x,0), y0=Math.max(o.y,0), x1=Math.min(o.x+o.w,W), y1=Math.min(o.y+o.h,state.canvas?state.canvas.height:1e9);
   return {x:x0,y:y0,w:Math.max(1,x1-x0),h:Math.max(1,y1-y0)};
 }
 function hitPhoto(e){
@@ -1347,7 +1408,42 @@ function afterTplChange(){
 }
 function szVisible(){ $('szBlock').style.display=state.chartMode==='full'?'':'none'; }
 function fillSel(sel,list,key,label){ list.forEach(function(x){ var o=document.createElement('option'); o.value=x[key]; o.textContent=x[label]; sel.appendChild(o); }); }
+/* ---------- 내 템플릿 (이 브라우저에 저장) ---------- */
+var MY_KEY='buyest.photoauto.myTpl.v1';
+function myTpls(){ try{ var a=JSON.parse(localStorage.getItem(MY_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function saveMyTpls(a){ try{ localStorage.setItem(MY_KEY,JSON.stringify(a)); return true; }catch(e){ alert('저장하지 못했어요: '+e.message); return false; } }
+function getTpl(id){ if(!id) return null; var m=myTpls().filter(function(t){ return t.id===id; })[0]; return m||TPL.tpl(id); }
+function fillMyTpls(sel){
+  var old=sel.querySelector('optgroup[data-my]'); if(old) old.remove();
+  var a=myTpls(); if(!a.length) return;
+  var g=document.createElement('optgroup'); g.label='★ 내 템플릿'; g.setAttribute('data-my','1');
+  a.forEach(function(t){ var o=document.createElement('option'); o.value=t.id; o.textContent=t.name; g.appendChild(o); });
+  sel.insertBefore(g,sel.options[1]||null);
+}
+function saveMyTpl(){
+  var name=prompt('템플릿 이름을 적어 주세요 (같은 이름이면 덮어씁니다)\n저장 내용: 정보 항목 순서 · 실측표 방식 · 하단 안내 · 실측표 틀(항목·사이즈 줄)','');
+  if(name==null) return; name=name.trim(); if(!name) return;
+  var a=myTpls(), id='my:'+name, i=a.map(function(t){ return t.id; }).indexOf(id);
+  if(i>=0&&!confirm('"'+name+'" 템플릿이 이미 있어요. 덮어쓸까요?')) return;
+  /* 실측 값은 상품마다 다르므로 비우고, MM 같은 고정값 열만 남긴다 */
+  var g=grid.map(function(r,ri){ return r.map(function(v,ci){ return (ri===0||ci===0||String(grid[0][ci]).toUpperCase()==='MM')?v:''; }); });
+  var t={id:id,name:name,mine:true,rows:curRows(),chart:state.chartMode,bottom:state.bottomKey||'',grid:g,
+    defaults:(fld('구성품')&&fld('구성품').value.trim())?{'구성품':fld('구성품').value.trim()}:(state.defaults||null)};
+  if(i>=0) a[i]=t; else a.push(t);
+  if(!saveMyTpls(a)) return;
+  fillMyTpls($('tplSel')); $('tplSel').value=id; state.tplId=id; $('tplDel').style.display='';
+  $('tplNote').textContent='저장했어요: 내 템플릿 ['+name+'] — 다음부터 위 목록의 "★ 내 템플릿"에서 고르면 돼요 (이 컴퓨터·브라우저에 저장)';
+}
+function deleteMyTpl(){
+  var id=$('tplSel').value, t=myTpls().filter(function(x){ return x.id===id; })[0]; if(!t) return;
+  if(!confirm('내 템플릿 ['+t.name+']을(를) 삭제할까요?')) return;
+  saveMyTpls(myTpls().filter(function(x){ return x.id!==id; }));
+  fillMyTpls($('tplSel')); $('tplSel').value=''; state.tplId=''; $('tplDel').style.display='none'; $('tplNote').textContent='삭제했어요.';
+}
 fillSel($('tplSel'),TPL.TEMPLATES,'id','name');
+fillMyTpls($('tplSel'));
+$('tplSave').addEventListener('click',saveMyTpl);
+$('tplDel').addEventListener('click',deleteMyTpl);
 fillSel($('bottomSel'),TPL.BOTTOMS,'k','name');
 function chip(box,label,attr,val){ var b=document.createElement('button'); b.type='button'; b.className='btn btn-out btn-sm'; b.textContent=label; b.setAttribute(attr,val); box.appendChild(b); }
 TPL.ITEMS.forEach(function(it){ chip($('itemChips'),it.name,'data-item',it.k); });
@@ -1385,23 +1481,26 @@ $('sizeChips').addEventListener('click',function(e){ var k=e.target.getAttribute
 function applyTplObj(t){
   state.tplId=t?t.id:'';
   state.defaults=t&&t.defaults||null;
+  $('tplDel').style.display='none';
   if(!t){ $('tplNote').textContent=''; return; }
   setInfoRows(t.rows);
   state.chartMode=t.chart; $('chartMode').value=t.chart;
   state.bottomKey=t.bottom||''; $('bottomSel').value=state.bottomKey;
   applyAuto(); szVisible();
   if(t.items) applyItemSet(t.items,!gridHasValues());
-  $('tplNote').textContent='적용: '+t.name+' (PSD '+t.src+')';
+  else if(t.grid&&t.chart==='full') gridSet(t.grid.map(function(r){ return r.slice(); }));
+  $('tplNote').textContent=t.mine?'적용: 내 템플릿 ['+t.name+']':'적용: '+t.name+' (PSD '+t.src+')';
+  $('tplDel').style.display=t.mine?'':'none';
   if(window.PhotoRegister) PhotoRegister.invalidate();
   afterTplChange();
 }
 function restoreTpl(m){
-  var t=m&&m.tplId?TPL.tpl(m.tplId):null;
+  var t=m&&m.tplId?getTpl(m.tplId):null;
   state.tplId=t?t.id:''; state.defaults=t&&t.defaults||null; $('tplSel').value=state.tplId;
   state.chartMode=(m&&m.chartMode)||'full'; $('chartMode').value=state.chartMode;
   state.bottomKey=(m&&m.bottomKey)||''; $('bottomSel').value=state.bottomKey; szVisible();
 }
-$('tplSel').addEventListener('change',function(){ applyTplObj(TPL.tpl(this.value)); });
+$('tplSel').addEventListener('change',function(){ applyTplObj(getTpl(this.value)); });
 $('chartMode').addEventListener('change',function(){ state.chartMode=this.value; szVisible(); if(window.PhotoRegister) PhotoRegister.invalidate(); afterTplChange(); });
 $('bottomSel').addEventListener('change',function(){ state.bottomKey=this.value; afterTplChange(); });
 
@@ -1416,15 +1515,9 @@ window.PhotoAuto={
     if(!state.canvas||!state.photos.length||!state.last) return null;
     return {pname:$('pname').value.trim(),code:codeOf(),canvas:state.canvas,photos:state.photos,genId:state.genId||0};
   },
-  /* 목록/오버 이미지용: 흰 배경 정리 → 긴 변 1600px 이하 → 4:4:4 JPEG */
+  /* 목록(_01)/오버(_02) 이미지용: 상품 가장자리를 잘라 1000×1000 흰 캔버스 가운데에 놓는다(JPG 전체 저장의 _01_/_02_ 와 같은 방식, 크기는 '컷 사진 상품 크기 %' 설정). 마우스를 올리면 다른 사진으로 바뀌는 목록용 */
   photoJpeg:function(p){
-    return loadImg(p.url).then(function(im){
-      return cleanBg(adjustCanvas(toWhiteCanvas(im),p.adj),p).then(function(rr){ var c=rr.c;
-      var m=Math.max(c.width,c.height);
-      if(m>1600){ var k=1600/m; c=resizeFrom(c,0,0,c.width,c.height,Math.round(c.width*k),Math.round(c.height*k)); }
-      return encodeJpeg(c);
-      });
-    });
+    return cutCanvas(p,1000,1000).then(encodeJpeg);
   },
   /* 템플릿: 실측 항목(머리글)만 채움. 값은 사람이 입력 */
   applyTemplate:function(b){

@@ -13,7 +13,7 @@
   .screen{ height:100vh; height:100dvh; width:100%; display:flex; }
   .screen[hidden]{ display:none; }
   /* 대화 영역은 평소엔 흐리게 두고, 화면을 만지는 동안(+몇 초)만 보인다 → 앱 전환 미리보기에 찍혀도 읽을 수 없다 */
-  .message-list.veil{ -webkit-filter:blur(20px); filter:blur(20px); }
+  .veil{ -webkit-filter:blur(20px); filter:blur(20px); }
   #cover{ position:fixed; inset:0; z-index:9999; background:var(--bg); }
   #cover[hidden]{ display:none; }
 
@@ -37,7 +37,34 @@
   .error{ color:var(--danger); font-size:13px; margin:0; text-align:center; }
 
   #chat-screen{ flex-direction:column; }
-  .chat-header{ flex:none; padding:14px 16px; padding-top:max(14px, env(safe-area-inset-top)); background:var(--panel); font-weight:600; }
+  .chat-header{ flex:none; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 16px; padding-top:max(10px, env(safe-area-inset-top)); background:var(--panel); font-weight:600; }
+  .message-list[hidden], .message-form[hidden]{ display:none; }
+  .tabs{ display:flex; gap:6px; }
+  .tab{ padding:7px 14px; border-radius:16px; border:none; background:#202c33; color:var(--muted); font-size:14px; font-weight:600; cursor:pointer; touch-action:manipulation; }
+  .tab.on{ background:var(--accent); color:#04211b; }
+  .msg .filelink{ display:block; color:var(--text); text-decoration:underline; word-break:break-all; }
+  .msg .keep{ display:inline-block; margin-top:6px; padding:3px 10px; border-radius:12px; border:none; background:rgba(255,255,255,.12); color:var(--text); font-size:12px; cursor:pointer; }
+  .msg img{ cursor:zoom-in; }
+  /* 갤러리: 한번 올리면 지워지지 않는 비밀 사진 보관소 */
+  #gallery-view{ flex:1; min-height:0; display:flex; flex-direction:column; }
+  #gallery-view[hidden]{ display:none; }
+  .gal-bar{ flex:none; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 14px; background:var(--panel); border-top:1px solid #202c33; font-size:13px; color:var(--muted); }
+  .gal-bar button{ padding:9px 14px; border-radius:18px; border:none; background:var(--accent); color:#04211b; font-weight:600; font-size:14px; cursor:pointer; }
+  .gal-bar button:disabled{ opacity:.6; }
+  #gal-grid{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px; display:grid; grid-template-columns:repeat(3,1fr); gap:4px; align-content:start; }
+  #gal-grid .cell{ position:relative; aspect-ratio:1/1; background:#1f2c34; border-radius:4px; overflow:hidden; cursor:pointer; }
+  #gal-grid .cell img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .gal-empty{ grid-column:1/-1; text-align:center; color:var(--muted); font-size:14px; padding:48px 12px; line-height:1.7; }
+  .gal-more{ grid-column:1/-1; padding:12px; border-radius:10px; border:none; background:#202c33; color:var(--text); font-size:14px; cursor:pointer; }
+  #viewer{ position:fixed; inset:0; z-index:9000; background:#000; display:flex; align-items:center; justify-content:center; }
+  #viewer[hidden]{ display:none; }
+  #viewer img{ max-width:100%; max-height:100%; object-fit:contain; }
+  #viewer .x{ position:absolute; top:max(12px, env(safe-area-inset-top)); right:14px; width:42px; height:42px; border-radius:50%; border:none; background:rgba(255,255,255,.18); color:#fff; font-size:20px; cursor:pointer; }
+  #viewer .del{ position:absolute; bottom:max(18px, env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); padding:10px 22px; border-radius:22px; border:none; background:rgba(241,92,109,.9); color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+  #viewer .del[hidden]{ display:none; }
+  #viewer .nav{ position:absolute; top:50%; transform:translateY(-50%); width:42px; height:60px; border:none; background:rgba(255,255,255,.12); color:#fff; font-size:22px; cursor:pointer; }
+  #viewer .nav.prev{ left:0; border-radius:0 10px 10px 0; } #viewer .nav.next{ right:0; border-radius:10px 0 0 10px; }
+  #viewer .nav[hidden]{ display:none; }
   .message-list{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px; display:flex; flex-direction:column; gap:8px; }
   .msg{ max-width:78%; padding:8px 12px; border-radius:14px; background:var(--bubble-other); align-self:flex-start; word-wrap:break-word; overflow-wrap:anywhere; white-space:pre-wrap; }
   .msg.mine{ background:var(--bubble-me); align-self:flex-end; }
@@ -53,6 +80,7 @@
 </head>
 <body>
 <div id="cover" hidden></div>
+<div id="viewer" hidden><img id="viewer-img" alt=""><button type="button" class="nav prev" id="v-prev" hidden>‹</button><button type="button" class="nav next" id="v-next" hidden>›</button><button type="button" class="x" id="viewer-x" title="닫기">✕</button><button type="button" class="del" id="v-del" title="삭제" hidden>🗑 삭제</button></div>
 
 <div id="login-screen" class="screen">
   <div id="entry-box" class="login-card">
@@ -72,11 +100,20 @@
 </div>
 
 <div id="chat-screen" class="screen" hidden>
-  <header class="chat-header">개발예정</header>
+  <header class="chat-header"><span>개발예정</span>
+    <div class="tabs"><button type="button" class="tab on" id="tab-chat">대화</button><button type="button" class="tab" id="tab-gal">갤러리</button></div>
+  </header>
   <main id="message-list" class="message-list"></main>
+  <section id="gallery-view" hidden>
+    <div class="gal-bar"><span id="gal-count"></span><button type="button" id="gal-add">+ 사진 보관</button></div>
+    <div id="gal-grid"></div>
+    <input id="gal-input" type="file" accept="image/*" multiple hidden>
+  </section>
   <form id="message-form" class="message-form">
     <button type="button" id="image-btn" class="icon-btn" title="사진 보내기">📷</button>
     <input id="image-input" type="file" accept="image/*" hidden>
+    <button type="button" id="file-btn" class="icon-btn" title="파일 보내기">📎</button>
+    <input id="file-input" type="file" hidden>
     <input id="text-input" type="text" placeholder="메시지 입력..." maxlength="2000" autocomplete="off">
     <button type="submit" class="send-btn">전송</button>
   </form>
@@ -88,7 +125,9 @@
   // 비밀 채팅방 화면. 서버(buyest.co.kr/toolkit_chat_api.php)가 buyest/buyest1 계정만 받아주고,
   // buyest1 은 30분, buyest 는 화면을 벗어나면 바로 — 이 화면에서 신호가 없으면 서버가 입장 상태를 끊는다. 끊기면 툴킷 메인으로 돌려보낸다.
   var API = 'https://buyest.co.kr/toolkit_chat_api.php';
-  var POLL_MS = 2500;
+  var POLL_MS = 150;        // 서버가 새 메시지가 올 때까지(최대 8초) 붙잡고 있다가 바로 돌려주므로, 응답 직후 곧바로 다시 요청 → 거의 실시간
+  var POLL_WAIT = 8;
+  var POLL_RETRY_MS = 2000; // 오류 났을 때만 천천히 재시도
   var IDLE_LIMIT_MS = 30 * 60 * 1000;   // buyest1: 30분 자리비움까지 유지 (buyest 는 화면을 벗어나면 즉시 로그아웃)
   var TTL_MS = 24 * 60 * 60 * 1000;
   var ALLOWED = ['buyest', 'buyest1'];
@@ -113,7 +152,7 @@
     else if(passInput.value.length < 20) passInput.value = passInput.value + k;
   });
   var list = $('message-list'), form = $('message-form'), textInput = $('text-input');
-  var imageInput = $('image-input'), imageBtn = $('image-btn');
+  var imageInput = $('image-input'), imageBtn = $('image-btn'), fileInput = $('file-input'), fileBtn = $('file-btn');
 
   var me = '', lastId = 0, pollTimer = null, hiddenAt = 0, polling = false, peerRead = 0;
 
@@ -143,6 +182,7 @@
     setToken('');
     if(pollTimer){ clearTimeout(pollTimer); pollTimer = null; }
     list.textContent = ''; lastId = 0; me = '';
+    try{ closeViewer(); galGrid.textContent = ''; galIds = []; galLoaded = false; }catch(e){}   // 갤러리 화면·큰 사진도 같이 지운다
     chatScreen.hidden = true; loginScreen.hidden = false; cover.hidden = true;
     passInput.value = '';
     if(message){ loginError.textContent = message; loginError.hidden = false; }
@@ -150,10 +190,11 @@
   }
   var IDLE_MESSAGE = '자리를 비워 로그아웃되었습니다. 비밀번호를 다시 입력하세요.';
 
-  function call(payload){
-    return fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+  function call(payload, signal){
+    return fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload), signal:signal})
       .then(function(r){ return r.json().catch(function(){ return {ok:false, error:'서버 응답 오류'}; }); });
   }
+  function tokenQ(){ return '&token=' + encodeURIComponent(getToken()); }
 
   function fmt(ts){
     var d = new Date(ts);
@@ -167,9 +208,26 @@
     var n = document.createElement('span'); n.className = 'nickname'; n.textContent = m.nick; el.appendChild(n);
     if(m.type === 'image'){
       var img = document.createElement('img'); img.alt = '사진';
-      img.src = API + '?action=image&id=' + m.id + '&token=' + encodeURIComponent(getToken());
+      var full = API + '?action=image&id=' + m.id + tokenQ();
+      img.src = full;
       img.onload = function(){ list.scrollTop = list.scrollHeight; };
+      img.addEventListener('click', function(){ openViewer([full]); });
       el.appendChild(img);
+      var keep = document.createElement('button'); keep.type = 'button'; keep.className = 'keep'; keep.textContent = '🖼 갤러리에 보관';
+      keep.addEventListener('click', function(){
+        keep.disabled = true; keep.textContent = '보관 중...';
+        call({action:'gallery_save', token:getToken(), id:m.id}).then(function(r){
+          if(r && r.expired) return forceLogout(IDLE_MESSAGE);
+          keep.textContent = (r && r.ok) ? '✓ 갤러리에 보관됨' : ((r && r.error) || '보관 실패');
+          if(r && r.ok) galLoaded = false;
+        }).catch(function(){ keep.textContent = '보관 실패'; });
+      });
+      el.appendChild(keep);
+    } else if(m.type === 'file'){
+      var a = document.createElement('a'); a.className = 'filelink'; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.href = API + '?action=file&id=' + m.id + tokenQ();
+      a.textContent = '📎 ' + m.text;
+      el.appendChild(a);
     } else {
       var t = document.createElement('span'); t.textContent = m.text; el.appendChild(t);
     }
@@ -183,12 +241,16 @@
     });
   }
 
-  function poll(){
+  // 서버 롱폴링: 새 메시지(또는 상대의 읽음)가 생기면 바로 응답이 오고, 없으면 최대 POLL_WAIT 초 뒤 빈 응답 → 곧바로 다시 요청.
+  // firstLoad=true 는 입장 직후 대화 내역을 기다림 없이 한 번에 받아올 때.
+  function poll(firstLoad){
     if(polling || !getToken() || document.hidden) return schedule();
     polling = true;
     var viewing = !document.hidden && cover.hidden && !chatScreen.hidden;
-    call({action:'poll', token:getToken(), after:lastId, seen: viewing ? lastId : 0}).then(function(r){
-      polling = false;
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var guard = setTimeout(function(){ if(ctrl) ctrl.abort(); }, (POLL_WAIT + 12) * 1000);
+    call({action:'poll', token:getToken(), after:lastId, seen: viewing ? lastId : 0, wait: firstLoad === true ? 0 : POLL_WAIT, peer: peerRead}, ctrl && ctrl.signal).then(function(r){
+      clearTimeout(guard); polling = false;
       if(r && r.expired){ return forceLogout(IDLE_MESSAGE); }
       if(r && r.ok){
         peerRead = r.peerRead || 0;
@@ -197,21 +259,22 @@
         pruneOld(r.first);
         refreshReceipts();
         if(r.msgs.length && (stick || lastId === r.msgs[r.msgs.length-1].id && list.children.length === r.msgs.length)) list.scrollTop = list.scrollHeight;
-      }
-      schedule();
-    }).catch(function(){ polling = false; schedule(); });
+        schedule(POLL_MS);
+      } else { schedule(POLL_RETRY_MS); }
+    }).catch(function(){ clearTimeout(guard); polling = false; schedule(POLL_RETRY_MS); });
   }
-  function schedule(){
+  function schedule(ms){
     if(pollTimer) clearTimeout(pollTimer);
-    if(getToken()) pollTimer = setTimeout(poll, POLL_MS);
+    if(getToken()) pollTimer = setTimeout(poll, ms == null ? 1000 : ms);
   }
 
   function enter(user){
     me = user;
     loginScreen.hidden = true; chatScreen.hidden = false;
-    lastId = 0; list.textContent = '';
+    lastId = 0; peerRead = 0; list.textContent = '';
+    showTab('chat');
     veil(true);
-    poll();
+    poll(true);
   }
 
   // 입장
@@ -268,19 +331,136 @@
       poll();
     }).catch(function(){ alert('전송 중 오류가 발생했습니다.'); });
   });
+  // ---- 사진 줄이기: 폰 사진(수 MB)을 그대로 올리면 느리므로, 대화용은 긴 변 1600px JPEG 로 줄여서 올린다 (갤러리는 3000px·고화질 + 작은 미리보기) ----
+  function isImg(f){ return /^image\//.test(f.type || '') || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name || ''); }
+  function shrink(file, max, q, force){
+    if(/gif$/i.test(file.type || '') || /\.gif$/i.test(file.name || '')) return Promise.resolve(file);   // 움직이는 사진은 그대로
+    return new Promise(function(res, rej){
+      var u = URL.createObjectURL(file), im = new Image();
+      im.onload = function(){ res({im:im, url:u}); };
+      im.onerror = function(){ URL.revokeObjectURL(u); rej(new Error('decode')); };
+      im.src = u;
+    }).then(function(o){
+      var w = o.im.naturalWidth, h = o.im.naturalHeight, s = Math.min(1, max / Math.max(w, h));
+      if(!force && s === 1 && file.size < 400000 && /jpe?g$/i.test(file.type || '')){ URL.revokeObjectURL(o.url); return file; }
+      var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(o.im, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(o.url);
+      return new Promise(function(res2){ c.toBlob(function(b){ res2(b || file); }, 'image/jpeg', q); });
+    }).catch(function(){ return file; });   // 이 기기에서 해독이 안 되는 형식(예: 일부 HEIC)은 원본 그대로
+  }
+  function jpgName(f){ return ((f.name || 'photo').replace(/\.[^.]+$/, '') || 'photo') + '.jpg'; }
+  function postForm(fd){
+    return fetch(API, {method:'POST', body:fd}).then(function(r){ return r.json().catch(function(){ return {ok:false, error:'서버 응답 오류'}; }); });
+  }
+  function sendAttachment(f){
+    var prep = isImg(f) ? shrink(f, 1600, 0.82) : Promise.resolve(f);
+    return prep.then(function(blob){
+      var fd = new FormData();
+      fd.append('action', 'upload'); fd.append('token', getToken());
+      fd.append('image', blob, blob === f ? (f.name || 'file') : jpgName(f));
+      return postForm(fd);
+    }).then(function(r){
+      if(r && r.expired) return forceLogout(IDLE_MESSAGE);
+      if(!r || !r.ok) alert((r && r.error) || '업로드에 실패했습니다.');
+      poll();
+    }).catch(function(err){ alert('업로드 중 오류가 발생했습니다: ' + err.message); });
+  }
   imageBtn.addEventListener('click', function(){ imageInput.click(); });
-  imageInput.addEventListener('change', function(){
-    var f = imageInput.files[0];
-    if(!f) return;
-    var fd = new FormData();
-    fd.append('action', 'upload'); fd.append('token', getToken()); fd.append('image', f);
-    fetch(API, {method:'POST', body:fd}).then(function(r){ return r.json().catch(function(){ return {ok:false, error:'서버 응답 오류'}; }); })
-      .then(function(r){
-        if(r && r.expired) return forceLogout(IDLE_MESSAGE);
-        if(!r || !r.ok) alert((r && r.error) || '업로드에 실패했습니다.');
-        poll();
-      }).catch(function(err){ alert('업로드 중 오류가 발생했습니다: ' + err.message); })
-      .then(function(){ imageInput.value = ''; });
+  fileBtn.addEventListener('click', function(){ fileInput.click(); });
+  imageInput.addEventListener('change', function(){ var f = imageInput.files[0]; if(f) sendAttachment(f).then(function(){ imageInput.value = ''; }); });
+  fileInput.addEventListener('change', function(){ var f = fileInput.files[0]; if(f) sendAttachment(f).then(function(){ fileInput.value = ''; }); });
+
+  // ---- 큰 사진 보기 (대화 사진·갤러리 공통) ----
+  var viewerEl = $('viewer'), viewerImg = $('viewer-img'), vPrev = $('v-prev'), vNext = $('v-next');
+  var vList = [], vIdx = 0, vGalIds = null;   // vGalIds: 갤러리에서 열었을 때만 사진 번호 목록(삭제용)
+  var vDel = $('v-del');
+  function showViewer(){
+    viewerImg.src = vList[vIdx];
+    vPrev.hidden = vIdx <= 0; vNext.hidden = vIdx >= vList.length - 1;
+    vDel.hidden = !(vGalIds && me === STRICT_USER);   // 삭제는 buyest 계정만 (서버도 다시 확인)
+  }
+  function openViewer(urls, idx, galIdList){ vList = urls; vIdx = idx || 0; vGalIds = galIdList || null; viewerEl.hidden = false; showViewer(); }
+  vDel.addEventListener('click', function(){
+    if(!vGalIds || me !== STRICT_USER) return;
+    if(!confirm('이 사진을 갤러리에서 영구 삭제할까요? 되돌릴 수 없습니다.')) return;
+    var id = vGalIds[vIdx]; vDel.disabled = true;
+    call({action:'gallery_delete', token:getToken(), id:id}).then(function(r){
+      vDel.disabled = false;
+      if(r && r.expired) return forceLogout(IDLE_MESSAGE);
+      if(!r || !r.ok){ alert((r && r.error) || '삭제하지 못했습니다.'); return; }
+      closeViewer(); galLoaded = false; loadGallery(true);
+    }).catch(function(){ vDel.disabled = false; alert('삭제 중 오류가 발생했습니다.'); });
+  });
+  function closeViewer(){ viewerEl.hidden = true; viewerImg.removeAttribute('src'); }
+  $('viewer-x').addEventListener('click', closeViewer);
+  vPrev.addEventListener('click', function(){ if(vIdx > 0){ vIdx--; showViewer(); } });
+  vNext.addEventListener('click', function(){ if(vIdx < vList.length - 1){ vIdx++; showViewer(); } });
+  viewerEl.addEventListener('click', function(e){ if(e.target === viewerEl) closeViewer(); });
+
+  // ---- 갤러리: 한번 올린 사진은 지워지지 않는다(삭제 기능 자체가 없음). 입장(비밀번호)한 사람만 이 탭을 볼 수 있다. ----
+  var galGrid = $('gal-grid'), galCount = $('gal-count'), galAdd = $('gal-add'), galInput = $('gal-input');
+  var galIds = [], galMore = false, galLoaded = false, galBusy = false;
+  function showTab(which){
+    var gal = which === 'gal';
+    $('tab-chat').classList.toggle('on', !gal); $('tab-gal').classList.toggle('on', gal);
+    list.hidden = gal; form.hidden = gal; $('gallery-view').hidden = !gal;
+    if(gal && !galLoaded) loadGallery(true); else if(!gal) list.scrollTop = list.scrollHeight;
+    veil(true);
+  }
+  $('tab-chat').addEventListener('click', function(){ showTab('chat'); });
+  $('tab-gal').addEventListener('click', function(){ showTab('gal'); });
+  function galUrl(id, thumb){ return API + '?action=gallery_image&id=' + id + (thumb ? '&thumb=1' : '') + tokenQ(); }
+  function loadGallery(reset){
+    if(galBusy) return; galBusy = true;
+    if(reset){ galIds = []; galGrid.textContent = ''; }
+    var before = galIds.length ? galIds[galIds.length - 1] : 0;
+    call({action:'gallery_list', token:getToken(), before:before}).then(function(r){
+      galBusy = false;
+      if(r && r.expired) return forceLogout(IDLE_MESSAGE);
+      if(!r || !r.ok){ galGrid.textContent = ''; var e = document.createElement('div'); e.className = 'gal-empty'; e.textContent = (r && r.error) || '불러오지 못했습니다.'; galGrid.appendChild(e); return; }
+      galLoaded = true; galMore = r.more;
+      var old = galGrid.querySelector('.gal-more'); if(old) old.remove();
+      var emptyEl = galGrid.querySelector('.gal-empty'); if(emptyEl) emptyEl.remove();
+      r.items.forEach(function(it){
+        galIds.push(it.id);
+        var cell = document.createElement('div'); cell.className = 'cell';
+        var im = document.createElement('img'); im.loading = 'lazy'; im.alt = ''; im.src = galUrl(it.id, true);
+        var idx = galIds.length - 1;
+        cell.addEventListener('click', function(){ openViewer(galIds.map(function(id){ return galUrl(id, false); }), idx, galIds.slice()); });
+        cell.appendChild(im); galGrid.appendChild(cell);
+      });
+      galCount.textContent = '보관 ' + r.total + '장';
+      if(!galIds.length){ var em = document.createElement('div'); em.className = 'gal-empty'; em.innerHTML = '아직 보관한 사진이 없습니다.<br>오른쪽 위 “+ 사진 보관”으로 올리면 서버에 비밀로 남습니다.'; galGrid.appendChild(em); }
+      if(galMore){ var mb = document.createElement('button'); mb.type = 'button'; mb.className = 'gal-more'; mb.textContent = '더 보기'; mb.addEventListener('click', function(){ loadGallery(false); }); galGrid.appendChild(mb); }
+    }).catch(function(){ galBusy = false; });
+  }
+  galAdd.addEventListener('click', function(){ galInput.click(); });
+  galInput.addEventListener('change', function(){
+    var files = [].slice.call(galInput.files || []); galInput.value = '';
+    if(!files.length) return;
+    galAdd.disabled = true;
+    var n = 0, fail = 0;
+    (function next(){
+      var f = files[n];
+      if(!f){
+        galAdd.disabled = false; galAdd.textContent = '+ 사진 보관';
+        if(fail) alert(fail + '장은 올리지 못했습니다. (사진 파일이 아니거나 너무 큽니다)');
+        galLoaded = false; return loadGallery(true);
+      }
+      galAdd.textContent = (n + 1) + '/' + files.length + ' 올리는 중...';
+      Promise.all([shrink(f, 3000, 0.92), shrink(f, 480, 0.7, true)]).then(function(p){
+        var fd = new FormData();
+        fd.append('action', 'gallery_upload'); fd.append('token', getToken());
+        fd.append('image', p[0], p[0] === f ? (f.name || 'photo') : jpgName(f));
+        if(p[1] !== f) fd.append('thumb', p[1], 'thumb.jpg');
+        return postForm(fd);
+      }).then(function(r){
+        if(r && r.expired){ galAdd.disabled = false; return forceLogout(IDLE_MESSAGE); }
+        if(!r || !r.ok) fail++;
+        n++; next();
+      }).catch(function(){ fail++; n++; next(); });
+    })();
   });
 
   // 폰 잠금/앱 전환 시 즉시 가리고, 30분(buyest1) 넘게 지나 돌아오면 로그아웃(→ 툴킷 메인)
@@ -308,8 +488,8 @@
   }
   // ---- 대화 가림 (buyest 계정만): 평소엔 흐리게, 화면을 누르고 있는 동안만 선명하게 ----
   // buyest1 은 흐림 기능을 쓰지 않는다.
-  function veil(on){ if(on && me !== STRICT_USER) return; list.classList.toggle('veil', on); }
-  function pressOn(){ if(me === STRICT_USER) list.classList.remove('veil'); }
+  function veil(on){ if(on && me !== STRICT_USER) return; list.classList.toggle('veil', on); galGrid.classList.toggle('veil', on); }
+  function pressOn(){ if(me === STRICT_USER){ list.classList.remove('veil'); galGrid.classList.remove('veil'); } }
   function pressOff(e){ if(e && e.touches && e.touches.length > 0) return; veil(true); }
   chatScreen.addEventListener('touchstart', pressOn, {passive:true, capture:true});
   chatScreen.addEventListener('touchend', pressOff, {passive:true, capture:true});

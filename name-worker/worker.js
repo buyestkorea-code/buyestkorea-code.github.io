@@ -14,7 +14,7 @@
  */
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "1.3.0";
+const VERSION = "1.3.1";
 
 const cors = () => ({
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -412,7 +412,13 @@ async function handlePromoTag(request, env) {
   if (!items.length) return json({ ok: true, tags: [], version: VERSION });
   await spendTag(env, user);
   const userText = `[상품]\n${items.map((x) => x.i + ": " + x.n).join("\n")}\n\n출력: {"tags":[{"i":번호,"k":"종류","t":["태그",...]}, ...]}  (모든 상품 번호에 대해 한 줄씩)`;
-  const { data, by, fellBack } = await runJson(env, TAG_SYSTEM, userText, { geminiOnly: true, maxTokens: 6000 });
+  // 기본 모델이 한도 초과(429→503)면 다음 모델로 넘어간다 (모델마다 한도가 따로라서, 11-10 에 3.8-flash 만 막혀 태그가 전부 실패했었음)
+  let data, by, fellBack, lastErr;
+  for (const model of [env.GEMINI_MODEL, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"].filter(Boolean)) {
+    try { ({ data, by, fellBack } = await runJson(env, TAG_SYSTEM, userText, { geminiOnly: true, maxTokens: 6000, model })); by = by + " " + model; lastErr = null; break; }
+    catch (e) { lastErr = e; if (!(e instanceof HttpError) || e.status !== 503) break; }
+  }
+  if (lastErr) throw lastErr;
   const allow = new Set(items.map((x) => x.i)), seen = new Set(), tags = [];
   for (const t of (Array.isArray(data.tags) ? data.tags : [])) {
     const i = Number(t && t.i);
