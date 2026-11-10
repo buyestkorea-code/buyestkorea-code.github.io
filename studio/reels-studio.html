@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI 릴스 스튜디오</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23101114'/%3E%3Crect x='10' y='5' width='12' height='22' rx='2' fill='none' stroke='%23c8a96a' stroke-width='2'/%3E%3Cpath d='M14 12l5 4-5 4z' fill='%23c8a96a'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=Noto+Serif+KR:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#0e0f12; --panel:#15171b; --panel2:#1b1e23; --panel3:#22262c; --line:#262a31; --line2:#343944;
+    --fg:#ecebe6; --dim:#9a9ca5; --mute:#8b8e98; --gold:#c8a96a; --gold2:#e2c98f; --goldbg:rgba(200,169,106,.14);
+    --live:#ff5b4a; --ok:#5fb184; --err:#ef6b6b;
+    --c-img:#3a4b61; --c-vid:#35506b; --c-ai:#6f5a30; --c-txt:#5b4570; --c-voice:#2f6b52; --c-bgm:#6b3a4b;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.45 "Noto Sans KR","Pretendard","Malgun Gothic",sans-serif; display:grid; grid-template-rows:46px minmax(0,1fr) var(--tlh,318px); overflow:hidden; user-select:none; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  input,select,textarea { font:inherit; color:var(--fg); background:var(--panel3); border:1px solid var(--line2); border-radius:6px; padding:6px 8px; width:100%; outline:none; user-select:text; }
+  input:focus,select:focus,textarea:focus { border-color:var(--gold); }
+  input[type=range] { padding:0; accent-color:var(--gold); background:none; border:0; }
+  input[type=checkbox] { width:auto; accent-color:var(--gold); }
+  input[type=color] { padding:1px; height:28px; width:44px; }
+  textarea { resize:vertical; min-height:56px; }
+  label.f { display:block; color:var(--dim); font-size:11.5px; margin:10px 0 4px; }
+  ::-webkit-scrollbar { width:10px; height:10px; } ::-webkit-scrollbar-thumb { background:#2e323b; border-radius:6px; border:2px solid var(--bg); } ::-webkit-scrollbar-corner { background:transparent; }
+  :focus-visible { outline:2px solid var(--gold); outline-offset:1px; }
+
+  /* ── 위 막대 ── */
+  .top { display:flex; align-items:center; gap:10px; padding:0 14px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .logo { font-family:"Noto Serif KR",serif; letter-spacing:.18em; font-size:12px; color:var(--gold); white-space:nowrap; }
+  .logo b { color:var(--fg); font-weight:600; }
+  #pname { max-width:240px; background:transparent; border-color:transparent; font-weight:700; }
+  #pname:hover { border-color:var(--line2); }
+  .sp { flex:1; }
+  .tb { background:var(--panel3); border:1px solid var(--line2); border-radius:6px; padding:5px 11px; display:inline-flex; align-items:center; gap:6px; }
+  .tb:hover:not(:disabled) { border-color:var(--gold); }
+  .tb:disabled { opacity:.35; cursor:default; }
+  .tb.pri { background:var(--gold); color:#1b160b; border-color:var(--gold); font-weight:700; }
+  .tb.pri:hover:not(:disabled) { background:var(--gold2); }
+  .net { font-size:11.5px; color:var(--dim); display:flex; align-items:center; gap:6px; }
+  .net i { width:7px; height:7px; border-radius:50%; background:var(--mute); display:inline-block; }
+  .net.ok i { background:var(--ok); } .net.bad i { background:var(--err); }
+
+  /* ── 가운데 ── */
+  .mid { display:grid; grid-template-columns:64px 348px minmax(0,1fr) 308px; min-height:0; }
+  .rail { background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; align-items:center; padding:8px 0; gap:2px; }
+  .rail button { width:56px; padding:9px 0 7px; background:none; border:0; border-radius:8px; color:var(--dim); display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11px; }
+  .rail button svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .rail button:hover { color:var(--fg); background:var(--panel2); }
+  .rail button.on { color:var(--gold); background:var(--goldbg); }
+  .panel { background:var(--panel); border-right:1px solid var(--line); overflow:auto; padding:14px; min-width:0; }
+  .panel h2 { margin:0 0 2px; font-size:15px; font-weight:700; }
+  .panel .sub { color:var(--dim); font-size:12px; margin:0 0 12px; line-height:1.55; }
+  .panel [data-panel] { display:none; } .panel [data-panel].on { display:block; }
+  .card { background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:12px; margin:0 0 12px; }
+  .card h3 { margin:0 0 8px; font-size:12px; color:var(--dim); font-weight:500; letter-spacing:.04em; display:flex; justify-content:space-between; align-items:center; }
+  .seg { display:flex; border:1px solid var(--line2); border-radius:7px; overflow:hidden; }
+  .seg button { flex:1; background:var(--panel3); border:0; padding:7px 10px; color:var(--dim); }
+  .seg button.on { background:var(--gold); color:#1b160b; font-weight:700; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .drop { border:1.5px dashed var(--line2); border-radius:10px; padding:16px 8px; text-align:center; color:var(--dim); cursor:pointer; }
+  .drop:hover,.drop.over { border-color:var(--gold); color:var(--gold2); }
+  .thumbs { display:grid; grid-template-columns:repeat(auto-fill,minmax(66px,1fr)); gap:6px; margin-top:8px; }
+  .th { position:relative; aspect-ratio:9/16; border-radius:6px; overflow:hidden; background:#000; border:1px solid var(--line2); }
+  .th img { width:100%; height:100%; object-fit:cover; display:block; }
+  .th b { position:absolute; left:3px; top:3px; background:rgba(0,0,0,.65); border-radius:4px; font-size:11px; padding:2px 7px; font-weight:500; }
+  .th button { position:absolute; right:2px; top:2px; width:18px; height:18px; border-radius:9px; background:rgba(0,0,0,.65); border:0; line-height:16px; font-size:11px; padding:0; }
+  .th .add { position:absolute; left:0; right:0; bottom:0; background:rgba(14,15,18,.85); border:0; border-top:1px solid var(--line2); border-radius:0; width:auto; height:auto; font-size:11px; padding:3px 0; color:var(--gold2); }
+  .btn { background:var(--panel3); border:1px solid var(--line2); border-radius:7px; padding:7px 12px; }
+  .btn:hover:not(:disabled) { border-color:var(--gold); }
+  .btn:disabled { opacity:.4; cursor:default; }
+  .btn.pri { background:var(--gold); border-color:var(--gold); color:#1b160b; font-weight:700; }
+  .btn.full { width:100%; }
+  .btn.sm { padding:6px 11px; font-size:12px; }
+  .hint { color:var(--mute); font-size:12px; line-height:1.55; }
+  .warn { color:#e8b05a; } .okc { color:var(--ok); } .errc { color:var(--err); }
+
+  /* 스토리보드 컷 카드 */
+  .cut { background:var(--panel2); border:1px solid var(--line); border-left:3px solid var(--gold); border-radius:8px; padding:9px; margin:0 0 9px; }
+  .cut.photo { border-left-color:#5a7ea6; }
+  .cut .hd { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .cut .hd .no { font-family:var(--mono); color:var(--gold); font-size:12px; }
+  .cut .hd .role { font-size:11px; color:var(--dim); background:var(--panel3); border-radius:4px; padding:3px 9px; }
+  .cut .hd .sp { flex:1; }
+  .cut .mini { background:none; border:0; color:var(--dim); padding:4px 8px; border-radius:4px; }
+  .cut .mini:hover { color:var(--fg); background:var(--panel3); }
+  .cut .body { display:grid; grid-template-columns:54px 1fr; gap:8px; }
+  .cut .body img { width:54px; aspect-ratio:9/16; object-fit:cover; border-radius:5px; background:#000; }
+  .cut textarea { min-height:44px; font-size:12px; }
+  .cut input { font-size:12px; }
+  .cut .line { display:flex; gap:6px; align-items:center; margin-bottom:5px; }
+  .cut .line select { width:auto; padding:3px 4px; font-size:12px; }
+  .cut .line input[type=number] { width:56px; padding:3px 4px; }
+  .prog { margin:8px 0 0; font-size:12px; line-height:1.7; color:var(--dim); }
+  .prog b { color:var(--fg); font-weight:500; }
+  .bar { height:5px; background:var(--panel3); border-radius:3px; overflow:hidden; margin:6px 0; }
+  .bar i { display:block; height:100%; width:0; background:var(--gold); transition:width .25s; }
+
+  .grid2 { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .lib { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .lib .it { position:relative; aspect-ratio:9/16; background:#000; border:1px solid var(--line2); border-radius:6px; overflow:hidden; cursor:pointer; }
+  .lib .it:hover { border-color:var(--gold); }
+  .lib .it img { width:100%; height:100%; object-fit:cover; }
+  .lib .it .tag { position:absolute; left:3px; bottom:3px; background:rgba(0,0,0,.7); font-size:11px; padding:2px 7px; border-radius:3px; font-family:var(--mono); }
+  .lib .it.au { aspect-ratio:auto; padding:10px 8px; background:var(--panel3); }
+  .lib .it.au span { font-size:11px; color:var(--dim); display:block; word-break:break-all; }
+  .opt { display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin:0 0 6px; cursor:pointer; text-align:left; width:100%; }
+  .opt:hover { border-color:var(--gold); }
+  .opt.on { border-color:var(--gold); background:var(--goldbg); }
+  .opt small { color:var(--mute); display:block; font-size:11px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { background:var(--panel3); border:1px solid var(--line2); border-radius:999px; padding:6px 13px; font-size:12px; }
+  .chip:hover { border-color:var(--gold); } .chip.on { background:var(--gold); color:#1b160b; border-color:var(--gold); font-weight:700; }
+  .sublist .si { display:grid; grid-template-columns:54px 1fr; gap:6px; align-items:center; margin-bottom:5px; }
+  .sublist .si span { font-family:var(--mono); font-size:11px; color:var(--mute); }
+  .sublist .si.sel input { border-color:var(--gold); }
+
+  /* ── 무대(라이브 뷰) ── */
+  .stage { display:grid; grid-template-rows:28px minmax(0,1fr) 56px; background:#0a0b0d; min-width:0; }
+  .live { display:flex; align-items:center; gap:8px; padding:0 14px; font-size:11px; letter-spacing:.1em; color:var(--dim); text-transform:uppercase; font-family:var(--mono); }
+  .live i { width:7px; height:7px; border-radius:50%; background:var(--live); display:inline-block; }
+  .live .sp { flex:1; } .live label { display:flex; gap:5px; align-items:center; text-transform:none; letter-spacing:0; font-family:"Noto Sans KR",sans-serif; }
+  .vp { position:relative; min-height:0; overflow:hidden; }
+  .vp .fr { position:absolute; top:6px; bottom:6px; left:50%; transform:translateX(-50%); aspect-ratio:9/16; max-width:100%; box-shadow:0 8px 40px rgba(0,0,0,.6); background:#000; }
+  #cv { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .safe { position:absolute; inset:0; pointer-events:none; display:none; }
+  .safe.on { display:block; }
+  .safe div { position:absolute; border:1px dashed rgba(200,169,106,.8); left:6.7%; right:21.3%; top:12%; bottom:25%; }
+  .safe span { position:absolute; left:8%; top:12.4%; font-size:11px; color:var(--gold2); }
+  .trans { display:flex; align-items:center; justify-content:center; gap:10px; padding:10px 16px; border-top:1px solid var(--line); background:var(--panel); }
+  .trans .tc { font-family:var(--mono); font-size:13px; letter-spacing:.04em; min-width:130px; text-align:center; }
+  .trans .tc b { color:var(--gold2); font-weight:500; }
+  .ib { width:32px; height:30px; background:var(--panel3); border:1px solid var(--line2); border-radius:6px; display:inline-flex; align-items:center; justify-content:center; padding:0; }
+  .ib svg { width:16px; height:16px; fill:currentColor; }
+  .ib:hover { border-color:var(--gold); }
+  .ib.play { width:40px; background:var(--gold); border-color:var(--gold); color:#1b160b; }
+
+  /* ── 인스펙터 ── */
+  .insp { background:var(--panel); border-left:1px solid var(--line); overflow:auto; padding:14px; min-width:0; }
+  .insp h2 { margin:0 0 10px; font-size:14px; display:flex; align-items:center; gap:8px; }
+  .insp h2 i { font-style:normal; font-size:11px; padding:3px 9px; border-radius:4px; background:var(--panel3); color:var(--dim); font-weight:400; }
+  .insp .empty { color:var(--mute); line-height:1.7; margin-top:10px; }
+  .ctl { margin:0 0 9px; }
+  .ctl .l { display:flex; justify-content:space-between; color:var(--dim); font-size:11.5px; margin-bottom:3px; }
+  .ctl .l span:last-child { font-family:var(--mono); color:var(--fg); }
+  .sec { color:var(--mute); font-size:11px; letter-spacing:.14em; margin:16px 0 8px; border-top:1px solid var(--line); padding-top:12px; }
+
+  /* ── 타임라인 ── */
+  .tl { background:var(--panel); border-top:1px solid var(--line); padding:6px 0 4px; display:grid; grid-template-rows:38px minmax(0,1fr); min-height:0; }
+  .tlbar { display:flex; align-items:center; gap:6px; padding:0 12px; border-bottom:1px solid var(--line); }
+  .tlbar .sep { width:1px; height:18px; background:var(--line2); margin:0 4px; }
+  .tlbar label { display:flex; align-items:center; gap:6px; color:var(--dim); font-size:12px; }
+  .tlbar input[type=range] { width:110px; }
+  #tls { overflow:auto; position:relative; min-height:0; }
+  #tlin { position:relative; min-width:100%; }
+  .ruler { position:sticky; top:0; z-index:6; height:24px; background:var(--panel); border-bottom:1px solid var(--line); cursor:pointer; }
+  .ruler .tk { position:absolute; top:0; bottom:0; border-left:1px solid var(--line2); font-family:var(--mono); font-size:11px; color:var(--mute); padding:5px 0 0 4px; white-space:nowrap; }
+  .ruler .tk.mn { top:14px; border-color:var(--line); }
+  .row { position:relative; display:flex; border-bottom:1px solid var(--line); }
+  .rlabel { position:sticky; left:0; z-index:5; width:92px; flex:none; background:var(--panel); border-right:1px solid var(--line); color:var(--dim); font-size:11.5px; padding:8px 8px; display:flex; align-items:flex-start; gap:6px; }
+  .rlabel svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.7; margin-top:1px; flex:none; }
+  .lane { position:relative; flex:none; }
+  .lane.over { background:rgba(200,169,106,.07); }
+  .blk { position:absolute; border-radius:6px; overflow:hidden; border:1px solid rgba(255,255,255,.14); cursor:grab; display:flex; align-items:center; font-size:11.5px; color:#fff; touch-action:none; }
+  .blk.sel { outline:2px solid var(--gold); z-index:3; }
+  .blk .tx { position:relative; z-index:2; padding:3px 10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 3px rgba(0,0,0,.8); pointer-events:none; }
+  .blk canvas { position:absolute; inset:0; width:100%; height:100%; opacity:.85; pointer-events:none; }
+  .blk .film { position:absolute; inset:0; background-repeat:repeat-x; background-size:auto 100%; opacity:.55; pointer-events:none; }
+  .blk .hdl { position:absolute; top:0; bottom:0; width:9px; z-index:4; cursor:ew-resize; }
+  .blk .hdl.l { left:0; } .blk .hdl.r { right:0; }
+  .blk:hover .hdl, .blk.sel .hdl { background:rgba(255,255,255,.22); }
+  .blk.img { background:var(--c-img); } .blk.vid { background:var(--c-vid); } .blk.ai { background:var(--c-ai); } .blk.pend { background:repeating-linear-gradient(45deg,#4b3f24,#4b3f24 8px,#5a4b2b 8px,#5a4b2b 16px); }
+  .blk.txt { background:var(--c-txt); } .blk.voice { background:var(--c-voice); } .blk.bgm { background:var(--c-bgm); }
+  .blk .trn { position:absolute; left:0; top:0; bottom:0; z-index:3; background:linear-gradient(90deg,rgba(255,255,255,.35),transparent); pointer-events:none; }
+  .ph { position:absolute; top:0; bottom:0; width:0; z-index:8; pointer-events:none; }
+  .ph::before { content:""; position:absolute; left:-1px; top:0; bottom:0; width:2px; background:var(--live); }
+  .ph::after { content:""; position:absolute; left:-6px; top:0; width:12px; height:12px; background:var(--live); clip-path:polygon(0 0,100% 0,50% 100%); }
+  .snapline { position:absolute; top:24px; bottom:0; width:1px; background:var(--gold); z-index:7; display:none; pointer-events:none; }
+
+  /* ── 모달 ── */
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.62); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal.on { display:flex; }
+  .mbox { background:var(--panel); border:1px solid var(--line2); border-radius:12px; width:min(560px,92vw); max-height:88vh; overflow:auto; padding:20px; }
+  .mbox h2 { margin:0 0 12px; font-size:16px; }
+  .mbox video { width:100%; max-height:56vh; background:#000; border-radius:8px; margin-top:10px; }
+  .plist .pi { display:flex; align-items:center; gap:8px; padding:9px 4px; border-bottom:1px solid var(--line); }
+  .plist .pi b { flex:1; font-weight:500; } .plist .pi span { color:var(--mute); font-size:11.5px; }
+  .toast { position:fixed; left:50%; bottom:340px; transform:translateX(-50%); background:var(--panel3); border:1px solid var(--gold); border-radius:8px; padding:8px 14px; z-index:60; display:none; max-width:70vw; }
+  .narrow { display:none; position:fixed; inset:0; background:var(--bg); z-index:100; align-items:center; justify-content:center; text-align:center; padding:30px; line-height:1.8; color:var(--dim); }
+  @media (max-width:1050px) { .narrow { display:flex; } }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="narrow">AI 릴스 스튜디오는 편집 화면이 넓어야 합니다.<br>PC(가로 1100px 이상) 크롬·엣지에서 열어 주세요.</div>
+
+<header class="top">
+  <div class="logo">BUYEST <b>REELS STUDIO</b></div>
+  <input id="pname" value="새 릴스" aria-label="프로젝트 이름" />
+  <span class="sp"></span>
+  <span class="net" id="net"><i></i><span>서버 확인 중</span></span>
+  <button class="tb" id="bUndo" title="되돌리기 (Ctrl+Z)" disabled>↶ 되돌리기</button>
+  <button class="tb" id="bRedo" title="다시 (Ctrl+Y)" disabled>↷ 다시</button>
+  <button class="tb" id="bProjects">내 프로젝트</button>
+  <button class="tb" id="bSave">저장</button>
+  <button class="tb pri" id="bExport">MP4 내보내기</button>
+</header>
+
+<div class="mid">
+  <nav class="rail" id="rail">
+    <button data-tab="make" class="on"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>AI 기획</button>
+    <button data-tab="media"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg>소재</button>
+    <button data-tab="text"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg>텍스트</button>
+    <button data-tab="sound"><svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>소리</button>
+    <button data-tab="fx"><svg viewBox="0 0 24 24"><path d="M4 20 20 4M14 4h6v6"/><path d="M5 5l2 2M9 3v3M3 9h3"/></svg>효과</button>
+    <button data-tab="auto"><svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8 8.5 20 17M8 15.5 20 7"/></svg>자동편집</button>
+  </nav>
+
+  <aside class="panel" id="panel">
+    <!-- AI 기획 -->
+    <section data-panel="make" class="on">
+      <h2>AI 릴스 만들기</h2>
+      <p class="sub">사진과 프롬프트만 주면 AI가 컷을 짜고, 영상·나레이션·자막·BGM까지 타임라인에 올려 줍니다. 만든 뒤에는 캡컷처럼 마음대로 고칠 수 있어요.</p>
+
+      <div class="card">
+        <h3>브랜드</h3>
+        <div class="seg" id="brandSeg"><button data-b="buyest" class="on">BUYEST</button><button data-b="kids">BUYEST Kids</button></div>
+      </div>
+
+      <div class="card">
+        <h3>① 상품 사진·영상 <span id="photoCnt" class="hint">0 / 10</span></h3>
+        <div class="drop" id="drop">사진·영상을 끌어놓거나 눌러서 선택<input type="file" id="photoFile" accept="image/*,video/*" multiple hidden /></div>
+        <div class="thumbs" id="photos"></div>
+        <p class="hint" style="margin:8px 0 0">앞에서부터 쓰입니다. 정면 전신 → 디테일 → 착용컷 순으로 올리면 좋아요.</p>
+      </div>
+
+      <div class="card">
+        <h3>② 릴스 프롬프트</h3>
+        <textarea id="prompt" rows="5" placeholder="예) 겨울 신상 키즈 패딩. 고글 후드가 포인트. 부모님이 '이거 뭐지?' 하고 눈길 가는 느낌으로 시작해서, 디테일과 사이즈를 보여주고, 댓글로 사이즈 문의 유도."></textarea>
+        <div class="row2">
+          <div><label class="f">길이</label><select id="targetSec"><option value="30">30초</option><option value="45" selected>45초</option><option value="60">60초</option><option value="75">75초</option><option value="90">90초</option></select></div>
+          <div><label class="f">배경음악</label><select id="bgmMood"></select></div>
+        </div>
+        <label class="f">나레이션 목소리</label><select id="voice"><option value="Kore">Kore · 단단하고 또렷한</option><option value="Sulafat">Sulafat · 따뜻한</option><option value="Achird">Achird · 친근한</option><option value="Puck">Puck · 경쾌한</option><option value="Charon">Charon · 차분한 설명</option><option value="Zephyr">Zephyr · 밝은</option></select>
+        <label class="f">바이럴 레퍼런스 (리듬만 참고)</label><select id="refSel"><option value="">쓰지 않음</option></select>
+        <div class="hint" id="refInfo" style="margin-top:6px"></div>
+        <details style="margin-top:10px"><summary class="hint" style="cursor:pointer">상품 정보 넣기 (선택 · 더 정확해져요)</summary>
+          <label class="f">상품 브랜드</label><input id="brandName" placeholder="AI라이더스" />
+          <label class="f">상품명</label><input id="productName" placeholder="AI라이더스 고글 패딩 자켓" />
+          <div class="row2"><div><label class="f">가격</label><input id="price" placeholder="₩890,000" /></div><div><label class="f">마지막 요청</label><input id="cta" placeholder="댓글에 '사이즈'" /></div></div>
+          <label class="f">특징 (한 줄에 하나, 있는 사실만)</label><textarea id="features" rows="3" placeholder="밀라노 부티크 직수입&#10;사이즈 4A~10A"></textarea>
+        </details>
+        <button class="btn pri full" id="bBoard" style="margin-top:12px">스토리보드 만들기</button>
+        <p class="hint" id="boardMsg" style="margin:8px 0 0"></p>
+      </div>
+
+      <div id="boardBox" style="display:none">
+        <div class="card" style="padding-bottom:6px">
+          <h3>③ 스토리보드 <span class="hint" id="boardSum"></span></h3>
+          <label class="f" style="margin-top:0">첫 화면 훅</label><input id="hookText" />
+          <div id="cuts" style="margin-top:10px"></div>
+          <button class="btn sm full" id="bAddCut" style="margin-bottom:8px">+ 컷 추가</button>
+        </div>
+        <div class="card">
+          <h3>④ 만들기</h3>
+          <label style="display:flex;gap:7px;align-items:center;margin-bottom:8px"><input type="checkbox" id="dry" /> <span>AI 영상 만들지 않기 <span class="hint">(무료 테스트 · 사진 효과로 대체)</span></span></label>
+          <div id="costLine" class="hint" style="margin-bottom:8px"></div>
+          <button class="btn pri full" id="bGen">영상 만들기</button>
+          <div class="prog" id="prog"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 소재 -->
+    <section data-panel="media">
+      <h2>소재</h2>
+      <p class="sub">사진·영상·음악 파일을 올리고, 눌러서 타임라인에 넣으세요.</p>
+      <button class="btn full" id="bUp">+ 파일 올리기 (사진·영상·음악)</button>
+      <input type="file" id="upFile" accept="image/*,video/*,audio/*" multiple hidden />
+      <div class="lib" id="lib" style="margin-top:12px"></div>
+      <p class="hint" id="libEmpty" style="margin-top:10px">아직 소재가 없습니다.</p>
+    </section>
+
+    <!-- 텍스트 -->
+    <section data-panel="text">
+      <h2>텍스트</h2>
+      <p class="sub">지금 재생 위치에 글자를 넣습니다. 타임라인에서 길이를 늘이고 줄일 수 있어요.</p>
+      <div class="chips" style="margin-bottom:12px">
+        <button class="chip" data-addtext="sub">자막</button><button class="chip" data-addtext="title">큰 제목</button>
+        <button class="chip" data-addtext="box">박스 강조</button><button class="chip" data-addtext="marker">형광펜</button>
+        <button class="chip" data-addtext="price">가격 표시</button>
+      </div>
+      <div class="card"><h3>스티커</h3><div class="chips" id="stickers"></div></div>
+      <div class="card"><h3>전체 글자 <span class="hint" id="txtCnt"></span></h3><div class="sublist" id="sublist"></div></div>
+    </section>
+
+    <!-- 소리 -->
+    <section data-panel="sound">
+      <h2>소리</h2>
+      <p class="sub">배경음악은 저작권 걱정 없이 브라우저가 직접 만들어 줍니다. 가진 음악 파일을 올려 써도 돼요.</p>
+      <div class="card"><h3>배경음악 만들기</h3><div id="bgmList"></div>
+        <button class="btn sm full" id="bBgmUp" style="margin-top:4px">+ 내 음악 파일 올려서 쓰기</button><input type="file" id="bgmFile" accept="audio/*" hidden />
+      </div>
+      <div class="card"><h3>나레이션 추가</h3>
+        <textarea id="vText" rows="3" placeholder="읽을 문장을 적고 음성으로 만드세요"></textarea>
+        <button class="btn full" id="bVoice" style="margin-top:8px">음성 만들어 재생 위치에 넣기</button>
+        <p class="hint" id="vMsg" style="margin:8px 0 0"></p>
+      </div>
+    </section>
+
+    <!-- 효과 -->
+    <section data-panel="fx">
+      <h2>효과</h2>
+      <p class="sub">타임라인에서 영상·사진 컷을 고른 뒤 눌러 적용하세요.</p>
+      <label style="display:flex;gap:7px;align-items:center;margin-bottom:12px"><input type="checkbox" id="fxAll" /> 모든 컷에 한꺼번에 적용</label>
+      <div class="card"><h3>컷 전환</h3><div class="chips" id="fxTrans"></div></div>
+      <div class="card"><h3>색감 필터</h3><div class="chips" id="fxFilter"></div></div>
+      <div class="card"><h3>사진 움직임 (켄번스)</h3><div class="chips" id="fxKb"></div></div>
+    </section>
+
+    <!-- 자동 편집 -->
+    <section data-panel="auto">
+      <h2>자동 편집</h2>
+      <p class="sub">직접 찍은 영상에서 <b>말 없는 구간을 잘라내고</b>, 말한 내용을 <b>자막으로</b> 만들어 줍니다. 소재 탭에서 영상을 올려 타임라인에 넣은 뒤 쓰세요.</p>
+      <div class="card"><h3>대상</h3>
+        <select id="aeTarget"><option value="sel">타임라인에서 고른 영상 컷</option><option value="all">영상 1 트랙의 모든 영상 컷</option></select>
+        <p class="hint" style="margin:8px 0 0">AI가 만든 컷과 사진 컷은 소리가 없어서 제외됩니다.</p>
+      </div>
+      <div class="card"><h3>① 말 없는 구간 잘라내기 <span class="hint">무료 · 이 브라우저에서 처리</span></h3>
+        <div class="ctl"><div class="l"><span>이 길이 이상 조용하면 자름</span><span id="aeSilV">0.5초</span></div><input type="range" id="aeSil" min="0.3" max="1.5" step="0.1" value="0.5" /></div>
+        <div class="ctl"><div class="l"><span>말 앞뒤로 남기는 여유</span><span id="aePadV">0.15초</span></div><input type="range" id="aePad" min="0" max="0.4" step="0.05" value="0.15" /></div>
+        <label class="f" style="margin-top:4px">소리 민감도</label>
+        <select id="aeSens"><option value="1">보통</option><option value="0.6">작은 말소리도 살리기</option><option value="1.6">주변 소음이 많은 곳</option></select>
+        <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="aeAnalyze" style="flex:1">분석하기</button><button class="btn pri" id="aeApply" style="flex:1" disabled>잘라내기 적용</button></div>
+        <div class="hint" id="aeResult" style="margin-top:8px"></div>
+      </div>
+      <div class="card"><h3>② 자막 자동 생성 <span class="hint">1분당 약 $0.006</span></h3>
+        <select id="aeStyle"></select>
+        <div class="ctl" style="margin-top:8px"><div class="l"><span>한 줄 글자 수</span><span id="aeLineV">14자</span></div><input type="range" id="aeLine" min="8" max="24" step="1" value="14" /></div>
+        <button class="btn full" id="aeSubs">자막 만들기</button>
+        <p class="hint" id="aeMsg" style="margin:8px 0 0">말한 내용을 인식해서 말하는 시점에 맞춰 자막을 넣습니다. 무음을 먼저 자른 뒤 만드세요.</p>
+      </div>
+      <button class="btn pri full" id="aeAllBtn">한 번에 자동 편집 (자르기 + 자막)</button>
+      <div class="prog" id="aeProg"></div>
+    </section>
+  </aside>
+
+  <main class="stage">
+    <div class="live"><i></i>LIVE VIEW <span class="sp"></span><label><input type="checkbox" id="safeTg" /> 인스타 안전영역</label></div>
+    <div class="vp"><div class="fr"><canvas id="cv" width="540" height="960"></canvas><div class="safe" id="safe"><div></div><span>글자는 이 안쪽에</span></div></div></div>
+    <div class="trans">
+      <button class="ib" id="bBegin" title="처음으로"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button class="ib play" id="bPlay" title="재생 / 정지 (Space)"><svg viewBox="0 0 24 24" id="playIc"><path d="M7 4v16l13-8z"/></svg></button>
+      <button class="ib" id="bEnd" title="끝으로"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+      <div class="tc"><b id="tCur">00:00.0</b> / <span id="tTot">00:00.0</span></div>
+    </div>
+  </main>
+
+  <aside class="insp" id="insp"></aside>
+</div>
+
+<section class="tl">
+  <div class="tlbar">
+    <button class="tb" id="bSplit" title="재생 위치에서 자르기 (S)">✂ 자르기</button>
+    <button class="tb" id="bDup" title="복제 (Ctrl+D)">복제</button>
+    <button class="tb" id="bDel" title="삭제 (Delete)">삭제</button>
+    <span class="sep"></span>
+    <button class="tb" id="bMagnet" title="영상 1 트랙의 빈틈을 붙입니다">빈틈 붙이기</button>
+    <label><input type="checkbox" id="ripple" checked /> 삭제하면 뒤를 당김</label>
+    <span class="sp"></span>
+    <label>확대 <input type="range" id="zoom" min="12" max="160" value="36" /></label>
+  </div>
+  <div id="tls"><div id="tlin"></div></div>
+</section>
+
+<div class="modal" id="mExport"><div class="mbox">
+  <h2>MP4 내보내기</h2>
+  <div id="exBody"></div>
+</div></div>
+<div class="modal" id="mProj"><div class="mbox"><h2>내 프로젝트</h2><div class="plist" id="plist"></div><div style="margin-top:14px;display:flex;gap:8px"><button class="btn" id="bNew">+ 새 프로젝트</button><span class="sp" style="flex:1"></span><button class="btn" id="bProjClose">닫기</button></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="vendor/mp4-muxer.js?v=1"></script>
+<script src="engine.js?v=20261110d"></script>
+<script src="rs-core.js?v=20261110d"></script>
+<script src="rs-bgm.js?v=20261110d"></script>
+<script src="rs-app.js?v=20261110d"></script>
+</body>
+</html>

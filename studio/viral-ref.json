@@ -1,0 +1,57 @@
+{
+  "updated": "2026-11-10",
+  "note": "HasData(인스타 공개 릴스 조회) + ffmpeg 구조 분석 결과. 영상 자체는 저장하지 않고 길이·컷 수·리듬만 기록한다. 계정 이름만 알려주면 레퍼런스를 더 추가할 수 있다.",
+  "refs": [
+    {
+      "id": "airiders-1009",
+      "name": "AI Riders · 색상 몽타주 (10/09)",
+      "source": "@airiders",
+      "url": "https://www.instagram.com/reel/DeRnpkVMwJ3/",
+      "metrics": { "likes": 741, "comments": 2, "followers": 11173 },
+      "durationSec": 13.8,
+      "cuts": 8,
+      "avgCutSec": 1.7,
+      "cutTimes": [1.8, 4.2, 5.7, 6.6, 7.5, 8.2, 8.9],
+      "structure": "0~2초 어두운 배경에서 아이 모델이 몸짓으로 시작 → 2~4초 핑크 점퍼 지퍼 클로즈업 → 전신 컷 → 5~9초 색상별 모델 컷이 1초 안팎으로 빠르게 교차 → 마지막 약 5초는 모델 컷과 로고 엔드카드",
+      "pacing": "처음 2초대 컷으로 시작해서 뒤로 갈수록 1초 이하로 빨라지는 가속 구조",
+      "hook": "카메라를 바로 보는 모델의 움직임으로 시작 (설명 없음)",
+      "text": "화면 글자 없음 (로고만)",
+      "audio": "음악 중심, 나레이션 없음",
+      "caption": "짧은 3줄, 이모지 1개, 마지막 줄은 선택을 묻는 한마디"
+    },
+    {
+      "id": "airiders-0924",
+      "name": "AI Riders · 캐릭터 포즈 (09/24)",
+      "source": "@airiders",
+      "url": "https://www.instagram.com/reel/DdqrNRhM-y0/",
+      "metrics": { "likes": 539, "comments": 1, "followers": 11173 },
+      "durationSec": 13.3,
+      "cuts": 8,
+      "avgCutSec": 1.5,
+      "cutTimes": [1.5, 3.2, 4.2, 6.6, 7.5, 8.2, 9.1],
+      "structure": "0~1.5초 생각하는 포즈의 모델 → 후드 디테일(캐릭터 모자) 클로즈업 → 색 점퍼 전신 → 지퍼 손 클로즈업 → 모델 춤 동작 컷 → 마지막 약 4초 로고 엔드카드",
+      "pacing": "1.5초 안팎의 균일한 컷 + 중간에 2.4초짜리 한 번 길게 쉬어 가는 컷",
+      "hook": "표정이 있는 모델 클로즈업으로 시작",
+      "text": "화면 글자 없음 (로고만)",
+      "audio": "음악 중심, 나레이션 없음",
+      "caption": "짧은 3줄, 이모지 1개, 분위기 한 줄"
+    },
+    {
+      "id": "airiders-1022",
+      "name": "AI Riders · 스튜디오 룩북 (10/22)",
+      "source": "@airiders",
+      "url": "https://www.instagram.com/reel/DezM5vAMxQS/",
+      "metrics": { "likes": 468, "comments": 3, "followers": 11173 },
+      "durationSec": 13.2,
+      "cuts": 5,
+      "avgCutSec": 2.6,
+      "cutTimes": [1.5, 7.5, 8.5, 11.8],
+      "structure": "0~1.5초 전신 컷 → 6초짜리 긴 컷 하나로 여러 모델의 움직임을 이어 보여줌 → 1초 안팎의 짧은 컷 두 번 → 마지막 약 2초 웃는 모델과 로고",
+      "pacing": "긴 컷 한 번과 짧은 컷 몇 번의 대비 (느림 → 빠름 → 끝)",
+      "hook": "전신 컷으로 상품 전체를 먼저 보여줌",
+      "text": "화면 글자 없음 (로고만)",
+      "audio": "음악 중심, 나레이션 없음",
+      "caption": "짧은 3줄, 이모지 1개"
+    }
+  ]
+}

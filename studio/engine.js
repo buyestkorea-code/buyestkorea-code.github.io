@@ -84,8 +84,8 @@
     let bx = o.x; if (align === "center") bx = o.x - bw / 2; else if (align === "right") bx = o.x - bw;
     let by = o.y; if (o.anchor === "bottom") by = o.y - bh; else if (o.anchor === "center") by = o.y - bh / 2;
     const theme = o.theme || "box";
-    const rise = (1 - easeOut(p)) * 30;
-    ctx.globalAlpha = clamp(p, 0, 1);
+    const rise = o.noRise ? 0 : (1 - easeOut(p)) * 30;
+    ctx.globalAlpha = ctx.globalAlpha * clamp(p, 0, 1); // 바깥에서 정한 투명도(편집기 페이드)를 곱해서 존중
     ctx.translate(0, rise);
     const fg = o.color || T.fg;
     const drawLines = (dx, dy, color) => {
@@ -433,5 +433,9 @@
     };
   }
 
-  window.SE = { W, H, FPS, SAFE, THEMES, themeOf, CAPTION_THEMES, buildClipScene, buildSequenceScene, decodeAudio, loadMedia, loadImage, ensureFonts, renderToMp4, supported, wrap };
+  window.SE = {
+    W, H, FPS, SAFE, SAFE_BOX, THEMES, themeOf, CAPTION_THEMES, buildClipScene, buildSequenceScene, decodeAudio, loadMedia, loadImage, ensureFonts, renderToMp4, supported, wrap,
+    // 릴스 스튜디오(편집기)가 같이 쓰는 도구
+    drawCaption, drawCover, roundRect, seekVideo, pickConfig, audioConfig, encodeAudio, yieldNow, hexA, easeOut, easeInOut, clamp, interp, font,
+  };
 })();

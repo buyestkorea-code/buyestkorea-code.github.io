@@ -12,7 +12,7 @@
  */
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const ASPECTS = { "4:5": "1024x1280", "3:4": "960x1280", "9:16": "864x1536", "1:1": "1024x1024", "16:9": "1536x864" }; // 새 모델은 16의 배수 사이즈를 직접 받는다 → 잘림 없이 정확한 비율
 // 대략적인 1장 비용(USD) — 화면 안내용. 실제 청구는 각 회사 콘솔에서 확인.
 const COST = { gemini: 0.04, openai: 0.06 };
@@ -210,6 +210,94 @@ async function openaiMany(env, prompt, refs, aspect, n) {
   return out;
 }
 
+// ── 릴스 스토리보드: 프롬프트 + 사진 → 컷 리스트(JSON) ───────────────
+// 글 모델은 Gemini 먼저, 막히면 OpenAI. 모델 이름은 STORY_MODEL / OPENAI_TEXT_MODEL 로 바꿀 수 있다.
+const STORY_SYSTEM = `너는 인스타그램 릴스 전문 편집 기획자다. 패션 쇼핑몰(BUYEST: 병행수입 명품·부티크 / BUYEST Kids: 키즈 명품) 상품 영상의 컷 구성표를 만든다.
+반드시 아래 JSON 하나만 출력한다 (설명·마크다운 금지).
+{"hook":"첫 화면 한 줄(공백 포함 18자 이내)","mood":"bright|calm|emotional|hype 중 하나","cuts":[{"role":"hook|intro|detail|style|proof|cta 중 하나","sec":3~15 정수,"photo":사진 번호(0부터),"mode":"ai|photo","motion":"영어로 쓴 카메라·피사체 움직임 한 문장(영상 안에 글자·로고 새로 만들지 말 것)","narration":"한국어 나레이션 1~2문장","caption":"화면 자막 한 줄(공백 포함 16자 이내)"}]}
+규칙:
+- 전체 길이(sec 합)는 요청한 목표 길이의 ±15% 안. 컷 수는 목표 길이÷6 정도(최소 4, 최대 14). 첫 컷은 5초 이하 훅, 마지막 컷은 행동 유도(cta).
+- 나레이션 글자 수는 컷 sec × 4 이하 (한국어 읽는 속도). 나레이션 없이 분위기만 둘 컷은 narration 을 빈 문자열로.
+- mode "ai": 모델이 움직이거나 소재가 흔들리는 장면처럼 움직임이 가치 있는 컷. mode "photo": 지퍼·로고·택·소재 클로즈업처럼 AI가 모양을 바꾸면 안 되는 디테일 컷.
+- 사진은 가능한 한 모두 한 번 이상 쓰고, 같은 사진을 연달아 쓰지 않는다. photo 는 주어진 사진 수 범위 안.
+- 나레이션·자막은 ① 사용자가 준 상품 정보 ② 사진에서 눈으로 확인되는 것(색, 모양, 후드, 고글 같은 디자인) ③ 사이즈 문의 유도 같은 일반 안내, 이 셋으로만 쓴다. 소재·보온성·기능·착용감·안전·품질·정품 보증·할인·재고처럼 입력에 없는 설명은 절대 쓰지 않는다 (예: "부드러운 소재", "튼튼한 지퍼", "안전 보장"은 금지).
+- 다른 브랜드 이름을 끌어와 비교하지 않는다. 과장·허위 표현 금지. 쓸 근거가 부족하면 나레이션을 짧게 하거나 빈 문자열로 둔다.
+- sec 합은 목표 길이의 90~105% 로 맞춘다 (목표보다 짧게 끝내지 않는다). sec 는 2~15 정수.
+- "참고 릴스 구조"가 주어지면 위의 "컷 수는 목표 길이÷6" 규칙 대신 이 규칙이 우선한다: 참고 릴스의 평균 컷 길이의 약 2배(최소 2초, 최대 6초)로 컷을 잘게 나눈다 (컷 수 최대 20). 처음 컷은 상대적으로 길게, 뒤로 갈수록 짧게 가속하고, 마무리 컷은 상품명·행동 유도로 닫는다. 같은 사진을 연달아 쓰지는 않되 다른 사진을 돌려 쓴다. 컷이 짧으면(3초 이하) 나레이션은 비우거나 아주 짧게 쓴다.
+- "참고 릴스 구조"가 주어지면 그 릴스의 리듬(컷 길이가 변하는 방식, 훅을 여는 방식, 마무리 방식)만 목표 길이에 맞게 늘려서 따른다. 참고 릴스의 장면·문구·소재를 그대로 베끼지 않는다. 참고 릴스에 나레이션이 없어도 사장님 요청에 나레이션이 필요하면 쓴다.
+- 말투: 사장님이 직접 말하듯 담백하고 구체적으로. 광고 문구 투의 상투어("지금 바로!", "놓치지 마세요")는 마지막 컷 외에는 쓰지 않는다.`;
+function extractJson(txt) {
+  const s = String(txt || ""); const a = s.indexOf("{"), b = s.lastIndexOf("}");
+  if (a < 0 || b <= a) throw new HttpError(502, "스토리보드 응답을 읽지 못했습니다");
+  try { return JSON.parse(s.slice(a, b + 1)); } catch (_) { throw new HttpError(502, "스토리보드 응답 형식이 올바르지 않습니다"); }
+}
+async function storyGemini(env, text, refs) {
+  const key = String(env.GEMINI_API_KEY).trim();
+  const models = [env.STORY_MODEL, "gemini-3.8"].filter(Boolean); // 2.5 는 신규 사용자에게 닫힘 (404 안내: gemini-3.8 로 바꾸라고 함)
+  let lastErr = "";
+  for (const model of models) {
+    let r;
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: STORY_SYSTEM }] },
+          contents: [{ role: "user", parts: [{ text }, ...refs.map((x) => ({ inline_data: { mime_type: x.mime, data: x.b64 } }))] }],
+          generationConfig: { temperature: 0.8, responseMimeType: "application/json" },
+        }),
+      });
+    } catch (_) { lastErr = "Gemini 서버에 연결하지 못했습니다."; continue; }
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) { const t = d?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || ""; if (t) return extractJson(t); lastErr = "Gemini 가 빈 응답을 돌려줬습니다."; continue; }
+    lastErr = `Gemini(${model}) ${r.status} ${String(d?.error?.message || "").slice(0, 120)}`;
+  }
+  throw new HttpError(502, lastErr || "Gemini 스토리보드 실패");
+}
+async function storyOpenAI(env, text, refs) {
+  let r;
+  const content = refs && refs.length ? [{ type: "text", text }, ...refs.map((x) => ({ type: "image_url", image_url: { url: `data:${x.mime};base64,${x.b64}`, detail: "low" } }))] : text;
+  try {
+    r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${String(env.OPENAI_API_KEY).trim()}` },
+      body: JSON.stringify({ model: env.OPENAI_TEXT_MODEL || "gpt-4.1-mini", temperature: 0.7, response_format: { type: "json_object" }, messages: [{ role: "system", content: STORY_SYSTEM }, { role: "user", content }] }),
+    });
+  } catch (_) { throw new HttpError(502, "OpenAI 서버에 연결하지 못했습니다."); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new HttpError(r.status === 429 ? 429 : 502, `OpenAI 스토리보드 실패 (${r.status}) ${String(d?.error?.message || "").slice(0, 140)}`);
+  return extractJson(d?.choices?.[0]?.message?.content);
+}
+const MOODS = ["bright", "calm", "emotional", "hype"], ROLES = ["hook", "intro", "detail", "style", "proof", "cta"];
+// 입력에 없는 단정·보증 표현은 코드에서 한 번 더 걸러낸다 (AI가 프롬프트를 어겨도 막히게)
+const RISKY = ["정품", "보장", "보증", "안전", "튼튼", "부드러", "보온", "따뜻", "최고", "100%", "완벽", "최저가", "할인", "고급", "프리미엄"];
+function scrub(board, sourceText) {
+  let removed = 0; const src = String(sourceText || "");
+  const bad = RISKY.filter((w) => !src.includes(w));
+  const hit = (s) => bad.some((w) => s.includes(w));
+  board.cuts.forEach((c) => {
+    const parts = c.narration.split(/(?<=[.!?。])\s*/).filter(Boolean), keep = parts.filter((s) => !hit(s));
+    if (keep.length !== parts.length) { removed += parts.length - keep.length; c.narration = keep.join(" ").trim(); }
+    if (hit(c.caption)) { c.caption = ""; removed++; }
+  });
+  if (hit(board.hook)) { board.hook = ""; removed++; }
+  board.removed = removed; return board;
+}
+function normalizeBoard(raw, targetSec, nPhotos) {
+  const cuts = (Array.isArray(raw?.cuts) ? raw.cuts : []).slice(0, 20).map((c, i) => ({
+    role: ROLES.includes(c?.role) ? c.role : i === 0 ? "hook" : "detail",
+    sec: Math.min(15, Math.max(2, Math.round(Number(c?.sec) || 6))),
+    photo: Math.min(nPhotos - 1, Math.max(0, Math.round(Number(c?.photo) || 0))),
+    mode: c?.mode === "photo" ? "photo" : "ai",
+    motion: String(c?.motion || "Slow cinematic push-in with gentle natural motion.").slice(0, 400),
+    narration: String(c?.narration || "").slice(0, 200),
+    caption: String(c?.caption || "").slice(0, 40),
+  }));
+  if (cuts.length < 2) throw new HttpError(502, "스토리보드에 컷이 부족합니다. 다시 시도해 주세요.");
+  // 총 길이가 목표의 90~105% 밖이면 컷 길이를 비례해서 맞춘다 (컷당 3~15초 안에서)
+  const sum = cuts.reduce((s, c) => s + c.sec, 0);
+  if (sum < targetSec * 0.9 || sum > targetSec * 1.05) { const k = targetSec / sum; cuts.forEach((c) => { c.sec = Math.min(15, Math.max(2, Math.round(c.sec * k))); }); }
+  return { hook: String(raw?.hook || "").slice(0, 40), mood: MOODS.includes(raw?.mood) ? raw.mood : "bright", cuts, targetSec };
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: cors() });
@@ -242,6 +330,59 @@ export default {
           out = await ttsOpenAI(env, text, voice); provider = "openai";
         }
         return json({ ...out, voice, provider, fallbackReason: provider === "openai" ? note : "" });
+      }
+      if (url.pathname === "/api/transcribe" && request.method === "POST") { // 영상 속 말소리 → 단어별 시간이 붙은 글 (자동 자막)
+        if (!env.OPENAI_API_KEY) throw new HttpError(503, "OpenAI 키가 없어 음성 인식을 쓸 수 없습니다.");
+        let fd; try { fd = await request.formData(); } catch (_) { throw new HttpError(400, "오디오 파일이 필요합니다"); }
+        const file = fd.get("file"); if (!file || typeof file === "string") throw new HttpError(400, "오디오 파일이 필요합니다");
+        if (file.size > 24 * 1024 * 1024) throw new HttpError(400, "오디오가 너무 큽니다 (최대 약 12분). 영상을 나눠서 시도해 주세요.");
+        const out = new FormData(); out.append("file", file, "audio.wav"); out.append("model", env.TRANSCRIBE_MODEL || "whisper-1"); out.append("language", "ko"); out.append("response_format", "verbose_json");
+        out.append("timestamp_granularities[]", "word"); out.append("timestamp_granularities[]", "segment");
+        let r; try { r = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { Authorization: `Bearer ${String(env.OPENAI_API_KEY).trim()}` }, body: out }); } catch (_) { throw new HttpError(502, "OpenAI 서버에 연결하지 못했습니다."); }
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new HttpError(r.status === 429 ? 429 : 502, `음성 인식 실패 (${r.status}) ${String(d?.error?.message || "").slice(0, 160)}`);
+        return json({ text: d.text || "", duration: d.duration || 0, segments: (d.segments || []).map((s) => ({ start: s.start, end: s.end, text: s.text })), words: (d.words || []).map((w) => ({ start: w.start, end: w.end, word: w.word })) });
+      }
+      if (url.pathname === "/api/story-models" && request.method === "GET") { // 진단: 이 키로 글 생성이 되는 Gemini 모델 목록
+        if (!env.GEMINI_API_KEY) throw new HttpError(503, "Gemini 키가 없습니다");
+        const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": String(env.GEMINI_API_KEY).trim() } });
+        const d = await r.json().catch(() => ({}));
+        return json({ status: r.status, models: (d.models || []).filter((m) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m) => m.name.replace("models/", "")).slice(0, 80), error: d?.error?.message || "" });
+      }
+      if (url.pathname === "/api/storyboard" && request.method === "POST") {
+        if (!env.GEMINI_API_KEY && !env.OPENAI_API_KEY) throw new HttpError(503, "글 모델 키(GEMINI_API_KEY 또는 OPENAI_API_KEY)가 아직 등록되지 않았습니다.");
+        const b = await request.json().catch(() => ({}));
+        const prompt = String(b.prompt || "").trim().slice(0, 2000);
+        if (!prompt) throw new HttpError(400, "릴스 프롬프트가 비어 있습니다");
+        const nPhotos = Math.min(10, Math.max(1, Math.round(Number(b.photoCount) || 1)));
+        const targetSec = Math.min(120, Math.max(15, Math.round(Number(b.targetSec) || 45)));
+        const p = b.product || {};
+        // 레퍼런스가 있으면 컷 수와 컷별 길이(점점 짧아지는 가속)를 서버가 정해서 모델에게 지시한다 (모델이 규칙을 무시하는 일을 막음)
+        let paceLine = "";
+        if (b.reference && typeof b.reference === "object") {
+          const avg = Math.min(4, Math.max(1, Number(b.reference.avgCutSec) || 2)), N = Math.min(20, Math.max(6, Math.round(targetSec / (avg * 2))));
+          const w = Array.from({ length: N }, (_, i) => 1.6 - (1.0 * i) / Math.max(1, N - 1)), ws = w.reduce((s, x) => s + x, 0);
+          const secs = w.map((x) => Math.min(8, Math.max(2, Math.round((x * targetSec) / ws))));
+          secs[N - 1] = Math.max(2, secs[N - 1] + (targetSec - secs.reduce((s, x) => s + x, 0)));
+          paceLine = `컷 구성 지시(반드시 지킬 것): 컷은 정확히 ${N}개, 각 컷의 sec 는 순서대로 [${secs.join(",")}] 로 한다. 이 지시가 위의 컷 수 규칙보다 우선한다.`;
+        }
+        const text = [
+          `브랜드: ${b.brand === "kids" ? "BUYEST Kids" : "BUYEST"}${b.brandName ? ` · 상품 브랜드 ${String(b.brandName).slice(0, 60)}` : ""}`,
+          `목표 길이: ${targetSec}초`, `사진 수: ${nPhotos}장 (0~${nPhotos - 1}번, 첨부된 순서)`,
+          p.name ? `상품명: ${String(p.name).slice(0, 120)}` : "", p.price ? `가격: ${String(p.price).slice(0, 40)}` : "",
+          p.features ? `특징:\n${String(p.features).slice(0, 600)}` : "", p.cta ? `마지막 요청: ${String(p.cta).slice(0, 80)}` : "",
+          b.reference && typeof b.reference === "object" ? `참고 릴스 구조 (리듬만 참고, 장면·문구 복제 금지):\n- 원본 길이 ${Number(b.reference.durationSec) || "?"}초, 컷 ${Number(b.reference.cuts) || "?"}개 (평균 ${Number(b.reference.avgCutSec) || "?"}초)\n- 구성: ${String(b.reference.structure || "").slice(0, 400)}\n- 리듬: ${String(b.reference.pacing || "").slice(0, 200)}\n- 훅: ${String(b.reference.hook || "").slice(0, 200)}\n- 글자: ${String(b.reference.text || "").slice(0, 100)} / 소리: ${String(b.reference.audio || "").slice(0, 100)}` : "",
+          paceLine,
+          Array.isArray(b.kinds) && b.kinds.includes("video") ? `소재 종류: ${b.kinds.slice(0, 10).map((k, i) => `${i}번=${k === "video" ? "영상" : "사진"}`).join(", ")}. 영상 소재를 쓰는 컷에서 mode "ai" 는 AI 수정(영상→영상)이고 이때 motion 은 영상을 어떻게 바꿀지 영어 한 문장(예: change the background to a snowy street while keeping the subject and motion)으로 쓴다. mode "photo" 는 영상 원본 그대로 쓴다. 영상 소재의 컷 길이(sec)는 3~15초.` : "",
+          `사장님 요청(릴스 프롬프트):\n${prompt}`,
+        ].filter(Boolean).join("\n");
+        const refs = (Array.isArray(b.images) ? b.images.slice(0, 8) : []).map((u) => { try { return parseDataUrl(u); } catch (_) { return null; } }).filter(Boolean);
+        // Gemini 는 Cloudflare 서버 위치 제한("User location is not supported")에 걸려 쓸 수 없는 경우가 많아 OpenAI 를 먼저 쓴다
+        let raw = null, note = "", provider = "";
+        if (env.OPENAI_API_KEY) { try { raw = await storyOpenAI(env, text, refs); provider = "openai"; } catch (e) { if (!env.GEMINI_API_KEY) throw e; note = String(e.message || "").slice(0, 160); } }
+        if (!raw && env.GEMINI_API_KEY) { raw = await storyGemini(env, text, refs); provider = "gemini"; }
+        if (!raw) throw new HttpError(502, "스토리보드를 만들지 못했습니다");
+        return json({ board: scrub(normalizeBoard(raw, targetSec, nPhotos), text), provider, fallbackReason: note });
       }
       if (url.pathname === "/api/generate" && request.method === "POST") {
         const b = await request.json().catch(() => ({}));
