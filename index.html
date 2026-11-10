@@ -1831,7 +1831,7 @@
         <div class="workspace">
           <div class="panel">
             <h2>주문서 창고위치찾기</h2>
-            <p class="sub">변환 규칙 — 상품명: [ ] 안의 내용 전체 삭제 · 쇼핑몰: ( ) 문자만 삭제 · 사이즈 없으면 TU · 비교코드: 상품코드_사이즈 · 재고장 품목명이 접두어_상품코드_사이즈 형태면 접두어는 비교에서 제외하고 재고위치에만 표시합니다.</p>
+            <p class="sub">재고위치는 <b>위치(실재고수량)</b> 형태로 표시됩니다 (예: 본(1),아(2)). 변환 규칙 — 상품명: [ ] 안의 내용 전체 삭제 · 쇼핑몰: ( ) 문자만 삭제 · 사이즈 없으면 TU · 비교코드: 상품코드_사이즈 · 재고장 품목명이 접두어_상품코드_사이즈 형태면 접두어는 비교에서 제외하고 재고위치에만 표시합니다.</p>
 
             <div class="dz-grid">
               <div class="dropzone" id="osOrderDrop" tabindex="0" role="button" aria-label="사방넷 주문서 선택">
@@ -8585,11 +8585,12 @@ window.__loadLib = (function(){
           var seenLoc = {}, seenRaw = {};
           var uniqueLocations = [], uniqueRawNames = [];
           matches.forEach(function(m){
-            if(!seenLoc[m.location]){ uniqueLocations.push(m.location); seenLoc[m.location]=true; }
+            if(!seenLoc[m.location]){ uniqueLocations.push(m.location); seenLoc[m.location]=0; }
+            seenLoc[m.location] += (m.qty||0);
             if(!seenRaw[m.rawName]){ uniqueRawNames.push(m.rawName); seenRaw[m.rawName]=true; }
           });
           matchResult = '매칭맞음';
-          locationText = uniqueLocations.join(',');
+          locationText = uniqueLocations.map(function(l){ return l + '(' + seenLoc[l] + ')'; }).join(',');
           rawText = uniqueRawNames.join(' | ');
         } else {
           matchResult = '매칭없음'; locationText = ''; rawText = '';
