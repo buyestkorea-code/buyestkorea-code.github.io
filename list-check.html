@@ -11,7 +11,7 @@
   h1 { font-size: 20px; margin: 0 0 4px; }
   p.desc { color: #4b5563; font-size: 13.5px; margin: 0 0 14px; line-height: 1.55; }
   .step { background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; margin:14px 0; }
-  .step h3 { margin:0 0 8px; font-size:15px; }
+  .step h2 { margin:0 0 8px; font-size:15px; }
   .btn { font-size:14.5px; padding:9px 20px; border:none; border-radius:6px; cursor:pointer; background:#111827; color:#fff; }
   .btn:disabled { background:#d1d5db; color:#6b7280; cursor:not-allowed; }
   .btn-sub { background:#0f766e; }
@@ -37,7 +37,7 @@
   .sub { color:var(--mute); font-size:11.5px; margin-top:2px; }
   .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; }
   .t-ok { background:#f0fdf4; color:var(--ok); } .t-warn { background:#fef3c7; color:#92400e; }
-  .t-purple { background:#f3e8ff; color:#7e22ce; }
+  .t-past { background:#e6f4f1; color:#0f766e; }
   th.sortable { cursor:pointer; user-select:none; }
   th.sortable:hover { background:#e5e7eb; }
   th .ar { color:#1f3a34; font-size:11px; }
@@ -63,7 +63,7 @@
   </details>
 
   <div class="step">
-    <h3>1. 리스트 올리기</h3>
+    <h2>1. 리스트 올리기</h2>
     <div class="dropzone" id="drop" tabindex="0" role="button" aria-label="리스트 파일 선택">
       <div>엑셀·CSV·PDF(패킹리스트/인보이스) 파일을 끌어다 놓거나 클릭해서 선택하세요 (여러 개 가능)</div>
       <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv,.txt,.pdf" multiple>
@@ -79,7 +79,7 @@
   </div>
 
   <div class="step" id="resultBox" style="display:none;">
-    <h3>2. 결과</h3>
+    <h2>2. 결과</h2>
     <div id="asOf" style="font-size:13px;color:var(--mute);"></div>
     <div class="stats" id="stats"></div>
     <div style="margin:8px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -371,7 +371,7 @@ loadSalesStatus();
 // 사용 목적: 많은 업체 리스트에서 "지금 품절인 것"과 "관심 높은 것"을 빨리 골라내기.
 const CATS = {
   soldout: { label: '품절 · 재주문 후보', rank: 0, cls: 't-bad',  fill: 'FFFEE2E2', font: 'FFB91C1C' },
-  pastsold:{ label: '과거 판매 · 현재 없음', rank: 1, cls: 't-purple', fill: 'FFF3E8FF', font: 'FF7E22CE' },
+  pastsold:{ label: '과거 판매 · 현재 없음', rank: 1, cls: 't-past', fill: 'FFE6F4F1', font: 'FF0F766E' },
   check:   { label: '확인 필요',          rank: 2, cls: 't-warn', fill: 'FFFEF3C7', font: 'FF92400E' },
   selling: { label: '판매중',             rank: 3, cls: 't-ok',   fill: 'FFDCFCE7', font: 'FF15803D' },
   unreg:   { label: '사이트 미등록',      rank: 4, cls: 't-gray', fill: 'FFF3F4F6', font: 'FF4B5563' },
