@@ -1942,7 +1942,52 @@
         <iframe data-src="promo-pick.html" title="TEST 기획전 상품 뽑기" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
       <section data-view="invoiceKhTest">
-        <iframe data-src="invoice-gyeongho.html" title="TEST 인보이스 재고추가(경호)" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+        <div class="workspace">
+          <div class="panel">
+            <h2>인보이스 재고추가(경호) <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:#fdf3e0;color:#a15c07;vertical-align:middle;">TEST</span></h2>
+            <p class="sub">인보이스 PDF·패킹 파일을 <b>여러 개 한꺼번에</b> 올리면 파일 이름으로 거래처를 알아보고, 글자가 들어 있는 파일(인보이스 → 패킹 PDF → 패킹 엑셀 순서)에서 품번·수량·단가를 읽어 <b>(경호) 양식 엑셀</b> 하나로 모아 줍니다. 스캔본은 아래 "직접 입력"으로 넣을 수 있어요.</p>
+            <div class="dropzone" id="ikhDrop" tabindex="0" role="button" aria-label="인보이스 파일 선택">
+              <div class="ic">&#128193;</div>
+              <div><strong>파일을 끌어놓거나 클릭해서 여러 개 선택하세요</strong></div>
+              <div style="font-size:12.5px;margin-top:4px;">.pdf / .xlsx · 인보이스와 패킹 파일을 같이 올려도 됩니다</div>
+              <input type="file" id="ikhFile" accept=".pdf,.xlsx,.xls" multiple />
+            </div>
+            <div id="ikhFileList"></div>
+            <div class="field" style="max-width:220px;margin-top:12px;"><label for="ikhDate">도착 날짜 (구역 제목에 들어가요)</label><input type="date" id="ikhDate" class="textinput"></div>
+            <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;"><input type="checkbox" id="ikhOcr"> 글자가 없는 스캔본(갈리아노·다니엘·스타일)도 OCR로 읽기 <span style="color:var(--ink-muted)">— 페이지당 1~5분, 정확도 낮음</span></label>
+            <div id="ikhStatus"></div>
+            <div class="progress" id="ikhProgress" style="display:none;"><div></div></div>
+            <div id="ikhProgressLabel" style="font-size:12px;color:var(--ink-muted);margin-top:-6px;"></div>
+            <div class="btn-row" id="ikhActions" style="display:none;margin-top:12px;">
+              <button class="btn btn-primary" id="ikhRun">한꺼번에 읽기</button>
+              <button class="btn" id="ikhReset">비우기</button>
+            </div>
+          </div>
+
+          <div class="panel" id="ikhResultPanel" style="display:none;">
+            <h2>읽은 결과</h2>
+            <p class="sub">칸을 눌러 바로 고칠 수 있어요. <b>규칙 적용</b>은 정답 파일에서 배운 띄어쓰기를 쓴 품번, <b>원본 유지</b>는 규칙을 못 찾아 그대로 둔 품번이니 눈으로 확인해 주세요.</p>
+            <div class="stat-row" id="ikhStats"></div>
+            <div id="ikhNotes"></div>
+            <div id="ikhSections"></div>
+            <div class="btn-row" style="margin-top:14px;">
+              <button class="btn btn-primary" id="ikhDownload">재고추가(경호) 엑셀 내려받기</button>
+            </div>
+            <div id="ikhDlStatus"></div>
+          </div>
+
+          <div class="panel">
+            <h2>직접 입력 (스캔본·읽지 못한 인보이스)</h2>
+            <p class="sub">스캔본에서 읽은 줄을 <code>품번 | 수량 | 단가</code> 모양으로 붙여넣으면 같은 규칙으로 정리해서 위 결과에 구역으로 더해 줘요.</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <div class="field" style="min-width:160px;"><label for="ikhMVendor">거래처</label><input type="text" id="ikhMVendor" class="textinput" placeholder="예) 스타일"></div>
+              <div class="field" style="min-width:120px;"><label for="ikhMNo">인보이스 번호</label><input type="text" id="ikhMNo" class="textinput" placeholder="예) 56"></div>
+            </div>
+            <div class="field" style="margin-top:10px;"><label for="ikhMText">붙여넣기</label><textarea id="ikhMText" class="textinput" rows="6" style="font-family:ui-monospace,Consolas,monospace;font-size:13px;" placeholder="L1624089P68 | 1 | 79.90&#10;L1500987001 | 2 | 215.10"></textarea></div>
+            <div class="btn-row" style="margin-top:10px;"><button class="btn" id="ikhMAdd">구역으로 더하기</button></div>
+            <div id="ikhMStatus"></div>
+          </div>
+        </div>
       </section>
       <section data-view="csAnswerTest">
         <iframe data-src="cs-answer.html" title="TEST 문의 답변 도우미" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
@@ -5466,6 +5511,282 @@ window.__loadLib = (function(){
         btn.disabled = false;
       }
     });
+
+    /* =========================================================
+       TEST: 인보이스 재고추가(경호) — 여러 파일을 한 번에 올려 거래처를 자동 인식하고 (경호) 양식 엑셀로 모은다.
+       읽기 순서: 글자 있는 인보이스 PDF → 글자 있는 패킹 PDF → 패킹 엑셀(쿠미니) → (선택) OCR → 직접 입력
+       파서는 위 인보이스 자동인식의 것을 그대로 쓰고, 추가 거래처 파서·품번 정리·엑셀 만들기는 invoice-kh.js(window.KH).
+       ========================================================= */
+    var ikhFiles = [];      // {file, vendor, pack, num, ext}
+    var ikhSections = [];   // {title, source, items:[{model,qty,price,origin,how,why,raws,merged}]}
+    var ikhNotes = [];      // 읽지 못한 것 안내
+    var IKH_ALIAS = {'그로포킴':'그루뽀킴','그루포킴':'그루뽀킴'};
+    var ikhBusy = false;
+
+    function ikhKH(){ if(!window.KH) throw new Error('invoice-kh.js를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.'); return window.KH; }
+    function ikhVendorKeys(){ var ks = VENDOR_KEYS.slice(); if(window.KH) Object.keys(KH.EXTRA).forEach(function(k){ if(ks.indexOf(k) === -1) ks.push(k); }); return ks; }
+    function ikhInfo(file){
+      var base = file.name.replace(/^.*[\\\/]/, '');
+      var ext = (base.lastIndexOf('.') >= 0 ? base.slice(base.lastIndexOf('.')) : '').toLowerCase();
+      var pack = /패킹|packing/i.test(base);
+      var stripped = base.replace(/\s*패킹/g, '');
+      var vendor = window.KH ? KH.vendorFromName(stripped, VENDOR_KEYS) : null;
+      var m = base.match(/(\d+)/);
+      return {file:file, vendor:vendor, pack:pack, num:m ? m[1] : '', ext:ext};
+    }
+    function ikhAddFiles(files){
+      files.forEach(function(f){ ikhFiles.push(ikhInfo(f)); });
+      ikhRenderFiles();
+    }
+    function ikhRenderFiles(){
+      var wrap = document.getElementById('ikhFileList');
+      wrap.innerHTML = '';
+      document.getElementById('ikhActions').style.display = ikhFiles.length ? 'flex' : 'none';
+      if(!ikhFiles.length) return;
+      var list = el('div', {class:'sheet-list'});
+      ikhFiles.forEach(function(entry, idx){
+        var row = el('div', {class:'sheet-row'});
+        row.appendChild(el('span', {class:'name'}, [document.createTextNode(entry.file.name)]));
+        row.appendChild(el('span', {class:'meta'}, [document.createTextNode(entry.pack ? '패킹' : '인보이스')]));
+        var select = document.createElement('select'); select.className = 'select';
+        var none = document.createElement('option'); none.value = ''; none.textContent = '(거래처 직접 선택)'; select.appendChild(none);
+        ikhVendorKeys().filter(function(k){ return k !== '그로포킴'; }).forEach(function(k){
+          var o = document.createElement('option'); o.value = k; o.textContent = k; if(entry.vendor === k) o.selected = true; select.appendChild(o);
+        });
+        select.addEventListener('change', function(){ entry.vendor = select.value || null; });
+        row.appendChild(select);
+        var del = el('button', {class:'row-del', title:'제거'}, [document.createTextNode('✕')]);
+        del.addEventListener('click', function(){ ikhFiles.splice(idx, 1); ikhRenderFiles(); });
+        row.appendChild(del);
+        list.appendChild(row);
+      });
+      wrap.appendChild(list);
+    }
+    (function(){
+      var dz = document.getElementById('ikhDrop'), input = document.getElementById('ikhFile');
+      dz.addEventListener('click', function(){ input.click(); });
+      dz.addEventListener('keydown', function(ev){ if(ev.key === 'Enter' || ev.key === ' ') input.click(); });
+      input.addEventListener('change', function(){ ikhAddFiles(Array.prototype.slice.call(input.files)); input.value = ''; });
+      ['dragenter','dragover'].forEach(function(evt){ dz.addEventListener(evt, function(e){ e.preventDefault(); dz.classList.add('drag'); }); });
+      ['dragleave','drop'].forEach(function(evt){ dz.addEventListener(evt, function(e){ e.preventDefault(); dz.classList.remove('drag'); }); });
+      dz.addEventListener('drop', function(e){ ikhAddFiles(Array.prototype.slice.call(e.dataTransfer.files)); });
+      var d = new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
+      document.getElementById('ikhDate').value = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    })();
+
+    function ikhProgress(pct, label){
+      var w = document.getElementById('ikhProgress'); w.style.display = 'block'; w.querySelector('div').style.width = pct + '%';
+      document.getElementById('ikhProgressLabel').textContent = label || '';
+    }
+    function ikhParse(vendor, pagesLines){
+      if(window.KH && KH.parsers[vendor]) return KH.parsers[vendor](pagesLines);
+      return window.__buyestDebug.dispatch(vendor, pagesLines);
+    }
+    function ikhChars(pagesLines){ var n = 0; pagesLines.forEach(function(ls){ ls.forEach(function(l){ n += String(l).trim().length; }); }); return n; }
+    function ikhTitle(vendor, num, stem){
+      var d = document.getElementById('ikhDate').value.replace(/-/g, '.');
+      return [d, IKH_ALIAS[vendor] || vendor, num || stem].filter(Boolean).join(' ');
+    }
+
+    // 한 인보이스(거래처+번호) 안의 파일 중 읽을 수 있는 첫 번째 것에서 품목을 뽑는다.
+    async function ikhProcessGroup(g, idx, total, useOcr){
+      var vendor = g.vendor, inv = [], pk = [], xl = [];
+      g.files.forEach(function(e){ (e.ext === '.pdf' ? (e.pack ? pk : inv) : xl).push(e); });
+      var tried = [];
+      // 쿠미니 패킹 엑셀(여러 인보이스가 한 파일에 들어 있을 수 있음)
+      if(vendor === '쿠미니' && xl.length){
+        var out = [];
+        for(var xi = 0; xi < xl.length; xi++){
+          var buf = await xl[xi].file.arrayBuffer();
+          var wb = await XLSXW.read(buf, {type:'array'});
+          var ws = wb.Sheets['Sheet1'] || wb.Sheets[wb.SheetNames[0]];
+          var stem = xl[xi].file.name.replace(/\.[^.]+$/, '');
+          var aoa = sheetToAoa(ws);
+          var hdrs = cuminiFindBlocks(aoa), numsInName = stem.match(/\d+/g) || [];
+          hdrs.forEach(function(hr, bi){
+            var lim = (bi + 1 < hdrs.length) ? hdrs[bi + 1] : aoa.length;
+            var its = cuminiParseBlock(aoa, hr, (bi + 1 < hdrs.length) ? hdrs[bi + 1] : null);
+            if(!its.length) return;
+            var totals = [];
+            for(var rr = hr; rr < lim; rr++){ var row = aoa[rr] || []; var rowTxt = row.join(' '); if(/TOTALE|IMPONIBILE/i.test(rowTxt)){ row.forEach(function(c){ if(typeof c === 'number' && c >= 20) totals.push(c); }); } }
+            out.push({title: ikhTitle(vendor, bi < numsInName.length ? numsInName[bi] : String(bi + 1), stem), source:'패킹 엑셀', items:its, vendor:vendor, check: KH.checkTotal(its, totals)});
+          });
+        }
+        if(out.length) return out;
+        tried.push('패킹 엑셀에서 품목을 찾지 못함');
+      }
+      var order = inv.concat(pk);
+      for(var i = 0; i < order.length; i++){
+        var e = order[i];
+        ikhProgress(Math.round((idx / total) * 100), '[' + (idx + 1) + '/' + total + '] ' + e.file.name + ' 읽는 중');
+        var ex = await extractPdfPagesLines(e.file, false, function(){});
+        if(ikhChars(ex.pagesLines) < 50){ tried.push(e.file.name + ' — 글자 없음(스캔본)'); continue; }
+        var items = ikhParse(vendor, ex.pagesLines);
+        if(items && items.length) return [{title: ikhTitle(vendor, e.num, e.file.name.replace(/\.[^.]+$/, '')), source: e.pack ? '패킹 PDF' : '인보이스 PDF', items:items, vendor:vendor, check: KH.checkTotal(items, KH.docTotals(ex.pagesLines))}];
+        tried.push(e.file.name + ' — 품목을 찾지 못함(양식이 다를 수 있음)');
+      }
+      // 마지막 수단: OCR (글자 없는 인보이스 PDF, OCR 지원 거래처만)
+      var cfg = VENDOR_PARSERS[vendor];
+      if(useOcr && cfg && cfg.ocr && inv.length){
+        var e2 = inv[0];
+        var ex2 = await extractPdfPagesLines(e2.file, true, function(p, n){ ikhProgress(Math.round(((idx + p / n) / total) * 100), '[' + (idx + 1) + '/' + total + '] ' + e2.file.name + ' OCR ' + p + '/' + n + '페이지'); });
+        var items2 = ikhParse(vendor, ex2.pagesLines);
+        if(items2 && items2.length) return [{title: ikhTitle(vendor, e2.num, e2.file.name.replace(/\.[^.]+$/, '')), source:'OCR(정확도 낮음, 꼭 확인)', items:items2, vendor:vendor, check: KH.checkTotal(items2, KH.docTotals(ex2.pagesLines))}];
+        tried.push(e2.file.name + ' — OCR로도 품목을 찾지 못함');
+      }
+      ikhNotes.push(vendor + ' ' + (g.num || '') + ': ' + (tried.length ? tried.join(' / ') : '읽을 수 있는 파일이 없음') + ' → 아래 "직접 입력"을 쓰세요');
+      return [];
+    }
+
+    async function ikhRun(){
+      if(ikhBusy) return;
+      var status = document.getElementById('ikhStatus');
+      status.innerHTML = '';
+      try{ ikhKH(); }catch(err){ banner(status, 'err', '준비 실패', err.message); return; }
+      var manual = ikhSections.filter(function(s){ return s.manual; });
+      ikhSections = manual; ikhNotes = [];
+      var groups = {}, order = [], unknown = [];
+      ikhFiles.forEach(function(e){
+        if(!e.vendor){ unknown.push(e.file.name); return; }
+        var key = e.vendor + '|' + (e.num || e.file.name);
+        if(!groups[key]){ groups[key] = {vendor:e.vendor, num:e.num, files:[]}; order.push(key); }
+        groups[key].files.push(e);
+      });
+      // 쿠미니 패킹 엑셀에 이미 들어 있는 번호의 스캔 PDF는 건너뛴다.
+      var cuminiNums = {};
+      ikhFiles.forEach(function(e){ if(e.vendor === '쿠미니' && e.ext !== '.pdf'){ (e.file.name.match(/\d+/g) || []).forEach(function(n){ cuminiNums[n] = true; }); } });
+      if(unknown.length) ikhNotes.push('거래처를 알아보지 못한 파일(목록에서 직접 고르세요): ' + unknown.join(', '));
+      if(!order.length){ banner(status, 'err', '읽을 파일이 없어요', '파일 목록에서 거래처를 골라 주세요.'); ikhRender(); return; }
+      ikhBusy = true; document.getElementById('ikhRun').disabled = true;
+      var useOcr = document.getElementById('ikhOcr').checked;
+      try{
+        for(var i = 0; i < order.length; i++){
+          var g = groups[order[i]];
+          if(g.vendor === '쿠미니' && g.num && cuminiNums[g.num] && !g.files.some(function(f){ return f.ext !== '.pdf'; })) continue;
+          var res = await ikhProcessGroup(g, i, order.length, useOcr);
+          res.forEach(function(r){
+            var merged = KH.mergeItems(r.items, r.vendor);
+            if(merged.length) ikhSections.push({title:r.title, source:r.source, items:merged, vendor:r.vendor, check:r.check || {status:'none'}});
+          });
+        }
+        ikhProgress(100, '');
+        document.getElementById('ikhProgress').style.display = 'none';
+        document.getElementById('ikhProgressLabel').textContent = '';
+        banner(status, ikhSections.length ? 'ok' : 'warn', '읽기 완료', ikhSections.length + '개 인보이스 구역을 만들었어요.' + (ikhNotes.length ? ' 읽지 못한 것이 ' + ikhNotes.length + '건 있어요.' : ''));
+      }catch(err){
+        document.getElementById('ikhProgress').style.display = 'none';
+        banner(status, 'err', '처리 중 오류', String((err && err.message) || err));
+      }finally{
+        ikhBusy = false; document.getElementById('ikhRun').disabled = false;
+      }
+      ikhRender();
+    }
+
+    function ikhRender(){
+      var panel = document.getElementById('ikhResultPanel');
+      panel.style.display = (ikhSections.length || ikhNotes.length) ? 'block' : 'none';
+      var totalRows = 0, totalQty = 0, totalAmt = 0;
+      ikhSections.forEach(function(s){ var t = KH.sums(s.items); totalRows += s.items.length; totalQty += t.qty; totalAmt += t.amount; });
+      var stats = document.getElementById('ikhStats'); stats.innerHTML = '';
+      function stat(n, l){ var s = el('div', {class:'stat'}); s.appendChild(el('div', {class:'n tabular'}, [document.createTextNode(n)])); s.appendChild(el('div', {class:'l'}, [document.createTextNode(l)])); return s; }
+      stats.appendChild(stat(String(ikhSections.length), '인보이스 구역'));
+      var okN = ikhSections.filter(function(s){ return s.check && s.check.status === 'ok'; }).length, badN = ikhSections.filter(function(s){ return s.check && s.check.status === 'bad'; }).length;
+      stats.appendChild(stat(okN + ' / ' + ikhSections.length, '합계 검증 통과'));
+      if(badN) stats.appendChild(stat(String(badN), '합계 불일치(확인 필요)'));
+      stats.appendChild(stat(String(totalRows), '품목 줄'));
+      stats.appendChild(stat(String(totalQty), '수량 합'));
+      stats.appendChild(stat(totalAmt.toLocaleString('ko-KR', {maximumFractionDigits:2}), '금액 합'));
+      var notes = document.getElementById('ikhNotes'); notes.innerHTML = '';
+      if(ikhNotes.length) banner(notes, 'warn', '읽지 못한 것', ikhNotes.join(' // '));
+      var box = document.getElementById('ikhSections'); box.innerHTML = '';
+      ikhSections.forEach(function(s, si){
+        var t = KH.sums(s.items);
+        var head = el('div', {style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0 6px;'});
+        var title = document.createElement('input'); title.className = 'textinput'; title.value = s.title; title.style.maxWidth = '320px'; title.style.fontWeight = '700';
+        title.addEventListener('input', function(){ s.title = title.value; });
+        head.appendChild(title);
+        head.appendChild(el('span', {class:'meta', style:'color:var(--ink-muted);font-size:12.5px;'}, [document.createTextNode(s.source + ' · ' + s.items.length + '줄 · 수량 ' + t.qty + ' · 금액 ' + t.amount.toLocaleString('ko-KR', {maximumFractionDigits:2}))]));
+        var ck = s.check || {status:'none'};
+        var badge = el('span', {style:'font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px;' + (ck.status === 'ok' ? 'background:#ecf8f5;color:#0f766e;' : ck.status === 'bad' ? 'background:#fdeceb;color:#b42318;' : 'background:#efefec;color:#6a6f76;')},
+          [document.createTextNode(ck.status === 'ok' ? '합계 검증 통과 ✓' : ck.status === 'bad' ? '합계 불일치 — 읽은 ' + ck.sum.toLocaleString('ko-KR') + ' ↔ 인보이스 ' + ck.total.toLocaleString('ko-KR') + ' (차이 ' + ck.diff + ') 확인 필요' : '총액을 못 찾아 검증 못 함')]);
+        head.appendChild(badge);
+        var rm = el('button', {class:'btn', style:'margin-left:auto;'}, [document.createTextNode('이 구역 빼기')]);
+        rm.addEventListener('click', function(){ ikhSections.splice(si, 1); ikhRender(); });
+        head.appendChild(rm);
+        box.appendChild(head);
+        var wrap = el('div', {class:'table-scroll'}); var table = el('table', {class:'data'});
+        var htr = el('tr'); ['상태','원본','MODEL (경호)','QTY','UNIT PRICE','원산지',''].forEach(function(c, ci){ htr.appendChild(el('th', (ci === 3 || ci === 4) ? {class:'num'} : null, [document.createTextNode(c)])); });
+        table.appendChild(el('thead', null, [htr]));
+        var tb = el('tbody');
+        s.items.forEach(function(it, ri){
+          var tr = el('tr');
+          var tag = it.how === 'rule' ? '규칙 적용' : (it.how === 'fix' ? it.why : '원본 유지');
+          var td0 = el('td'); td0.appendChild(document.createTextNode(tag + (it.merged > 1 ? ' · 합산 ' + it.merged + '줄' : ''))); if(it.how !== 'rule') td0.style.color = '#a15c07'; tr.appendChild(td0);
+          var td1 = el('td', {style:'color:var(--ink-muted);font-family:ui-monospace,Consolas,monospace;font-size:11.5px;'}); td1.textContent = it.raws.join(' / '); tr.appendChild(td1);
+          function cell(field, num){
+            var td = el('td', num ? {class:'num tabular', contenteditable:'true'} : {contenteditable:'true'}); td.textContent = it[field] == null ? '' : String(it[field]);
+            td.addEventListener('input', function(){ var v = td.textContent; if(field === 'qty' || field === 'price'){ var n = parseFloat(String(v).replace(/,/g, '')); it[field] = isFinite(n) ? n : 0; } else { it[field] = v; if(field === 'model'){ it.how = 'rule'; it.why = '직접 수정'; } } });
+            return td;
+          }
+          tr.appendChild(cell('model', false)); tr.appendChild(cell('qty', true)); tr.appendChild(cell('price', true)); tr.appendChild(cell('origin', false));
+          var td6 = el('td'); var del = el('button', {class:'row-del', title:'이 줄 빼기'}, [document.createTextNode('✕')]);
+          del.addEventListener('click', function(){ s.items.splice(ri, 1); ikhRender(); }); td6.appendChild(del); tr.appendChild(td6);
+          tb.appendChild(tr);
+        });
+        table.appendChild(tb); wrap.appendChild(table); box.appendChild(wrap);
+      });
+    }
+
+    // 스캔본 등 직접 입력: "품번 | 수량 | 단가"
+    function ikhParsePasted(text){
+      var items = [], bad = [];
+      text.split(/\r?\n/).forEach(function(ln, i){
+        ln = ln.trim(); if(!ln) return;
+        var parts;
+        if(/[|\t]/.test(ln)) parts = ln.split(/\s*[|\t]\s*/);
+        else { var m = ln.match(/^(.+?)\s+(\d+)\s+([\d.,]+)$/); parts = m ? [m[1], m[2], m[3]] : null; }
+        if(!parts || parts.length < 3){ bad.push(i + 1); return; }
+        var q = KH.numEu(parts[1]), p = KH.numEu(parts[2]);
+        if(!isFinite(q) || !isFinite(p) || q <= 0){ bad.push(i + 1); return; }
+        items.push({model:parts[0].trim(), name:'', qty:q, unitPrice:p, note:(parts[3] || '').trim(), mat:(parts[4] || '').trim(), brand:''});
+      });
+      return {items:items, bad:bad};
+    }
+    document.getElementById('ikhMAdd').addEventListener('click', function(){
+      var st = document.getElementById('ikhMStatus');
+      try{ ikhKH(); }catch(err){ banner(st, 'err', '준비 실패', err.message); return; }
+      var vendor = document.getElementById('ikhMVendor').value.trim(), no = document.getElementById('ikhMNo').value.trim();
+      if(!vendor){ banner(st, 'err', '거래처를 넣어 주세요', ''); return; }
+      var r = ikhParsePasted(document.getElementById('ikhMText').value);
+      if(!r.items.length){ banner(st, 'err', '읽을 수 있는 줄이 없어요', '"품번 | 수량 | 단가" 모양인지 확인해 주세요.' + (r.bad.length ? ' (문제 줄: ' + r.bad.slice(0, 8).join(', ') + ')' : '')); return; }
+      var merged = KH.mergeItems(r.items, vendor);
+      ikhSections.push({title: ikhTitle(vendor, no, ''), source:'직접 입력', items:merged, vendor:vendor, manual:true});
+      document.getElementById('ikhMText').value = ''; document.getElementById('ikhMNo').value = '';
+      banner(st, r.bad.length ? 'warn' : 'ok', '구역을 더했어요', merged.length + '줄' + (r.bad.length ? ' · 읽지 못한 줄: ' + r.bad.slice(0, 8).join(', ') + '번' : ''));
+      ikhRender();
+    });
+
+    document.getElementById('ikhRun').addEventListener('click', ikhRun);
+    document.getElementById('ikhReset').addEventListener('click', function(){
+      ikhFiles = []; ikhSections = []; ikhNotes = [];
+      document.getElementById('ikhStatus').innerHTML = ''; document.getElementById('ikhFileList').innerHTML = '';
+      document.getElementById('ikhActions').style.display = 'none'; document.getElementById('ikhResultPanel').style.display = 'none';
+    });
+    document.getElementById('ikhDownload').addEventListener('click', function(){
+      var st = document.getElementById('ikhDlStatus');
+      try{ ikhKH(); }catch(err){ banner(st, 'err', '준비 실패', err.message); return; }
+      var secs = ikhSections.map(function(s){ return {title:s.title, items:s.items.filter(function(it){ return it.model && isFinite(+it.qty) && +it.qty !== 0; })}; }).filter(function(s){ return s.items.length; });
+      if(!secs.length){ banner(st, 'err', '내려받을 내용이 없어요', ''); return; }
+      var ws = KH.buildSheet(XLSX, secs);
+      var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      var arr = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+      var d = document.getElementById('ikhDate').value.replace(/-/g, '.') || timestamp();
+      deliverFile({baseName: d + ' 재고추가(경호)', xlsxBlob: new Blob([arr], {type:'application/octet-stream'}), csvText: null}, function(type, title, msg){
+        banner(st, type === 'ok' ? 'ok' : (type === 'warn' ? 'warn' : 'err'), title, msg);
+      });
+    });
+    // 진단/시험용: 콘솔에서 같은 규칙으로 직접 돌려볼 수 있게 노출
+    window.__ikhDebug = { files: function(){ return ikhFiles; }, sections: function(){ return ikhSections; }, run: ikhRun, info: ikhInfo };
   })();
 
   /* =========================================================
@@ -8869,6 +9190,7 @@ window.__loadLib = (function(){
 
 })();
 </script>
+<script src="invoice-kh.js"></script>
 <script src="colresize.js"></script>
 <script src="paste-upload.js"></script>
 <script src="manual-data.js"></script>
