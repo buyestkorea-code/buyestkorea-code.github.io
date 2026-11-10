@@ -95,13 +95,14 @@
         if (rowNum > maxHeaderRows) throw new Error('머리글 행을 찾지 못했습니다 (' + wanted.join(', ') + ')');
         var names = {}, any = false;
         Object.keys(cells).forEach(function (k) { names[String(cells[k]).replace(/\s+/g, ' ').trim()] = +k; });
+        var optional = (opts && opts.optional) || [];
         pick = wanted.map(function (w) { var k = names[w]; if (k !== undefined) any = true; return k; });
-        if (!any || pick.indexOf(undefined) >= 0) { pick = null; continue; }
+        if (!any || pick.some(function (k, ix) { return k === undefined && optional.indexOf(wanted[ix]) < 0; })) { pick = null; continue; }
         header = Object.keys(names);
         continue;
       }
       var out = new Array(pick.length);
-      for (var i = 0; i < pick.length; i++) { var v = cells[pick[i]]; out[i] = v === undefined ? '' : v; }
+      for (var i = 0; i < pick.length; i++) { var v = pick[i] === undefined ? undefined : cells[pick[i]]; out[i] = v === undefined ? '' : v; }
       rows.push(out);
     }
     if (!pick) throw new Error('필요한 열을 찾지 못했습니다: ' + wanted.join(', '));
