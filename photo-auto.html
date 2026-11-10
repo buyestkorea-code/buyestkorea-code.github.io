@@ -164,7 +164,7 @@
     <input type="checkbox" id="zoom" hidden>
     <label class="hint"><input type="checkbox" id="bgwhite" checked> 연한 회색 배경 사진은 흰 배경으로 자동 정리</label>
     <label class="hint" style="margin-left:14px" title="브라우저 안에서 AI가 제품만 남기고 배경을 흰색으로 바꿉니다. 사진은 밖으로 나가지 않아요. 처음 한 번 모델(약 44MB)을 내려받고, 사진 한 장에 몇 초 걸립니다."><input type="checkbox" id="aicut"> AI 누끼 (어떤 배경이든 제품만 남기고 흰색 · 위 회색 정리보다 우선)</label>
-    <label class="hint" style="margin-left:14px" title="JPG 전체 저장으로 나오는 3컷(960×1280 · 1000×1000 두 장)에서 상품이 차지하는 가로 폭(px)">컷 사진 상품 폭 <input type="number" id="cutW" value="500" min="200" max="900" step="10" style="width:68px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> px</label>
+    <label class="hint" style="margin-left:14px" title="JPG 전체 저장으로 나오는 3컷(1000×1000 두 장 · 960×1280 한 장)에서 상품이 차지하는 크기. 긴 쪽이 캔버스의 이 %까지 커집니다. 1000×1000에서 정한 상품 크기를 960×1280에도 똑같이 씁니다(비율이 바뀌어 길어 보이지 않게).">컷 사진 상품 크기 <input type="number" id="cutW" value="90" min="50" max="100" step="1" style="width:60px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> %</label>
     <label class="hint" style="margin-left:14px" title="Product Detail 아래 상세 사진들 사이의 세로 간격(px). 전체에 한 번에 적용됩니다">사진 사이 여백 <input type="number" id="photoGap" value="37" min="0" max="400" step="1" style="width:68px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> px
       <button class="btn btn-out btn-sm" type="button" data-gap="0">0</button><button class="btn btn-out btn-sm" type="button" data-gap="37">기본</button><button class="btn btn-out btn-sm" type="button" data-gap="80">80</button><button class="btn btn-out btn-sm" type="button" data-gap="150">150</button></label>
   </div>
@@ -1100,12 +1100,13 @@ $('dl').addEventListener('click',function(){
   });
 });
 /* 다른 팀에 넘기는 컷: 첫 사진 → _0012(960×1280)·_01_(1000×1000), 둘째 사진(없으면 첫 사진) → _02_(1000×1000)
-   상품 가장자리를 잘라낸 뒤 가로 cutW px 로 맞춰 흰 캔버스 가운데에 놓는다(세로가 너무 길면 캔버스의 80% 이하로 줄임) */
+   상품 가장자리를 잘라낸 뒤, 1000×1000 캔버스에서 긴 쪽이 cutW % 가 되는 배율을 정하고 그 배율을 960×1280 에도 똑같이 쓴다(캔버스를 넘으면 그때만 줄임). 흰 캔버스 가운데에 놓는다 */
 function cutCanvas(p,cw,ch){
   return loadImg(p.url).then(function(im){
     return cleanBg(adjustCanvas(toWhiteCanvas(im),p.adj),p).then(function(rr){ var c=rr.c;
-    var b=trimBox(c), bw=b[2]-b[0], bh=b[3]-b[1], tw=Math.max(100,parseInt($('cutW').value,10)||500);
-    var k=Math.min(tw/bw,(ch*0.8)/bh), w=Math.max(1,Math.round(bw*k)), h=Math.max(1,Math.round(bh*k));
+    var b=trimBox(c), bw=b[2]-b[0], bh=b[3]-b[1], pc=Math.max(50,Math.min(100,parseInt($('cutW').value,10)||90))/100;
+    var kBase=Math.min(1000*pc/bw,1000*pc/bh);                       /* 기준: 1000×1000 */
+    var k=Math.min(kBase,cw*pc/bw,ch*pc/bh), w=Math.max(1,Math.round(bw*k)), h=Math.max(1,Math.round(bh*k));
     var r=resizeFrom(c,b[0],b[1],bw,bh,w,h), o=document.createElement('canvas'); o.width=cw; o.height=ch;
     var x=o.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,cw,ch); x.drawImage(r,Math.round((cw-w)/2),Math.round((ch-h)/2)); return o;
     });
