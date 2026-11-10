@@ -14,7 +14,7 @@
  */
 const ALLOWED_ORIGIN = "https://buyestkorea-code.github.io";
 const LOGIN_API = "https://buyest.co.kr/toolkit_dashboard_api.php";
-const VERSION = "1.3.1";
+const VERSION = "1.3.2";
 
 const cors = () => ({
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -416,7 +416,7 @@ async function handlePromoTag(request, env) {
   let data, by, fellBack, lastErr;
   for (const model of [env.GEMINI_MODEL, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"].filter(Boolean)) {
     try { ({ data, by, fellBack } = await runJson(env, TAG_SYSTEM, userText, { geminiOnly: true, maxTokens: 6000, model })); by = by + " " + model; lastErr = null; break; }
-    catch (e) { lastErr = e; if (!(e instanceof HttpError) || e.status !== 503) break; }
+    catch (e) { lastErr = e; if (!(e instanceof HttpError) || ![502, 503].includes(e.status)) break; }   // 한도/붐빔(503)뿐 아니라 답변 해석 실패(502)도 다음 모델로 (11-11: 3.8 이 JSON 을 깨뜨려 6,400개에서 멈춤)
   }
   if (lastErr) throw lastErr;
   const allow = new Set(items.map((x) => x.i)), seen = new Set(), tags = [];
