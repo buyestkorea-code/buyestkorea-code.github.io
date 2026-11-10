@@ -274,11 +274,13 @@ async function loadSalesStatus(){
     const d = await salesCall({ action: 'status' }); SALES.status = d;
     if (!d.has_data) { box.innerHTML = '<b>아직 올린 판매현황이 없어요.</b> 아래에서 이카운트 판매현황 엑셀을 올려 주세요.'; $('salesBadge').textContent = '(없음)'; return; }
     const l = d.last, to = d.ranges.length ? d.ranges[d.ranges.length - 1][1] : '';
-    const lag = to ? Math.floor((Date.now() - new Date(to + 'T00:00:00').getTime()) / 86400000) : 0;
-    $('salesBadge').textContent = `(${to} 까지)`;
+    const est = d.est || null, end = est ? est.to : to;
+    const lag = end ? Math.floor((Date.now() - new Date(end + 'T00:00:00').getTime()) / 86400000) : 0;
+    $('salesBadge').textContent = est ? `(${to} 까지 실제 + ${est.to} 까지 자동 추정)` : `(${to} 까지)`;
     box.innerHTML = `<div><b>판매현황 기준:</b> ${esc(fmtRange(d.ranges))}</div>
+      ${est ? `<div style="color:#0f766e;margin-top:4px;"><b>자동 추정:</b> ${esc(est.from)} ~ ${esc(est.to)} (${est.days}일) — 이카운트 재고가 줄어든 만큼을 판매로 매시간 자동 반영해요. 입고·반품은 빼고, 반품 출고·재고조정도 섞일 수 있어요. 이 기간 엑셀을 올리면 실제값으로 교체돼요.</div>` : ''}
       <div style="color:var(--mute)">품번 ${d.products.toLocaleString()}개 · 일별 ${d.daily_rows.toLocaleString()}행${d.ranges.length > 1 ? ' · <span style="color:#b45309">기간이 끊겨 있어요(빈 구간은 판매가 0으로 보여요)</span>' : ''}</div>
-      ${lag > 14 ? `<div class="note" style="margin-top:6px;">마지막 판매 기간이 ${to} 까지라서 최근 ${lag}일 판매가 비어 있어요. 그 이후 기간을 이카운트에서 받아 올려 주세요.</div>` : ''}`;
+      ${lag > 14 ? `<div class="note" style="margin-top:6px;">마지막 판매 기간이 ${end} 까지라서 최근 ${lag}일 판매가 비어 있어요. 그 이후 기간을 이카운트에서 받아 올려 주세요.</div>` : ''}`;
   } catch (e) { box.textContent = '상태를 불러오지 못했어요: ' + e.message; }
 }
 
