@@ -155,7 +155,7 @@
 <div class="row" style="margin-bottom:12px">
   <button class="btn btn-pri" id="go">상세페이지 만들기</button>
   <button class="btn btn-out" id="dl" disabled title="상세페이지 이미지(_00)만 저장">JPG 저장</button>
-  <button class="btn btn-out" id="dla" disabled title="상세페이지(_00) + 다른 팀에 넘기는 3컷(_0012 · _01_ · _02_)을 한 번에 저장">JPG 전체 저장</button>
+  <button class="btn btn-out" id="dla" disabled title="상세페이지(_00) + 다른 팀에 넘기는 3컷(_0012 · _01_ · _02_)을 ZIP 하나로 한 번에 저장">JPG 전체 저장</button>
   <button class="btn btn-out" id="dlp" disabled title="글자는 글자 레이어, 사진·박스는 각각 레이어로 저장">PSD 저장</button>
   <span id="status" class="hint"></span>
 </div>
@@ -224,6 +224,7 @@
 </div></div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/libs/jszip-3.10.1.min.js"></script>
 <script src="assets/libs/jpeg-encoder-0.4.4.js"></script>
 <script src="assets/photo-auto/templates.js"></script>
 <script>
@@ -934,12 +935,20 @@ $('dla').addEventListener('click',function(){
             [function(){ return cutCanvas(p1,960,1280); },code+'_0012.jpg'],
             [function(){ return cutCanvas(p1,1000,1000); },code+'_01_.jpg'],
             [function(){ return cutCanvas(p2,1000,1000); },code+'_02_.jpg']], i=0;
+  var zip=window.JSZip?new JSZip():null;
   function next(){
     if(i>=jobs.length) return Promise.resolve();
     var j=jobs[i++];
-    return j[0]().then(encodeJpeg).then(function(b){ saveBlob(b,j[1]); return new Promise(function(r){ setTimeout(r,400); }); }).then(next);
+    return j[0]().then(encodeJpeg).then(function(b){
+      if(zip){ zip.file(j[1],b); return; }   /* JSZip 로드 실패 시에만 예전처럼 한 장씩 저장 */
+      saveBlob(b,j[1]); return new Promise(function(r){ setTimeout(r,400); });
+    }).then(next);
   }
-  next().then(function(){ $('status').textContent=old; }).catch(function(e){ $('status').textContent='JPG 전체 저장 실패: '+e.message; console.error(e); }).then(function(){ btn.disabled=false; });
+  next().then(function(){
+    if(!zip) return;
+    $('status').textContent='ZIP 묶는 중…';
+    return zip.generateAsync({type:'blob',compression:'STORE'}).then(function(z){ saveBlob(z,code+'.zip'); });
+  }).then(function(){ $('status').textContent=old; }).catch(function(e){ $('status').textContent='JPG 전체 저장 실패: '+e.message; console.error(e); }).then(function(){ btn.disabled=false; });
 });
 $('dlp').addEventListener('click',function(){
   if(!state.last) return;
