@@ -157,6 +157,7 @@
   <div class="row" style="margin-top:12px">
     <input type="checkbox" id="zoom" hidden>
     <label class="hint"><input type="checkbox" id="bgwhite" checked> 연한 회색 배경 사진은 흰 배경으로 자동 정리</label>
+    <label class="hint" style="margin-left:14px" title="브라우저 안에서 AI가 제품만 남기고 배경을 흰색으로 바꿉니다. 사진은 밖으로 나가지 않아요. 처음 한 번 모델(약 44MB)을 내려받고, 사진 한 장에 몇 초 걸립니다."><input type="checkbox" id="aicut"> AI 누끼 (어떤 배경이든 제품만 남기고 흰색 · 위 회색 정리보다 우선)</label>
     <label class="hint" style="margin-left:14px" title="JPG 전체 저장으로 나오는 3컷(960×1280 · 1000×1000 두 장)에서 상품이 차지하는 가로 폭(px)">컷 사진 상품 폭 <input type="number" id="cutW" value="500" min="200" max="900" step="10" style="width:68px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> px</label>
     <label class="hint" style="margin-left:14px" title="Product Detail 아래 상세 사진들 사이의 세로 간격(px). 전체에 한 번에 적용됩니다">사진 사이 여백 <input type="number" id="photoGap" value="37" min="0" max="400" step="1" style="width:68px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> px
       <button class="btn btn-out btn-sm" type="button" data-gap="0">0</button><button class="btn btn-out btn-sm" type="button" data-gap="37">기본</button><button class="btn btn-out btn-sm" type="button" data-gap="80">80</button><button class="btn btn-out btn-sm" type="button" data-gap="150">150</button></label>
@@ -484,6 +485,58 @@ function loadImg(url){ return new Promise(function(res,rej){ var im=new Image();
 function toWhiteCanvas(im){
   var c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight;
   var x=c.getContext('2d',{willReadFrequently:true}); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0); return c;
+}
+/* ---------- AI 누끼 (브라우저 안에서 onnxruntime-web + silueta 모델 · 사진은 밖으로 나가지 않음) ---------- */
+var ortSess=null, cutCache={};
+function loadScriptOnce(src){ return new Promise(function(res,rej){ var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=function(){ rej(new Error('불러오기 실패: '+src)); }; document.head.appendChild(s); }); }
+function getCutSession(){
+  if(ortSess) return ortSess;
+  ortSess=(window.ort?Promise.resolve():loadScriptOnce('assets/libs/ort/ort.min.js')).then(function(){
+    ort.env.wasm.wasmPaths='assets/libs/ort/'; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
+    return ort.InferenceSession.create('assets/photo-auto/models/silueta.onnx',{executionProviders:['wasm']});
+  }).catch(function(e){ ortSess=null; throw e; });
+  return ortSess;
+}
+/* 사진 크기와 같은 0~255 투명도 배열(255=제품)을 돌려준다. 같은 사진은 한 번만 계산 */
+function aiMask(c,key){
+  var hit=cutCache[key]; if(hit&&hit.w===c.width&&hit.h===c.height) return Promise.resolve(hit.a);
+  return getCutSession().then(function(sess){
+    var S=320, t=document.createElement('canvas'); t.width=t.height=S;
+    var x=t.getContext('2d',{willReadFrequently:true}); x.imageSmoothingQuality='high'; x.drawImage(c,0,0,S,S);
+    var d=x.getImageData(0,0,S,S).data, f=new Float32Array(3*S*S), mx=1, i, ch, mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225];
+    for(i=0;i<d.length;i+=4){ if(d[i]>mx) mx=d[i]; if(d[i+1]>mx) mx=d[i+1]; if(d[i+2]>mx) mx=d[i+2]; }
+    for(i=0;i<S*S;i++){ for(ch=0;ch<3;ch++) f[ch*S*S+i]=(d[i*4+ch]/mx-mean[ch])/std[ch]; }
+    var feeds={}; feeds[sess.inputNames[0]]=new ort.Tensor('float32',f,[1,3,S,S]);
+    return sess.run(feeds).then(function(out){
+      var o=out[sess.outputNames[0]].data, mn=Infinity, mxo=-Infinity;
+      for(i=0;i<S*S;i++){ if(o[i]<mn) mn=o[i]; if(o[i]>mxo) mxo=o[i]; }
+      var mc=document.createElement('canvas'); mc.width=mc.height=S; var mctx=mc.getContext('2d'), id=mctx.createImageData(S,S);
+      for(i=0;i<S*S;i++){ id.data[i*4]=id.data[i*4+1]=id.data[i*4+2]=255; id.data[i*4+3]=Math.round(255*(o[i]-mn)/((mxo-mn)||1)); }
+      mctx.putImageData(id,0,0);
+      var up=document.createElement('canvas'); up.width=c.width; up.height=c.height;
+      var ux=up.getContext('2d',{willReadFrequently:true}); ux.imageSmoothingQuality='high'; ux.drawImage(mc,0,0,c.width,c.height);
+      var ud=ux.getImageData(0,0,c.width,c.height).data, a=new Uint8Array(c.width*c.height);
+      for(i=0;i<a.length;i++) a[i]=ud[i*4+3];
+      cutCache[key]={w:c.width,h:c.height,a:a}; return a;
+    });
+  });
+}
+function applyCut(c,a){
+  var ctx=c.getContext('2d',{willReadFrequently:true}), im=ctx.getImageData(0,0,c.width,c.height), d=im.data, i, t, k;
+  for(i=0;i<a.length;i++){
+    t=(a[i]/255-0.35)/0.3; t=t<0?0:(t>1?1:t); t=t*t*(3-2*t);
+    if(t<1){ k=i*4; d[k]=Math.round(d[k]*t+255*(1-t)); d[k+1]=Math.round(d[k+1]*t+255*(1-t)); d[k+2]=Math.round(d[k+2]*t+255*(1-t)); }
+  }
+  ctx.putImageData(im,0,0);
+}
+/* 배경 정리 한 곳으로 모음: AI 누끼(켜짐) → 실패하면 기존 회색 정리 → 꺼져 있으면 기존 방식. 항상 Promise */
+function cleanBg(c,p){
+  function legacy(){ return $('bgwhite').checked?whitenBackdrop(c):0; }
+  if($('aicut')&&$('aicut').checked){
+    return aiMask(c,p.key||p.file.name).then(function(a){ applyCut(c,a); return {c:c,bw:0}; })
+      .catch(function(e){ console.error(e); return {c:c,bw:legacy(),err:'AI 누끼 실패('+(e&&e.message||e)+') — 기존 방식으로 처리했어요'}; });
+  }
+  return Promise.resolve({c:c,bw:legacy()});
 }
 /* 회색 스튜디오 배경 → 흰색. 사진 테두리 색이 거의 균일한 연한 회색일 때만, 가장자리에서 이어진 배경 영역만 칠한다
    (제품 안쪽의 밝은 부분은 건드리지 않음). 반환: 0=정리 불필요(이미 흰색/어두운 배경) 1=정리함 2=배경이 균일하지 않아 건너뜀 */
@@ -976,7 +1029,7 @@ $('go').addEventListener('click',function(){
     function next(){
       if(i>=state.photos.length) return Promise.resolve();
       var p=state.photos[i++]; $('status').textContent='사진 처리 중… ('+i+'/'+state.photos.length+')';
-      return loadImg(p.url).then(function(im){ var c=adjustCanvas(toWhiteCanvas(im),p.adj); if($('bgwhite').checked){ var bw=whitenBackdrop(c); if(bw===2) warns.push(p.file.name+': 배경이 균일한 회색이 아니라 배경 정리를 건너뜀 — 확인'); } seq.push({name:p.file.name,c:c,size:sizePct(p.adj),key:p.key}); }).then(function(){ return new Promise(function(r){setTimeout(r,0);}); }).then(next);
+      return loadImg(p.url).then(function(im){ var c0=adjustCanvas(toWhiteCanvas(im),p.adj); if($('aicut').checked) $('status').textContent='누끼 처리 중… ('+i+'/'+state.photos.length+') — 처음엔 AI 모델을 내려받느라 오래 걸려요'; return cleanBg(c0,p).then(function(r){ if(r.err) warns.push(p.file.name+': '+r.err); else if(r.bw===2) warns.push(p.file.name+': 배경이 균일한 회색이 아니라 배경 정리를 건너뜀 — 확인'); seq.push({name:p.file.name,c:r.c,size:sizePct(p.adj),key:p.key}); }); }).then(function(){ return new Promise(function(r){setTimeout(r,0);}); }).then(next);
     }
     return next().then(function(){
       var items=[seq[0]].concat(seq);                       /* 메인 + 상세(메인 포함 전부) */
@@ -1010,11 +1063,12 @@ $('dl').addEventListener('click',function(){
    상품 가장자리를 잘라낸 뒤 가로 cutW px 로 맞춰 흰 캔버스 가운데에 놓는다(세로가 너무 길면 캔버스의 80% 이하로 줄임) */
 function cutCanvas(p,cw,ch){
   return loadImg(p.url).then(function(im){
-    var c=adjustCanvas(toWhiteCanvas(im),p.adj); if($('bgwhite').checked) whitenBackdrop(c);
+    return cleanBg(adjustCanvas(toWhiteCanvas(im),p.adj),p).then(function(rr){ var c=rr.c;
     var b=trimBox(c), bw=b[2]-b[0], bh=b[3]-b[1], tw=Math.max(100,parseInt($('cutW').value,10)||500);
     var k=Math.min(tw/bw,(ch*0.8)/bh), w=Math.max(1,Math.round(bw*k)), h=Math.max(1,Math.round(bh*k));
     var r=resizeFrom(c,b[0],b[1],bw,bh,w,h), o=document.createElement('canvas'); o.width=cw; o.height=ch;
     var x=o.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,cw,ch); x.drawImage(r,Math.round((cw-w)/2),Math.round((ch-h)/2)); return o;
+    });
   });
 }
 function saveBlob(b,name){ var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},4000); }
@@ -1079,7 +1133,7 @@ function saveHistory(){
   saving=true; setHist('서버에 보관 중…');
   var id=state.job, photos=state.photos.slice(), canvas=state.canvas;
   var meta={v:1,pname:$('pname').value.trim(),code:codeOf(),fields:readF(),dirty:state.dirty,size:$('size').value,table:$('table').value,
-    zoom:$('zoom').checked,bgwhite:$('bgwhite').checked,ov:state.ov,chart:state.chart,xl:state.xl,infoRows:state.infoRows,tplId:state.tplId,chartMode:state.chartMode,bottomKey:state.bottomKey,
+    zoom:$('zoom').checked,bgwhite:$('bgwhite').checked,aicut:$('aicut').checked,ov:state.ov,chart:state.chart,xl:state.xl,infoRows:state.infoRows,tplId:state.tplId,chartMode:state.chartMode,bottomKey:state.bottomKey,
     sv:state.sv,photos:photos.map(function(p){return {key:p.key,name:p.file.name,type:p.file.type,lm:p.file.lastModified,adj:p.adj||null};})};
   phJson('has',{job:id,keys:JSON.stringify(photos.map(function(p){return p.key;}))}).then(function(j){
     var todo=photos.filter(function(p){ return j.have.indexOf(p.key)<0; }), i=0;
@@ -1133,7 +1187,7 @@ function loadJob(id){
     setInfoRows(m.infoRows||null);
     restoreTpl(m);
     fieldKeys().forEach(function(k){ fld(k).value=(m.fields&&m.fields[k])||''; });
-    $('size').value=m.size||''; $('table').value=m.table||''; gridSet(gridFromText()); $('zoom').checked=false; $('bgwhite').checked=m.bgwhite!==false;
+    $('size').value=m.size||''; $('table').value=m.table||''; gridSet(gridFromText()); $('zoom').checked=false; $('bgwhite').checked=m.bgwhite!==false; $('aicut').checked=!!m.aicut;
     $('xName').textContent=(state.xl.brand||state.xl.origin||state.xl.material)?'✔ (보관된 작업) 브랜드 '+(state.xl.brand||'?')+' · 제조국 '+(state.xl.origin||'?')+' · 소재 '+(state.xl.material||'?'):'';
     state.photos=[]; var i=0, list=m.photos||[];
     function next(){ if(i>=list.length) return Promise.resolve(); var p=list[i++];
@@ -1247,10 +1301,11 @@ window.PhotoAuto={
   /* 목록/오버 이미지용: 흰 배경 정리 → 긴 변 1600px 이하 → 4:4:4 JPEG */
   photoJpeg:function(p){
     return loadImg(p.url).then(function(im){
-      var c=adjustCanvas(toWhiteCanvas(im),p.adj); if($('bgwhite').checked) whitenBackdrop(c);
+      return cleanBg(adjustCanvas(toWhiteCanvas(im),p.adj),p).then(function(rr){ var c=rr.c;
       var m=Math.max(c.width,c.height);
       if(m>1600){ var k=1600/m; c=resizeFrom(c,0,0,c.width,c.height,Math.round(c.width*k),Math.round(c.height*k)); }
       return encodeJpeg(c);
+      });
     });
   },
   /* 템플릿: 실측 항목(머리글)만 채움. 값은 사람이 입력 */

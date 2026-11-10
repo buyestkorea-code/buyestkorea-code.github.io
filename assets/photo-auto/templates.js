@@ -14,7 +14,7 @@ var ROWS_SHOES=['상품명','브랜드','카테고리','수입여부','제조년
 /* 하단 안내 이미지: ''(빈 값) = 기본 assets/photo-auto/bottom.png, 나머지는 assets/photo-auto/bottoms/<키>.png */
 var BOTTOMS=[
   {k:'',        name:'공통 (기본)'},
-  {k:'cloth',   name:'의류 (라벨 랜덤발송 안내 포함)'},
+  {k:'cloth',   name:'톰브라운'},
   {k:'noseason',name:'시즌 없이 작업'},
   {k:'nosize',  name:'사이즈 기재 안 함'},
   {k:'cp',      name:'C.P 컴퍼니'},
