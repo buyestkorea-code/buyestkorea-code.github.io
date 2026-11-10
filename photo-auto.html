@@ -172,6 +172,7 @@
 
 <div class="row" style="margin-bottom:12px">
   <button class="btn btn-pri" id="go">상세페이지 만들기</button>
+  <button class="btn btn-out" id="applyBtn" disabled title="위 입력칸에서 고친 값과 미리보기에서 직접 고친 내용을 지금 상세페이지에 반영합니다. (JPG·PSD 저장을 누를 때도 자동으로 반영됩니다)">현재 변경사항 저장</button>
   <button class="btn btn-out" id="dl" disabled title="상세페이지 이미지(_00)만 저장">JPG 저장</button>
   <button class="btn btn-out" id="dla" disabled title="상세페이지(_00) + 다른 팀에 넘기는 3컷(_0012 · _01_ · _02_)을 ZIP 하나로 한 번에 저장">JPG 전체 저장</button>
   <button class="btn btn-out" id="dlp" disabled title="글자는 글자 레이어, 사진·박스는 각각 레이어로 저장">PSD 저장</button>
@@ -307,7 +308,7 @@ renderRowChips();
 function activeRows(f){
   return state.infoRows?state.infoRows:INFO_ROWS.filter(function(k){ return k!=='수납공간' || f['수납공간'] || BAGS.indexOf(f['카테고리'])>=0; });
 }
-fieldBox.addEventListener('input',function(e){ if(e.target.dataset.k){ state.dirty[e.target.dataset.k]=true; mark(); if(window.PhotoRegister&&PhotoRegister.mirror) PhotoRegister.mirror(e.target.dataset.k,e.target.value); } });
+fieldBox.addEventListener('input',function(e){ if(e.target.dataset.k){ state.dirty[e.target.dataset.k]=true; mark(); if(state.last){ state.stale=true; setApplyBtn(); } if(window.PhotoRegister&&PhotoRegister.mirror) PhotoRegister.mirror(e.target.dataset.k,e.target.value); } });
 function mark(){
   ['브랜드','카테고리','제조년월','색상','제조국','소재','수납공간'].forEach(function(k){
     if(fld(k)) fld(k).classList.toggle('need', !fld(k).value.trim());
@@ -895,8 +896,26 @@ function showPreview(){
   var hl=document.createElement('div'); hl.className='hl'; hl.style.display='none'; wrapEl.appendChild(hl);
   prev.appendChild(wrapEl); state.wrapEl=wrapEl; state.hl=hl; placeSel(); prev.scrollTop=st0;
 }
+function setApplyBtn(){
+  var b=$('applyBtn'); if(!b) return;
+  b.disabled=!state.last;
+  if(state.stale){ b.textContent='● 현재 변경사항 저장'; b.style.borderColor='#c2410c'; b.style.color='#c2410c'; b.style.fontWeight='700'; }
+  else { b.textContent='현재 변경사항 저장'; b.style.borderColor=''; b.style.color=''; b.style.fontWeight=''; }
+}
+/* 열려 있는 글자 편집을 확정하고, 입력칸에서 고친 값까지 미리보기(=저장될 이미지)에 반영 */
+function applyPending(){
+  var ed=state.wrapEl&&state.wrapEl.querySelector('.ed'); if(ed) ed.blur();
+  if(state.last&&state.stale) rerender();
+  state.stale=false; setApplyBtn();
+}
+$('applyBtn').addEventListener('click',function(){
+  if(!state.last) return;
+  var had=state.stale; applyPending();
+  var b=$('applyBtn'); b.textContent='✓ 저장됨'; setTimeout(setApplyBtn,1500);
+  $('status').textContent=(had?'입력칸에서 고친 내용을 반영했습니다':'현재 상태 그대로 저장 준비 완료')+' — 이제 JPG/PSD 저장을 누르면 이 상태로 내려받아집니다';
+});
 function rerender(){
-  var r=render(readF(),state.chart,state.slots,state.ov);
+  var r=render(readF(),state.chart,state.slots,state.ov); state.stale=false; setApplyBtn();
   state.last=r; state.canvas=r.canvas; state.genId=(state.genId||0)+1; if(window.PhotoRegister) PhotoRegister.invalidate(); showPreview();
   $('status').textContent='완료: '+W+' × '+r.canvas.height+' px · 사진 '+state.photos.length+'장 · 글자를 눌러 바로 고칠 수 있어요';
   queueSave(1500);
@@ -1098,7 +1117,7 @@ $('go').addEventListener('click',function(){
   if(state.chartMode!=='full'){}
   else if(!chart.given) warns.push('★ 실측 입력 필요 — 실측 칸을 채우고 다시 만드세요');
   else if(sizeHasEmpty(chart)) warns.push('★ 실측 표에 비어 있는 칸이 있습니다 — 채우고 다시 만드세요');
-  btn.disabled=true; $('dl').disabled=true; $('dla').disabled=true; $('dlp').disabled=true; state.ov=(state.pending&&state.pending.ov)||{}; $('status').textContent='만드는 중…';
+  btn.disabled=true; $('dl').disabled=true; $('dla').disabled=true; $('dlp').disabled=true; $('applyBtn').disabled=true; state.ov=(state.pending&&state.pending.ov)||{}; $('status').textContent='만드는 중…';
 
   Promise.all([loadFonts(),loadStatic()]).then(function(){
     var seq=[], i=0;
@@ -1124,12 +1143,12 @@ $('go').addEventListener('click',function(){
     showPreview(); $('editHint').style.display='block';
     $('status').textContent='완료: '+W+' × '+c.height+' px · 사진 '+state.photos.length+'장';
     state.genId=(state.genId||0)+1;
-    $('dl').disabled=false; $('dla').disabled=false; $('dlp').disabled=false; showWarns(warns); queueSave(300);
+    state.stale=false; $('dl').disabled=false; $('dla').disabled=false; $('dlp').disabled=false; setApplyBtn(); showWarns(warns); queueSave(300);
     if(window.PhotoRegister) PhotoRegister.onGenerated();
   }).catch(function(e){ $('status').textContent='실패: '+e.message; console.error(e); }).then(function(){ btn.disabled=false; });
 });
 $('dl').addEventListener('click',function(){
-  if(!state.canvas) return;
+  if(!state.canvas) return; applyPending();
   encodeJpeg(state.canvas).then(function(b){
     var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=codeOf()+'_00.jpg';
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
@@ -1150,7 +1169,7 @@ function cutCanvas(p,cw,ch){
 }
 function saveBlob(b,name){ var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},4000); }
 $('dla').addEventListener('click',function(){
-  if(!state.canvas||!state.photos.length) return;
+  if(!state.canvas||!state.photos.length) return; applyPending();
   var btn=$('dla'), old=$('status').textContent, code=codeOf(), p1=state.photos[0], p2=state.photos[1]||state.photos[0];
   btn.disabled=true; $('status').textContent='JPG 전체 만드는 중…';
   var jobs=[[function(){ return Promise.resolve(state.canvas); },code+'_00.jpg'],
@@ -1173,7 +1192,7 @@ $('dla').addEventListener('click',function(){
   }).then(function(){ $('status').textContent=old; }).catch(function(e){ $('status').textContent='JPG 전체 저장 실패: '+e.message; console.error(e); }).then(function(){ btn.disabled=false; });
 });
 $('dlp').addEventListener('click',function(){
-  if(!state.last) return;
+  if(!state.last) return; applyPending();
   var b=$('dlp'); b.disabled=true; var old=$('status').textContent; $('status').textContent='PSD 만드는 중…';
   loadScript('assets/libs/ag-psd-28.2.2.bundle.js').then(function(){
     return new Promise(function(r){setTimeout(r,30);});
