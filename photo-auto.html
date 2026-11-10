@@ -597,7 +597,42 @@ function encodeJpeg(c){
     c.toBlob(res,'image/jpeg',1);
   });
 }
-function trimBox(c){
+/* 피사체(상품) 영역 찾기: 가장자리 색을 배경으로 보고, 배경과 다른 덩어리 중 큰 것들만 피사체로 인정한다.
+   먼지·점·모서리 잡티·워터마크 같은 작은 조각은 무시해서 상품이 한쪽으로 쏠리지 않게 한다. 실패하면 null */
+function subjectBox(c){
+  var w=c.width,h=c.height, k=Math.max(1,Math.max(w,h)/420), sw=Math.max(8,Math.round(w/k)), sh=Math.max(8,Math.round(h/k));
+  var t=document.createElement('canvas'); t.width=sw; t.height=sh; var tx=t.getContext('2d',{willReadFrequently:true}); tx.imageSmoothingEnabled=true; tx.drawImage(c,0,0,sw,sh);
+  var d=tx.getImageData(0,0,sw,sh).data, R=[],G=[],B=[], i, x, y;
+  function samp(px,py){ var j=(py*sw+px)*4; R.push(d[j]); G.push(d[j+1]); B.push(d[j+2]); }
+  for(x=0;x<sw;x++){ samp(x,0); samp(x,sh-1); } for(y=0;y<sh;y++){ samp(0,y); samp(sw-1,y); }
+  function med(a){ a=a.slice().sort(function(p,q){return p-q;}); return a[a.length>>1]; }
+  var mr=med(R), mg=med(G), mb=med(B), near=0;
+  for(i=0;i<R.length;i++){ if((299*Math.abs(R[i]-mr)+587*Math.abs(G[i]-mg)+114*Math.abs(B[i]-mb))/1000<=24) near++; }
+  var uniform=near/R.length>=0.85, rr=uniform?mr:255, rg=uniform?mg:255, rb=uniform?mb:255, T=(uniform&&(299*mr+587*mg+114*mb)/1000<245)?26:13;
+  function isFg(r,g,b){ return (299*Math.abs(r-rr)+587*Math.abs(g-rg)+114*Math.abs(b-rb))/1000>T; }
+  var n=sw*sh, m=new Uint8Array(n), fg=0;
+  for(i=0;i<n;i++){ if(isFg(d[i*4],d[i*4+1],d[i*4+2])){ m[i]=1; fg++; } }
+  if(!fg||fg>n*0.9) return null;
+  var lab=new Int32Array(n), sizes=[0], stack=new Int32Array(n), cnt=0, bx0=[],by0=[],bx1=[],by1=[];
+  for(i=0;i<n;i++){ if(m[i]&&!lab[i]){ cnt++; var sp=0, sz=0, ax0=sw, ay0=sh, ax1=-1, ay1=-1; stack[sp++]=i; lab[i]=cnt;
+    while(sp){ var q=stack[--sp], qx=q%sw, qy=(q-qx)/sw; sz++; if(qx<ax0)ax0=qx; if(qx>ax1)ax1=qx; if(qy<ay0)ay0=qy; if(qy>ay1)ay1=qy;
+      if(qx>0&&m[q-1]&&!lab[q-1]){ lab[q-1]=cnt; stack[sp++]=q-1; } if(qx<sw-1&&m[q+1]&&!lab[q+1]){ lab[q+1]=cnt; stack[sp++]=q+1; }
+      if(qy>0&&m[q-sw]&&!lab[q-sw]){ lab[q-sw]=cnt; stack[sp++]=q-sw; } if(qy<sh-1&&m[q+sw]&&!lab[q+sw]){ lab[q+sw]=cnt; stack[sp++]=q+sw; } }
+    sizes.push(sz); bx0.push(ax0); by0.push(ay0); bx1.push(ax1); by1.push(ay1); } }
+  var big=0; for(i=1;i<=cnt;i++) if(sizes[i]>big) big=sizes[i];
+  var X0=sw,Y0=sh,X1=-1,Y1=-1;
+  for(i=1;i<=cnt;i++){ if(sizes[i]>=Math.max(6,big*0.03)){ if(bx0[i-1]<X0)X0=bx0[i-1]; if(by0[i-1]<Y0)Y0=by0[i-1]; if(bx1[i-1]>X1)X1=bx1[i-1]; if(by1[i-1]>Y1)Y1=by1[i-1]; } }
+  if(X1<0) return null;
+  /* 큰 영역만 잡았으니, 그 영역 안에서 원본 해상도로 가장자리를 정확히 다시 찾는다 */
+  var gx0=Math.max(0,Math.floor(X0*k-k*2)), gy0=Math.max(0,Math.floor(Y0*k-k*2)), gx1=Math.min(w,Math.ceil((X1+1)*k+k*2)), gy1=Math.min(h,Math.ceil((Y1+1)*k+k*2));
+  var fd=c.getContext('2d',{willReadFrequently:true}).getImageData(gx0,gy0,gx1-gx0,gy1-gy0).data, fw=gx1-gx0, ex0=w,ey0=h,ex1=-1,ey1=-1;
+  for(y=0;y<gy1-gy0;y++){ for(x=0;x<fw;x++){ var j=(y*fw+x)*4; if(isFg(fd[j],fd[j+1],fd[j+2])){ var X=x+gx0, Y=y+gy0; if(X<ex0)ex0=X; if(X>ex1)ex1=X; if(Y<ey0)ey0=Y; if(Y>ey1)ey1=Y; } } }
+  if(ex1<0) return null;
+  var bw=ex1-ex0+1, bh=ey1-ey0+1;
+  if(bw*bh<w*h*0.03) return null;
+  return [ex0,ey0,ex1+1,ey1+1];
+}
+function trimBoxRaw(c){
   var w=c.width,h=c.height, d=c.getContext('2d').getImageData(0,0,w,h).data;
   var x0=w,y0=h,x1=-1,y1=-1;
   for(var y=0;y<h;y++){ var row=y*w*4;
@@ -606,6 +641,7 @@ function trimBox(c){
   if(x1<0) return [0,0,w,h];
   return [x0,y0,x1+1,y1+1];
 }
+function trimBox(c){ var r=null; try{ r=subjectBox(c); }catch(e){ console.error(e); } return r||trimBoxRaw(c); }
 function resizeFrom(src,sx,sy,sw,sh,tw,th){
   /* 큰 축소는 절반씩 줄여 화질 유지 */
   var cur=document.createElement('canvas'); cur.width=sw; cur.height=sh;
