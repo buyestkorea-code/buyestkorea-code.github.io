@@ -1910,6 +1910,7 @@ async function renderDailyScreen(){
   if (!res.ok){ body.innerHTML = `<div class="hint">${esc(res.error||'불러오기 실패')}</div>`; return; }
   dailyDaysCache = res.days;
   if (res.days.length===0){ body.innerHTML = '<div class="hint">아직 거래 내역이 없어요.</div>'; return; }
+  const sum = k => res.days.reduce((n,d)=>n+(Number(d[k])||0),0);
   body.innerHTML = `
     <div class="tbl-wrap"><table>
       <thead><tr><th>날짜</th><th>판매</th><th>수기판매</th><th>반품</th><th>주문택배</th><th>회수</th><th>판매금액<br><span style="font-weight:400;font-size:11px;">(주문택배 포함)</span></th><th>└ 주문택배금액</th><th>반품금액</th><th></th></tr></thead>
@@ -1922,6 +1923,10 @@ async function renderDailyScreen(){
         </tr>
         <tr id="dd-${d.d}" style="display:none;"><td colspan="10" style="background:#fafafa;"></td></tr>
       `).join('')}</tbody>
+      <tfoot><tr style="font-weight:700;background:#f3f3f3;border-top:2px solid #999;">
+        <td>합계</td><td>${sum('sale_cnt')}</td><td>${sum('manual_cnt')}</td><td>${sum('return_cnt')}</td><td>${sum('courier_cnt')}</td><td>${sum('recall_cnt')}</td>
+        <td>${money(sum('sale_amount'))}</td><td>${money(sum('courier_amount'))}</td><td>${money(sum('return_amount'))}</td><td></td>
+      </tr></tfoot>
     </table></div>`;
 }
 
