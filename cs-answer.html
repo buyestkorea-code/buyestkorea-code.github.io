@@ -8,94 +8,148 @@
   @import url("assets/fonts/pretendard/pretendard.css");
   :root{--bg:#f6f6f4;--card:#fff;--ink:#15171a;--sub:#6a6f76;--line:#e4e4e0;--pri:#15171a;--ok:#0f766e;--okbg:#ecf8f5;--warn:#a15c07;--warnbg:#fdf3e0;--bad:#b42318;--badbg:#fdeceb;--blue:#1d4ed8;--bluebg:#eef3ff;--font:"Pretendard Variable","Pretendard",-apple-system,"Malgun Gothic",sans-serif;}
   *{box-sizing:border-box;}
-  body{font-family:var(--font);background:var(--bg);color:var(--ink);margin:0;padding:16px;font-size:14px;}
-  h1{font-size:19px;margin:0 0 4px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
-  h1 .badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--warnbg);color:var(--warn);}
-  .lead{color:var(--sub);font-size:13px;margin:0 0 14px;line-height:1.6;}
-  .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;}
-  .step{font-size:12px;font-weight:700;color:var(--sub);margin:0 0 8px;letter-spacing:.02em;}
-  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  html,body{height:100%;}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);margin:0;font-size:14px;overflow:hidden;}
+  button{font-family:inherit;}
+  [hidden]{display:none !important;}
   .btn{font:600 13px var(--font);padding:9px 14px;border:1px solid transparent;border-radius:8px;cursor:pointer;}
-  .btn-pri{background:var(--pri);color:#fff;} .btn-out{background:#fff;color:var(--ink);border-color:var(--line);}
+  .btn-pri{background:var(--pri);color:#fff;} .btn-out{background:#fff;color:var(--ink);border-color:var(--line);} .btn-out:hover{border-color:#bfc3c8;}
+  .btn-ai{background:var(--bluebg);border-color:#c9d6fb;color:var(--blue);}
   .btn:disabled{opacity:.45;cursor:not-allowed;}
-  .btn:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
-  .hint{font-size:12px;color:var(--sub);line-height:1.55;}
-  .msg{font-size:13px;margin-top:8px;line-height:1.6;} .msg.err{color:var(--bad);font-weight:600;} .msg.ok{color:var(--ok);font-weight:600;}
-  .dz{border:2px dashed var(--line);border-radius:12px;padding:14px;transition:.15s;}
-  .dz.over{border-color:#111;background:#f3f3f3;}
+  .btn.sm{font-size:12px;padding:6px 10px;}
+  .btn:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
   input[type=text],input[type=search],textarea,select{font:14px var(--font);padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);}
-  textarea{width:100%;min-height:84px;resize:vertical;line-height:1.6;}
+  textarea{width:100%;min-height:96px;resize:vertical;line-height:1.6;}
+  .hint{font-size:12px;color:var(--sub);line-height:1.55;}
 
-  /* 상단 현황 */
-  .bar{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 8px;margin:0 -2px;}
-  .tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
-  .tab{font:600 13px var(--font);padding:8px 12px;border:1px solid var(--line);border-radius:99px;background:#fff;color:var(--ink);cursor:pointer;display:inline-flex;gap:6px;align-items:center;}
-  .tab b{font-weight:700;color:var(--sub);} .tab.on{background:var(--pri);color:#fff;border-color:var(--pri);} .tab.on b{color:#cfd3d8;}
-  .prog{height:4px;background:var(--line);border-radius:4px;margin-top:10px;overflow:hidden;} .prog i{display:block;height:100%;background:var(--ok);width:0;transition:width .25s;}
-  .progtxt{font-size:12px;color:var(--sub);margin-top:6px;}
-  .tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;}
-  .tools label{font-size:12.5px;color:var(--sub);display:inline-flex;gap:6px;align-items:center;cursor:pointer;}
+  /* 전체 틀: 위 줄 + 3칸(목록 | 대화 | 정보) */
+  .app{height:100vh;display:flex;flex-direction:column;}
+  .top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 16px;background:#fff;border-bottom:1px solid var(--line);}
+  .top h1{font-size:16px;margin:0;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
+  .top h1 .badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;background:var(--warnbg);color:var(--warn);}
+  .modes{display:flex;gap:2px;background:#eeeeea;border-radius:10px;padding:3px;}
+  .mode{font:700 13px var(--font);padding:7px 14px;border:0;border-radius:8px;background:none;color:var(--sub);cursor:pointer;display:inline-flex;gap:7px;align-items:center;}
+  .mode.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08);}
+  .pill{font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--badbg);color:var(--bad);} .pill:empty{display:none;}
+  .status{display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;margin-left:auto;font-size:12px;color:var(--sub);}
+  .status .warn,.asof.warn,.learn.off{color:var(--warn);font-weight:600;}
+  .status .okc{color:var(--ok);font-weight:600;}
+  .cols{flex:1;min-height:0;display:grid;grid-template-columns:340px minmax(0,1fr) 320px;}
+  .col{min-height:0;overflow:auto;}
+  .list{background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;}
+  .center{background:var(--bg);display:flex;flex-direction:column;}
+  .info{background:#fff;border-left:1px solid var(--line);padding:6px 0;}
 
-  /* 카드 */
-  .cs{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;}
-  .cs.k-auto{border-left-color:var(--ok);} .cs.k-check{border-left-color:#d49a22;} .cs.k-manual{border-left-color:var(--blue);} .cs.k-platform{border-left-color:#9aa0a6;background:#fafaf8;}
-  .cs.done{opacity:.55;} .cs.done .q{max-height:2.8em;overflow:hidden;}
-  .ch{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;}
+  /* 목록 */
+  .lhead{padding:10px 12px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:2;}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin;}
+  .chip{flex:none;font:600 12.5px var(--font);padding:6px 11px;border:1px solid var(--line);border-radius:99px;background:#fff;color:var(--ink);cursor:pointer;display:inline-flex;gap:6px;align-items:center;}
+  .chip b{font-weight:700;color:var(--sub);} .chip.on{background:var(--pri);border-color:var(--pri);color:#fff;} .chip.on b{color:#cfd3d8;}
+  .lrow2{display:flex;gap:6px;align-items:center;margin-top:6px;} .lrow2 input[type=search]{flex:1;min-width:0;padding:7px 10px;font-size:13px;} .lrow2 select{max-width:120px;padding:7px 8px;font-size:12.5px;}
+  .lrow3{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--sub);}
+  .lrow3 label{display:inline-flex;gap:5px;align-items:center;cursor:pointer;}
+  .prog{height:3px;background:var(--line);border-radius:4px;margin-top:8px;overflow:hidden;} .prog i{display:block;height:100%;background:var(--ok);width:0;transition:width .25s;}
+  .row{display:block;width:100%;text-align:left;background:#fff;border:0;border-bottom:1px solid #efefeb;border-left:4px solid transparent;padding:11px 12px 11px 10px;cursor:pointer;color:var(--ink);}
+  .row:hover{background:#fafaf8;} .row.on{background:var(--bluebg);}
+  .row.k-auto,.row.s-replied{border-left-color:var(--ok);} .row.k-check{border-left-color:#d49a22;} .row.k-manual{border-left-color:var(--blue);} .row.k-platform,.row.s-done{border-left-color:#c8cbd0;} .row.s-wait{border-left-color:var(--bad);}
+  .row.done{opacity:.5;}
+  .r1{display:flex;gap:8px;align-items:baseline;justify-content:space-between;} .r1 b{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .r1 time{flex:none;font-size:11.5px;color:var(--sub);font-variant-numeric:tabular-nums;}
+  .r2{font-size:13px;line-height:1.5;margin-top:3px;color:#3a3d42;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
+  .r3{font-size:11.5px;color:var(--sub);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .empty{text-align:center;color:var(--sub);padding:34px 18px;line-height:1.7;}
   .tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;}
   .t-auto{background:var(--okbg);color:var(--ok);} .t-check{background:var(--warnbg);color:var(--warn);} .t-manual{background:var(--bluebg);color:var(--blue);} .t-platform{background:#eceeef;color:#555b61;}
-  .lbl{font-weight:700;font-size:13.5px;}
-  .meta{font-size:12px;color:var(--sub);margin-left:auto;display:flex;gap:6px;align-items:center;}
-  .no{font-variant-numeric:tabular-nums;cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:1px 7px;background:#fff;color:var(--ink);font:600 12px var(--font);}
-  .prod{font-size:12.5px;color:var(--sub);margin-bottom:8px;word-break:break-all;}
-  .q{background:#f4f4f1;border-radius:8px;padding:10px 12px;line-height:1.65;white-space:pre-wrap;word-break:break-word;margin-bottom:10px;max-height:11em;overflow:auto;}
-  .also{background:var(--warnbg);color:var(--warn);font-size:12.5px;font-weight:600;border-radius:8px;padding:6px 10px;margin-bottom:8px;}
-  .note{font-size:12.5px;color:var(--sub);margin:0 0 8px;line-height:1.55;}
-  .stk{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;font-size:12.5px;}
-  .sz{border:1px solid var(--line);border-radius:6px;padding:2px 8px;background:#fff;font-variant-numeric:tabular-nums;cursor:default;}
+
+  /* 대화 */
+  .chead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 18px;background:#fff;border-bottom:1px solid var(--line);}
+  .chead .ttl{flex:1;min-width:180px;line-height:1.45;word-break:break-all;} .chead .ttl b{font-size:14px;} .chead .ttl div{font-size:12px;color:var(--sub);margin-top:1px;} .chead a{color:var(--blue);}
+  .back{display:none;}
+  .no{cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:1px 7px;background:#fff;color:var(--ink);font:600 12px var(--font);font-variant-numeric:tabular-nums;}
+  .msgs{flex:1;min-height:120px;overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:8px;}
+  .bub{max-width:78%;padding:9px 13px;border-radius:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word;font-size:14px;}
+  .bub small{display:block;font-size:11px;margin-top:3px;opacity:.65;}
+  .bub.in{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px;}
+  .bub.out{align-self:flex-end;background:var(--pri);color:#fff;border-bottom-right-radius:4px;} .bub.out.partner{background:#4b5563;}
+  .comp{background:#fff;border-top:1px solid var(--line);padding:12px 18px 14px;}
+  .also,.nq{background:var(--warnbg);color:var(--warn);font-size:12.5px;font-weight:600;border-radius:8px;padding:6px 10px;margin-bottom:8px;}
+  .note{font-size:12.5px;color:var(--sub);margin:0 0 8px;line-height:1.55;} .ainote{color:var(--blue);font-weight:600;} .ainote:empty{display:none;} .ainote.warn{color:var(--warn);}
+  .slot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;} .slot label{font-size:12.5px;font-weight:600;} .slot input[type=text]{flex:1;min-width:200px;}
+  .snip{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0;}
+  .act{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;}
+  .act .sp{margin-left:auto;}
+  .cnt{font-size:12px;color:var(--sub);} .cnt.over{color:var(--bad);font-weight:700;}
+  .kbd{font-size:11px;color:var(--sub);}
+
+  /* 정보 패널 */
+  .sec{border-bottom:1px solid #efefeb;padding:4px 16px;} .sec summary{cursor:pointer;font-weight:700;font-size:12.5px;padding:9px 0;list-style:none;display:flex;justify-content:space-between;color:var(--ink);} .sec summary::-webkit-details-marker{display:none;} .sec summary::after{content:"▾";color:var(--sub);} .sec:not([open]) summary::after{content:"▸";}
+  .sec .body{padding:0 0 12px;font-size:13px;line-height:1.6;word-break:break-word;}
+  .kv{display:flex;gap:8px;justify-content:space-between;padding:2px 0;} .kv span:first-child{color:var(--sub);flex:none;} .kv span:last-child{text-align:right;}
+  .stk{display:flex;gap:6px;flex-wrap:wrap;}
+  .sz{border:1px solid var(--line);border-radius:6px;padding:3px 9px;background:#fff;font-variant-numeric:tabular-nums;font-size:12.5px;}
   .sz.z{color:#9aa0a6;background:#f4f4f1;text-decoration:line-through;} .sz.hit{border-color:var(--blue);background:var(--bluebg);color:var(--blue);font-weight:700;text-decoration:none;}
   .sz.pick{cursor:pointer;} .sz.pick:hover{border-color:var(--ink);}
-  .slot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;} .slot label{font-size:12.5px;font-weight:600;} .slot input[type=text]{flex:1;min-width:220px;}
-  .btns{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0;} .btns .btn{font-size:12px;padding:6px 10px;}
-  .act{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;}
-  .real{margin-top:10px;font-size:12.5px;} .real summary{cursor:pointer;color:var(--sub);} .real div{background:#f4f4f1;border-radius:8px;padding:10px 12px;margin-top:6px;line-height:1.6;white-space:pre-wrap;}
-  .ainote{color:var(--blue);font-weight:600;} .ainote:empty{display:none;} .ainote.warn{color:var(--warn);}
-  .btn-ai{border-color:#c9d6fb;background:var(--bluebg);color:var(--blue);} .btn-ai:disabled{opacity:.6;}
-  .sim{margin-top:8px;} .sim .it{background:#f4f4f1;border-radius:8px;padding:8px 10px;margin-top:6px;font-size:12.5px;line-height:1.6;} .sim .it b{color:var(--sub);font-weight:600;} .sim .it .btn{margin-top:4px;font-size:12px;padding:4px 9px;}
-  .learn{font-size:12.5px;color:var(--sub);margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;} .learn.off{color:var(--warn);}
-  .empty{text-align:center;color:var(--sub);padding:36px 0;}
-  .asof{font-size:12.5px;color:var(--sub);} .asof.warn{color:var(--warn);font-weight:600;}
-  @media (max-width:640px){body{padding:10px;}.meta{margin-left:0;}}
+  .it{background:#f4f4f1;border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:12.5px;line-height:1.6;} .it b{color:var(--sub);font-weight:600;} .it .btn{margin-top:4px;}
+  .meas{background:#f4f4f1;border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.6;}
+  .dz{border:2px dashed var(--line);border-radius:14px;padding:26px 20px;text-align:center;background:#fff;transition:.15s;max-width:560px;margin:34px auto 0;} .dz.over{border-color:#111;background:#f3f3f3;}
+  .msg{font-size:13px;margin-top:8px;line-height:1.6;} .msg.err{color:var(--bad);font-weight:600;} .msg.ok{color:var(--ok);font-weight:600;}
+  .fmsg{font-size:12px;margin-top:6px;} .fmsg.err{color:var(--bad);font-weight:600;} .fmsg.ok{color:var(--ok);font-weight:600;}
+
+  /* 진행 중 상담 탭줄 (톡easy 화면 ①) */
+  .strip{display:flex;gap:8px;overflow-x:auto;padding:8px 16px;background:#eef0fb;border-bottom:1px solid var(--line);scrollbar-width:thin;}
+  .stab{flex:none;min-width:150px;max-width:210px;text-align:left;background:#fff;border:1px solid #d9dcef;border-radius:10px;padding:6px 10px;cursor:pointer;color:var(--ink);}
+  .stab.hot{border-color:#e08a82;background:#fff6f5;} .stab.on{box-shadow:0 0 0 2px var(--blue);}
+  .stab b{display:block;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .stab span{display:block;font-size:11.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .own{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--bluebg);color:var(--blue);} .own.other{background:var(--warnbg);color:var(--warn);}
+  .st-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:#eceeef;color:#555b61;} .st-badge.wait{background:var(--badbg);color:var(--bad);} .st-badge.hold{background:var(--warnbg);color:var(--warn);} .st-badge.replied{background:var(--okbg);color:var(--ok);}
+  .lock{background:var(--warnbg);color:var(--warn);font-size:12.5px;font-weight:600;border-radius:8px;padding:7px 10px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .actr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;} .actr .sp{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .memo{min-height:70px;font-size:13px;} .pastq{border-bottom:1px solid #efefeb;padding:6px 0;font-size:12.5px;line-height:1.5;} .pastq time{display:block;font-size:11.5px;color:var(--sub);}
+  .faqrow{display:flex;gap:6px;margin-bottom:6px;} .faqrow select,.faqrow input{flex:1;min-width:0;padding:7px 9px;font-size:12.5px;}
+  /* 좁은 화면: 목록 → 대화(+정보) 한 칸씩 */
+  @media (max-width:1180px){
+    .cols{display:block;position:relative;}
+    .cols > .col{height:100%;}
+    .cols[data-view="list"] .center,.cols[data-view="list"] .info{display:none;}
+    .cols[data-view="detail"] .list{display:none;}
+    .cols[data-view="detail"]{overflow:auto;}
+    .cols[data-view="detail"] .center{height:auto;min-height:70%;overflow:visible;} .cols[data-view="detail"] .msgs{max-height:42vh;}
+    .cols[data-view="detail"] .info{border-left:0;border-top:1px solid var(--line);height:auto;overflow:visible;}
+    .back{display:inline-flex;} .list{border-right:0;} .bub{max-width:92%;}
+    .status{margin-left:0;width:100%;}
+  }
 </style>
 </head>
 <body>
-<h1>문의 답변 도우미 <span class="badge">TEST</span></h1>
-<p class="lead">스케줄러가 모은 <b>문의사항답변 엑셀</b>을 올리면, 문의를 종류별로 나누고 답변 초안을 만들어 줍니다. 초안을 확인하고 <b>답변 복사</b>를 눌러 사방넷에 붙여넣으세요. 이 화면에서 사방넷으로 자동 전송하지는 않아요. 플랫폼 공지·페널티 안내는 따로 빼서 보여줍니다.<br>카드의 <b>✨ AI 초안</b>을 누르면 AI가 문의를 읽고 다시 써 줘요. 이때 <b>이름·전화번호·주문번호는 가리고</b> 문의 내용과 확인된 재고·실측만 AI 서비스(Gemini)로 보냅니다. AI도 틀릴 수 있으니 사실 확인 후 복사하세요.</p>
-
-<div class="box">
-  <div class="step">① 문의 엑셀 올리기</div>
-  <div class="row dz" id="dz">
-    <button class="btn btn-out" type="button" id="pick">파일 선택 또는 여기로 끌어놓기</button><input type="file" id="file" accept=".xlsx,.xls" hidden>
-    <span class="hint" id="fileInfo">스케줄러가 받은 <b>문의사항답변_다운로드.xlsx</b> 그대로 올리면 돼요. 엑셀에서 복사한 셀을 Ctrl+V 해도 됩니다.</span>
-  </div>
-  <div class="msg" id="fileMsg"></div>
-  <div class="asof" id="stockMsg"></div>
-  <div class="learn" id="learnMsg"></div>
-</div>
-
-<div id="work" hidden>
-  <div class="bar">
-    <div class="tabs" id="tabs"></div>
-    <div class="prog"><i id="progBar"></i></div>
-    <div class="progtxt" id="progTxt"></div>
-    <div class="tools">
-      <input type="search" id="search" placeholder="문의·상품·쇼핑몰 검색" style="min-width:200px">
-      <select id="shopSel"><option value="">쇼핑몰 전체</option></select>
-      <button class="btn btn-ai" id="aiAll" type="button">✨ 이 목록 AI 초안 만들기</button><button class="btn btn-out" id="aiStop" type="button" hidden>멈추기</button><span class="hint" id="aiProg"></span>
-      <label><input type="checkbox" id="showAns"> 이미 답변된 문의도 보기 <span class="hint">(연습용 — 실제 답변과 비교할 수 있어요)</span></label>
+<div class="app">
+  <header class="top">
+    <h1>문의 답변 도우미 <span class="badge">TEST</span></h1>
+    <div class="modes" role="tablist">
+      <button class="mode" type="button" id="modeBtnTt" role="tab" data-mode="tt">네이버 톡톡 실시간 <span class="pill" id="ttPill"></span></button>
+      <button class="mode" type="button" id="modeBtnXls" role="tab" data-mode="xls">사방넷 문의 엑셀 <span class="pill" id="xlsPill"></span></button>
     </div>
+    <div class="status"><span id="connMsg"></span><span class="asof" id="stockMsg"></span><span class="learn" id="learnMsg"></span></div>
+  </header>
+  <div class="strip" id="strip" hidden></div>
+  <div class="cols" id="cols" data-view="list">
+    <aside class="col list" id="colList">
+      <div class="lhead">
+        <div class="chips" id="chips"></div>
+        <div class="lrow2"><input type="search" id="search" placeholder="문의·상품 검색" aria-label="문의 검색"><select id="shopSel" aria-label="쇼핑몰"><option value="">쇼핑몰 전체</option></select></div>
+        <div class="lrow3" id="xlsTools">
+          <span id="fileBox"><button class="btn btn-out sm" type="button" id="pick">엑셀 올리기</button><input type="file" id="file" accept=".xlsx,.xls" hidden></span>
+          <button class="btn btn-ai sm" id="aiAll" type="button">✨ 이 목록 AI 초안</button><button class="btn btn-out sm" id="aiStop" type="button" hidden>멈추기</button>
+          <label><input type="checkbox" id="showAns"> 답변된 문의도</label>
+          <span id="aiProg"></span>
+        </div>
+        <div class="prog"><i id="progBar"></i></div>
+        <div class="hint" id="progTxt" style="margin-top:5px"></div>
+        <div class="fmsg" id="fileMsg"></div>
+      </div>
+      <div id="list"></div>
+    </aside>
+    <main class="col center" id="center"></main>
+    <aside class="col info" id="info"></aside>
   </div>
-  <div id="list"></div>
-  <div class="row" style="justify-content:center;margin:10px 0 40px"><button class="btn btn-out" id="more" hidden>더 보기</button></div>
 </div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
@@ -111,177 +165,23 @@ const USERMEAS = LS.get('cs.meas', {});        // 상품코드 → 실측값 (�
 let SERVERMEAS = {};
 const measOf = k => USERMEAS[k] || SERVERMEAS[k] || (window.CS_MEAS || {})[k] || '';
 const KIND = { auto: '자동 초안', check: '확인 후 복사', manual: '직접 작성', platform: '플랫폼 알림' };
-let CARDS = [], FILTER = 'todo', SHOWN = 80, STOCKFN = null, FILENAME = '';
-
-/* ---------- 파일 ---------- */
-$('pick').onclick = () => $('file').click();
-$('file').onchange = e => { if(e.target.files[0]) load(e.target.files[0]); e.target.value = ''; };
-const dz = $('dz');
-['dragover', 'dragenter'].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); dz.classList.add('over'); }));
-['dragleave', 'drop'].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); dz.classList.remove('over'); }));
-dz.addEventListener('drop', e => { if(e.dataTransfer.files[0]) load(e.dataTransfer.files[0]); });
-
-async function load(f){
-  FILENAME = f.name; msg('파일을 읽는 중…');
-  try{
-    const buf = await f.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array' });
-    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: false });
-    const rows = CSAnswer.rowsFromAoa(aoa);
-    if(!rows) return msg('"문의내용" 열을 찾지 못했어요. 스케줄러가 받은 문의사항답변 엑셀이 맞는지 확인해 주세요.', 'err');
-    if(!rows.length) return msg('문의가 한 건도 없어요.', 'err');
-    await loadStock();
-    await initLearn();
-    build(rows);
-    offerSabang();
-    msg(`✅ 문의 ${rows.length.toLocaleString()}건을 읽었어요.`, 'ok');
-  }catch(e){ msg('엑셀을 읽지 못했어요: ' + e.message, 'err'); }
-}
-function msg(t, c){ const m = $('fileMsg'); m.className = 'msg ' + (c || ''); m.textContent = t; }
-
-async function loadStock(){
-  const el = $('stockMsg'); el.className = 'asof'; STOCKFN = null;
-  try{
-    const d = await ECCache.load('master');
-    STOCKFN = CSAnswer.makeStock(d.rows);
-    const t = new Date(d.as_of * 1000), p = n => String(n).padStart(2, '0');
-    const age = d.age_min < 60 ? d.age_min + '분 전' : Math.floor(d.age_min / 60) + '시간 전';
-    el.textContent = `이카운트 재고 기준: ${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())} (${age})` + (d.stale ? ' — 오래된 값일 수 있어요' : '');
-    if(d.stale) el.classList.add('warn');
-  }catch(e){
-    el.className = 'asof warn';
-    el.textContent = '재고 연동 꺼짐 — ' + (e.message || '재고를 불러오지 못했어요') + ' (재고 문의는 직접 작성으로 표시돼요)';
-  }
-}
-
-/* ---------- 카드 만들기 ---------- */
-function build(rows){
-  CARDS = rows.map(r => {
-    const c = CSAnswer.classify(r, { stock: STOCKFN, meas: measOf });
-    const slotVal = c.slot ? (c.slot.value || '') : '';
-    const k = r.no || ('r' + r.idx);
-    const t0 = CSAnswer.applySlot(c, slotVal);
-    return { r, c, key: k, slotVal, text: t0, machine: t0, aiUsed: false, edited: false, answered: !!(r.a && r.a.trim()) };
-  });
-  const shops = [...new Set(CARDS.map(x => x.r.shop).filter(Boolean))].sort();
-  $('shopSel').innerHTML = '<option value="">쇼핑몰 전체</option>' + shops.map(s => `<option>${esc(s)}</option>`).join('');
-  $('work').hidden = false; FILTER = 'todo'; SHOWN = 80;
-  // 이미 답변된 것만 있는 파일이면 자동으로 연습 모드
-  const unans = CARDS.filter(x => !x.answered).length;
-  $('showAns').checked = unans === 0;
-  render();
-}
-
-function visible(){
-  const q = $('search').value.trim().toLowerCase(), shop = $('shopSel').value, showAns = $('showAns').checked;
-  return CARDS.filter(x => {
-    if(!showAns && x.answered) return false;
-    if(shop && x.r.shop !== shop) return false;
-    if(q && !(x.r.q + ' ' + x.r.prod + ' ' + x.r.shop + ' ' + x.r.title).toLowerCase().includes(q)) return false;
-    return true;
-  });
-}
-
-function filterList(base){ return base.filter(x => FILTER === 'done' ? DONE[x.key] : (!DONE[x.key] && (FILTER === 'todo' || x.c.kind === FILTER))); }
-function render(){
-  const base = visible();
-  const cnt = { todo: 0, auto: 0, check: 0, manual: 0, platform: 0, done: 0 };
-  base.forEach(x => { if(DONE[x.key]) cnt.done++; else { cnt.todo++; cnt[x.c.kind]++; } });
-  const T = [['todo', '해야 할 것'], ['auto', '자동 초안'], ['check', '확인 후 복사'], ['manual', '직접 작성'], ['platform', '플랫폼 알림'], ['done', '완료']];
-  $('tabs').innerHTML = T.map(([k, n]) => `<button class="tab${FILTER === k ? ' on' : ''}" data-f="${k}">${n} <b>${cnt[k]}</b></button>`).join('');
-  const total = base.length, dn = cnt.done;
-  $('progBar').style.width = total ? (dn / total * 100) + '%' : '0';
-  $('progTxt').textContent = `처리 ${dn} / ${total}건` + (FILENAME ? ' · ' + FILENAME : '');
-  const list = filterList(base);
-  $('list').innerHTML = list.slice(0, SHOWN).map(cardHtml).join('') || '<div class="empty">여기에 표시할 문의가 없어요.</div>';
-  $('more').hidden = list.length <= SHOWN; $('more').textContent = `더 보기 (${list.length - SHOWN}건 남음)`;
-  list.slice(0, SHOWN).forEach(x => { const ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`); if(ta) fit(ta); });
-}
 const cssq = s => String(s).replace(/"/g, '\\"');
-const fit = ta => { ta.style.height = 'auto'; ta.style.height = Math.max(84, ta.scrollHeight + 2) + 'px'; };
+const fit = ta => { if(!ta) return; ta.style.height = 'auto'; ta.style.height = Math.max(96, ta.scrollHeight + 2) + 'px'; };
+const tm = s => (s || '').slice(5, 16).replace('-', '/');
+const NARROW = () => window.matchMedia('(max-width:1180px)').matches;
 
-function stockHtml(x){
-  const st = x.c.stock; if(!st || !st.found) return '';
-  const hit = new Set(CSAnswer.specsMentioned(x.r.q + ' ' + CSAnswer.cleanTitle(x.r.title), st.sizes).map(s => s.spec));
-  const pick = x.c.slot && x.c.slot.chips;
-  return `<div class="stk"><span class="hint">이카운트 재고</span>` + st.sizes.map(s => `<span class="sz${s.qty <= 0 ? ' z' : ''}${hit.has(s.spec) ? ' hit' : ''}${pick && s.qty > 0 ? ' pick' : ''}" ${pick && s.qty > 0 ? `data-chip="${esc(s.spec)}"` : ''}>${esc(s.spec)} ${s.qty}</span>`).join('') + `</div>`;
+let CARDS = [], FILTER = 'todo', SHOWN = 80, STOCKFN = null, FILENAME = '';
+let MODE = LS.get('cs.mode', 'xls'); if(MODE !== 'tt' && MODE !== 'xls') MODE = 'xls';
+const SEL = { xls: null, tt: null };
+const TT = { state: 'wait', threads: [], strip: [], me: '', lock: '', counts: { wait: 0, hold: 0, mine: 0, replied: 0, done: 0 }, data: null, x: {}, timer: null, cfg: null, sending: false, ready: false, err: '' };
+let SHOWN_KEY = '';   // 가운데 칸에 지금 그려진 대화 (MODE:key)
+
+/* ---------- 인증 · 개인정보 가리기 · 학습 저장소 ---------- */
+function authInfo(){ try{ const a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); return (a && a.id && a.pass) ? a : null; }catch(e){ return null; } }
+function maskPii(s){
+  return String(s || '').replace(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g, '{전화}').replace(/(?:ORD)?\d{12,}/gi, '{번호}')
+    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '{이메일}').replace(/(회원명|성함|이름|고객명)\s*[:：]?\s*[가-힣A-Za-z]{2,6}/g, '$1: {이름}');
 }
-
-function cardHtml(x){
-  const { r, c } = x, k = esc(x.key), done = DONE[x.key];
-  const also = c.also && c.also.length ? `<div class="also">이 문의에는 [${esc(c.also.join(', '))}] 질문도 섞여 있어요. 초안이 빠뜨린 게 없는지 보세요.</div>` : '';
-  let body = '';
-  if(c.kind === 'platform'){
-    body = `<p class="note">${esc(c.note)}</p>`;
-  } else {
-    const slot = c.slot ? `<div class="slot"><label>${esc(c.slot.label)}</label><input type="text" data-slot="${k}" value="${esc(x.slotVal)}" placeholder="${esc(c.slot.placeholder || '')}">${c.slot.saveable ? `<label class="hint"><input type="checkbox" data-save="${k}" checked> 이 상품에 저장</label>` : ''}</div>` : '';
-    const btns = c.buttons && c.buttons.length ? `<div class="btns">${c.buttons.map((b, i) => `<button class="btn btn-out" type="button" data-ins="${k}" data-i="${i}">+ ${esc(b.label)}</button>`).join('')}<button class="btn btn-out" type="button" data-redo="${k}">↺ 초안 다시</button><button class="btn btn-ai" type="button" data-ai="${k}">✨ AI 초안</button><button class="btn btn-out" type="button" data-sim="${k}">비슷한 과거 답변</button></div>` : `<div class="btns"><button class="btn btn-out" type="button" data-redo="${k}">↺ 초안 다시</button><button class="btn btn-ai" type="button" data-ai="${k}">✨ AI 초안</button><button class="btn btn-out" type="button" data-sim="${k}">비슷한 과거 답변</button></div>`;
-    body = `${c.note ? `<p class="note">${esc(c.note)}</p>` : ''}<p class="note ainote${x.aiWarn ? ' warn' : ''}" data-ainote="${k}">${esc(x.aiNote || '')}</p>${stockHtml(x)}${slot}<textarea data-ta="${k}" placeholder="직접 작성하거나, 아래 문구를 눌러 넣으세요">${esc(x.text)}</textarea>${btns}<div class="sim" data-simbox="${k}">${simHtml(x)}</div>`;
-  }
-  const act = c.kind === 'platform'
-    ? `<button class="btn btn-pri" data-ok="${k}">${done ? '확인함 ✓' : '확인했어요'}</button>`
-    : `<button class="btn btn-pri" data-copy="${k}">${done ? '복사됨 ✓ (다시 복사)' : '답변 복사'}</button>`;
-  const real = x.answered ? `<details class="real"><summary>실제로 나간 답변 보기 (${esc(r.ans || '')})</summary><div>${esc(r.a)}</div></details>` : '';
-  const date = (r.date || '').slice(5, 16);
-  return `<article class="cs k-${c.kind}${done ? ' done' : ''}" data-card="${k}">
-    <div class="ch"><span class="tag t-${c.kind}">${KIND[c.kind]}</span><span class="lbl">${esc(c.label)}</span>
-      <span class="meta">${esc(r.shop)} · ${date ? esc(date) + ' · ' : ''}<button class="no" type="button" data-no="${esc(r.no)}" title="사방넷에서 찾을 때 쓰는 문의 번호 (누르면 복사)">#${esc(r.no || r.idx)}</button></span></div>
-    ${r.prod ? `<div class="prod">${esc(r.prod)}</div>` : ''}
-    <div class="q">${esc((r.q && r.q !== 'null') ? r.q : CSAnswer.cleanTitle(r.title))}</div>
-    ${also}${body}
-    <div class="act">${act}<span class="hint" data-st="${k}"></span></div>${real}</article>`;
-}
-
-/* ---------- 동작 ---------- */
-const byKey = k => CARDS.find(x => x.key === k);
-function copyText(t){
-  if(navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t);
-  return new Promise((res, rej) => { const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy') ? res() : rej(); }catch(e){ rej(e); } ta.remove(); });
-}
-function appendBody(cur, body){
-  cur = (cur || '').trim(); if(!cur) return CSAnswer.wrap(body);
-  const END = CSAnswer.T ? ' 감사합니다.' : '';
-  if(cur.endsWith('감사합니다.')) cur = cur.slice(0, -'감사합니다.'.length).trim();
-  return cur + ' ' + body + END;
-}
-function setDone(x, v){ if(v) DONE[x.key] = 1; else delete DONE[x.key]; LS.set('cs.done', DONE); }
-function redraft(x){ x.text = CSAnswer.applySlot(x.c, x.slotVal); x.machine = x.text; x.aiUsed = false; x.edited = false; const ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`); if(ta){ ta.value = x.text; fit(ta); } }
-
-document.addEventListener('click', async e => {
-  const t = e.target.closest('button,.sz'); if(!t) return;
-  if(t.dataset.f){ FILTER = t.dataset.f; SHOWN = 80; return render(); }
-  if(t.id === 'more'){ SHOWN += 80; return render(); }
-  if(t.dataset.no !== undefined){ try{ await copyText(t.dataset.no); t.textContent = '복사됨'; setTimeout(() => render(), 700); }catch(_){} return; }
-  if(t.dataset.chip){ const card = t.closest('[data-card]'), x = byKey(card.dataset.card); x.slotVal = t.dataset.chip; card.querySelector('[data-slot]').value = x.slotVal; redraft(x); return; }
-  if(t.dataset.ins){ const x = byKey(t.dataset.ins), b = x.c.buttons[+t.dataset.i], ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`); x.text = appendBody(ta.value, b.text); x.edited = true; ta.value = x.text; fit(ta); return; }
-  if(t.dataset.redo){ const x = byKey(t.dataset.redo); x.aiNote = ''; x.aiWarn = false; const n = document.querySelector(`[data-ainote="${cssq(x.key)}"]`); if(n) n.textContent = ''; return redraft(x); }
-  if(t.dataset.ai){ return askAI(byKey(t.dataset.ai)); }
-  if(t.dataset.sim){ return showSimilar(byKey(t.dataset.sim)); }
-  if(t.dataset.simuse){ const parts = t.dataset.simuse.split('|'), x = byKey(parts[0]), it = x.sim && x.sim[+parts[1]]; if(it){ x.text = it.a; x.edited = true; x.aiUsed = false; const ta = document.querySelector('[data-ta="' + cssq(x.key) + '"]'); ta.value = x.text; fit(ta); } return; }
-  if(t.dataset.ok){ const x = byKey(t.dataset.ok); setDone(x, !DONE[x.key]); return render(); }
-  if(t.dataset.copy){
-    const x = byKey(t.dataset.copy), ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`), text = (ta ? ta.value : x.text).trim();
-    const st = document.querySelector(`[data-st="${cssq(x.key)}"]`);
-    if(!text){ st.textContent = '답변이 비어 있어요. 내용을 쓰거나 문구를 눌러 넣어 주세요.'; st.style.color = 'var(--bad)'; return; }
-    if(/\{[^}]+\}/.test(text)){ st.textContent = '{ } 로 된 빈칸이 남아 있어요. 채워 주세요.'; st.style.color = 'var(--bad)'; return; }
-    try{ await copyText(text); }catch(_){ st.textContent = '복사에 실패했어요. 글상자에서 직접 복사해 주세요.'; st.style.color = 'var(--bad)'; return; }
-    // 실측값 저장
-    const sv = document.querySelector(`[data-save="${cssq(x.key)}"]`);
-    if(sv && sv.checked && x.slotVal.trim() && x.c.measKey){ USERMEAS[x.c.measKey] = x.slotVal.trim(); LS.set('cs.meas', USERMEAS); saveMeas(x.c.measKey, x.slotVal.trim()); }
-    saveAnswer(x, text);
-    setDone(x, true);
-    const card = document.querySelector(`[data-card="${cssq(x.key)}"]`); if(card) card.classList.add('done');
-    t.textContent = '복사됨 ✓'; st.textContent = '사방넷에 붙여넣으세요.'; st.style.color = 'var(--ok)';
-    setTimeout(render, 900);
-  }
-});
-document.addEventListener('input', e => {
-  const t = e.target;
-  if(t.dataset.slot){ const x = byKey(t.dataset.slot); x.slotVal = t.value; if(!x.edited){ x.text = CSAnswer.applySlot(x.c, x.slotVal); x.machine = x.text; const ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`); ta.value = x.text; fit(ta); } }
-  else if(t.dataset.ta){ const x = byKey(t.dataset.ta); x.text = t.value; x.edited = true; fit(t); }
-});
-
-/* ---------- 학습 저장소 (buyest.co.kr/cs_learn_api.php) ---------- */
 const LEARN = 'https://buyest.co.kr/cs_learn_api.php';
 let LEARN_ON = false;
 async function lapi(action, payload, timeout){
@@ -294,14 +194,15 @@ async function lapi(action, payload, timeout){
 function learnMsg(t, off){ const el = $('learnMsg'); el.className = 'learn' + (off ? ' off' : ''); el.textContent = t; }
 async function initLearn(){
   LEARN_ON = false;
-  if(!authInfo()){ learnMsg('학습 저장소 꺼짐 — 툴킷에 로그인하면 확정한 답변이 저장되고 AI가 참고해요.', true); return; }
+  if(!authInfo()){ learnMsg('학습 저장소 꺼짐 — 툴킷에 로그인하세요', true); return; }
   try{
     const res = await Promise.all([lapi('meas_all', {}, 6000), lapi('stats', {}, 6000)]);
     const m = res[0], st = res[1];
     SERVERMEAS = m.meas || {}; LEARN_ON = true;
-    learnMsg('학습 저장소 연결됨 · 직원이 확정한 답변 ' + st.copy + '건 (AI 초안 ' + st.ai + ' · 직접 고침 ' + st.edited + ') · 사방넷 답변 ' + st.sabang + '건 · 상품 실측 ' + st.meas + '개');
+    learnMsg('학습 저장소 연결됨 · 확정 답변 ' + st.copy + '건 · 사방넷 답변 ' + st.sabang + '건 · 실측 ' + st.meas + '개');
+    $('learnMsg').title = 'AI 초안 ' + st.ai + ' · 직접 고침 ' + st.edited;
     flushPending();
-  }catch(e){ learnMsg('학습 저장소에 연결하지 못했어요 (' + e.message + '). 복사는 그대로 되고, 저장은 나중에 다시 시도해요.', true); }
+  }catch(e){ learnMsg('학습 저장소에 연결하지 못했어요 (' + e.message + ')', true); }
 }
 function pendingGet(){ return LS.get('cs.pending', []); }
 function pendingAdd(items){ LS.set('cs.pending', pendingGet().concat(items).slice(-300)); }
@@ -314,47 +215,338 @@ function itemOf(x, finalText, src){
   return { no: x.r.no, shop: x.r.shop, prod_key: x.c.measKey || CSAnswer.measKey(x.r.prod), prod: maskPii(x.r.prod), q: maskPii(questionOf(x)), label: x.c.label, intent: x.c.intent, kind: x.c.kind,
     draft: src === 'copy' ? maskPii(x.machine) : '', final: maskPii(finalText), ai: x.aiUsed ? 1 : 0, src: src, actor: src === 'sabang' ? (x.r.ans || '') : '' };
 }
+async function saveMeas(key, text){ SERVERMEAS[key] = text; try{ if(LEARN_ON) await lapi('meas_set', { key: key, text: text }); }catch(_){} }
 async function saveAnswer(x, finalText){
   if(!x.r.no || x.c.kind === 'platform') return;
   const it = itemOf(x, finalText, 'copy');
   try{ if(!LEARN_ON) throw new Error('off'); await lapi('save', { items: [it] }); }catch(_){ pendingAdd([it]); }
 }
-async function saveMeas(key, text){ SERVERMEAS[key] = text; try{ if(LEARN_ON) await lapi('meas_set', { key: key, text: text }); }catch(_){} }
-function sabangList(){ return CARDS.filter(x => x.answered && x.r.no && x.c.kind !== 'platform' && (x.r.a || '').trim().length >= 3); }
-function offerSabang(){
-  const n = sabangList().length;
-  if(!n || !LEARN_ON) return;
-  $('learnMsg').insertAdjacentHTML('beforeend', ' <button class="btn btn-out" id="sbSave" type="button">이 파일에 있는 사방넷 답변 ' + n + '건을 학습 데이터로 저장</button><span class="hint" id="sbProg"></span>');
-  $('sbSave').onclick = async () => {
-    const list = sabangList().map(x => itemOf(x, x.r.a, 'sabang'));
-    $('sbSave').disabled = true; let ok = 0;
-    try{
-      for(let i = 0; i < list.length; i += 50){ const d = await lapi('save', { items: list.slice(i, i + 50) }, 20000); ok += d.saved; $('sbProg').textContent = Math.min(i + 50, list.length) + ' / ' + list.length + '건 보내는 중…'; }
-      $('sbProg').textContent = '저장 완료 (' + ok + '건 — 이미 있던 건은 갱신)';
-    }catch(e){ $('sbProg').textContent = '저장 중 멈췄어요: ' + e.message; $('sbSave').disabled = false; }
-  };
-}
-function simHtml(x){
-  if(!x.sim) return '';
-  if(!x.sim.length) return '<div class="it"><b>비슷한 과거 답변이 아직 없어요.</b></div>';
-  return x.sim.map((it, i) => '<div class="it"><b>' + (it.src === 'copy' ? '직원 확정' : '사방넷') + ' · 비슷함 ' + Math.round(it.score * 100) + '%</b><br>문의: ' + esc(it.q) + '<br>답변: ' + esc(it.a) + '<br><button class="btn btn-out" type="button" data-simuse="' + esc(x.key) + '|' + i + '">이 답변 넣기</button></div>').join('');
-}
-async function showSimilar(x){
-  const box = document.querySelector('[data-simbox="' + cssq(x.key) + '"]'); if(!box) return;
-  if(!LEARN_ON){ box.innerHTML = '<div class="it"><b>학습 저장소에 연결되어 있지 않아요 (로그인 필요).</b></div>'; return; }
-  box.innerHTML = '<div class="it"><b>찾는 중…</b></div>';
-  try{ const d = await lapi('similar', { q: maskPii(questionOf(x)), intent: x.c.intent, prod_key: x.c.measKey || CSAnswer.measKey(x.r.prod), k: 3 }, 6000); x.sim = d.items || []; }
-  catch(e){ box.innerHTML = '<div class="it"><b>못 찾았어요: ' + esc(e.message) + '</b></div>'; return; }
-  box.innerHTML = simHtml(x);
+
+/* ---------- 재고 ---------- */
+async function loadStock(){
+  const el = $('stockMsg'); el.className = 'asof'; STOCKFN = null;
+  try{
+    const d = await ECCache.load('master');
+    STOCKFN = CSAnswer.makeStock(d.rows);
+    const age = d.age_min < 60 ? d.age_min + '분 전' : Math.floor(d.age_min / 60) + '시간 전';
+    el.textContent = '이카운트 재고 ' + age + ' 기준' + (d.stale ? ' — 오래된 값일 수 있어요' : '');
+    if(d.stale) el.classList.add('warn');
+  }catch(e){
+    el.className = 'asof warn';
+    el.textContent = '재고 연동 꺼짐 — ' + (e.message || '재고를 불러오지 못했어요');
+  }
 }
 
-/* ---------- AI 초안 (name-worker /api/cs) ---------- */
-const WK = 'https://buyest-namegen.buyest.workers.dev';
-function authInfo(){ try{ const a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); return (a && a.id && a.pass) ? a : null; }catch(e){ return null; } }
-function maskPii(s){
-  return String(s || '').replace(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g, '{전화}').replace(/(?:ORD)?\d{12,}/gi, '{번호}')
-    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '{이메일}').replace(/(회원명|성함|이름|고객명)\s*[:：]?\s*[가-힣A-Za-z]{2,6}/g, '$1: {이름}');
+/* ---------- 문의 엑셀 ---------- */
+function fmsg(t, c){ const m = $('fileMsg'); m.className = 'fmsg ' + (c || ''); m.textContent = t; }
+$('pick').onclick = () => $('file').click();
+$('file').onchange = e => { if(e.target.files[0]) loadXlsx(e.target.files[0]); e.target.value = ''; };
+async function loadXlsx(f){
+  FILENAME = f.name; fmsg('파일을 읽는 중…');
+  try{
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: false });
+    const rows = CSAnswer.rowsFromAoa(aoa);
+    if(!rows) return fmsg('"문의내용" 열을 찾지 못했어요. 스케줄러가 받은 문의사항답변 엑셀이 맞는지 확인해 주세요.', 'err');
+    if(!rows.length) return fmsg('문의가 한 건도 없어요.', 'err');
+    await loadStock();
+    await initLearn();
+    buildCards(rows);
+    offerSabang();
+    fmsg(`문의 ${rows.length.toLocaleString()}건을 읽었어요.`, 'ok');
+  }catch(e){ fmsg('엑셀을 읽지 못했어요: ' + e.message, 'err'); }
 }
+function buildCards(rows){
+  CARDS = rows.map(r => {
+    const c = CSAnswer.classify(r, { stock: STOCKFN, meas: measOf });
+    const slotVal = c.slot ? (c.slot.value || '') : '';
+    const k = r.no || ('r' + r.idx);
+    const t0 = CSAnswer.applySlot(c, slotVal);
+    return { r, c, key: k, slotVal, text: t0, machine: t0, aiUsed: false, edited: false, answered: !!(r.a && r.a.trim()) };
+  });
+  const shops = [...new Set(CARDS.map(x => x.r.shop).filter(Boolean))].sort();
+  $('shopSel').innerHTML = '<option value="">쇼핑몰 전체</option>' + shops.map(s => `<option>${esc(s)}</option>`).join('');
+  FILTER = 'todo'; SHOWN = 80; SEL.xls = null;
+  $('showAns').checked = CARDS.filter(x => !x.answered).length === 0;   // 이미 답변된 것만 있는 파일이면 연습 모드
+  setMode('xls');
+}
+function byKey(k){ return MODE === 'xls' ? CARDS.find(x => x.key === k) : TT.x[k]; }
+function curX(){ return SEL[MODE] ? byKey(SEL[MODE]) : null; }
+function xlsVisible(){
+  const q = $('search').value.trim().toLowerCase(), shop = $('shopSel').value, showAns = $('showAns').checked;
+  return CARDS.filter(x => {
+    if(!showAns && x.answered) return false;
+    if(shop && x.r.shop !== shop) return false;
+    if(q && !(x.r.q + ' ' + x.r.prod + ' ' + x.r.shop + ' ' + x.r.title).toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function xlsFiltered(base){ return base.filter(x => FILTER === 'done' ? DONE[x.key] : (!DONE[x.key] && (FILTER === 'todo' || x.c.kind === FILTER))); }
+function offerSabang(){
+  const list = CARDS.filter(x => x.answered && x.r.no && x.c.kind !== 'platform' && (x.r.a || '').trim().length >= 3);
+  if(!list.length || !LEARN_ON) return;
+  $('learnMsg').insertAdjacentHTML('beforeend', ' <button class="btn btn-out sm" id="sbSave" type="button">사방넷 답변 ' + list.length + '건 학습 저장</button><span id="sbProg"></span>');
+  $('sbSave').onclick = async () => {
+    const items = list.map(x => itemOf(x, x.r.a, 'sabang'));
+    $('sbSave').disabled = true; let ok = 0;
+    try{
+      for(let i = 0; i < items.length; i += 50){ const d = await lapi('save', { items: items.slice(i, i + 50) }, 20000); ok += d.saved; $('sbProg').textContent = ' ' + Math.min(i + 50, items.length) + ' / ' + items.length; }
+      $('sbProg').textContent = ' 저장 완료 (' + ok + '건)';
+    }catch(e){ $('sbProg').textContent = ' 멈췄어요: ' + e.message; $('sbSave').disabled = false; }
+  };
+}
+
+/* ---------- 톡톡 ---------- */
+const TTAPI = 'https://buyest.co.kr/tt_api.php';
+async function tapi(action, payload, timeout){
+  const a = authInfo(); if(!a) throw new Error('툴킷에 로그인한 뒤 쓸 수 있어요. 로그인 후 새로고침해 주세요.');
+  const r = await fetch(TTAPI, { method: 'POST', signal: AbortSignal.timeout(timeout || 10000), headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action, user: a.id, pass: a.pass }, payload || {})) });
+  const d = await r.json().catch(() => ({}));
+  if(!d.ok){ const er = new Error(d.error || ('서버 응답 ' + r.status)); er.data = d; throw er; }
+  return d;
+}
+const ttWho = k => '고객 …' + String(k).slice(-4);
+const TT_STATE = { wait: '답변 필요', hold: '보류', replied: '답변함', done: '완료' };
+const FAQ_TYPES = [['', '전체 유형'], ['auth', '정품 문의'], ['restock', '재입고'], ['pack', '선물포장·쇼핑백'], ['as', 'A/S·수선'], ['price', '가격·할인'], ['ret', '반품·교환·취소'], ['stock', '재고 확인'], ['sameday', '당일 발송'], ['ship', '배송·출고'], ['meas', '실측 치수'], ['sizerec', '사이즈 추천'], ['mat', '소재·디테일']];
+function ttTail(msgs){ const ins = []; for(let i = msgs.length - 1; i >= 0; i--){ if(msgs[i].dir === 'in') ins.unshift(msgs[i]); else break; } return ins; }
+function ttMakeX(key, d){
+  const tail = ttTail(d.messages), q = tail.filter(m => m.kind === 'text').map(m => m.text).join('\n');
+  const r = { no: 'tt' + (tail.length ? tail[tail.length - 1].id : 0), idx: 0, shop: '네이버톡톡', prod: (d.product && d.product.name) || '', q, title: '', a: '', ans: '', date: '' };
+  let c;
+  try{ c = CSAnswer.classify(r, { stock: STOCKFN, meas: measOf }); }
+  catch(_){ c = { kind: 'manual', intent: 'etc', label: '기타', slot: null, buttons: [], stock: null, note: '', build: function(){ return ''; } }; }
+  const slotVal = c.slot ? (c.slot.value || '') : '';
+  const t0 = q && c.kind !== 'platform' ? CSAnswer.applySlot(c, slotVal) : '';
+  return { r, c, key, slotVal, text: t0, machine: t0, aiUsed: false, edited: false, tailLen: tail.length, hasQ: !!q };
+}
+async function ttRefresh(){
+  try{
+    const st = await tapi('status');
+    TT.cfg = st; TT.counts = st.counts; TT.err = ''; TT.me = st.me || TT.me;
+    $('ttPill').textContent = st.counts.wait ? String(st.counts.wait) : '';
+    if(st.configured){
+      const d = await tapi('threads', { state: TT.state, limit: 60 });
+      TT.threads = d.items; TT.ready = true;
+      TT.strip = TT.state === 'wait' ? d.items : (await tapi('threads', { state: 'wait', limit: 20 })).items;
+      $('connMsg').className = 'okc'; $('connMsg').textContent = '톡톡 연결됨 · 마지막 수신 ' + (st.last_event ? tm(st.last_event) : '아직 없음') + (st.handover ? '' : ' · 파트너센터 대기목록 연동 꺼짐');
+    } else { TT.ready = false; $('connMsg').className = 'warn'; $('connMsg').textContent = '톡톡 연결 전'; }
+  }catch(e){ TT.err = e.message; $('connMsg').className = 'warn'; $('connMsg').textContent = '톡톡 문의를 불러오지 못했어요: ' + e.message; }
+  if(MODE !== 'tt') return;
+  renderList(); renderStrip();
+  if(SEL.tt && TT.ready) await ttOpen(SEL.tt, true); else if(!SEL.tt) renderCenter();
+}
+async function ttOpen(key, quiet){
+  let d;
+  try{ d = await tapi('thread', { user_key: key, limit: 80 }); }
+  catch(e){ if(!quiet){ $('center').innerHTML = `<div class="empty"><b>대화를 불러오지 못했어요</b><br>${esc(e.message)}</div>`; } return; }
+  if(SEL.tt !== key && quiet) return;   // 그 사이 다른 대화로 옮겼다면 버린다
+  SEL.tt = key; TT.data = d;
+  if(d.owner && d.owner !== TT.me){ TT.lock = d.owner; }
+  else { try{ await tapi('claim', { user_key: key }); TT.lock = ''; d.owner = TT.me; }catch(e){ TT.lock = (e.data && e.data.owner) || '다른 직원'; } }
+  let x = TT.x[key];
+  const nx = ttMakeX(key, d);
+  if(!x || (!x.edited && x.tailLen !== nx.tailLen && !x.aiUsed)){ TT.x[key] = x = nx; }
+  else if(x.tailLen !== nx.tailLen){ x.tailLen = nx.tailLen; x.r = nx.r; x.c = nx.c; x.hasQ = nx.hasQ; x.newQ = true; }
+  if(SHOWN_KEY === 'tt:' + key && $('msgs')){
+    const box = $('msgs'), atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    box.innerHTML = msgsHtml(); if(atBottom) box.scrollTop = box.scrollHeight;
+    const ta = $('draft'); if(ta && !x.edited && !x.aiUsed && ta.value !== x.text){ ta.value = x.text; fit(ta); }
+    const nq = $('nq'); if(nq) nq.hidden = !x.newQ;
+    ttApplyLock();
+  } else { renderCenter(); renderInfo(); }
+  renderList(); renderStrip();
+}
+function ttApplyLock(){
+  const bar = $('lockbar'), sh = document.querySelector('[data-act="send"]');
+  if(bar){ bar.hidden = !TT.lock; const sp = bar.querySelector('span'); if(sp) sp.textContent = TT.lock ? TT.lock + '님이 맡아 답하는 중이에요 (10분 안에 갱신됨). 같이 답하면 고객에게 두 번 나가요.' : ''; }
+  if(sh) sh.disabled = !!TT.lock || TT.sending;
+}
+function renderStrip(){
+  const el = $('strip');
+  if(MODE !== 'tt' || !TT.ready || !TT.strip.length){ el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = TT.strip.map(t => `<button class="stab hot${t.user_key === SEL.tt ? ' on' : ''}" type="button" data-open="${esc(t.user_key)}"><b>${esc(t.product || ttWho(t.user_key))}</b><span>${t.owner ? esc(t.owner) + ' 담당 · ' : ''}${esc(t.last_q)}</span></button>`).join('');
+}
+
+/* ---------- 화면 ---------- */
+function setMode(m){
+  MODE = m; LS.set('cs.mode', m);
+  $('modeBtnTt').classList.toggle('on', m === 'tt'); $('modeBtnXls').classList.toggle('on', m === 'xls');
+  $('modeBtnTt').setAttribute('aria-selected', String(m === 'tt')); $('modeBtnXls').setAttribute('aria-selected', String(m === 'xls'));
+  $('xlsTools').hidden = m !== 'xls'; $('shopSel').hidden = m !== 'xls'; $('fileMsg').hidden = m !== 'xls';
+  $('cols').dataset.view = 'list'; SHOWN_KEY = '';
+  if(TT.timer){ clearInterval(TT.timer); TT.timer = null; }
+  if(m === 'tt'){
+    (async () => {
+      if(!STOCKFN) await loadStock();
+      if(!LEARN_ON) await initLearn();
+      await ttRefresh();
+    })();
+    TT.timer = setInterval(() => { if(document.visibilityState === 'visible' && MODE === 'tt') ttRefresh(); }, 20000);
+  }
+  renderAll();
+}
+function renderAll(){ renderList(); renderStrip(); renderCenter(); renderInfo(); }
+
+function renderList(){
+  const chips = $('chips'), list = $('list');
+  if(MODE === 'tt'){
+    const C = TT.counts;
+    chips.innerHTML = [['wait', '답변 필요'], ['mine', '내가 맡은 것'], ['hold', '보류'], ['replied', '답변함'], ['done', '완료']].map(([k, n]) => `<button class="chip${TT.state === k ? ' on' : ''}" type="button" data-filter="${k}">${n} <b>${C[k] || 0}</b></button>`).join('');
+    $('progBar').parentElement.hidden = true; $('progTxt').textContent = '20초마다 자동으로 새로고침해요';
+    const q = $('search').value.trim().toLowerCase();
+    const rows = TT.threads.filter(t => !q || (t.last_q + ' ' + t.product).toLowerCase().includes(q));
+    list.innerHTML = !TT.ready ? '' : (rows.map(t => `<button class="row s-${esc(t.state)}${t.user_key === SEL.tt ? ' on' : ''}" type="button" data-open="${esc(t.user_key)}">
+      <div class="r1"><b>${esc(t.product || ttWho(t.user_key))}</b><time>${esc(tm(t.last_in || t.last))}</time></div>
+      <div class="r2">${esc(t.last_q)}</div><div class="r3">${esc(TT_STATE[t.state] || '')} · 고객 메시지 ${t.n_in}개${t.owner ? ' · ' + esc(t.owner) + ' 담당' : ''}</div></button>`).join('')
+      || `<div class="empty">${TT.state === 'wait' ? '답변이 필요한 문의가 없어요.' : '표시할 대화가 없어요.'}</div>`);
+    return;
+  }
+  $('progBar').parentElement.hidden = false;
+  if(!CARDS.length){ chips.innerHTML = ''; list.innerHTML = '<div class="empty">문의 엑셀을 올리면 여기에 목록이 나와요.</div>'; $('progBar').style.width = '0'; $('progTxt').textContent = ''; $('xlsPill').textContent = ''; return; }
+  const base = xlsVisible(), cnt = { todo: 0, auto: 0, check: 0, manual: 0, platform: 0, done: 0 };
+  base.forEach(x => { if(DONE[x.key]) cnt.done++; else { cnt.todo++; cnt[x.c.kind]++; } });
+  $('xlsPill').textContent = cnt.todo ? String(cnt.todo) : '';
+  chips.innerHTML = [['todo', '해야 할 것'], ['auto', '자동 초안'], ['check', '확인 후 복사'], ['manual', '직접 작성'], ['platform', '플랫폼 알림'], ['done', '완료']].map(([k, n]) => `<button class="chip${FILTER === k ? ' on' : ''}" type="button" data-filter="${k}">${n} <b>${cnt[k]}</b></button>`).join('');
+  $('progBar').style.width = base.length ? (cnt.done / base.length * 100) + '%' : '0';
+  $('progTxt').textContent = `처리 ${cnt.done} / ${base.length}건` + (FILENAME ? ' · ' + FILENAME : '');
+  const rows = xlsFiltered(base);
+  list.innerHTML = rows.slice(0, SHOWN).map(x => {
+    const q = (x.r.q && x.r.q !== 'null') ? x.r.q : CSAnswer.cleanTitle(x.r.title);
+    return `<button class="row k-${x.c.kind}${x.key === SEL.xls ? ' on' : ''}${DONE[x.key] ? ' done' : ''}" type="button" data-open="${esc(x.key)}">
+      <div class="r1"><b>${esc(x.c.label)}</b><time>${esc(tm(x.r.date))}</time></div><div class="r2">${esc(q)}</div><div class="r3">${esc(x.r.shop)}${x.r.prod ? ' · ' + esc(x.r.prod) : ''}</div></button>`;
+  }).join('') + (rows.length > SHOWN ? `<div style="padding:10px;text-align:center"><button class="btn btn-out sm" type="button" data-act="more">더 보기 (${rows.length - SHOWN}건 남음)</button></div>` : '')
+    || '<div class="empty">여기에 표시할 문의가 없어요.</div>';
+}
+
+function msgsHtml(){
+  if(MODE === 'tt'){
+    const msgs = TT.data ? TT.data.messages : [];
+    if(!msgs.length) return '<div class="empty">아직 메시지가 없어요.</div>';
+    return msgs.map(m => {
+      const body = m.kind === 'image' ? `[이미지] <a href="${esc(m.text)}" target="_blank" rel="noopener">열기</a>` : esc(m.text);
+      const cls = m.dir === 'in' ? 'in' : ('out' + (m.by === 'partner' ? ' partner' : ''));
+      const who = m.dir === 'in' ? '' : (m.by === 'partner' ? '파트너센터 · ' : esc(m.by) + (m.ai ? ' · AI 초안 기반' : '') + ' · ');
+      return `<div class="bub ${cls}">${body}<small>${who}${esc(tm(m.at))}</small></div>`;
+    }).join('');
+  }
+  const x = curX(); if(!x) return '';
+  const q = (x.r.q && x.r.q !== 'null') ? x.r.q : CSAnswer.cleanTitle(x.r.title);
+  let h = `<div class="bub in">${esc(q)}<small>${esc(x.r.shop)} · ${esc(tm(x.r.date))}</small></div>`;
+  if(x.answered) h += `<div class="bub out partner">${esc(x.r.a)}<small>실제로 나간 답변 · ${esc(x.r.ans || '')}</small></div>`;
+  return h;
+}
+
+function renderCenter(){
+  const el = $('center'), x = curX();
+  SHOWN_KEY = '';
+  if(MODE === 'tt' && !TT.ready){
+    el.innerHTML = TT.err ? `<div class="empty"><b>톡톡 문의를 불러오지 못했어요</b><br>${esc(TT.err)}</div>`
+      : (TT.cfg && !TT.cfg.configured ? '<div class="empty"><b>아직 톡톡과 연결되지 않았어요</b><br>서버에 톡톡 설정이 없어요. 톡톡 파트너센터에서 <b>이벤트 받을 URL</b>과 <b>보내기 API 키</b>를 등록하면<br>고객 문의가 이 화면으로 들어와요.</div>' : '<div class="empty">불러오는 중…</div>');
+    return;
+  }
+  if(!x){
+    if(MODE === 'xls' && !CARDS.length){
+      el.innerHTML = `<div class="dz" id="dz"><b style="font-size:15px">문의 엑셀 올리기</b><p class="hint">스케줄러가 받은 <b>문의사항답변_다운로드.xlsx</b>를 여기로 끌어놓거나 Ctrl+V 하세요.<br>문의를 종류별로 나누고 답변 초안을 만들어 줘요. 사방넷으로 자동 전송하지는 않아요.</p><button class="btn btn-pri" type="button" data-act="pickfile">파일 선택</button></div>`;
+      const dz = $('dz');
+      ['dragover', 'dragenter'].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); dz.classList.add('over'); }));
+      ['dragleave', 'drop'].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); dz.classList.remove('over'); }));
+      dz.addEventListener('drop', e => { if(e.dataTransfer.files[0]) loadXlsx(e.dataTransfer.files[0]); });
+    } else el.innerHTML = '<div class="empty">왼쪽에서 문의를 고르면 내용과 답변 초안이 여기에 나와요.</div>';
+    return;
+  }
+  const c = x.c, tt = MODE === 'tt', d = TT.data;
+  let head;
+  if(tt){
+    const p = d && d.product;
+    head = `<div class="chead"><button class="btn btn-out sm back" type="button" data-act="back">← 목록</button><div class="ttl"><b>${esc(p && p.name ? p.name : ttWho(x.key))}</b><div>${p && p.name ? esc(ttWho(x.key)) + (p.price ? ' · ' + esc(p.price) : '') + (p.url ? ` · <a href="${esc(p.url)}" target="_blank" rel="noopener">상품 페이지</a>` : '') : '상품 페이지가 아닌 곳에서 시작한 대화'}</div></div><span class="st-badge ${esc(d ? d.state : '')}">${esc(TT_STATE[d && d.state] || '')}</span>${TT.lock ? `<span class="own other">${esc(TT.lock)} 담당</span>` : '<span class="own">내가 맡음</span>'}${d && (d.state === 'done' || d.state === 'hold') ? '<button class="btn btn-out sm" type="button" data-act="reopen">다시 열기</button>' : ''}</div>`;
+  } else {
+    head = `<div class="chead"><button class="btn btn-out sm back" type="button" data-act="back">← 목록</button><div class="ttl"><b>${esc(x.r.shop)}</b><div>${esc(x.r.prod || '')}</div></div><span class="tag t-${c.kind}">${KIND[c.kind]}</span><button class="no" type="button" data-act="copyno" data-no="${esc(x.r.no)}" title="사방넷에서 찾을 때 쓰는 문의 번호 (누르면 복사)">#${esc(x.r.no || x.r.idx)}</button></div>`;
+  }
+  let comp;
+  if(c.kind === 'platform'){
+    comp = `<div class="comp"><p class="note">${esc(c.note)}</p><div class="act"><button class="btn btn-pri" type="button" data-act="ok">${DONE[x.key] ? '확인함 ✓' : '확인했어요'}</button></div></div>`;
+  } else {
+    const also = c.also && c.also.length ? `<div class="also">이 문의에는 [${esc(c.also.join(', '))}] 질문도 섞여 있어요. 초안이 빠뜨린 게 없는지 보세요.</div>` : '';
+    const slot = c.slot ? `<div class="slot"><label for="slot">${esc(c.slot.label)}</label><input type="text" id="slot" value="${esc(x.slotVal)}" placeholder="${esc(c.slot.placeholder || '')}">${c.slot.saveable ? `<label class="hint"><input type="checkbox" id="saveMeas" checked> 이 상품에 저장</label>` : ''}</div>` : '';
+    const snips = (c.buttons || []).map((b, i) => `<button class="btn btn-out sm" type="button" data-ins="${i}">+ ${esc(b.label)}</button>`).join('');
+    const primary = tt ? `<button class="btn btn-pri" type="button" data-act="send" id="primary" ${TT.lock ? 'disabled' : ''}>전송</button>` : `<button class="btn btn-pri" type="button" data-act="copy" id="primary">${DONE[x.key] ? '복사됨 ✓ (다시 복사)' : '답변 복사'}</button>`;
+    comp = `<div class="comp">
+      ${tt ? `<div class="lock" id="lockbar" ${TT.lock ? '' : 'hidden'}><span>${TT.lock ? esc(TT.lock) + '님이 맡아 답하는 중이에요 (10분 안에 갱신됨). 같이 답하면 고객에게 두 번 나가요.' : ''}</span><button class="btn btn-out sm" type="button" data-act="takeover">내가 맡기</button></div>` : ''}${tt ? `<div class="nq" id="nq" ${x.newQ ? '' : 'hidden'}>고객이 새로 말을 걸었어요. 쓰던 답변은 그대로 두었어요. 필요하면 ↺ 초안 다시를 누르세요.</div>` : ''}${also}
+      ${c.note && (x.hasQ !== false) ? `<p class="note">${esc(c.note)}</p>` : ''}<p class="note ainote${x.aiWarn ? ' warn' : ''}" id="ainote">${esc(x.aiNote || '')}</p>
+      ${slot}<textarea id="draft" placeholder="${tt && x.hasQ === false ? '답할 새 질문이 없어요. 이어서 말할 내용을 쓰세요' : '직접 쓰거나 ✨ AI 초안을 눌러 보세요'}">${esc(x.text)}</textarea>
+      ${snips ? `<div class="snip">${snips}</div>` : ''}
+      <div class="actr"><button class="btn btn-ai" type="button" data-act="ai" id="aiBtn">✨ AI 초안</button><button class="btn btn-out" type="button" data-act="redo">↺ 초안 다시</button><span class="hint" id="st"></span>
+        <span class="sp"><span class="cnt" id="cnt"></span>${tt ? '<button class="btn btn-out" type="button" data-act="hold">보류</button><button class="btn btn-out" type="button" data-act="done">상담 완료</button>' : ''}${primary}</span></div>
+      <div class="kbd" style="margin-top:6px">Ctrl+Enter ${tt ? '보내기' : '복사'} · Alt+↑↓ 이전/다음 문의</div></div>`;
+  }
+  el.innerHTML = head + `<div class="msgs" id="msgs">${msgsHtml()}</div>` + comp;
+  SHOWN_KEY = MODE + ':' + x.key;
+  fit($('draft')); count();
+  const box = $('msgs'); box.scrollTop = box.scrollHeight;
+  if(NARROW()) $('cols').dataset.view = 'detail';
+}
+function count(){ const ta = $('draft'), c = $('cnt'); if(!ta || !c) return; if(MODE !== 'tt'){ c.textContent = ''; return; } const n = ta.value.length; c.textContent = n + ' / 1,500자'; c.classList.toggle('over', n > 1500); }
+function st(t, bad){ const s = $('st'); if(s){ s.textContent = t; s.style.color = bad ? 'var(--bad)' : 'var(--ok)'; } }
+
+/* ----- 오른쪽 정보 ----- */
+function stockHtml(x, pickable){
+  const s = x.c.stock; if(!s || !s.found) return STOCKFN ? '<div class="hint">이카운트에서 이 상품의 재고를 찾지 못했어요.</div>' : '<div class="hint">재고 연동이 꺼져 있어요.</div>';
+  const hit = new Set(CSAnswer.specsMentioned(x.r.q + ' ' + CSAnswer.cleanTitle(x.r.title), s.sizes).map(z => z.spec));
+  const pick = pickable && x.c.slot && x.c.slot.chips;
+  return `<div class="stk">` + s.sizes.map(z => `<span class="sz${z.qty <= 0 ? ' z' : ''}${hit.has(z.spec) ? ' hit' : ''}${pick && z.qty > 0 ? ' pick' : ''}" ${pick && z.qty > 0 ? `data-chip="${esc(z.spec)}" title="추천 사이즈로 넣기"` : ''}>${esc(z.spec)} ${z.qty}</span>`).join('') + `</div>` + (hit.size ? '<div class="hint" style="margin-top:6px">파란 칸 = 문의에 나온 사이즈</div>' : '');
+}
+function simHtml(x){
+  if(!x.sim) return '<div class="hint">찾는 중…</div>';
+  if(!x.sim.length) return '<div class="hint">비슷한 과거 답변이 아직 없어요.</div>';
+  return x.sim.map((it, i) => '<div class="it"><b>' + (it.src === 'copy' ? '직원 확정' : '사방넷') + ' · 비슷함 ' + Math.round(it.score * 100) + '%</b><br>문의: ' + esc(it.q) + '<br>답변: ' + esc(it.a) + '<br><button class="btn btn-out sm" type="button" data-simuse="' + i + '">선택</button></div>').join('');
+}
+function renderInfo(){
+  const el = $('info'), x = curX();
+  if(!x || (MODE === 'tt' && !TT.ready)){ el.innerHTML = '<div class="empty" style="padding-top:30px">문의를 고르면 상품·재고·비슷한 과거 답변이 여기에 나와요.</div>'; return; }
+  const tt = MODE === 'tt', d = TT.data, p = tt && d && d.product, mk = x.c.measKey || CSAnswer.measKey(x.r.prod), ms = mk ? measOf(mk) : '';
+  const past = (tt && d.past) || [];
+  const cust = tt ? `<details class="sec" open><summary>고객 정보</summary><div class="body">
+      <div class="kv"><span>고객</span><span>${esc(ttWho(x.key))}</span></div>
+      <div class="kv"><span>첫 문의</span><span>${esc(tm(d.first_at))}</span></div>
+      <div class="kv"><span>고객 메시지</span><span>${d.n_all}개</span></div>
+      <div class="kv"><span>분류</span><span>${esc(x.c.label)}</span></div>
+      ${x.r.prod ? `<div class="kv"><span>상품</span><span>${esc(x.r.prod)}</span></div>` : ''}${p && p.price ? `<div class="kv"><span>판매가</span><span>${esc(p.price)}</span></div>` : ''}
+    </div></details>
+    <details class="sec" open><summary>내부 메모 <span class="hint">고객에게 안 보여요</span></summary><div class="body"><textarea class="memo" id="memo" placeholder="직원끼리 남길 메모">${esc(d.note || '')}</textarea><div class="actr"><button class="btn btn-out sm" type="button" data-act="memosave">저장</button><span class="hint" id="memoSt"></span></div></div></details>
+    <details class="sec" open><summary>지난 문의 <span class="hint">${past.length}건</span></summary><div class="body">${past.length ? past.map(q => `<div class="pastq"><time>${esc(tm(q.at))}</time>${esc(q.text)}</div>`).join('') : '<div class="hint">이 고객의 이전 날짜 문의는 없어요.</div>'}</div></details>`
+    : `<details class="sec" open><summary>문의 정보</summary><div class="body">
+      <div class="kv"><span>분류</span><span>${esc(x.c.label)}</span></div><div class="kv"><span>채널</span><span>${esc(x.r.shop)}</span></div><div class="kv"><span>접수</span><span>${esc(tm(x.r.date))}</span></div>
+      ${x.r.prod ? `<div class="kv"><span>상품</span><span>${esc(x.r.prod)}</span></div>` : ''}</div></details>`;
+  el.innerHTML = cust + `
+    <details class="sec" open><summary>AI FAQ 어시스턴트</summary><div class="body">
+      <div class="faqrow"><select id="faqType" aria-label="질문 유형">${FAQ_TYPES.map(([v, n]) => `<option value="${v}"${v === x.c.intent ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
+      <div class="faqrow"><input type="search" id="faqQ" placeholder="키워드로 찾기"><button class="btn btn-out sm" type="button" data-act="faqgo">조회</button></div>
+      <div id="simBox">${LEARN_ON ? simHtml(x) : '<div class="hint">학습 저장소에 연결되어 있지 않아요 (로그인 필요).</div>'}</div></div></details>
+    <details class="sec" open><summary>이카운트 재고</summary><div class="body" id="infoStock">${stockHtml(x, true)}</div></details>
+    <details class="sec" open><summary>저장된 실측</summary><div class="body">${ms ? `<div class="meas">${esc(ms)}</div>` : '<div class="hint">이 상품은 저장된 실측이 없어요. 실측 문의 때 입력하면 저장돼요.</div>'}</div></details>`;
+  if(LEARN_ON && !x.sim && x.c.kind !== 'platform') loadSim(x);
+}
+async function faqSearch(){
+  const x = curX(); if(!x) return;
+  const box = $('simBox'); if(!LEARN_ON){ box.innerHTML = '<div class="hint">학습 저장소에 연결되어 있지 않아요.</div>'; return; }
+  const kw = $('faqQ').value.trim(), ty = $('faqType').value, label = (FAQ_TYPES.find(a => a[0] === ty) || [])[1] || '';
+  box.innerHTML = '<div class="hint">찾는 중…</div>';
+  try{
+    const d = await lapi('similar', { q: maskPii(kw || label || questionOf(x)), intent: kw ? ty : (ty || x.c.intent), prod_key: '', k: 6 }, 7000);
+    x.sim = d.items || [];
+  }catch(e){ box.innerHTML = '<div class="hint">못 찾았어요: ' + esc(e.message) + '</div>'; return; }
+  box.innerHTML = simHtml(x);
+}
+async function loadSim(x){
+  try{ const d = await lapi('similar', { q: maskPii(questionOf(x)), intent: x.c.intent, prod_key: x.c.measKey || CSAnswer.measKey(x.r.prod), k: 3 }, 6000); x.sim = d.items || []; }
+  catch(e){ x.sim = []; }
+  const cur = curX(); if(cur === x && $('simBox')) $('simBox').innerHTML = simHtml(x);
+}
+
+/* ----- AI 초안 (name-worker /api/cs) ----- */
+const WK = 'https://buyest-namegen.buyest.workers.dev';
 function factsOf(x){
   const f = [], c = x.c;
   if(c.stock && c.stock.found){
@@ -366,21 +558,30 @@ function factsOf(x){
   if(sv && c.slot){ if(c.slot.tpl === 'meas' || c.slot.tpl === 'kids') f.push('실측값: ' + sv); else if(c.slot.tpl === 'rec') f.push('직원이 고른 추천 사이즈: ' + sv); }
   return f.join('\n');
 }
-function setAiUi(x){
-  const n = document.querySelector(`[data-ainote="${cssq(x.key)}"]`), ta = document.querySelector(`[data-ta="${cssq(x.key)}"]`), b = document.querySelector(`[data-ai="${cssq(x.key)}"]`);
+function aiUi(x){
+  if(curX() !== x) return;
+  const n = $('ainote'), ta = $('draft'), b = $('aiBtn');
   if(n){ n.textContent = x.aiNote || ''; n.classList.toggle('warn', !!x.aiWarn); }
-  if(ta){ ta.value = x.text; fit(ta); }
+  if(ta && document.activeElement !== ta){ ta.value = x.text; fit(ta); count(); }
   if(b){ b.disabled = !!x.aiBusy; b.textContent = x.aiBusy ? '✨ 만드는 중…' : '✨ AI 초안'; }
 }
-async function askAI(x){
+async function askAI(x, tt){
   if(x.aiBusy || x.c.kind === 'platform') return;
   const a = authInfo();
-  if(!a){ x.aiNote = '툴킷에 로그인한 뒤 쓸 수 있어요. 로그인 후 새로고침해 주세요.'; x.aiWarn = true; return setAiUi(x); }
-  x.aiBusy = true; setAiUi(x);
+  if(!a){ x.aiNote = '툴킷에 로그인한 뒤 쓸 수 있어요. 로그인 후 새로고침해 주세요.'; x.aiWarn = true; return aiUi(x); }
+  x.aiBusy = true; aiUi(x);
   try{
-    const q = (x.r.q && x.r.q !== 'null') ? x.r.q : CSAnswer.cleanTitle(x.r.title);
+    let q = questionOf(x);
+    if(tt && TT.data){
+      // 워커가 문의를 900자에서 자르므로, 오래된 말부터 버리고 최신 대화가 남게 채운다
+      const head = '(네이버 톡톡 실시간 채팅 — 짧고 친절하게)\n', lines = [];
+      let used = head.length;
+      const all = TT.data.messages.filter(m => m.kind === 'text').map(m => (m.dir === 'in' ? '고객: ' : '직원: ') + maskPii(m.text).slice(0, 300));
+      for(let i = all.length - 1; i >= 0 && lines.length < 10; i--){ if(used + all[i].length + 1 > 860 && lines.length) break; lines.unshift(all[i]); used += all[i].length + 1; }
+      q = head + lines.join('\n');
+    }
     let examples = [];
-    if(LEARN_ON){ try{ const sm = await lapi('similar', { q: maskPii(q), intent: x.c.intent, prod_key: x.c.measKey || CSAnswer.measKey(x.r.prod), k: 4 }, 5000); examples = (sm.items || []).map(e => ({ q: e.q, a: e.a })); }catch(_){} }
+    if(LEARN_ON){ try{ const sm = await lapi('similar', { q: maskPii(questionOf(x)), intent: x.c.intent, prod_key: x.c.measKey || CSAnswer.measKey(x.r.prod), k: 4 }, 5000); examples = (sm.items || []).map(e => ({ q: e.q, a: e.a })); }catch(_){} }
     const r = await fetch(WK + '/api/cs', { method: 'POST', signal: AbortSignal.timeout(60000),
       headers: { 'Content-Type': 'application/json', 'X-Studio-User': encodeURIComponent(a.id), 'X-Studio-Pass': encodeURIComponent(a.pass), 'X-Studio-Enc': '1' },
       body: JSON.stringify({ q: maskPii(q), prod: maskPii(x.r.prod), shop: x.r.shop, label: x.c.label, facts: factsOf(x), draft: maskPii(x.text), examples }) });
@@ -388,27 +589,136 @@ async function askAI(x){
     if(!d.ok) throw new Error(d.error || ('서버 응답 ' + r.status));
     if(d.answer){ x.text = d.answer; x.machine = d.answer; x.aiUsed = true; x.edited = false; }
     x.aiWarn = !!d.needs_staff;
-    x.aiNote = d.needs_staff ? '✨ AI가 확신하지 못했어요 — ' + (d.reason || '직접 확인해 주세요') : '✨ AI 초안이에요. 재고·실측 같은 사실이 맞는지 확인하고 복사하세요.';
+    x.aiNote = d.needs_staff ? '✨ AI가 확신하지 못했어요 — ' + (d.reason || '직접 확인해 주세요') : '✨ AI 초안이에요. 재고·실측 같은 사실이 맞는지 확인하고 ' + (tt ? '보내세요.' : '복사하세요.');
   }catch(e){
     x.aiWarn = true; x.aiNote = 'AI 초안을 만들지 못했어요: ' + (e.name === 'TimeoutError' ? '시간이 너무 오래 걸렸어요. 다시 눌러 주세요.' : e.message);
   }
-  x.aiBusy = false; setAiUi(x);
+  x.aiBusy = false;
+  if(curX() === x && $('draft')){ $('draft').value = x.text; fit($('draft')); count(); }
+  aiUi(x);
 }
 let AI_STOP = false;
 $('aiAll').onclick = async () => {
-  const targets = filterList(visible()).filter(x => x.c.kind !== 'platform' && x.c.kind !== 'auto' && !x.aiNote).slice(0, 30);
-  if(!targets.length){ $('aiProg').textContent = '이 목록에는 AI 초안을 만들 문의가 없어요.'; return; }
+  const targets = xlsFiltered(xlsVisible()).filter(x => x.c.kind !== 'platform' && x.c.kind !== 'auto' && !x.aiNote).slice(0, 30);
+  if(!targets.length){ $('aiProg').textContent = '만들 문의가 없어요'; return; }
   AI_STOP = false; $('aiAll').disabled = true; $('aiStop').hidden = false;
   let i = 0, done = 0;
-  const worker = async () => { while(!AI_STOP && i < targets.length){ const x = targets[i++]; await askAI(x); done++; $('aiProg').textContent = `AI 초안 ${done} / ${targets.length}건`; } };
+  const worker = async () => { while(!AI_STOP && i < targets.length){ const x = targets[i++]; await askAI(x, false); done++; $('aiProg').textContent = `${done} / ${targets.length}`; } };
   await Promise.all([worker(), worker()]);
-  $('aiAll').disabled = false; $('aiStop').hidden = true; $('aiProg').textContent += AI_STOP ? ' (멈춤)' : ' 완료 — 한 건씩 확인하고 복사하세요.';
+  $('aiAll').disabled = false; $('aiStop').hidden = true; $('aiProg').textContent += AI_STOP ? ' (멈춤)' : ' 완료';
 };
 $('aiStop').onclick = () => { AI_STOP = true; };
 
-$('search').addEventListener('input', () => { SHOWN = 80; render(); });
-$('shopSel').onchange = () => { SHOWN = 80; render(); };
-$('showAns').onchange = () => { SHOWN = 80; render(); };
+/* ----- 동작 ----- */
+function copyText(t){
+  if(navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t);
+  return new Promise((res, rej) => { const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy') ? res() : rej(); }catch(e){ rej(e); } ta.remove(); });
+}
+function appendBody(cur, body){
+  cur = (cur || '').trim(); if(!cur) return CSAnswer.wrap(body);
+  const END = CSAnswer.T ? ' 감사합니다.' : '';
+  if(cur.endsWith('감사합니다.')) cur = cur.slice(0, -'감사합니다.'.length).trim();
+  return cur + ' ' + body + END;
+}
+function setDone(x, v){ if(v) DONE[x.key] = 1; else delete DONE[x.key]; LS.set('cs.done', DONE); }
+function setDraft(x, text, edited){ x.text = text; x.edited = !!edited; const ta = $('draft'); if(ta){ ta.value = text; fit(ta); count(); } }
+function redraft(x){
+  x.aiNote = ''; x.aiWarn = false; x.aiUsed = false; x.edited = false; x.newQ = false;
+  if(MODE === 'tt'){ const nx = ttMakeX(x.key, TT.data); Object.assign(x, { r: nx.r, c: nx.c, hasQ: nx.hasQ, tailLen: nx.tailLen, text: nx.text, machine: nx.machine }); renderCenter(); renderInfo(); return; }
+  x.text = CSAnswer.applySlot(x.c, x.slotVal); x.machine = x.text; renderCenter();
+}
+async function openItem(key){
+  if(MODE === 'tt' && SEL.tt && SEL.tt !== key && !TT.lock){ tapi('release', { user_key: SEL.tt }).catch(() => {}); }
+  SEL[MODE] = key;
+  if(MODE === 'tt'){ SHOWN_KEY = ''; await ttOpen(key); } else { renderCenter(); renderInfo(); renderList(); }
+  if(NARROW()) $('cols').dataset.view = 'detail';
+}
+function moveSel(dir){
+  const rows = [...document.querySelectorAll('#list [data-open]')]; if(!rows.length) return;
+  const i = rows.findIndex(r => r.dataset.open === SEL[MODE]), n = rows[Math.min(rows.length - 1, Math.max(0, (i < 0 ? (dir > 0 ? 0 : rows.length - 1) : i + dir)))];
+  openItem(n.dataset.open); n.scrollIntoView({ block: 'nearest' });
+}
+
+async function doCopy(x){
+  const ta = $('draft'), text = (ta ? ta.value : x.text).trim();
+  if(!text) return st('답변이 비어 있어요. 내용을 쓰거나 문구를 눌러 넣어 주세요.', true);
+  if(/\{[^}]+\}/.test(text)) return st('{ } 로 된 빈칸이 남아 있어요. 채워 주세요.', true);
+  try{ await copyText(text); }catch(_){ return st('복사에 실패했어요. 글상자에서 직접 복사해 주세요.', true); }
+  const sv = $('saveMeas');
+  if(sv && sv.checked && x.slotVal.trim() && x.c.measKey){ USERMEAS[x.c.measKey] = x.slotVal.trim(); LS.set('cs.meas', USERMEAS); saveMeas(x.c.measKey, x.slotVal.trim()); }
+  saveAnswer(x, text); setDone(x, true);
+  $('primary').textContent = '복사됨 ✓'; st('사방넷에 붙여넣으세요.', false);
+  renderList();
+}
+async function doSend(x){
+  if(TT.sending) return;
+  const ta = $('draft'), text = ta.value.trim();
+  if(!text) return st('답변이 비어 있어요. 내용을 쓰거나 ✨ AI 초안을 눌러 주세요.', true);
+  if(/\{[^}]+\}/.test(text)) return st('{ } 로 된 빈칸이 남아 있어요. 채워 주세요.', true);
+  if(text.length > 1500) return st('1,500자 이내로 줄여 주세요.', true);
+  if(!confirm('이 내용이 고객에게 바로 전송돼요. 보낼까요?\n\n' + text.slice(0, 300) + (text.length > 300 ? '…' : ''))) return;
+  TT.sending = true; $('primary').disabled = true; st('보내는 중…', false);
+  try{
+    const lastQ = TT.data.messages.filter(m => m.dir === 'in' && m.kind === 'text').slice(-1)[0];
+    const res = await tapi('send', { user_key: x.key, text, ai: x.aiUsed ? 1 : 0 }, 20000);
+    if(lastQ){ const it = itemOf(x, text, 'copy'); it.no = 'tt' + lastQ.id; try{ if(!LEARN_ON) throw 0; await lapi('save', { items: [it] }); }catch(_){ pendingAdd([it]); } }
+    const sv = $('slot'); if(sv && sv.value.trim() && x.c.measKey && x.c.slot && x.c.slot.saveable && $('saveMeas') && $('saveMeas').checked){ USERMEAS[x.c.measKey] = sv.value.trim(); LS.set('cs.meas', USERMEAS); saveMeas(x.c.measKey, sv.value.trim()); }
+    delete TT.x[x.key];
+    await ttRefresh();
+    st(res.push ? '보냈어요 (고객이 채팅창을 나가 있어 알림도 보냈어요)' : '보냈어요', false);
+  }catch(e){ st('보내지 못했어요: ' + e.message, true); }
+  TT.sending = false; const b = $('primary'); if(b) b.disabled = false;
+}
+
+document.addEventListener('click', async e => {
+  const chipEl = e.target.closest('[data-chip]');
+  if(chipEl){ const x = curX(); if(x){ x.slotVal = chipEl.dataset.chip; const s = $('slot'); if(s) s.value = x.slotVal; if(!x.edited){ x.text = CSAnswer.applySlot(x.c, x.slotVal); x.machine = x.text; setDraft(x, x.text, false); } } return; }
+  const t = e.target.closest('button'); if(!t) return;
+  if(t.dataset.mode) return setMode(t.dataset.mode);
+  if(t.dataset.filter){ if(MODE === 'tt'){ TT.state = t.dataset.filter; SEL.tt = null; TT.data = null; await ttRefresh(); renderCenter(); renderInfo(); } else { FILTER = t.dataset.filter; SHOWN = 80; renderList(); } return; }
+  if(t.dataset.open) return openItem(t.dataset.open);
+  const x = curX(), act = t.dataset.act;
+  if(t.dataset.ins !== undefined && x){ const b = x.c.buttons[+t.dataset.ins]; setDraft(x, appendBody($('draft').value, b.text), true); return; }
+  if(t.dataset.simuse !== undefined && x){ const it = x.sim && x.sim[+t.dataset.simuse]; if(it){ x.aiUsed = false; setDraft(x, it.a, true); } return; }
+  if(!act) return;
+  if(act === 'more'){ SHOWN += 80; return renderList(); }
+  if(act === 'pickfile') return $('file').click();
+  if(act === 'back'){ $('cols').dataset.view = 'list'; return; }
+  if(act === 'copyno'){ try{ await copyText(t.dataset.no); t.textContent = '복사됨'; setTimeout(() => { t.textContent = '#' + t.dataset.no; }, 800); }catch(_){} return; }
+  if(!x) return;
+  if(act === 'ai') return askAI(x, MODE === 'tt');
+  if(act === 'redo') return redraft(x);
+  if(act === 'copy') return doCopy(x);
+  if(act === 'send') return doSend(x);
+  if(act === 'ok'){ setDone(x, !DONE[x.key]); renderCenter(); renderList(); return; }
+  if(act === 'takeover'){ try{ await tapi('claim', { user_key: x.key, force: true }); TT.lock = ''; if(TT.data) TT.data.owner = TT.me; renderCenter(); }catch(err){ st(err.message, true); } return; }
+  if(act === 'memosave'){ try{ await tapi('note', { user_key: x.key, text: $('memo').value }); TT.data.note = $('memo').value; $('memoSt').textContent = '저장했어요'; setTimeout(() => { const m = $('memoSt'); if(m) m.textContent = ''; }, 1500); }catch(err){ $('memoSt').textContent = err.message; } return; }
+  if(act === 'faqgo') return faqSearch();
+  if(act === 'hold' || act === 'done' || act === 'reopen'){
+    try{ await tapi(act, { user_key: x.key }); SEL.tt = null; TT.data = null; delete TT.x[x.key]; await ttRefresh(); renderCenter(); renderInfo(); if(NARROW()) $('cols').dataset.view = 'list'; }
+    catch(err){ st(err.message, true); }
+  }
+});
+document.addEventListener('input', e => {
+  const t = e.target, x = curX();
+  if(t.id === 'draft' && x){ x.text = t.value; x.edited = true; x.newQ = false; const nq = $('nq'); if(nq) nq.hidden = true; fit(t); count(); }
+  else if(t.id === 'slot' && x){ x.slotVal = t.value; if(!x.edited){ x.text = CSAnswer.applySlot(x.c, x.slotVal); x.machine = x.text; setDraft(x, x.text, false); } }
+  else if(t.id === 'search'){ SHOWN = 80; renderList(); }
+});
+$('shopSel').onchange = () => { SHOWN = 80; renderList(); };
+$('showAns').onchange = () => { SHOWN = 80; renderList(); };
+document.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && e.target.id === 'faqQ'){ e.preventDefault(); faqSearch(); return; }
+  if(e.key === 'Enter' && (e.ctrlKey || e.metaKey) && $('primary') && !$('primary').disabled){ e.preventDefault(); $('primary').click(); }
+  else if(e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')){ e.preventDefault(); moveSel(e.key === 'ArrowDown' ? 1 : -1); }
+});
+
+/* ---------- 시작 ---------- */
+(async () => {
+  if(authInfo()){ initLearn(); }
+  else learnMsg('학습 저장소 꺼짐 — 툴킷에 로그인하세요', true);
+  setMode(MODE);
+})();
 </script>
 <script src="paste-upload.js"></script>
 </body>
