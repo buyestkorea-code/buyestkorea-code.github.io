@@ -105,6 +105,15 @@
   .actr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;} .actr .sp{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
   .memo{min-height:70px;font-size:13px;} .pastq{border-bottom:1px solid #efefeb;padding:6px 0;font-size:12.5px;line-height:1.5;} .pastq time{display:block;font-size:11.5px;color:var(--sub);}
   .faqrow{display:flex;gap:6px;margin-bottom:6px;} .faqrow select,.faqrow input{flex:1;min-width:0;padding:7px 9px;font-size:12.5px;}
+  /* 이미지 템플릿 */
+  .bub img{display:block;max-width:240px;max-height:280px;border-radius:8px;background:#fff;}
+  .imgpanel{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;background:#fafaf8;}
+  .imgpanel .ph{display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:12.5px;font-weight:700;} .imgpanel .ph .sp{margin-left:auto;}
+  .tplgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px;max-height:260px;overflow:auto;}
+  .tpl{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:5px;position:relative;}
+  .tpl img{width:100%;height:84px;object-fit:contain;background:#f4f4f1;border-radius:6px;}
+  .tpl b{font-size:12px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tpl .x{position:absolute;top:3px;right:3px;width:22px;height:22px;padding:0;border-radius:99px;border:1px solid var(--line);background:#fff;color:var(--sub);cursor:pointer;font-size:12px;line-height:1;}
   /* 좁은 화면: 목록 → 대화(+정보) 한 칸씩 */
   @media (max-width:1180px){
     .cols{display:block;position:relative;}
@@ -361,6 +370,7 @@ function ttApplyLock(){
   const bar = $('lockbar'), sh = document.querySelector('[data-act="send"]');
   if(bar){ bar.hidden = !TT.lock; const sp = bar.querySelector('span'); if(sp) sp.textContent = TT.lock ? TT.lock + '님이 맡아 답하는 중이에요 (10분 안에 갱신됨). 같이 답하면 고객에게 두 번 나가요.' : ''; }
   if(sh) sh.disabled = !!TT.lock || TT.sending;
+  const ip = $('imgPanel'); if(ip && !ip.hidden && TT.tpls) tplRender();
 }
 function renderStrip(){
   const el = $('strip');
@@ -425,7 +435,7 @@ function msgsHtml(){
     const msgs = TT.data ? TT.data.messages : [];
     if(!msgs.length) return '<div class="empty">아직 메시지가 없어요.</div>';
     return msgs.map(m => {
-      const body = m.kind === 'image' ? `[이미지] <a href="${esc(m.text)}" target="_blank" rel="noopener">열기</a>` : esc(m.text);
+      const body = m.kind === 'image' ? `<a href="${esc(m.text)}" target="_blank" rel="noopener"><img src="${esc(m.text)}" alt="이미지" loading="lazy" onerror="this.replaceWith(document.createTextNode('[이미지] 미리보기를 불러오지 못했어요'))"></a>` : esc(m.text);
       const cls = m.dir === 'in' ? 'in' : ('out' + (m.by === 'partner' ? ' partner' : ''));
       const who = m.dir === 'in' ? '' : (m.by === 'partner' ? '파트너센터 · ' : esc(m.by) + (m.ai ? ' · AI 초안 기반' : '') + ' · ');
       return `<div class="bub ${cls}">${body}<small>${who}${esc(tm(m.at))}</small></div>`;
@@ -477,7 +487,8 @@ function renderCenter(){
       ${c.note && (x.hasQ !== false) ? `<p class="note">${esc(c.note)}</p>` : ''}<p class="note ainote${x.aiWarn ? ' warn' : ''}" id="ainote">${esc(x.aiNote || '')}</p>
       ${slot}<textarea id="draft" placeholder="${tt && x.hasQ === false ? '답할 새 질문이 없어요. 이어서 말할 내용을 쓰세요' : '직접 쓰거나 ✨ AI 초안을 눌러 보세요'}">${esc(x.text)}</textarea>
       ${snips ? `<div class="snip">${snips}</div>` : ''}
-      <div class="actr"><button class="btn btn-ai" type="button" data-act="ai" id="aiBtn">✨ AI 초안</button><button class="btn btn-out" type="button" data-act="redo">↺ 초안 다시</button><span class="hint" id="st"></span>
+      ${tt ? '<div class="imgpanel" id="imgPanel" hidden></div>' : ''}
+      <div class="actr"><button class="btn btn-ai" type="button" data-act="ai" id="aiBtn">✨ AI 초안</button><button class="btn btn-out" type="button" data-act="redo">↺ 초안 다시</button>${tt ? '<button class="btn btn-out" type="button" data-act="imgpanel">🖼 이미지</button>' : ''}<span class="hint" id="st"></span>
         <span class="sp"><span class="cnt" id="cnt"></span>${tt ? '<button class="btn btn-out" type="button" data-act="hold">보류</button><button class="btn btn-out" type="button" data-act="done">상담 완료</button>' : ''}${primary}</span></div>
       <div class="kbd" style="margin-top:6px">Ctrl+Enter ${tt ? '보내기' : '복사'} · Alt+↑↓ 이전/다음 문의</div></div>`;
   }
@@ -486,6 +497,46 @@ function renderCenter(){
   fit($('draft')); count();
   const box = $('msgs'); box.scrollTop = box.scrollHeight;
   if(NARROW()) $('cols').dataset.view = 'detail';
+}
+/* ----- 이미지 템플릿 (사이즈표·배송 안내처럼 자주 보내는 이미지) ----- */
+async function tplLoad(force){
+  const box = $('imgPanel'); if(!box) return;
+  if(!TT.tpls || force){
+    box.innerHTML = '<div class="hint">불러오는 중…</div>';
+    try{ TT.tpls = (await tapi('tpl_list')).items; }
+    catch(e){ box.innerHTML = '<div class="hint">이미지를 불러오지 못했어요: ' + esc(e.message) + '</div>'; return; }
+  }
+  tplRender();
+}
+function tplRender(){
+  const box = $('imgPanel'); if(!box) return;
+  const L = TT.tpls || [];
+  box.innerHTML = `<div class="ph">이미지 템플릿 <span class="hint">눌러서 고객에게 바로 보내요</span><span class="sp"><button class="btn btn-out sm" type="button" data-act="tpladd">＋ 새 이미지</button></span></div><input type="file" id="tplFile" accept="image/png,image/jpeg,image/gif" hidden>`
+    + (L.length ? `<div class="tplgrid">${L.map(t => `<div class="tpl"><img src="${esc(t.url)}" alt="" loading="lazy"><b title="${esc(t.title)}">${esc(t.title)}</b><button class="btn btn-pri sm" type="button" data-act="tplsend" data-id="${t.id}"${TT.lock ? ' disabled' : ''}>보내기</button><button class="x" type="button" data-act="tpldel" data-id="${t.id}" aria-label="삭제" title="목록에서 삭제">✕</button></div>`).join('')}</div>`
+      : '<div class="hint">저장된 이미지가 없어요. "새 이미지"로 사이즈표나 배송 안내 이미지를 올려 두세요.</div>');
+}
+async function tplUpload(file){
+  if(!file) return;
+  if(!/^image\/(png|jpeg|gif)$/.test(file.type)) return st('JPG, PNG, GIF 이미지만 올릴 수 있어요.', true);
+  if(file.size > 4 * 1024 * 1024) return st('이미지는 4MB 이하만 올릴 수 있어요.', true);
+  const title = (prompt('이 이미지의 이름을 입력하세요 (예: 사이즈표 신발)', file.name.replace(/\.[^.]+$/, '')) || '').trim();
+  if(!title) return;
+  st('올리는 중…', false);
+  try{
+    const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
+    await tapi('tpl_add', { title, name: file.name, data }, 40000);
+    await tplLoad(true); st('올렸어요', false);
+  }catch(e){ st('올리지 못했어요: ' + e.message, true); }
+}
+async function tplSend(id){
+  const x = curX(), t = (TT.tpls || []).find(a => a.id === id); if(!x || !t || TT.sending) return;
+  if(!confirm('이 이미지를 고객에게 바로 전송해요. 보낼까요?\n\n' + t.title)) return;
+  TT.sending = true; st('이미지를 보내는 중…', false);
+  try{
+    const res = await tapi('send_image', { user_key: x.key, tpl_id: id }, 40000);
+    t.uses++; await ttRefresh(); st(res.push ? '보냈어요 (고객이 채팅창을 나가 있어 알림도 보냈어요)' : '보냈어요', false);
+  }catch(e){ st('보내지 못했어요: ' + e.message, true); }
+  TT.sending = false;
 }
 function count(){ const ta = $('draft'), c = $('cnt'); if(!ta || !c) return; if(MODE !== 'tt'){ c.textContent = ''; return; } const n = ta.value.length; c.textContent = n + ' / 1,500자'; c.classList.toggle('over', n > 1500); }
 function st(t, bad){ const s = $('st'); if(s){ s.textContent = t; s.style.color = bad ? 'var(--bad)' : 'var(--ok)'; } }
@@ -691,6 +742,14 @@ document.addEventListener('click', async e => {
   if(act === 'copy') return doCopy(x);
   if(act === 'send') return doSend(x);
   if(act === 'ok'){ setDone(x, !DONE[x.key]); renderCenter(); renderList(); return; }
+  if(act === 'imgpanel'){ const p = $('imgPanel'); if(p){ p.hidden = !p.hidden; if(!p.hidden) tplLoad(); } return; }
+  if(act === 'tpladd'){ const f = $('tplFile'); if(f) f.click(); return; }
+  if(act === 'tplsend') return tplSend(+t.dataset.id);
+  if(act === 'tpldel'){
+    if(!confirm('이 이미지를 목록에서 지울까요? (이미 보낸 대화에는 영향 없어요)')) return;
+    try{ await tapi('tpl_del', { id: +t.dataset.id }); await tplLoad(true); }catch(err){ st(err.message, true); }
+    return;
+  }
   if(act === 'takeover'){ try{ await tapi('claim', { user_key: x.key, force: true }); TT.lock = ''; if(TT.data) TT.data.owner = TT.me; renderCenter(); }catch(err){ st(err.message, true); } return; }
   if(act === 'memosave'){ try{ await tapi('note', { user_key: x.key, text: $('memo').value }); TT.data.note = $('memo').value; $('memoSt').textContent = '저장했어요'; setTimeout(() => { const m = $('memoSt'); if(m) m.textContent = ''; }, 1500); }catch(err){ $('memoSt').textContent = err.message; } return; }
   if(act === 'faqgo') return faqSearch();
@@ -705,6 +764,7 @@ document.addEventListener('input', e => {
   else if(t.id === 'slot' && x){ x.slotVal = t.value; if(!x.edited){ x.text = CSAnswer.applySlot(x.c, x.slotVal); x.machine = x.text; setDraft(x, x.text, false); } }
   else if(t.id === 'search'){ SHOWN = 80; renderList(); }
 });
+document.addEventListener('change', e => { if(e.target.id === 'tplFile'){ const f = e.target.files[0]; e.target.value = ''; tplUpload(f); } });
 $('shopSel').onchange = () => { SHOWN = 80; renderList(); };
 $('showAns').onchange = () => { SHOWN = 80; renderList(); };
 document.addEventListener('keydown', e => {
