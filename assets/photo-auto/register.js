@@ -256,8 +256,26 @@ function refreshButtons(){
 }
 
 /* ---------- 이력·알림 ---------- */
+var HP={page:1,per:20,q:'',timer:0,all:null};
+var HP_KEY='buyest.photoauto.regHistFold.v1';
+function hpFolded(){ try{ return localStorage.getItem(HP_KEY)==='1'; }catch(e){ return false; } }
+function hpApplyFold(){ var f=hpFolded(); $('rHistBody').style.display=f?'none':''; $('rHistFold').textContent=f?'이력 펼치기 ▼':'이력 접기 ▲'; $('rHistFold').setAttribute('aria-expanded',f?'false':'true'); }
+function hpMatch(x,q){ q=q.toLowerCase(); return [x.folder_name,x.username,x.pid,x.created_at].some(function(v){ return String(v==null?'':v).toLowerCase().indexOf(q)>=0; }); }
+function hpPager(total){
+  var pg=$('rHistPager'), pages=Math.max(1,Math.ceil(total/HP.per)); pg.innerHTML='';
+  if(HP.page>pages) HP.page=pages;
+  if(pages<=1) return;
+  function btn(label,p,on,dis){ var b=document.createElement('button'); b.type='button'; b.className='btn btn-sm '+(on?'btn-pri':'btn-out'); b.textContent=label; b.disabled=!!dis; if(on) b.setAttribute('aria-current','page'); b.addEventListener('click',function(){ HP.page=p; loadHistory(); }); pg.appendChild(b); }
+  btn('‹ 이전',HP.page-1,false,HP.page<=1);
+  var from=Math.max(1,HP.page-2), to=Math.min(pages,from+4); from=Math.max(1,to-4);
+  if(from>1){ btn('1',1,false); if(from>2){ var d=document.createElement('span'); d.textContent='…'; pg.appendChild(d); } }
+  for(var i=from;i<=to;i++) btn(String(i),i,i===HP.page);
+  if(to<pages){ if(to<pages-1){ var e=document.createElement('span'); e.textContent='…'; pg.appendChild(e); } btn(String(pages),pages,false); }
+  btn('다음 ›',HP.page+1,false,HP.page>=pages);
+}
 function loadHistory(){
-  return api('history').then(function(j){
+  hpApplyFold();
+  return api('history',{page:HP.page,per:HP.per,q:HP.q}).then(function(j){
     if(!j.ok) return;
     var al=$('rAlerts'); al.innerHTML='';
     (j.alerts||[]).forEach(function(a){
@@ -268,7 +286,13 @@ function loadHistory(){
       d.appendChild(b); al.appendChild(d);
     });
     var h='<table class="regtbl hist2"><tr><th>시간</th><th>작업자</th><th>구분</th><th>상품</th><th>결과</th></tr>';
-    (j.rows||[]).forEach(function(x){
+    /* 서버가 total 을 주면 서버 쪽 페이지·검색(전체 기록), 아니면 받은 최근 기록 안에서 이 화면이 나눠 보여줌 */
+    var rows=j.rows||[], total, serverMode=(j.total!=null);
+    if(serverMode){ total=+j.total; }
+    else { var f=HP.q?rows.filter(function(x){ return hpMatch(x,HP.q); }):rows; total=f.length; rows=f.slice((HP.page-1)*HP.per,HP.page*HP.per); }
+    $('rHistInfo').textContent=(HP.q?'검색 결과 ':'전체 ')+total+'건'+(serverMode?'':' (최근 '+(j.rows||[]).length+'건 안에서)');
+    if(!rows.length) h+='<tr><td colspan="5" class="hint">'+(HP.q?'검색 결과가 없어요.':'기록이 없어요.')+'</td></tr>';
+    rows.forEach(function(x){
       var res=x.status==='ok'?'<span class="chip cok">성공</span>':x.status==='running'?'<span class="chip cwarn">처리중</span>':'<span class="chip cbad">실패</span>';
       if(x.pid) res+=' pid '+x.pid;
       if(x.kids_status==='repaired') res+=' <span class="chip cwarn">키즈 자동복구</span>';
@@ -276,7 +300,7 @@ function loadHistory(){
       if(x.alert==1&&!x.ack_at) res+=' <span class="chip cbad">알림</span>';
       h+='<tr><td>'+esc(String(x.created_at).slice(5,16))+'</td><td>'+esc(x.username)+'</td><td>'+(x.action==='register'?'등록':'미리보기')+'</td><td>'+esc(x.folder_name)+'</td><td>'+res+'</td></tr>';
     });
-    $('rHist').innerHTML=h+'</table>';
+    $('rHist').innerHTML=h+'</table>'; hpPager(total);
   }).catch(function(){});
 }
 
@@ -304,6 +328,9 @@ function init(){
   $('rPreviewBtn').addEventListener('click',doPreview);
   $('rRegBtn').addEventListener('click',doRegister);
   $('rHistRefresh').addEventListener('click',loadHistory);
+  $('rHistFold').addEventListener('click',function(){ try{ localStorage.setItem(HP_KEY,hpFolded()?'0':'1'); }catch(e){} hpApplyFold(); if(!hpFolded()) loadHistory(); });
+  $('rHistQ').addEventListener('input',function(){ clearTimeout(HP.timer); var v=this.value.trim(); HP.timer=setTimeout(function(){ HP.q=v; HP.page=1; loadHistory(); },300); });
+  hpApplyFold();
   kidsToggle(); refreshButtons();
 }
 root.PhotoRegister={
