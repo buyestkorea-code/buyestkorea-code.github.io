@@ -1558,7 +1558,53 @@ function afterTplChange(){
 }
 function szVisible(){ $('szBlock').style.display=state.chartMode==='full'?'':'none'; }
 function fillSel(sel,list,key,label){ list.forEach(function(x){ var o=document.createElement('option'); o.value=x[key]; o.textContent=x[label]; sel.appendChild(o); }); }
-/* ---------- 내 템플릿 (이 브라우저에 저장) ---------- */
+/* ---------- 팀 공용 저장 (웹 서버) — 항목 세트·사이즈 세트·내 템플릿을 PC마다가 아니라 서버에 보관 ---------- */
+var SETS_API='https://buyest.co.kr/toolkit_register_api.php', SYNC_NOTE='';
+function setsAuth(){ try{ var a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return a&&a.id&&a.pass?a:null; }catch(e){ return null; } }
+function setsCall(action,fields){
+  var a=setsAuth(); if(!a) return Promise.reject(new Error('툴킷 로그인이 필요해요'));
+  var fd=new FormData(); fd.append('action',action); fd.append('user',a.id); fd.append('pass',a.pass);
+  Object.keys(fields||{}).forEach(function(k){ fd.append(k,fields[k]); });
+  return fetch(SETS_API,{method:'POST',body:fd}).then(function(r){ return r.json(); }).then(function(j){ if(!j.ok) throw new Error(j.error||'서버 오류'); return j; });
+}
+function setSyncNote(t){ SYNC_NOTE=t||''; var e=$('setSync'); if(e) e.textContent=SYNC_NOTE; }
+function setBody(kind,t){
+  if(kind==='item') return {corner:t.corner,cols:t.cols,rows:t.rows};
+  if(kind==='size'){ var b={v:t.v}; if(t.mm) b.mm=t.mm; if(t.hdr) b.hdr=t.hdr; return b; }
+  return {rows:t.rows,chart:t.chart,bottom:t.bottom,grid:t.grid,defaults:t.defaults||null};
+}
+function pushSet(kind,t){
+  return setsCall('sets_save',{kind:kind,name:t.name,body:JSON.stringify(setBody(kind,t))}).then(syncSets)
+    .catch(function(e){ setSyncNote('⚠ 서버에 저장하지 못했어요 ('+e.message+') — 이 PC에만 임시로 저장됨. 로그인 후 다시 열면 자동으로 올라가요'); });
+}
+function removeSetRemote(kind,t,done){
+  if(t.srv===false){ done(); return; }
+  setsCall('sets_delete',{kind:kind,name:t.name}).then(done).then(syncSets).catch(function(e){ alert('삭제하지 못했어요: '+e.message); });
+}
+var syncing=false;
+function syncSets(){
+  if(!setsAuth()){ setSyncNote('로그인하면 팀 공용(웹)으로 저장돼요 — 지금은 이 PC에만 저장'); return Promise.resolve(); }
+  if(syncing) return Promise.resolve(); syncing=true;
+  return setsCall('sets_list',{}).then(function(j){
+    var onSrv={item:{},size:{},tpl:{}}; j.sets.forEach(function(x){ if(onSrv[x.kind]) onSrv[x.kind][x.name]=1; });
+    var ms=mySets(), tp=myTpls(), ups=[];
+    ms.items.forEach(function(t){ if(!t.srv&&!onSrv.item[t.name]) ups.push(setsCall('sets_save',{kind:'item',name:t.name,body:JSON.stringify(setBody('item',t))})); });
+    ms.sizes.forEach(function(t){ if(!t.srv&&!onSrv.size[t.name]) ups.push(setsCall('sets_save',{kind:'size',name:t.name,body:JSON.stringify(setBody('size',t))})); });
+    tp.forEach(function(t){ if(!t.srv&&!onSrv.tpl[t.name]) ups.push(setsCall('sets_save',{kind:'tpl',name:t.name,body:JSON.stringify(setBody('tpl',t))})); });
+    return Promise.all(ups).then(function(){ return ups.length?setsCall('sets_list',{}):j; });
+  }).then(function(j){
+    var o={items:[],sizes:[]}, tp=[];
+    j.sets.forEach(function(x){ var b=x.body||{};
+      if(x.kind==='item'){ o.items.push({k:'myitem:'+x.name,name:x.name,corner:b.corner||'사이즈',cols:b.cols||[],rows:b.rows||['단품'],srv:true,by:x.updated_by}); }
+      else if(x.kind==='size'){ var z={k:'mysize:'+x.name,name:x.name,v:b.v||[],srv:true,by:x.updated_by}; if(b.mm) z.mm=b.mm; if(b.hdr) z.hdr=b.hdr; o.sizes.push(z); }
+      else if(x.kind==='tpl'){ tp.push({id:'my:'+x.name,name:x.name,mine:true,rows:b.rows,chart:b.chart,bottom:b.bottom||'',grid:b.grid,defaults:b.defaults||null,srv:true,by:x.updated_by}); } });
+    saveMySets(o); saveMyTpls(tp);
+    var sel=$('tplSel'), cur=sel.value; fillMyTpls(sel); if(cur) sel.value=cur;
+    renderSetChips(); setSyncNote('☁ 팀 공용(웹)에 저장돼요 — 다른 PC에서도 같은 세트가 보여요');
+  }).catch(function(e){ setSyncNote('⚠ 서버에 연결하지 못했어요 ('+e.message+') — 이 PC에 저장된 것만 보여요'); })
+  .then(function(){ syncing=false; });
+}
+/* ---------- 내 템플릿 (팀 공용 · 서버 보관, 이 브라우저는 복사본) ---------- */
 var MY_KEY='buyest.photoauto.myTpl.v1';
 function myTpls(){ try{ var a=JSON.parse(localStorage.getItem(MY_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
 function saveMyTpls(a){ try{ localStorage.setItem(MY_KEY,JSON.stringify(a)); return true; }catch(e){ alert('저장하지 못했어요: '+e.message); return false; } }
@@ -1579,16 +1625,19 @@ function saveMyTpl(){
   var g=grid.map(function(r,ri){ return r.map(function(v,ci){ return (ri===0||ci===0||String(grid[0][ci]).toUpperCase()==='MM')?v:''; }); });
   var t={id:id,name:name,mine:true,rows:curRows(),chart:state.chartMode,bottom:state.bottomKey||'',grid:g,
     defaults:(fld('구성품')&&fld('구성품').value.trim())?{'구성품':fld('구성품').value.trim()}:(state.defaults||null)};
-  if(i>=0) a[i]=t; else a.push(t);
+  t.srv=false; if(i>=0) a[i]=t; else a.push(t);
   if(!saveMyTpls(a)) return;
+  pushSet('tpl',t);
   fillMyTpls($('tplSel')); $('tplSel').value=id; state.tplId=id; $('tplDel').style.display='';
-  $('tplNote').textContent='저장했어요: 내 템플릿 ['+name+'] — 다음부터 위 목록의 "★ 내 템플릿"에서 고르면 돼요 (이 컴퓨터·브라우저에 저장)';
+  $('tplNote').textContent='저장했어요: 내 템플릿 ['+name+'] — 다음부터 위 목록의 "★ 내 템플릿"에서 고르면 돼요 (팀 공용으로 서버에 저장 — 다른 PC에서도 보여요)';
 }
 function deleteMyTpl(){
   var id=$('tplSel').value, t=myTpls().filter(function(x){ return x.id===id; })[0]; if(!t) return;
   if(!confirm('내 템플릿 ['+t.name+']을(를) 삭제할까요?')) return;
-  saveMyTpls(myTpls().filter(function(x){ return x.id!==id; }));
-  fillMyTpls($('tplSel')); $('tplSel').value=''; state.tplId=''; $('tplDel').style.display='none'; $('tplNote').textContent='삭제했어요.';
+  removeSetRemote('tpl',t,function(){
+    saveMyTpls(myTpls().filter(function(x){ return x.id!==id; }));
+    fillMyTpls($('tplSel')); $('tplSel').value=''; state.tplId=''; $('tplDel').style.display='none'; $('tplNote').textContent='삭제했어요.';
+  });
 }
 fillSel($('tplSel'),TPL.TEMPLATES,'id','name');
 fillMyTpls($('tplSel'));
@@ -1602,8 +1651,8 @@ function mySets(){ try{ var o=JSON.parse(localStorage.getItem(SETS_KEY)||'{}'); 
 function saveMySets(o){ try{ localStorage.setItem(SETS_KEY,JSON.stringify(o)); return true; }catch(e){ alert('저장하지 못했어요: '+e.message); return false; } }
 function findItem(k){ var m=mySets().items.filter(function(x){ return x.k===k; })[0]; return m||TPL.item(k); }
 function findSize(k){ var m=mySets().sizes.filter(function(x){ return x.k===k; })[0]; return m||TPL.size(k); }
-function mineChip(box,label,attr,val){
-  var w=document.createElement('span'); w.className='mychip';
+function mineChip(box,label,attr,val,by){
+  var w=document.createElement('span'); w.className='mychip'; if(by) w.title='만든 사람: '+by;
   var b=document.createElement('button'); b.type='button'; b.className='btn btn-out btn-sm'; b.textContent='★ '+label; b.setAttribute(attr,val);
   var x=document.createElement('button'); x.type='button'; x.className='btn btn-out btn-sm mychip-x'; x.textContent='×'; x.title='이 세트 삭제'; x.setAttribute('data-delset',val);
   w.appendChild(b); w.appendChild(x); box.appendChild(w);
@@ -1613,11 +1662,12 @@ function renderSetChips(){
   var ib=$('itemChips'), sb=$('sizeChips'), ms=mySets();
   ib.innerHTML=''; sb.innerHTML='';
   TPL.ITEMS.forEach(function(it){ chip(ib,it.name,'data-item',it.k); });
-  ms.items.forEach(function(it){ mineChip(ib,it.name,'data-item',it.k); });
+  ms.items.forEach(function(it){ mineChip(ib,it.name,'data-item',it.k,it.by); });
   ib.appendChild(saveBtn('itemSave','＋ 지금 표의 항목을 세트로 저장'));
   TPL.SIZES.forEach(function(z){ chip(sb,z.name,'data-size',z.k); });
-  ms.sizes.forEach(function(z){ mineChip(sb,z.name,'data-size',z.k); });
+  ms.sizes.forEach(function(z){ mineChip(sb,z.name,'data-size',z.k,z.by); });
   sb.appendChild(saveBtn('sizeSave','＋ 지금 표의 사이즈 줄을 세트로 저장'));
+  var sy=document.createElement('div'); sy.className='hint'; sy.id='setSync'; sy.style.cssText='width:100%;margin-top:4px'; sy.textContent=SYNC_NOTE; sb.appendChild(sy);
 }
 function saveItemSet(){
   if(!grid[0]||grid[0].length<2){ alert('저장할 항목이 없어요. 표 맨 윗줄에 항목 이름을 먼저 적어 주세요.'); return; }
@@ -1627,9 +1677,9 @@ function saveItemSet(){
   var rows=grid.slice(1).map(function(r){ return String(r[0]||'').trim(); }).filter(Boolean);
   var o=mySets(), k='myitem:'+name, i=o.items.map(function(x){ return x.k; }).indexOf(k);
   if(i>=0&&!confirm('"'+name+'" 항목 세트가 이미 있어요. 덮어쓸까요?')) return;
-  var t={k:k,name:name,corner:String(grid[0][0]||'사이즈').trim()||'사이즈',cols:cols,rows:rows.length?rows:['단품']};
+  var t={k:k,name:name,corner:String(grid[0][0]||'사이즈').trim()||'사이즈',cols:cols,rows:rows.length?rows:['단품'],srv:false};
   if(i>=0) o.items[i]=t; else o.items.push(t);
-  if(saveMySets(o)) renderSetChips();
+  if(saveMySets(o)){ renderSetChips(); setSyncNote('서버에 저장 중…'); pushSet('item',t); }
 }
 function saveSizeSet(){
   var v=grid.slice(1).map(function(r){ return String(r[0]||'').trim(); }).filter(Boolean);
@@ -1639,17 +1689,19 @@ function saveSizeSet(){
   if(mmI>0){ mm=grid.slice(1).filter(function(r){ return String(r[0]||'').trim(); }).map(function(r){ return String(r[mmI]||''); }); if(!mm.some(Boolean)) mm=null; }
   var o=mySets(), k='mysize:'+name, i=o.sizes.map(function(x){ return x.k; }).indexOf(k);
   if(i>=0&&!confirm('"'+name+'" 사이즈 세트가 이미 있어요. 덮어쓸까요?')) return;
-  var z={k:k,name:name,v:v}; if(mm) z.mm=mm;
+  var z={k:k,name:name,v:v,srv:false}; if(mm){ z.mm=mm; z.hdr=grid[0].slice(); }
   if(i>=0) o.sizes[i]=z; else o.sizes.push(z);
-  if(saveMySets(o)) renderSetChips();
+  if(saveMySets(o)){ renderSetChips(); setSyncNote('서버에 저장 중…'); pushSet('size',z); }
 }
 function deleteMySet(k){
   var o=mySets(), isItem=k.indexOf('myitem:')===0, list=isItem?o.items:o.sizes, t=list.filter(function(x){ return x.k===k; })[0]; if(!t) return;
   if(!confirm((isItem?'내 항목 세트':'내 사이즈 세트')+' ['+t.name+']을(를) 삭제할까요?')) return;
-  if(isItem) o.items=o.items.filter(function(x){ return x.k!==k; }); else o.sizes=o.sizes.filter(function(x){ return x.k!==k; });
-  if(saveMySets(o)) renderSetChips();
+  removeSetRemote(isItem?'item':'size',t,function(){
+    var o2=mySets(); if(isItem) o2.items=o2.items.filter(function(x){ return x.k!==k; }); else o2.sizes=o2.sizes.filter(function(x){ return x.k!==k; });
+    if(saveMySets(o2)) renderSetChips();
+  });
 }
-renderSetChips();
+renderSetChips(); syncSets();
 function gridHasValues(){ for(var r=1;r<grid.length;r++) for(var c=1;c<grid[r].length;c++) if(grid[r][c]) return true; return false; }
 function applyItemSet(k,fresh){
   var it=findItem(k); if(!it) return;
@@ -1671,7 +1723,7 @@ function applySizeSet(k){
   var z=findSize(k); if(!z) return;
   if(gridHasValues() && !confirm('입력해 둔 실측 값이 지워집니다. 사이즈 줄을 바꿀까요?')) return;
   var header=(grid[0]&&grid[0].length>1)?grid[0].slice():['사이즈','가로','세로','폭'];
-  if(z.mm && header.indexOf('MM')<0){ var it=TPL.item(k.indexOf('us')===0?'shoeUS':'shoeEU'); header=[it.corner].concat(it.cols); }
+  if(z.mm && header.indexOf('MM')<0){ if(z.hdr&&z.hdr.length>1) header=z.hdr.slice(); else { var it=TPL.item(k.indexOf('us')===0?'shoeUS':'shoeEU'); header=[it.corner].concat(it.cols); } }
   var mmI=header.indexOf('MM'), g=[header];
   z.v.forEach(function(lb,i){ var r=[lb]; for(var c=1;c<header.length;c++) r.push(c===mmI&&z.mm?z.mm[i]:''); g.push(r); });
   gridSet(g);
@@ -1679,12 +1731,13 @@ function applySizeSet(k){
   refreshOptHint();
   if(window.PhotoRegister) PhotoRegister.invalidate();
 }
+function itemFresh(k){ return k.indexOf('myitem:')===0&&!gridHasValues(); }   /* 내 항목 세트는 입력해 둔 실측 값이 없으면 저장해 둔 사이즈 줄까지 그대로 복원 */
 function setChipClick(e,attr,fn){
   var t=e.target.closest('button'); if(!t) return;
   var d=t.getAttribute('data-delset'); if(d){ deleteMySet(d); return; }
   var k=t.getAttribute(attr); if(k) fn(k);
 }
-$('itemChips').addEventListener('click',function(e){ if(e.target.id==='itemSave'){ saveItemSet(); return; } setChipClick(e,'data-item',function(k){ applyItemSet(k); }); });
+$('itemChips').addEventListener('click',function(e){ if(e.target.id==='itemSave'){ saveItemSet(); return; } setChipClick(e,'data-item',function(k){ applyItemSet(k,itemFresh(k)); }); });
 $('sizeChips').addEventListener('click',function(e){ if(e.target.id==='sizeSave'){ saveSizeSet(); return; } setChipClick(e,'data-size',applySizeSet); });
 function applyTplObj(t){
   state.tplId=t?t.id:'';
