@@ -897,6 +897,19 @@ function drawOp(ctx,o,dx,dy){
   }
 }
 
+/* 맨 아래 흰 여백 자동 삭제: 사진·하단 이미지를 옮기다 생긴 빈 공간을 JPG/PSD/미리보기에서 모두 잘라낸다 */
+function trimBottomWhite(c){
+  var w=c.width, h=c.height, ctx=c.getContext('2d'), y=h, step=40, found=-1;
+  while(y>1 && found<0){
+    var n=Math.min(step,y-1), d=ctx.getImageData(0,y-n,w,n).data, r, x, i;
+    for(r=n-1;r>=0&&found<0;r--){ for(x=0;x<w;x++){ i=(r*w+x)*4; if(d[i]<250||d[i+1]<250||d[i+2]<250){ found=y-n+r; break; } } }
+    if(found<0) y-=n;
+  }
+  var nh=found>=0?found+1:h;
+  if(nh>=h) return c;
+  var o=document.createElement('canvas'); o.width=w; o.height=nh; o.getContext('2d').drawImage(c,0,0);
+  return o;
+}
 function photoGap(){ var v=parseInt($('photoGap').value,10); return isFinite(v)?Math.max(0,Math.min(400,v)):37; }
 function render(f,chart,slots,ov){
   ov=ov||{};
@@ -977,12 +990,12 @@ function render(f,chart,slots,ov){
   var bottomTop=slotTop-gap+39, botH=Math.round(botImg.naturalHeight*W/botImg.naturalWidth);
   var fBot=fxSl('#bot');
   img(botImg,mvX(fBot),bottomTop+mvY(fBot),W,botH,'하단 안내(고정)',fBot);
-  var totalH=Math.round(bottomTop+botH);
+  var totalH=Math.round(bottomTop+Math.max(0,mvY(fBot))+botH);
 
   var c=document.createElement('canvas'); c.width=W; c.height=totalH;
   var ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,totalH);
   ops.forEach(function(o){drawOp(ctx,o,0,0);});
-  return {canvas:c, ops:ops};
+  return {canvas:trimBottomWhite(c), ops:ops};
 }
 
 /* ---------- 미리보기에서 글자 눌러 바로 고치기 ---------- */
@@ -1202,6 +1215,7 @@ function buildPsd(){
       L=Math.max(0,Math.floor(o.t==='img'?Math.round(o.x):o.x)); T=Math.max(0,Math.floor(o.t==='img'?Math.round(o.y):o.y));
       w=Math.min(W-L,Math.ceil(o.w)+1); h=Math.ceil(o.h)+1;
       if(o.t==='img'&&o.sr){ L=Math.round(o.sr.x); T=Math.round(o.sr.y); w=Math.round(o.sr.w); h=Math.round(o.sr.h); }
+      if(T>=H) return; h=Math.min(h,H-T);   /* 잘라낸 하단 여백 아래로 나가는 레이어는 문서 안으로 */
       c=document.createElement('canvas'); c.width=w; c.height=h; drawOp(c.getContext('2d'),o,L,T);
       kids.push({name:o.nm,top:T,left:L,canvas:c});
     }
