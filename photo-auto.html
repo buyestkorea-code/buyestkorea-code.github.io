@@ -867,7 +867,7 @@ function refreshOptHint(){
 }
 $('szToOpt').addEventListener('click',function(){
   var a=tableSizes(); if(!a.length){ alert('실측표에 사이즈 줄이 없어요.'); return; }
-  if(window.PhotoRegister&&PhotoRegister.setTier){ PhotoRegister.setTier(1,'사이즈',a); refreshOptHint(); $('szOptHint').textContent='✔ 옵션 1 값을 '+$('rT1v').value+' 로 바꿨어요 (입고된 값은 이 안에 있는 것만 유지)'; }
+  if(window.PhotoRegister&&PhotoRegister.setTier){ PhotoRegister.setTier(1,'사이즈',a,true); refreshOptHint(); $('szOptHint').textContent='✔ 옵션 1 값을 '+$('rT1v').value+' 로 바꿨어요 (실제 입고된 값 칸은 그대로 둡니다)'; }
 });
 document.addEventListener('input',function(e){ if(e.target&&(e.target.id==='rT1v'||(e.target.closest&&e.target.closest('#szGrid')))) refreshOptHint(); });
 function gridSet(g){ grid=normGrid(g&&g.length?g:PRE_WALLET.map(function(r){return r.slice();})); if(grid.length<2) grid.push(grid[0].map(function(x,i){return i?'':'단품';})); gridSave(); gridDraw(); }

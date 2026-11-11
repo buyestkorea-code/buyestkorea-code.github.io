@@ -335,7 +335,7 @@ function init(){
 }
 root.PhotoRegister={
   init:init,
-  setTier:function(i,name,values){ var n=$('rT'+i+'n'); if(!n) return; if(!n.value.trim()) n.value=name; $('rT'+i+'v').value=sortCsv(values).join(','); $('rT'+i+'s').value=csv($('rT'+i+'s').value).filter(function(x){ return values.indexOf(x)>=0; }).join(','); invalidate(); },
+  setTier:function(i,name,values,keepReal){ var n=$('rT'+i+'n'); if(!n) return; if(!n.value.trim()) n.value=name; $('rT'+i+'v').value=sortCsv(values).join(','); if(!keepReal) $('rT'+i+'s').value=csv($('rT'+i+'s').value).filter(function(x){ return values.indexOf(x)>=0; }).join(','); invalidate(); },   /* keepReal=true: '실제 입고된 값'은 건드리지 않는다 */
   onGenerated:function(){ invalidate(); $('rResult').style.display='none'; if(R.auth) msg('이미지가 준비됐어요. 아래 정보를 확인하고 [미리보기]를 누르세요.'); },
   onXlsx:function(file){
     if(!root.XLSX||!file||!$('regBox')) return;
