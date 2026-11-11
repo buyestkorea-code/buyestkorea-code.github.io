@@ -80,6 +80,8 @@
   .rchip-ph{display:inline-block;border:2px dashed #1d4ed8;border-radius:999px;background:rgba(29,78,216,.07);box-sizing:border-box;}
   .rchips.dragging,.rchips.dragging *{cursor:grabbing !important;}
   .rchips input{width:170px;padding:4px 9px;font-size:12.5px;}
+  .prev .psel.fx .phr,.prev .psel.fx .phb,.prev .psel.fx .phd,.prev .psel.fx .pbar button[data-a=dn],.prev .psel.fx .pbar button[data-a=up]{display:none;}
+  .prev textarea.ed{resize:none;line-height:1.3;padding:2px 6px;white-space:pre;overflow:hidden;}
   .prev .hl{position:absolute;pointer-events:none;border:1.5px dashed #2b6cb0;background:rgba(43,108,176,.10);border-radius:3px;}
   .prev .ed{position:absolute;box-sizing:border-box;padding:0 6px;border:2px solid #2b6cb0;border-radius:4px;background:#fff;color:#111;font-family:inherit;outline:none;z-index:3;}
   .hist .hrow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line,#e5e5e0);}
@@ -277,7 +279,7 @@ var fieldBox=$('fields');
 var ALWAYS_SHOWN=['브랜드한글'];
 function addFieldBox(k){
   var d=document.createElement('div'); d.setAttribute('data-wrap',k);
-  var lb=document.createElement('label'); lb.textContent=k; var inp; if(k==='소재'){ inp=document.createElement('textarea'); inp.rows=2; inp.style.minHeight='0'; inp.placeholder='여러 줄이면 Enter로 줄바꿈 (내피 / 외피 등)'; } else { inp=document.createElement('input'); inp.type='text'; } inp.setAttribute('data-k',k);
+  var lb=document.createElement('label'); lb.textContent=k; var inp; if(k==='소재'||k==='상품명'){ inp=document.createElement('textarea'); inp.rows=2; inp.style.minHeight='0'; inp.placeholder='여러 줄이면 Enter로 줄바꿈'+(k==='소재'?' (내피 / 외피 등)':''); } else { inp=document.createElement('input'); inp.type='text'; } inp.setAttribute('data-k',k);
   d.appendChild(lb); d.appendChild(inp); fieldBox.appendChild(d);
 }
 FIELD_KEYS.forEach(addFieldBox);
@@ -903,7 +905,9 @@ function render(f,chart,slots,ov){
   function img(im,x,yy,w,h,nm,sl,gr){ ops.push({t:'img',im:im,x:x,y:yy,w:w,h:h,nm:nm||'사진',sl:sl||null,gr:gr||null,sr:null}); }
 
   var topH=Math.round(topImg.naturalHeight*W/topImg.naturalWidth);
-  img(topImg,0,0,W,topH,'상단 안내(고정)');
+  function fxSl(k){ var v=state.sv[k]||{}; return {key:k,fixed:true,dx:v.dx||0,dy:v.dy||0,px:100,py:100}; }
+  var fTop=fxSl('#top');
+  img(topImg,mvX(fTop),mvY(fTop),W,topH,'상단 안내(고정)',fTop);
   text(f['브랜드'],360,1206.84,50,'Bold',DARK,'center',{id:'f:브랜드',type:'field',name:'브랜드'});
   if(f['브랜드한글']) text(f['브랜드한글'],360,1261.84,24,'Regular',LIGHT,'center',{id:'f:브랜드한글',type:'field',name:'브랜드한글'});
 
@@ -965,7 +969,8 @@ function render(f,chart,slots,ov){
     slotTop+=sh+gap;
   });
   var bottomTop=slotTop-gap+39, botH=Math.round(botImg.naturalHeight*W/botImg.naturalWidth);
-  img(botImg,0,bottomTop,W,botH,'하단 안내(고정)');
+  var fBot=fxSl('#bot');
+  img(botImg,mvX(fBot),bottomTop+mvY(fBot),W,botH,'하단 안내(고정)',fBot);
   var totalH=Math.round(bottomTop+botH);
 
   var c=document.createElement('canvas'); c.width=W; c.height=totalH;
@@ -1042,15 +1047,26 @@ function startEdit(o){
   var old=state.wrapEl.querySelector('.ed'); if(old) old.remove();
   var b=boxOf(o), sc=state.canvas.clientWidth/state.canvas.width;
   var cur=o.ref&&o.ref.type==='field'?fld(o.ref.name).value:o.s;
-  var inp=document.createElement('input'); inp.type='text'; inp.className='ed'; inp.value=cur;
-  var wpx=Math.max(b.w*sc+20,160);
-  inp.style.cssText='left:'+Math.max(0,Math.min(b.x*sc-6,state.canvas.clientWidth-wpx))+'px;top:'+(b.y*sc-4)+'px;width:'+wpx+'px;height:'+(b.h*sc+8)+'px;font-size:'+Math.max(12,o.size*sc)+'px;';
+  var isField=!!(o.ref&&o.ref.type==='field');
+  var inp=document.createElement('textarea'); inp.className='ed'; inp.value=cur; inp.rows=1;
+  var wpx=Math.max(b.w*sc+20,160), fsz=Math.max(12,o.size*sc), minH=b.h*sc+8;
+  inp.style.cssText='left:'+Math.max(0,Math.min(b.x*sc-6,state.canvas.clientWidth-wpx))+'px;top:'+(b.y*sc-4)+'px;width:'+wpx+'px;height:'+minH+'px;font-size:'+fsz+'px;';
+  function grow(){ inp.style.height='auto'; inp.style.height=Math.max(minH,inp.scrollHeight+4)+'px'; }
   var done=false;
   function commit(save){ if(done) return; done=true; var v=inp.value; inp.remove();
+    if(!isField) v=v.split(String.fromCharCode(10)).join(' ');
     if(save && v!==cur){ applyEdit(o,v); rerender(); } }
-  inp.addEventListener('keydown',function(e){ if(e.key==='Enter') commit(true); else if(e.key==='Escape') commit(false); });
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){
+      e.preventDefault();
+      if((e.ctrlKey||e.metaKey)&&isField){ var a=inp.selectionStart, z=inp.selectionEnd; inp.value=inp.value.slice(0,a)+String.fromCharCode(10)+inp.value.slice(z); inp.selectionStart=inp.selectionEnd=a+1; grow(); }
+      else commit(true);
+    } else if(e.key==='Escape') commit(false);
+  });
+  inp.addEventListener('input',grow);
   inp.addEventListener('blur',function(){ commit(true); });
-  state.wrapEl.appendChild(inp); inp.focus(); inp.select();
+  state.wrapEl.appendChild(inp); grow(); inp.focus(); inp.select();
+  if(isField) $('status').textContent='글자 수정 중 — Enter: 확정 · Ctrl+Enter: 줄바꿈 · Esc: 취소';
 }
 $('prev').addEventListener('mousemove',function(e){
   if(!state.hl||e.target.className==='ed') return;
@@ -1120,6 +1136,7 @@ function placeSel(){
     el.addEventListener('pointerdown',function(ev){ if(ev.target.closest('.pbar')) return; startDrag(ev,ev.target.getAttribute('data-m')||'move'); });
     el.querySelector('.pbar').addEventListener('click',function(ev){
       var a=ev.target.getAttribute('data-a'); if(!a) return; var cur=opOfSel(); if(!cur) return; var s=cur.sl;
+      if(a==='rs'&&s.fixed){ var vf=(state.sv[s.key]=state.sv[s.key]||{}); vf.dx=0; vf.dy=0; refreshCanvas(); return; }
       if(a==='rs'){ s.dx=0; s.dy=0; var v0=(state.sv[s.key]=state.sv[s.key]||{}); v0.dx=0; v0.dy=0; setSlotPct(s,100,100); }
       else { var st=a==='up'?5:-5; setSlotPct(s,clampPct((s.px||100)+st),clampPct((s.py||100)+st)); }
       refreshCanvas();
@@ -1127,10 +1144,12 @@ function placeSel(){
   }
   var sc=state.canvas.clientWidth/state.canvas.width, v=visRect(o);
   el.style.left=Math.round(v.x*sc)+'px'; el.style.top=Math.round(v.y*sc)+'px'; el.style.width=Math.round(v.w*sc)+'px'; el.style.height=Math.round(v.h*sc)+'px';
+  el.classList.toggle('fx',!!o.sl.fixed);
+  if(o.sl.fixed){ el.querySelector('.pinfo').textContent='고정 이미지 · 끌어서 이동 (가로 '+Math.round(o.sl.dx||0)+' · 세로 '+Math.round(o.sl.dy||0)+')'; return; }
   el.querySelector('.pinfo').textContent='가로 '+(o.sl.px||100)+'% · 세로 '+(o.sl.py||100)+'%  ·  끌어서 이동';
 }
 function startDrag(ev,mode){
-  var o=opOfSel(); if(!o) return; ev.preventDefault();
+  var o=opOfSel(); if(!o) return; if(o.sl.fixed&&mode!=='move') return; ev.preventDefault();
   var s0=o.sl, sc=state.canvas.clientWidth/state.canvas.width, sx=ev.clientX, sy=ev.clientY, dx0=s0.dx||0, dy0=s0.dy||0, px0=s0.px||100, py0=s0.py||100;
   var rect=state.canvas.getBoundingClientRect(), cx=rect.left+(o.x+o.w/2)*sc, cy=rect.top+(o.y+o.h/2)*sc;
   var dd=Math.hypot(sx-cx,sy-cy)||1, ddx=Math.abs(sx-cx)||1, ddy=Math.abs(sy-cy)||1, raf=0, last=null;
