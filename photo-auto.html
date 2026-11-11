@@ -80,6 +80,9 @@
   .rchip-ph{display:inline-block;border:2px dashed #1d4ed8;border-radius:999px;background:rgba(29,78,216,.07);box-sizing:border-box;}
   .rchips.dragging,.rchips.dragging *{cursor:grabbing !important;}
   .rchips input{width:170px;padding:4px 9px;font-size:12.5px;}
+  .prev .psel .pbar{flex-wrap:wrap;max-width:calc(100% - 12px);}
+  .prev .psel.fx .pbar button[data-a=rep],.prev .psel.fx .pbar button[data-a=del],.prev .psel.fx .pbar button[data-a=rm],.prev .psel.main .pbar button[data-a=rm]{display:none;}
+  .prev .psel.em .pbar button[data-a=dn],.prev .psel.em .pbar button[data-a=up],.prev .psel.em .pbar button[data-a=rs],.prev .psel.em .pbar button[data-a=del],.prev .psel.em .phr,.prev .psel.em .phb,.prev .psel.em .phd{display:none;}
   .prev .psel.fx .phr,.prev .psel.fx .phb,.prev .psel.fx .phd,.prev .psel.fx .pbar button[data-a=dn],.prev .psel.fx .pbar button[data-a=up]{display:none;}
   .prev textarea.ed{resize:none;line-height:1.3;padding:2px 6px;white-space:pre;overflow:hidden;}
   .mychip{display:inline-flex;} .mychip .btn:first-child{border-radius:8px 0 0 8px;background:#eef3ff;color:#1d4ed8;border-color:#b9ccff;} .mychip-x{border-radius:0 8px 8px 0;margin-left:-1px;padding:5px 8px;color:#b42318;}
@@ -795,8 +798,8 @@ function resizeFrom(src,sx,sy,sw,sh,tw,th){
 }
 /* 사진은 가이드 칸(점선)을 넘어서도 옮길 수 있다 - 화면 안에서만 제한 */ function mvX(s){ return Math.max(-W,Math.min(W,s.dx||0)); }
 function mvY(s,sh){ return Math.max(-900,Math.min(900,s.dy||0)); }
-function fitPhoto(c,px,py){
-  var b=trimBox(c), cw=b[2]-b[0], ch=b[3]-b[1], warn='';
+function fitPhoto(c,px,py,raw){
+  var b=raw?[0,0,c.width,c.height]:trimBox(c), cw=b[2]-b[0], ch=b[3]-b[1], warn='';
   var full=cw>=c.width*0.97 && ch>=c.height*0.97;
   var s=Math.min(PHOTO_MAX_W/cw, SLOT_H/ch);
   if(s>1.25){ s=1.25; warn='해상도 낮음('+cw+'px)'; }
@@ -1176,10 +1179,38 @@ function refreshCanvas(){
   if(state.wrapEl&&old&&old.parentNode===state.wrapEl) state.wrapEl.replaceChild(r.canvas,old); else showPreview();
   placeSel(); queueSave(1500);
 }
+/* ---------- 사진 칸 개별 수정: 교체(그 칸에만 새 사진) · 비우기 · 칸 삭제 ---------- */
+function emptySlot(key){
+  var c=document.createElement('canvas'); c.width=1; c.height=1; c.getContext('2d').fillStyle='#fff'; c.getContext('2d').fillRect(0,0,1,1);
+  return {c:c,w:SLOT_W,h:SLOT_H,full:false,warn:'',src:null,key:key,px:100,py:100,dx:0,dy:0,empty:true};
+}
+function svOf(k){ return (state.sv[k]=state.sv[k]||{}); }
+function replaceSlotPhoto(key,file){
+  var i=-1; state.slots.forEach(function(sl,j){ if(sl.key===key) i=j; }); if(i<0) return;
+  $('status').textContent='사진 바꾸는 중…';
+  var url=URL.createObjectURL(file);
+  loadImg(url).then(function(im){
+    var c=toWhiteCanvas(im), n=fitPhoto(c,100,100,true);   /* 누끼·피사체 자동 자르기 없이 올린 사진 그대로 */
+    n.src=c; n.raw=true; n.key=key; n.px=100; n.py=100; n.dx=0; n.dy=0; n.custom=true;
+    state.slots[i]=n; var v=svOf(key); v.px=100; v.py=100; v.dx=0; v.dy=0; v.empty=0;
+    state.sel=key; refreshCanvas(); state.stale=false;
+    $('status').textContent='이 칸에 "'+file.name+'" 사진을 넣었어요 — 크기·위치는 끌어서 조절하세요 (다시 만들기를 누르면 처음 사진으로 돌아가요)';
+    URL.revokeObjectURL(url);
+  }).catch(function(e){ $('status').textContent='사진을 읽지 못했어요: '+e.message; });
+}
+var repInput=document.createElement('input'); repInput.type='file'; repInput.accept='image/*'; repInput.style.display='none'; document.body.appendChild(repInput);
+repInput.addEventListener('change',function(){ var f=repInput.files[0], k=repInput.getAttribute('data-key'); repInput.value=''; if(f&&k) replaceSlotPhoto(k,f); });
+function slotAction(a,cur){
+  var sl=cur.sl, key=sl.key, i=state.slots.indexOf(sl);
+  if(a==='rep'){ repInput.setAttribute('data-key',key); repInput.click(); return true; }
+  if(a==='del'){ if(i<0) return true; state.slots[i]=emptySlot(key); svOf(key).empty=1; refreshCanvas(); $('status').textContent='이 칸의 사진을 지웠어요 — 빈 칸에 "사진 올리기"로 다른 사진을 넣거나 "칸 삭제"로 칸을 없앨 수 있어요'; return true; }
+  if(a==='rm'){ if(i<1) return true; if(!confirm('이 사진 칸을 통째로 없앨까요? (아래 칸이 위로 올라옵니다)')) return true; state.slots.splice(i,1); svOf(key).gone=1; state.sel=''; refreshCanvas(); return true; }
+  return false;
+}
 function setSlotPct(s,px,py){
   var i=state.slots.indexOf(s); if(i<0||!s.src) return s;
   py=py==null?px:py;
-  var n=fitPhoto(s.src,px,py); n.src=s.src; n.key=s.key; n.px=px; n.py=py; n.dx=s.dx||0; n.dy=s.dy||0;
+  var n=fitPhoto(s.src,px,py,s.raw); n.raw=s.raw; n.src=s.src; n.key=s.key; n.px=px; n.py=py; n.dx=s.dx||0; n.dy=s.dy||0;
   state.slots[i]=n; var v=(state.sv[n.key]=state.sv[n.key]||{}); v.px=px; v.py=py; delete v.pct; return n;
 }
 /* 가이드선: 사진 칸 테두리(점선) + 선택한 사진 칸의 가로·세로 중앙선(가운데에 오면 진해짐) */
@@ -1206,11 +1237,12 @@ function placeSel(){
   if(!o){ if(el) el.remove(); return; }
   if(!el){
     el=document.createElement('div'); el.className='psel';
-    el.innerHTML='<div class="pbar"><button type="button" data-a="dn">−</button><button type="button" data-a="up">＋</button><button type="button" data-a="rs">원래대로</button></div><div class="pinfo"></div><div class="phr" data-m="sizeX" title="끌어서 가로 길이 조절"></div><div class="phb" data-m="sizeY" title="끌어서 세로 길이 조절"></div><div class="phd" data-m="size" title="끌어서 크기 조절(가로·세로 같이)"></div>';
+    el.innerHTML='<div class="pbar"><button type="button" data-a="dn">−</button><button type="button" data-a="up">＋</button><button type="button" data-a="rs">원래대로</button><button type="button" data-a="rep">사진 교체</button><button type="button" data-a="del">사진 지우기</button><button type="button" data-a="rm">칸 삭제</button></div><div class="pinfo"></div><div class="phr" data-m="sizeX" title="끌어서 가로 길이 조절"></div><div class="phb" data-m="sizeY" title="끌어서 세로 길이 조절"></div><div class="phd" data-m="size" title="끌어서 크기 조절(가로·세로 같이)"></div>';
     w.appendChild(el);
     el.addEventListener('pointerdown',function(ev){ if(ev.target.closest('.pbar')) return; startDrag(ev,ev.target.getAttribute('data-m')||'move'); });
     el.querySelector('.pbar').addEventListener('click',function(ev){
       var a=ev.target.getAttribute('data-a'); if(!a) return; var cur=opOfSel(); if(!cur) return; var s=cur.sl;
+      if(slotAction(a,cur)) return;
       if(a==='rs'&&s.fixed){ var vf=(state.sv[s.key]=state.sv[s.key]||{}); vf.dx=0; vf.dy=0; refreshCanvas(); return; }
       if(a==='rs'){ s.dx=0; s.dy=0; var v0=(state.sv[s.key]=state.sv[s.key]||{}); v0.dx=0; v0.dy=0; setSlotPct(s,100,100); }
       else { var st=a==='up'?5:-5; setSlotPct(s,clampPct((s.px||100)+st),clampPct((s.py||100)+st)); }
@@ -1219,12 +1251,14 @@ function placeSel(){
   }
   var sc=state.canvas.clientWidth/state.canvas.width, v=visRect(o);
   el.style.left=Math.round(v.x*sc)+'px'; el.style.top=Math.round(v.y*sc)+'px'; el.style.width=Math.round(v.w*sc)+'px'; el.style.height=Math.round(v.h*sc)+'px';
-  el.classList.toggle('fx',!!o.sl.fixed);
+  el.classList.toggle('fx',!!o.sl.fixed); el.classList.toggle('em',!!o.sl.empty); el.classList.toggle('main',state.slots&&state.slots.indexOf(o.sl)===0);
+  var rb=el.querySelector('[data-a=rep]'); if(rb) rb.textContent=o.sl.empty?'사진 올리기':'사진 교체';
+  if(o.sl.empty){ el.querySelector('.pinfo').textContent='빈 칸 — 위의 "사진 올리기"로 이 칸에만 사진을 넣을 수 있어요'; return; }
   if(o.sl.fixed){ el.querySelector('.pinfo').textContent='고정 이미지 · 끌어서 이동 (가로 '+Math.round(o.sl.dx||0)+' · 세로 '+Math.round(o.sl.dy||0)+')'; return; }
   el.querySelector('.pinfo').textContent='가로 '+(o.sl.px||100)+'% · 세로 '+(o.sl.py||100)+'%  ·  끌어서 이동';
 }
 function startDrag(ev,mode){
-  var o=opOfSel(); if(!o) return; if(o.sl.fixed&&mode!=='move') return; ev.preventDefault();
+  var o=opOfSel(); if(!o) return; if(o.sl.empty) return; if(o.sl.fixed&&mode!=='move') return; ev.preventDefault();
   var s0=o.sl, sc=state.canvas.clientWidth/state.canvas.width, sx=ev.clientX, sy=ev.clientY, dx0=s0.dx||0, dy0=s0.dy||0, px0=s0.px||100, py0=s0.py||100;
   var rect=state.canvas.getBoundingClientRect(), cx=rect.left+(o.x+o.w/2)*sc, cy=rect.top+(o.y+o.h/2)*sc;
   var dd=Math.hypot(sx-cx,sy-cy)||1, ddx=Math.abs(sx-cx)||1, ddy=Math.abs(sy-cy)||1, raf=0, last=null;
@@ -1314,7 +1348,8 @@ $('go').addEventListener('click',function(){
       var slots=items.map(function(s,ix){
         var key=s.key+(ix===0?'#m':'#d'), v=state.sv[key]||{}, base=v.pct!=null?v.pct:s.size, px=v.px!=null?v.px:base, py=v.py!=null?v.py:base, r=fitPhoto(s.c,px,py);
         if(r.warn) warns.push(s.name+': '+r.warn);
-        r.src=s.c; r.key=key; r.px=px; r.py=py; r.dx=v.dx||0; r.dy=v.dy||0; return r; });
+        r.src=s.c; r.key=key; r.px=px; r.py=py; r.dx=v.dx||0; r.dy=v.dy||0; if(v.empty) return emptySlot(key); return r; })
+        .filter(function(sl,ix){ return ix===0||!(state.sv[sl.key]&&state.sv[sl.key].gone); });
       if($('zoom').checked){ var z=fitPhoto(makeZoom(seq[0].c)); z.full=true; slots.push(z); }
       $('status').textContent='조립 중…';
       state.chart=chart; state.slots=slots;
