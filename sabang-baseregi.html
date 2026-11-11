@@ -267,7 +267,7 @@ function buildConverter(ref) {
   }
   function materialAttr(J) {
     if (!J) return '';
-    let x = J.split('/').join('\n');
+    let x = J;
     return x.split('(재사용 섬유가 사용되었음)').join('\n(재사용 섬유가 사용되었음)');
   }
   function attrCode(AO) {
