@@ -14,6 +14,100 @@
     '지갑': ['지갑', '월렛'], '스니커즈': ['스니커즈', '운동화'], '부츠': ['부츠'], '신발': ['스니커즈', '부츠', '로퍼', '샌들', '슈즈'],
     '머플러': ['머플러', '스카프'], '목도리': ['머플러', '스카프']
   };
+
+  // ───────── 사방넷 카테고리 기준 세분화 종류 ─────────
+  // k 종류 이름 · g 묶음 · w 상품명에서 찾을 단어(하나라도 있으면) · x 이 단어가 있으면 이 종류가 아님 · s 잘 나가는 계절(없으면 사계절)
+  var KIND_SPEC = [
+    { k: '패딩', g: '아우터', w: ['패딩', '다운', '푸퍼', '퍼퍼', '구스다운', '덕다운'], x: [], s: ['겨울'] },
+    { k: '코트', g: '아우터', w: ['코트', '트렌치', '체스터'], x: [], s: ['가을', '겨울', '봄'] },
+    { k: '자켓', g: '아우터', w: ['자켓', '재킷', '블루종', '블레이저', '봄버'], x: [], s: [] },
+    { k: '가디건', g: '아우터', w: ['가디건', '카디건'], x: [], s: ['봄', '가을', '겨울'] },
+    { k: '긴팔티', g: '상의', w: ['롱슬리브', '긴팔', '롱 슬리브'], x: ['반팔', '숏슬리브', '후드', '맨투맨', '니트', '가디건', '민소매'], s: ['봄', '가을', '겨울'] },
+    { k: '반팔티', g: '상의', w: ['반팔', '숏슬리브', '티셔츠', '폴로'], x: ['롱슬리브', '긴팔', '롱 슬리브', '후드', '맨투맨', '니트', '가디건'], s: ['봄', '여름'] },
+    { k: '니트', g: '상의', w: ['니트', '스웨터', '풀오버'], x: ['가디건', '카디건'], s: ['가을', '겨울', '봄'] },
+    { k: '후드', g: '상의', w: ['후드'], x: [], s: ['봄', '가을', '겨울'] },
+    { k: '맨투맨', g: '상의', w: ['맨투맨', '스웨트'], x: [], s: ['봄', '가을', '겨울'] },
+    { k: '셔츠', g: '상의', w: ['셔츠'], x: ['티셔츠'], s: [] },
+    { k: '팬츠', g: '하의·원피스', w: ['팬츠', '바지'], x: ['반바지', '쇼츠', '숏팬츠', '청바지', '데님', '브리프', '팬티'], s: [] },
+    { k: '청바지', g: '하의·원피스', w: ['청바지', '데님', '진팬츠'], x: ['반바지', '쇼츠', '숏팬츠'], s: [] },
+    { k: '반바지', g: '하의·원피스', w: ['반바지', '쇼츠', '숏팬츠', '하프팬츠', '버뮤다'], x: [], s: ['봄', '여름'] },
+    { k: '스커트', g: '하의·원피스', w: ['스커트'], x: [], s: [] },
+    { k: '원피스', g: '하의·원피스', w: ['원피스', '드레스'], x: [], s: ['봄', '여름', '가을'] },
+    { k: '브리프/팬티', g: '속옷', w: ['브리프', '팬티', '트렁크', '드로즈', '언더웨어', '속옷'], x: [], s: [] },
+    { k: '스니커즈', g: '신발', w: ['스니커즈', '운동화', '러닝화'], x: [], s: [] },
+    { k: '샌들/쪼리', g: '신발', w: ['샌들', '쪼리', '플립플롭'], x: [], s: ['봄', '여름'] },
+    { k: '슬리퍼', g: '신발', w: ['슬리퍼', '슬라이드', '뮬'], x: [], s: [] },
+    { k: '부츠', g: '신발', w: ['부츠', '첼시', '앵클', '워커', '부티'], x: [], s: ['가을', '겨울'] },
+    { k: '구두/로퍼', g: '신발', w: ['로퍼', '구두', '옥스포드', '더비', '몽크스트랩'], x: [], s: [] },
+    { k: '단화/플랫', g: '신발', w: ['플랫', '발레리나', '단화', '메리제인'], x: [], s: ['봄', '여름', '가을'] },
+    { k: '하이힐/펌프스', g: '신발', w: ['펌프스', '하이힐', '슬링백', '스틸레토', '힐'], x: ['슬리퍼', '부츠'], s: [] },
+    { k: '가방', g: '가방·잡화', w: ['백', '가방', '토트', '숄더', '크로스'], x: [], s: [] },
+    { k: '지갑', g: '가방·잡화', w: ['지갑', '월렛'], x: [], s: [] },
+    { k: '모자', g: '가방·잡화', w: ['모자', '캡', '볼캡', '비니', '버킷햇', '베레', '바이저'], x: ['캡슐'], s: [] },
+    { k: '스카프', g: '가방·잡화', w: ['스카프', '머플러', '숄', '목도리', '넥워머'], x: ['숄더'], s: ['가을', '겨울', '봄'] },
+    { k: '쥬얼리', g: '가방·잡화', w: ['쥬얼리', '주얼리', '목걸이', '귀걸이', '이어링', '반지', '팔찌', '브레이슬릿', '네크리스', '펜던트'], x: ['반지갑'], s: [] },
+    { k: '잡화', g: '가방·잡화', w: ['벨트', '키링', '키홀더', '양말', '장갑', '선글라스', '안경', '우산', '넥타이', '머리띠', '잡화', '액세서리', '악세서리'], x: [], s: [] }
+  ];
+  var SPEC = {}; KIND_SPEC.forEach(function (sp) { SPEC[sp.k] = sp; KIND_MAP[sp.k] = sp.w; });
+  var KIND_GROUPS = [];
+  KIND_SPEC.forEach(function (sp) {
+    var g = KIND_GROUPS.filter(function (x) { return x[0] === sp.g; })[0];
+    if (!g) KIND_GROUPS.push(g = [sp.g, []]);
+    g[1].push(sp.k);
+  });
+  // 요청 문장에 이 말이 있으면 이 칩(들)을 고른다 (칩 이름과 다른 말·예전 말)
+  var KIND_ALIAS = {
+    '티셔츠': ['긴팔티', '반팔티'], '긴팔': ['긴팔티'], '반팔': ['반팔티'], '롱슬리브': ['긴팔티'],
+    '신발': ['스니커즈', '샌들/쪼리', '슬리퍼', '부츠', '구두/로퍼', '단화/플랫', '하이힐/펌프스'],
+    '샌들': ['샌들/쪼리'], '쪼리': ['샌들/쪼리'], '구두': ['구두/로퍼'], '로퍼': ['구두/로퍼'], '단화': ['단화/플랫'], '플랫슈즈': ['단화/플랫'],
+    '하이힐': ['하이힐/펌프스'], '펌프스': ['하이힐/펌프스'], '브리프': ['브리프/팬티'], '팬티': ['브리프/팬티'], '속옷': ['브리프/팬티'],
+    '머플러': ['스카프'], '목도리': ['스카프'], '스카프': ['스카프'], '주얼리': ['쥬얼리'], '쥬얼리': ['쥬얼리'], '목걸이': ['쥬얼리'], '귀걸이': ['쥬얼리'],
+    '반바지': ['반바지'], '슬리퍼': ['슬리퍼'], '모자': ['모자'], '잡화': ['잡화'], '청바지': ['청바지'], '가디건': ['가디건'],
+    '롱패딩': ['패딩'], '경량패딩': ['패딩'], '다운': ['패딩'], '푸퍼': ['패딩']
+  };
+  // ───────── 계절 ─────────
+  // 달 → 지금 팔리는 계절 (한 달 앞서 판다)
+  var SEASON_OF_MONTH = { 1: ['겨울'], 2: ['겨울', '봄'], 3: ['봄'], 4: ['봄'], 5: ['봄', '여름'], 6: ['여름'], 7: ['여름'], 8: ['여름', '가을'], 9: ['가을'], 10: ['가을', '겨울'], 11: ['가을', '겨울'], 12: ['겨울'] };
+  // 계절에 확실히 안 맞는 상품명 단어
+  var OFF_WORDS = {
+    '겨울': ['반팔', '반바지', '샌들', '쪼리', '플립플롭', '민소매', '슬리브리스', '쇼츠', '수영복', '비키니', '린넨', '리넨'],
+    '봄': ['패딩', '다운', '푸퍼', '기모', '무스탕', '시어링', '목도리', '수영복', '비키니'],
+    '여름': ['패딩', '다운', '푸퍼', '기모', '무스탕', '시어링', '목도리', '머플러', '부츠', '코트', '캐시미어'],
+    '가을': ['샌들', '쪼리', '플립플롭', '민소매', '슬리브리스', '수영복', '비키니', '린넨', '리넨']
+  };
+  // mode: 'auto'(이번 달) | '봄'|'여름'|'가을'|'겨울' | 'none'
+  function activeSeasons(mode, now) {
+    if (mode === 'none') return [];
+    if (OFF_WORDS[mode]) return [mode];
+    return SEASON_OF_MONTH[(now || new Date()).getMonth() + 1];
+  }
+  // 활성 계절 모두에서 안 맞는 단어. 고른 종류 자신의 단어(예: 겨울에 샌들/쪼리를 직접 고름)는 뺀다.
+  function offWords(active, kinds) {
+    if (!active || !active.length) return [];
+    var own = {}; (kinds || []).forEach(function (k) { (KIND_MAP[k] || []).forEach(function (w) { own[w] = 1; }); });
+    return OFF_WORDS[active[0]].filter(function (w) {
+      return !own[w] && active.every(function (a) { return OFF_WORDS[a].indexOf(w) >= 0; });
+    });
+  }
+  function kindInSeason(k, active) {
+    var sp = SPEC[k]; if (!sp || !sp.s.length || !active || !active.length) return true;
+    return sp.s.some(function (x) { return active.indexOf(x) >= 0; });
+  }
+  function dropOffSeason(rows, off) {
+    if (!off || !off.length) return rows;
+    return rows.filter(function (r) {
+      var n = r.name + ' ' + (r.tg || '');
+      for (var i = 0; i < off.length; i++) { if (n.indexOf(off[i]) >= 0) return false; }
+      return true;
+    });
+  }
+  // 단어 w 가 고른 종류(들)의 단어일 때, 그 종류의 '아님' 단어가 상품명에 있으면 이 단어로는 안 잡는다
+  function blockedByKind(w, text, kinds) {
+    if (!kinds || !kinds.length) return false;
+    var owners = kinds.filter(function (k) { return SPEC[k] && SPEC[k].w.indexOf(w) >= 0; });
+    if (!owners.length) return false;                         // 종류와 상관없는 직접 쓴 단어
+    return owners.every(function (k) { return SPEC[k].x.some(function (xw) { return text.indexOf(xw) >= 0; }); });
+  }
   var STOP = ['명품', '세일', '기획전', '기획', '할인', '프로모션', '이벤트', '관련', '브랜드', '입니다', '주세요', '해주세요',
     '11월', '12월', '10월', '9월', '8월', '1월', '2월', '3월', '4월', '5월', '6월', '7월', '등', '및', '그리고'];
 
@@ -107,11 +201,22 @@
     });
     var words = [], kinds = [];
     Object.keys(KIND_MAP).forEach(function (k) {
-      if (textN.indexOf(k) >= 0) {
+      if ((k === '셔츠' ? textN.replace(/티셔츠/g, '') : textN).indexOf(k) >= 0) {
         kinds.push(k);
         KIND_MAP[k].forEach(function (w) { if (words.indexOf(w) < 0) words.push(w); });
       }
     });
+    Object.keys(KIND_ALIAS).forEach(function (a) {
+      if (textN.indexOf(a) < 0) return;
+      KIND_ALIAS[a].forEach(function (k) {
+        if (kinds.indexOf(k) < 0) kinds.push(k);
+        (KIND_MAP[k] || []).forEach(function (w) { if (words.indexOf(w) < 0) words.push(w); });
+      });
+    });
+    var canon = []; // 예전 이름(티셔츠·신발·머플러…)은 칩 이름으로 바꾼다
+    kinds.forEach(function (k) { (KIND_ALIAS[k] || [k]).forEach(function (c) { if (canon.indexOf(c) < 0) canon.push(c); }); });
+    kinds = canon;
+    if (kinds.indexOf('셔츠') >= 0 && textN.replace(/티셔츠/g, '').indexOf('셔츠') < 0) kinds.splice(kinds.indexOf('셔츠'), 1); // '티셔츠'만 말했는데 셔츠까지 고르지 않게
     var audiences = [];
     if (/키즈|아동|아기|주니어|kids/i.test(text)) audiences.push('아동');
     if (/여성|우먼|레이디/.test(text)) audiences.push('여성');
@@ -121,7 +226,7 @@
   }
 
   // audiences: ['여성','남성','아동'] 중 허용할 대상 (상품분류 맨 앞 단어 기준). 비어 있거나 분류가 없으면 거르지 않는다.
-  function select(rows, brands, words, inStockOnly, audiences, seasons) {
+  function select(rows, brands, words, inStockOnly, audiences, seasons, kinds) {
     var bset = {};
     brands.forEach(function (b) { bset[b] = true; });
     return rows.filter(function (r) {
@@ -135,7 +240,7 @@
       if (words.length) {
         var ok = false;
         var hay = r.name + ' ' + (r.cat || '') + ' ' + (r.tg || ''); // 상품분류(카테고리)와 AI가 붙인 태그(r.tg)도 함께 본다
-        for (var i = 0; i < words.length; i++) { if (hay.indexOf(words[i]) >= 0) { ok = true; break; } }
+        for (var i = 0; i < words.length; i++) { if (hay.indexOf(words[i]) >= 0 && !blockedByKind(words[i], hay, kinds)) { ok = true; break; } }
         if (!ok) return false;
       }
       return true;
@@ -228,7 +333,8 @@
     '패딩': 'TOP', '다운': 'TOP', '푸퍼': 'TOP', '코트': 'TOP', '자켓': 'TOP', '재킷': 'TOP', '점퍼': 'TOP', '니트': 'TOP', '스웨터': 'TOP',
     '후드': 'TOP', '맨투맨': 'TOP', '셔츠': 'TOP', '티셔츠': 'TOP', '가디건': 'TOP', '블레이저': 'TOP', '무스탕': 'TOP', '파카': 'TOP', '트렌치': 'TOP', '베스트': 'TOP',
     '팬츠': 'BOTTOM', '청바지': 'BOTTOM', '스커트': 'BOTTOM', '원피스': 'CLOTH',
-    '가방': '가방', '지갑': '지갑', '스니커즈': '신발', '부츠': '신발', '신발': '신발', '머플러': '머플러', '목도리': '머플러'
+    '가방': '가방', '지갑': '지갑', '스니커즈': '신발', '부츠': '신발', '신발': '신발', '머플러': '머플러', '목도리': '머플러',
+    '긴팔티': 'TOP', '반팔티': 'TOP', '반바지': 'BOTTOM', '샌들/쪼리': '신발', '슬리퍼': '신발', '구두/로퍼': '신발', '단화/플랫': '신발', '하이힐/펌프스': '신발'
   };
   function catOkForKinds(r, kinds) {
     if (!kinds || !kinds.length || !r.cat) return true;
@@ -253,6 +359,6 @@
       return ex.some(function (w) { return n.indexOf(w) >= 0; });
     });
   }
-  var api = { excludedByKinds: excludedByKinds, catOkForKinds: catOkForKinds, MALL_COLS: MALL_COLS, OUT_HEAD: OUT_HEAD, mallRecord: mallRecord, groupMalls: groupMalls, mergeMap: mergeMap, mapAsOf: mapAsOf, convert: convert, seasonOf: seasonOf, seasonRank: seasonRank, order: order, brandStats: brandStats, parseSabangnet: parseSabangnet, parseRequest: parseRequest, select: select, KIND_MAP: KIND_MAP };
+  var api = { KIND_SPEC: KIND_SPEC, KIND_GROUPS: KIND_GROUPS, KIND_ALIAS: KIND_ALIAS, activeSeasons: activeSeasons, offWords: offWords, kindInSeason: kindInSeason, dropOffSeason: dropOffSeason, excludedByKinds: excludedByKinds, catOkForKinds: catOkForKinds, MALL_COLS: MALL_COLS, OUT_HEAD: OUT_HEAD, mallRecord: mallRecord, groupMalls: groupMalls, mergeMap: mergeMap, mapAsOf: mapAsOf, convert: convert, seasonOf: seasonOf, seasonRank: seasonRank, order: order, brandStats: brandStats, parseSabangnet: parseSabangnet, parseRequest: parseRequest, select: select, KIND_MAP: KIND_MAP };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PromoPick = api;
 })(typeof window !== 'undefined' ? window : this);

@@ -96,7 +96,8 @@
         var names = {}, any = false;
         Object.keys(cells).forEach(function (k) { names[String(cells[k]).replace(/\s+/g, ' ').trim()] = +k; });
         var optional = (opts && opts.optional) || [];
-        pick = wanted.map(function (w) { var k = names[w]; if (k !== undefined) any = true; return k; });
+        var nsp = {}; Object.keys(names).forEach(function (k) { nsp[k.replace(/\s+/g, '')] = names[k]; });   // 띄어쓰기 달라도 같은 열로 본다 (부가정보 제목 = 부가정보제목)
+        pick = wanted.map(function (w) { var k = names[w]; if (k === undefined) k = nsp[w.replace(/\s+/g, '')]; if (k !== undefined) any = true; return k; });
         if (!any || pick.some(function (k, ix) { return k === undefined && optional.indexOf(wanted[ix]) < 0; })) { pick = null; continue; }
         header = Object.keys(names);
         continue;

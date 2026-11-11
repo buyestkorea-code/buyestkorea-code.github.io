@@ -30,6 +30,10 @@
   .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:8px 14px;font-size:13px;background:#fff;cursor:pointer;}
   .chip.on{background:var(--okbg);border-color:var(--ok);color:var(--ok);font-weight:600;}
   .chip input{margin:0;}
+  .kg{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;} .kg>b{flex:0 0 78px;font-size:12px;color:var(--sub);font-weight:600;}
+  .kg .chip{padding:6px 12px;margin:0;} .chip.off{opacity:.5;border-style:dashed;}
+  .sea{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;}
+  .sea select{font:13px var(--font);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;}
   table{width:100%;border-collapse:collapse;font-size:12.5px;} th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;}
   th{background:#fafaf8;position:sticky;top:0;}
   .tw{max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff;margin-top:12px;}
@@ -66,7 +70,9 @@
   <div class="f"><label class="l">브랜드 <span class="hint" id="brandHint"></span></label><div class="chips" id="brandChips"></div>
     <div class="row" style="margin-top:8px"><button class="btn btn-out" type="button" id="topBrands">재고 많은 상위 5개만 선택</button><button class="btn btn-out" type="button" id="clearBrands">선택 해제</button></div>
     <div class="hint">브랜드 옆 숫자는 상품 수 · 재고 합계입니다(재고 많은 순). 체크한 브랜드만 대상이 돼요.</div></div>
-  <div class="f"><label class="l">상품 종류 <span class="hint">— 눌러서 고르면 아래 단어 칸이 자동으로 채워져요 (유의어 포함)</span></label><div class="chips" id="kindChips"></div></div>
+  <div class="f"><label class="l">상품 종류 <span class="hint">— 사방넷 카테고리 기준. 눌러서 고르면 아래 단어 칸이 자동으로 채워져요 (유의어 포함)</span></label><div id="kindChips"></div>
+    <div class="sea"><label for="seaMode"><b>계절감</b></label><select id="seaMode"><option value="auto">자동 (이번 달 기준)</option><option value="봄">봄</option><option value="여름">여름</option><option value="가을">가을</option><option value="겨울">겨울</option><option value="none">상관없이 전부</option></select><span class="hint" id="seaNote" style="margin:0"></span></div>
+    <div class="hint">점선으로 흐린 종류는 지금 계절엔 잘 안 나가는 종류예요(눌러서 고를 수는 있어요). 계절에 안 맞는 단어가 상품명에 있는 상품(예: 겨울의 반팔·샌들)은 결과에서 빼고, 직접 고른 종류는 빼지 않아요. 긴팔티는 상품명에 '롱슬리브·긴팔'이 있는 것, 반팔티는 '반팔'이나 길이 표시가 없는 티셔츠예요.</div></div>
   <div class="f"><label class="l" for="words">상품명에 들어갈 단어 (하나라도 있으면 포함)</label>
     <input type="text" id="words" placeholder="패딩, 다운, 푸퍼">
     <div class="hint">비워두면 선택한 브랜드의 모든 상품이 나옵니다. 쉼표로 구분하세요.</div></div>
@@ -334,7 +340,14 @@ $('clearBrands').onclick=()=>renderBrands([]);
 function getOpts(){ const n=parseInt(($('maxN').value||'').replace(/[^0-9]/g,''),10); return {ord:document.querySelector('input[name=ord]:checked').value,max:n>0?n:0,balance:$('balance').checked,seasons:getSeasons()}; }
 function applyOrder(rows,o){ let out=PromoPick.order(rows,o.ord,o.balance); if(o.max&&out.length>o.max) out=out.slice(0,o.max); return out; }
 function getAud(){ return DATA&&DATA.hasCat?[...$('audChips').querySelectorAll('input:checked')].map(i=>i.value):[]; }
-const KIND_LIST=['패딩','코트','자켓','니트','후드','맨투맨','셔츠','티셔츠','팬츠','스커트','원피스','가방','지갑','신발','머플러'];
+const seaActive=()=>PromoPick.activeSeasons($('seaMode').value);
+function offNow(){ return PromoPick.offWords(seaActive(),getKindChips()); }
+function refreshKindDim(){
+  const act=seaActive();
+  $('kindChips').querySelectorAll('.chip').forEach(c=>c.classList.toggle('off',!PromoPick.kindInSeason(c.querySelector('input').value,act)));
+  $('seaNote').textContent=act.length?`지금 기준 계절: ${act.join('·')}`:'계절 상관없이 전부 뽑습니다';
+}
+$('seaMode').onchange=refreshKindDim;
 function getKindChips(){ return [...$('kindChips').querySelectorAll('input:checked')].map(i=>i.value); }
 function getKinds(){ return [...new Set([...getKindChips(),...PromoPick.parseRequest($('req').value,ALLB).kinds])]; }
 function syncWordsFromKinds(){
@@ -345,8 +358,9 @@ function syncWordsFromKinds(){
 }
 function renderKinds(sel){
   const set=new Set(sel);
-  $('kindChips').innerHTML=KIND_LIST.map(k=>`<label class="chip ${set.has(k)?'on':''}"><input type="checkbox" value="${k}" ${set.has(k)?'checked':''}> ${k}</label>`).join('');
+  $('kindChips').innerHTML=PromoPick.KIND_GROUPS.map(g=>`<div class="kg"><b>${g[0]}</b>${g[1].map(k=>`<label class="chip ${set.has(k)?'on':''}"><input type="checkbox" value="${k}" ${set.has(k)?'checked':''}> ${k}</label>`).join('')}</div>`).join('');
   $('kindChips').querySelectorAll('input').forEach(i=>i.onchange=()=>{ i.parentElement.classList.toggle('on',i.checked); syncWordsFromKinds(); });
+  refreshKindDim();
 }
 function showCond(brands,words,msg,aud,kinds){
   // 이미 고른 조건이 있으면 그 위에 더한다 (AI/규칙이 찾은 것을 합침)
@@ -439,9 +453,10 @@ $('pick').onclick=async()=>{
       $('msg').dataset.cap=`단어로 확실한 ${sure.length.toLocaleString()}개 + AI가 후보 ${cand.length.toLocaleString()}개를 보고 ${chosen.size-sure.length}개 추가. `;
     } else {
       const o=getOpts();
-      PICKED=applyOrder(PromoPick.select(DATA.rows,brands,words,$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons),o);
+      PICKED=applyOrder(PromoPick.select(DATA.rows,brands,words,$('stockOnly').checked&&DATA.hasStock,getAud(),o.seasons,getKindChips()),o);
       if(o.ord==='new'&&!HASREG) $('msg').dataset.cap='(등록일 정보가 없는 파일이라 신상 순은 적용되지 않았어요) ';
     }
+    { const off=offNow(); if(off.length&&PICKED.length){ const before=PICKED.length; PICKED=PromoPick.dropOffSeason(PICKED,off); if(before>PICKED.length) $('msg').dataset.cap=($('msg').dataset.cap||'')+`계절에 안 맞는 상품(${off.slice(0,4).join('·')} 등 상품명) ${(before-PICKED.length).toLocaleString()}개는 뺐어요. `; } }
     $('tb').innerHTML=PICKED.map(r=>{ const e=EC.idx?ecOf(r):null, z=e&&e.found&&e.total===0; return `<tr${z?' style="background:var(--badbg);color:var(--bad)"':''}><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.brand)}</td><td style="font-size:11.5px">${esc(r.cat||'')}</td><td>${r.price?Number(r.price).toLocaleString():''}</td><td>${e?(e.found?e.total.toLocaleString():'-'):''}</td><td style="font-size:11.5px">${e?esc(ecSizesText(e)):''}</td></tr>`; }).join('');
     $('tw').hidden=!PICKED.length;
     $('msg').className=PICKED.length?'msg ok':'msg';
@@ -587,6 +602,7 @@ $('mallFile').onchange=async e=>{
   const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
   $('mallPick').disabled=true;
   try{
+    const extraNotes=[];
     await srvList(true); MALLS=(await idbGet('malls'))||{};   // 다른 PC 가 먼저 올린 내용이 있으면 그 위에 합친다
     for(let i=0;i<files.length;i++){
       const f=files[i];
@@ -594,6 +610,8 @@ $('mallFile').onchange=async e=>{
       const r=await XlsxFast.readColumns(f,PromoPick.MALL_COLS,{optional:['부가정보제목']});
       const groups=PromoPick.groupMalls(r.rows);
       const ks=Object.keys(groups);
+      { const hasCol=r.header.some(h=>h.replace(/\s+/g,'')==='부가정보제목'); const nTitle=r.rows.filter(x=>String(x[16]||'').trim()).length;
+        extraNotes.push(hasCol?(nTitle?`${f.name}: 부가정보제목 ${nTitle.toLocaleString()}줄 읽음`:`⚠ ${f.name}: 부가정보제목 열은 있는데 값이 전부 비어 있어요`):`⚠ ${f.name}: '부가정보제목' 열이 없어요 (사방넷 다운로드 항목에 부가정보제목을 넣어서 다시 받아 주세요)`); }
       for(let j=0;j<ks.length;j++){
         const k=ks[j]; $('mallBusy').textContent=`(${i+1}/${files.length}) ${f.name} 저장 중... ${j+1}/${ks.length}`;
         const old=await idbGet('mall:'+k);
@@ -605,7 +623,7 @@ $('mallFile').onchange=async e=>{
       }
       await idbSet('malls',MALLS);
     }
-    $('mallBusy').textContent=`✅ ${files.length}개 파일을 반영했습니다.`;
+    $('mallBusy').textContent=`✅ ${files.length}개 파일을 반영했습니다. `+extraNotes.join(' / ');
     MALLMAP=null; renderMalls();
   }catch(err){ $('mallBusy').textContent='오류: '+err.message; }
   finally{ $('mallPick').disabled=false; }
@@ -645,8 +663,9 @@ $('convert').onclick=async()=>{
     const m=MALLS[k];
     $('ctb').innerHTML=CONV.matched.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[3])}</td><td>${esc(r[6])}</td><td>${esc(r[10])}</td><td>${r[12].toLocaleString()}</td></tr>`).join('');
     $('ctw').hidden=!CONV.matched.length;
+    const noTitle=CONV.matched.filter(r=>!String(r[14]||'').trim()).length;
     $('cmsg').className=CONV.matched.length?'msg ok':'msg err';
-    $('cmsg').textContent=`${m.mall} 기준: 바뀐 상품 ${CONV.matched.length.toLocaleString()}개 / 제외·미등록 ${CONV.skipped.length.toLocaleString()}개 (고른 상품 ${PICKED.length.toLocaleString()}개)`+(mallAge(m.asOf)>=MALL_WARN_DAYS?' · ⚠️ 쇼핑몰 자료가 오래됐어요':'');
+    $('cmsg').textContent=`${m.mall} 기준: 바뀐 상품 ${CONV.matched.length.toLocaleString()}개 / 제외·미등록 ${CONV.skipped.length.toLocaleString()}개 (고른 상품 ${PICKED.length.toLocaleString()}개)`+(mallAge(m.asOf)>=MALL_WARN_DAYS?' · ⚠️ 쇼핑몰 자료가 오래됐어요':'')+(noTitle?` · ⚠️ 부가정보제목이 비어 있는 상품 ${noTitle.toLocaleString()}개 (쇼핑몰 파일을 부가정보제목 포함해 다시 올리면 채워져요)`:'');
     const sk=CONV.skipped; const by={}; sk.forEach(s=>by[s.reason]=(by[s.reason]||0)+1);
     $('skipNote').hidden=!sk.length;
     const notReg=sk.filter(x=>x.reason==='이 쇼핑몰에 등록 안 됨');
