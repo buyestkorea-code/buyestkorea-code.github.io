@@ -102,11 +102,49 @@
   .alertbox{background:var(--badbg);border:2px solid var(--bad);color:var(--bad);border-radius:10px;padding:10px 12px;margin:8px 0;font-size:13px;}
   .alertbox pre{white-space:pre-wrap;font:12.5px var(--font);margin:6px 0;color:#7a1710;}
   .cok{background:var(--okbg);color:var(--ok);} .cwarn{background:var(--warnbg);color:var(--warn);} .cbad{background:var(--badbg);color:var(--bad);}
+  /* 상단 탭 (상세페이지 만들기 / 시즌변경) */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 14px;}
+  .tabs button{font:600 14px var(--font);padding:9px 16px 10px;border:0;background:none;color:var(--sub);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tabs button.on{color:var(--ink);border-bottom-color:var(--ink);}
+  .tabs button:hover:not(.on){color:var(--ink);}
+  .tabs button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px;border-radius:6px;}
+  /* 시즌변경 */
+  #seasonBox{display:none;}
+  .sv-meta{font-size:12.5px;color:var(--sub);margin:0 0 10px;}
+  .sv-season{background:var(--bluebg);border-radius:10px;padding:10px 12px;margin:0 0 12px;}
+  .sv-season label{display:block;margin-bottom:6px;font-size:13px;}
+  .sv-tbl{border-collapse:collapse;width:100%;font-size:13px;}
+  .sv-tbl th,.sv-tbl td{border-top:1px solid var(--line);padding:6px 8px;vertical-align:top;text-align:left;}
+  .sv-tbl thead th{border-top:0;color:var(--sub);font-weight:600;font-size:12px;}
+  .sv-tbl tbody th{width:86px;color:var(--sub);font-weight:600;white-space:nowrap;}
+  .sv-tbl td.old{color:#55595f;line-height:1.5;word-break:break-all;width:30%;}
+  .sv-tbl td.nt{width:150px;white-space:nowrap;}
+  .sv-tbl textarea{min-height:0;}
+  .sv-sub{margin:14px 0 6px;font-size:13px;}
+  .sv-mini{border-collapse:collapse;font-size:13px;} .sv-mini th,.sv-mini td{border:1px solid var(--line);padding:4px 12px;text-align:center;} .sv-mini th{background:#f5f5f3;font-weight:600;}
+  .sv-ph{display:flex;flex-wrap:wrap;gap:8px;}
+  .sv-p{display:flex;flex-direction:column;gap:4px;align-items:center;font-size:11.5px;color:var(--sub);border:1px solid var(--line);border-radius:10px;padding:6px;background:#fff;cursor:pointer;}
+  .sv-p img{width:96px;height:96px;object-fit:contain;background:#f0f0ee;border-radius:6px;}
+  .sv-fx{margin-top:10px;font-size:12.5px;color:var(--sub);} .sv-fx summary{cursor:pointer;margin-bottom:8px;}
+  #seasonDrop:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
 </style>
 </head>
 <body>
 <h1>사진 자동화 <span class="badge">TEST</span> <button class="btn btn-out btn-sm" id="newJob" type="button" title="지금 작업은 최근 작업에 그대로 남고, 빈 화면으로 새로 시작합니다">＋ 새 작업</button></h1>
-<p class="lead">사진 + 기본틀 엑셀 + 상품명만 넣으면 상세페이지 이미지(폭 720px)를 자동으로 조립합니다. <b>실측</b>은 직접 입력하세요. 만드는 작업은 이 브라우저 안에서 처리되고, 결과와 사진은 <b>서버에 3일간 보관</b>돼 아래 '최근 작업'에서 다시 불러올 수 있습니다.</p>
+<div class="tabs" role="tablist" aria-label="작업 방식">
+  <button type="button" role="tab" id="tabNew" class="on" aria-selected="true">상세페이지 만들기</button>
+  <button type="button" role="tab" id="tabSeason" aria-selected="false">시즌변경</button>
+</div>
+<p class="lead" id="leadNew">사진 + 기본틀 엑셀 + 상품명만 넣으면 상세페이지 이미지(폭 720px)를 자동으로 조립합니다. <b>실측</b>은 직접 입력하세요. 만드는 작업은 이 브라우저 안에서 처리되고, 결과와 사진은 <b>서버에 3일간 보관</b>돼 아래 '최근 작업'에서 다시 불러올 수 있습니다.</p>
+<p class="lead" id="leadSeason" style="display:none">예전 틀로 만든 상세페이지 PSD를 올리면 글자·실측표·사진을 읽어 <b>현재 템플릿</b>에 옮겨 줍니다. 시즌·원산지·소재처럼 바뀐 값은 고쳐 쓰고, 그 뒤는 상세페이지 만들기 · 수정 · 사이트 등록까지 똑같이 진행해요.</p>
+
+<div class="box" id="seasonBox">
+  <h2>시즌변경 — 예전 PSD를 현재 템플릿으로</h2>
+  <div class="drop" id="seasonDrop" tabindex="0" role="button" aria-label="예전 PSD 파일 올리기">예전 상세페이지 PSD(.psd)를 끌어놓거나 클릭<div class="hint" style="margin-top:4px">PSD는 이 브라우저 안에서만 읽고 서버로 보내지 않아요 · 한 번에 한 상품</div></div>
+  <input type="file" id="seasonFile" accept=".psd" hidden>
+  <div id="seasonLoad" class="hint" style="margin-top:6px"></div>
+  <div id="seasonRes" style="margin-top:10px"></div>
+</div>
 
 <div class="box hist">
   <h2>최근 작업 <span class="hint">(서버에 마지막 작업 후 3일간 보관 · 팀 공용)</span> <button class="btn btn-out btn-sm" id="histRefresh" type="button">새로고침</button> <button class="btn btn-out btn-sm" id="histFold" type="button" aria-expanded="true">목록 접기 ▲</button></h2>
@@ -169,6 +207,8 @@
       <div class="row" style="margin-top:8px">
         <button class="btn btn-out btn-sm" id="szAddRow" type="button">＋ 사이즈(줄) 추가</button>
         <button class="btn btn-out btn-sm" id="szAddCol" type="button">＋ 항목(칸) 추가</button>
+        <button class="btn btn-sm" id="szToOpt" type="button" style="background:#eef3ff;color:#1d4ed8;border:1px solid #b9ccff" title="이 표의 사이즈 줄을 ④ 사이트 등록의 '옵션1 값'에 그대로 넣습니다">옵션 1(사이트 등록)에 반영 ↓</button>
+        <span class="hint" id="szOptHint"></span>
         <span class="hint">단위 cm · 빈 칸(빨간색)이 남아 있으면 경고가 떠요</span>
       </div>
       <input type="text" id="size" hidden><textarea id="table" hidden></textarea>
@@ -264,6 +304,7 @@
 <script src="assets/libs/jszip-3.10.1.min.js"></script>
 <script src="assets/libs/jpeg-encoder-0.4.4.js"></script>
 <script src="assets/photo-auto/templates.js"></script>
+<script src="assets/photo-auto/season.js"></script>
 <script>
 (function(){
 'use strict';
@@ -809,8 +850,23 @@ function gridDraw(){
       td.appendChild(inp); tr.appendChild(td); });
     tb.appendChild(tr);
   });
-  box.appendChild(tb);
+  box.appendChild(tb); refreshOptHint();
 }
+/* 실측표의 사이즈 줄 ↔ 사이트 등록 '옵션1 값' 맞추기 */
+function tableSizes(){ return grid.slice(1).map(function(r){ return String(r[0]||'').trim(); }).filter(Boolean); }
+function refreshOptHint(){
+  var h=$('szOptHint'), t=$('rT1v'); if(!h||!t) return;
+  var a=tableSizes(), b=t.value.split(',').map(function(x){ return x.trim(); }).filter(Boolean);
+  if(!a.length){ h.textContent=''; return; }
+  var same=a.length===b.length&&a.every(function(x){ return b.indexOf(x)>=0; });
+  h.textContent=same?'✔ 옵션 1 값과 같아요':'⚠ 옵션 1 값('+(b.join(',')||'비어 있음')+')과 달라요 — 왼쪽 버튼으로 반영';
+  h.style.color=same?'#0f766e':'#a15c07';
+}
+$('szToOpt').addEventListener('click',function(){
+  var a=tableSizes(); if(!a.length){ alert('실측표에 사이즈 줄이 없어요.'); return; }
+  if(window.PhotoRegister&&PhotoRegister.setTier){ PhotoRegister.setTier(1,'사이즈',a); refreshOptHint(); $('szOptHint').textContent='✔ 옵션 1 값을 '+$('rT1v').value+' 로 바꿨어요 (입고된 값은 이 안에 있는 것만 유지)'; }
+});
+document.addEventListener('input',function(e){ if(e.target&&(e.target.id==='rT1v'||(e.target.closest&&e.target.closest('#szGrid')))) refreshOptHint(); });
 function gridSet(g){ grid=normGrid(g&&g.length?g:PRE_WALLET.map(function(r){return r.slice();})); if(grid.length<2) grid.push(grid[0].map(function(x,i){return i?'':'단품';})); gridSave(); gridDraw(); }
 function setGridRows(rows){ gridSet(rows); }
 $('szGrid').addEventListener('input',function(e){
@@ -1237,7 +1293,7 @@ $('go').addEventListener('click',function(){
   var f=readF();
   (state.infoRows?state.infoRows.filter(function(k){ return ['상품명','수입여부','구성품'].indexOf(k)<0; }):['브랜드','카테고리','제조년월','색상','제조국','소재'].concat(BAGS.indexOf(f['카테고리'])>=0?['수납공간']:[])).forEach(function(k){ if(!f[k]) warns.push('"'+k+'" 비어 있음'); });
   if(state.info.color && !state.info.colorKnown) warns.push('색상 "'+state.info.color+'" 이(가) 일반 색상어가 아님 — 확인');
-  if(!state.info.category) warns.push('카테고리를 상품명에서 못 찾음 — 직접 입력');
+  if(!state.info.category && !f['카테고리']) warns.push('카테고리를 상품명에서 못 찾음 — 직접 입력');
   var chart=(state.pending&&state.pending.chart)||buildSizeChart();
   state.pending=null;
   var pn=$('pname').value.trim(); if(!state.job||state.jobName!==pn){ state.job=newId(); state.jobName=pn; }
@@ -1585,6 +1641,7 @@ function applySizeSet(k){
   z.v.forEach(function(lb,i){ var r=[lb]; for(var c=1;c<header.length;c++) r.push(c===mmI&&z.mm?z.mm[i]:''); g.push(r); });
   gridSet(g);
   if(window.PhotoRegister&&PhotoRegister.setTier) PhotoRegister.setTier(1,'사이즈',z.v);
+  refreshOptHint();
   if(window.PhotoRegister) PhotoRegister.invalidate();
 }
 function setChipClick(e,attr,fn){
@@ -1621,6 +1678,7 @@ $('chartMode').addEventListener('change',function(){ state.chartMode=this.value;
 $('bottomSel').addEventListener('change',function(){ state.bottomKey=this.value; afterTplChange(); });
 
 window.PhotoAuto={
+  optHint:function(){ refreshOptHint(); },
   infoRows:function(){ return state.infoRows; },
   setField:function(k,v){ if(fld(k)){ fld(k).value=v; state.dirty[k]=true; mark(); } },
   sizeText:function(){ return $('size').value.trim(); },
@@ -1662,6 +1720,21 @@ window.PhotoAuto={
 };
 gridSet(gridFromText());
 if(window.PhotoRegister) PhotoRegister.init();
+/* 시즌변경 탭이 쓰는 입구 (assets/photo-auto/season.js) */
+if(window.PhotoSeason) PhotoSeason.init({
+  hasPhotos:function(){ return state.photos.length; },
+  setPhotos:function(files){
+    state.photos=files.map(function(f){ return {file:f,url:URL.createObjectURL(f),key:keyOf(f)}; });
+    state.last=null; drawPhotos();
+  },
+  setPname:function(v){ $('pname').value=v; $('pname').dispatchEvent(new Event('input',{bubbles:true})); },
+  setField:function(k,v){ if(!fld(k)){ ensureField(k); if(state.infoRows&&state.infoRows.indexOf(k)<0) setInfoRows(state.infoRows.concat([k])); } fld(k).value=v; fld(k).dispatchEvent(new Event('input',{bubbles:true})); },
+  setChartFull:function(){ state.chartMode='full'; $('chartMode').value='full'; szVisible(); },
+  setGrid:function(g){ gridSet(g.map(function(r){ return r.slice(); })); },
+  tplChosen:function(){ return !!state.tplId; },
+  scrollTop:function(){ $('tplSel').scrollIntoView({block:'start',behavior:'smooth'}); },
+  go:function(){ $('go').click(); }
+});
 })();
 </script>
 <script src="assets/photo-auto/template.js"></script>

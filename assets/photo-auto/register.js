@@ -154,7 +154,7 @@ function fill(v){
   kidsToggle(); invalidate();
 }
 function kidsToggle(){ var on=$('rKids').checked; ['rKidsPrice','rKidsShowWrap'].forEach(function(id){ $(id).style.display=on?'':'none'; }); }
-function invalidate(){ R.lastPreview=null; R.previewKey=''; refreshButtons(); }
+function invalidate(){ R.lastPreview=null; R.previewKey=''; refreshButtons(); if(root.PhotoAuto&&root.PhotoAuto.optHint) root.PhotoAuto.optHint(); }
 function keyOf(){
   var c=PA.ctx(); if(!c) return '';
   return JSON.stringify([c.pname,c.genId,collect(),c.photos.slice(0,2).map(function(p){return p.file.name+p.file.size;})]);
