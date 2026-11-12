@@ -6643,6 +6643,12 @@ window.__loadLib = (function(){
       if(r.status === 'changed' || r.status === 'dupChanged') return r.newStock;
       return (r.status === 'noChange' || r.status === 'hold') ? r.item.remain : '';
     }
+    // 재고 차이 = 신규 값(이카운트 잔량) - 기존 현재고(사방넷). 둘 다 숫자일 때만 계산.
+    function rvmDiff(r){
+      var nv = rvmNewValueDisplay(r);
+      if(r.curStock === undefined || nv === '' || nv == null) return '';
+      return Number(nv) - Number(r.curStock);
+    }
     function rvmSbCode(r){
       if(r.sbRowIdx === undefined) return '';
       var rows = r.holdRows || [r.sbRowIdx];
@@ -6712,11 +6718,11 @@ window.__loadLib = (function(){
 
       var table = document.getElementById('rvmTable');
       table.innerHTML = '';
-      var cols = ['품목명','규격','상태','사방넷 상품명','사방넷상품코드','기존 현재고','신규 값(잔량)'];
+      var cols = ['품목명','규격','상태','사방넷 상품명','사방넷상품코드','기존 현재고','신규 값(잔량)','재고 차이'];
       var thead = el('thead');
       var htr = el('tr');
       cols.forEach(function(c){
-        var attrs = (c === '규격' || c === '기존 현재고' || c === '신규 값(잔량)') ? {class:'num'} : null;
+        var attrs = (c === '규격' || c === '기존 현재고' || c === '신규 값(잔량)' || c === '재고 차이') ? {class:'num'} : null;
         htr.appendChild(el('th', attrs, [document.createTextNode(c)]));
       });
       thead.appendChild(htr); table.appendChild(thead);
@@ -6754,10 +6760,11 @@ window.__loadLib = (function(){
         tr.appendChild(td(rvmSbCode(r)));
         tr.appendChild(td(r.curStock === undefined ? '' : r.curStock, true));
         tr.appendChild(td(rvmNewValueDisplay(r), true));
+        tr.appendChild(td(rvmDiff(r), true));
         tbody.appendChild(tr);
         if(r.dup){
           var dtr = el('tr'); dtr.style.display = 'none';
-          var dtd = el('td', {colspan:'7'});
+          var dtd = el('td', {colspan:'8'});
           var html = '<div style="padding:6px 10px;font-size:12.5px;line-height:1.7;">' +
             (r.dup.reasons ? '<div style="color:#92400e;font-weight:600;">' + r.dup.reasons.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>' : '');
           r.dup.cands.forEach(function(c){
@@ -6824,10 +6831,10 @@ window.__loadLib = (function(){
     // 화면에 보이는 매칭 결과 표(반영예정·변동없음·규격불일치·중복·상품없음 전부)를 그대로 다운로드한다.
     // 사방넷 재업로드용 파일이 아니라, 지금 화면 상태를 그대로 기록해두는 결과표다.
     function buildRvmFullResultAoa(){
-      var header = ['품목명','규격','전일재고','구매','판매','잔량','상태','사방넷 상품명','사방넷상품코드','기존 현재고','신규 값(잔량)'];
+      var header = ['품목명','규격','전일재고','구매','판매','잔량','상태','사방넷 상품명','사방넷상품코드','기존 현재고','신규 값(잔량)','재고 차이'];
       var aoa = [header];
       rvmSortedResults(state.results||[]).forEach(function(r){
-        aoa.push([r.item.name, r.item.spec, r.item.prevStock, r.item.buy, r.item.sale, r.item.remain, RVM_STATUS_LABEL[r.status], r.sbName||'', rvmSbCode(r), r.curStock===undefined?'':r.curStock, rvmNewValueDisplay(r)]);
+        aoa.push([r.item.name, r.item.spec, r.item.prevStock, r.item.buy, r.item.sale, r.item.remain, RVM_STATUS_LABEL[r.status], r.sbName||'', rvmSbCode(r), r.curStock===undefined?'':r.curStock, rvmNewValueDisplay(r), rvmDiff(r)]);
       });
       return aoa;
     }
@@ -6836,7 +6843,7 @@ window.__loadLib = (function(){
       try{
         var outAoa = buildRvmFullResultAoa();
         var ws = XLSX.utils.aoa_to_sheet(outAoa);
-        ws['!cols'] = [{wch:38},{wch:8},{wch:10},{wch:8},{wch:8},{wch:8},{wch:12},{wch:38},{wch:16},{wch:12},{wch:12}];
+        ws['!cols'] = [{wch:38},{wch:8},{wch:10},{wch:8},{wch:8},{wch:8},{wch:12},{wch:38},{wch:16},{wch:12},{wch:12},{wch:10}];
         ws['!autofilter'] = {ref: ws['!ref']};
         var wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '매칭결과');
