@@ -202,10 +202,11 @@
   <div class="grid" style="margin-top:12px" id="szBlock">
     <div class="wide">
       <label>실측 표 — 칸을 눌러 바로 입력 (엑셀에서 복사해 붙여넣어도 됩니다. 첫 줄 = 항목 이름, 첫 칸 = 사이즈 이름)</label>
-      <div class="hint" style="margin:2px 0 4px">① 항목 세트 (표의 맨 윗줄)</div>
+      <div class="hint" style="margin:2px 0 4px">표 세트 — 누르면 항목(맨 윗줄)과 사이즈 줄이 함께 채워져요. ★ 내 세트는 저장해 둔 항목·사이즈 그대로 복원돼요</div>
       <div class="row" id="itemChips" style="margin-bottom:8px"></div>
-      <div class="hint" style="margin:2px 0 4px">② 사이즈 세트 (표의 첫 칸 + 옵션 1 값도 같이 채워짐)</div>
-      <div class="row" id="sizeChips" style="margin-bottom:10px"></div>
+      <details style="margin:0 0 10px"><summary class="hint" style="cursor:pointer">사이즈 줄만 바꾸기 (항목은 그대로 두고 첫 칸 + 옵션 1 값만 교체)</summary>
+        <div class="row" id="sizeChips" style="margin-top:6px"></div>
+      </details>
       <div id="szGrid" style="overflow:auto"></div>
       <div class="row" style="margin-top:8px">
         <button class="btn btn-out btn-sm" id="szAddRow" type="button">＋ 사이즈(줄) 추가</button>
@@ -1569,7 +1570,7 @@ function setsCall(action,fields){
 }
 function setSyncNote(t){ SYNC_NOTE=t||''; var e=$('setSync'); if(e) e.textContent=SYNC_NOTE; }
 function setBody(kind,t){
-  if(kind==='item') return {corner:t.corner,cols:t.cols,rows:t.rows};
+  if(kind==='item'){ var ib={corner:t.corner,cols:t.cols,rows:t.rows}; if(t.mm) ib.mm=t.mm; return ib; }
   if(kind==='size'){ var b={v:t.v}; if(t.mm) b.mm=t.mm; if(t.hdr) b.hdr=t.hdr; return b; }
   return {rows:t.rows,chart:t.chart,bottom:t.bottom,grid:t.grid,defaults:t.defaults||null};
 }
@@ -1595,7 +1596,7 @@ function syncSets(){
   }).then(function(j){
     var o={items:[],sizes:[]}, tp=[];
     j.sets.forEach(function(x){ var b=x.body||{};
-      if(x.kind==='item'){ o.items.push({k:'myitem:'+x.name,name:x.name,corner:b.corner||'사이즈',cols:b.cols||[],rows:b.rows||['단품'],srv:true,by:x.updated_by}); }
+      if(x.kind==='item'){ var it0={k:'myitem:'+x.name,name:x.name,corner:b.corner||'사이즈',cols:b.cols||[],rows:b.rows||['단품'],srv:true,by:x.updated_by}; if(b.mm) it0.mm=b.mm; o.items.push(it0); }
       else if(x.kind==='size'){ var z={k:'mysize:'+x.name,name:x.name,v:b.v||[],srv:true,by:x.updated_by}; if(b.mm) z.mm=b.mm; if(b.hdr) z.hdr=b.hdr; o.sizes.push(z); }
       else if(x.kind==='tpl'){ tp.push({id:'my:'+x.name,name:x.name,mine:true,rows:b.rows,chart:b.chart,bottom:b.bottom||'',grid:b.grid,defaults:b.defaults||null,srv:true,by:x.updated_by}); } });
     saveMySets(o); saveMyTpls(tp);
@@ -1663,21 +1664,23 @@ function renderSetChips(){
   ib.innerHTML=''; sb.innerHTML='';
   TPL.ITEMS.forEach(function(it){ chip(ib,it.name,'data-item',it.k); });
   ms.items.forEach(function(it){ mineChip(ib,it.name,'data-item',it.k,it.by); });
-  ib.appendChild(saveBtn('itemSave','＋ 지금 표의 항목을 세트로 저장'));
+  ib.appendChild(saveBtn('itemSave','＋ 지금 표(항목+사이즈)를 세트로 저장'));
   TPL.SIZES.forEach(function(z){ chip(sb,z.name,'data-size',z.k); });
   ms.sizes.forEach(function(z){ mineChip(sb,z.name,'data-size',z.k,z.by); });
   sb.appendChild(saveBtn('sizeSave','＋ 지금 표의 사이즈 줄을 세트로 저장'));
-  var sy=document.createElement('div'); sy.className='hint'; sy.id='setSync'; sy.style.cssText='width:100%;margin-top:4px'; sy.textContent=SYNC_NOTE; sb.appendChild(sy);
+  var sy=document.createElement('div'); sy.className='hint'; sy.id='setSync'; sy.style.cssText='width:100%;margin-top:4px'; sy.textContent=SYNC_NOTE; ib.appendChild(sy);
 }
 function saveItemSet(){
   if(!grid[0]||grid[0].length<2){ alert('저장할 항목이 없어요. 표 맨 윗줄에 항목 이름을 먼저 적어 주세요.'); return; }
   var cols=grid[0].slice(1).map(function(x){ return String(x).trim(); }).filter(Boolean);
   if(!cols.length){ alert('표 맨 윗줄에 항목 이름이 비어 있어요.'); return; }
-  var name=prompt('항목 세트 이름 (같은 이름이면 덮어씁니다)\n저장 내용: '+(grid[0][0]||'사이즈')+' | '+cols.join(' · '),cols.join('·')); if(name==null) return; name=name.trim(); if(!name) return;
   var rows=grid.slice(1).map(function(r){ return String(r[0]||'').trim(); }).filter(Boolean);
+  var name=prompt('표 세트 이름 (같은 이름이면 덮어씁니다)\n저장 내용: '+(grid[0][0]||'사이즈')+' | '+cols.join(' · ')+'\n사이즈 줄: '+(rows.join(' ')||'단품'),cols.join('·')); if(name==null) return; name=name.trim(); if(!name) return;
+  var mmI0=(grid[0]||[]).indexOf('MM'), mm0=null;
+  if(mmI0>0){ mm0=grid.slice(1).filter(function(r){ return String(r[0]||'').trim(); }).map(function(r){ return String(r[mmI0]||''); }); if(!mm0.some(Boolean)) mm0=null; }
   var o=mySets(), k='myitem:'+name, i=o.items.map(function(x){ return x.k; }).indexOf(k);
   if(i>=0&&!confirm('"'+name+'" 항목 세트가 이미 있어요. 덮어쓸까요?')) return;
-  var t={k:k,name:name,corner:String(grid[0][0]||'사이즈').trim()||'사이즈',cols:cols,rows:rows.length?rows:['단품'],srv:false};
+  var t={k:k,name:name,corner:String(grid[0][0]||'사이즈').trim()||'사이즈',cols:cols,rows:rows.length?rows:['단품'],srv:false}; if(mm0) t.mm=mm0;
   if(i>=0) o.items[i]=t; else o.items.push(t);
   if(saveMySets(o)){ renderSetChips(); setSyncNote('서버에 저장 중…'); pushSet('item',t); }
 }
@@ -1712,9 +1715,9 @@ function applyItemSet(k,fresh){
   else if(rows.length===1&&rows[0]==='단품') rows=it.rows;
   else if(needNum && !rows.every(function(x){ return /^[\d.]+$/.test(x); })) rows=it.rows;
   var g=[[it.corner].concat(it.cols)];
-  rows.forEach(function(lb){
+  rows.forEach(function(lb,ri){
     var orow=old.filter(function(x){return x[0]===lb;})[0], r=[lb];
-    it.cols.forEach(function(c){ var oi=oh.indexOf(c); r.push(orow&&oi>0?(orow[oi]||''):''); });
+    it.cols.forEach(function(c){ var oi=oh.indexOf(c), v=orow&&oi>0?(orow[oi]||''):''; if(!v&&fresh&&it.mm&&c==='MM'&&rows===it.rows) v=it.mm[ri]||''; r.push(v); });
     g.push(r);
   });
   gridSet(g); if(window.PhotoRegister) PhotoRegister.invalidate();
@@ -1724,6 +1727,15 @@ function applySizeSet(k){
   if(gridHasValues() && !confirm('입력해 둔 실측 값이 지워집니다. 사이즈 줄을 바꿀까요?')) return;
   var header=(grid[0]&&grid[0].length>1)?grid[0].slice():['사이즈','가로','세로','폭'];
   if(z.mm && header.indexOf('MM')<0){ if(z.hdr&&z.hdr.length>1) header=z.hdr.slice(); else { var it=TPL.item(k.indexOf('us')===0?'shoeUS':'shoeEU'); header=[it.corner].concat(it.cols); } }
+  /* MM 열은 신발 사이즈 세트(mm 값이 있는 세트)에서만 의미가 있다 → 앞서 쓰던 표의 MM 열이 옷 사이즈(XS S M L XL 등)로 넘어오지 않게 뺀다 */
+  if(!z.mm){
+    var keep=header.map(function(h,i){ return i===0||String(h).trim().toUpperCase()!=='MM'; });
+    if(keep.indexOf(false)>=0){
+      header=header.filter(function(h,i){ return keep[i]; });
+      if(header.length<2) header=['사이즈','가로','세로','폭'];
+      else if(/^사이즈\s*\(/.test(String(header[0]))) header[0]='사이즈';
+    }
+  }
   var mmI=header.indexOf('MM'), g=[header];
   z.v.forEach(function(lb,i){ var r=[lb]; for(var c=1;c<header.length;c++) r.push(c===mmI&&z.mm?z.mm[i]:''); g.push(r); });
   gridSet(g);
@@ -1737,7 +1749,13 @@ function setChipClick(e,attr,fn){
   var d=t.getAttribute('data-delset'); if(d){ deleteMySet(d); return; }
   var k=t.getAttribute(attr); if(k) fn(k);
 }
-$('itemChips').addEventListener('click',function(e){ if(e.target.id==='itemSave'){ saveItemSet(); return; } setChipClick(e,'data-item',function(k){ applyItemSet(k,itemFresh(k)); }); });
+$('itemChips').addEventListener('click',function(e){ if(e.target.id==='itemSave'){ saveItemSet(); return; } setChipClick(e,'data-item',function(k){
+  if(k.indexOf('myitem:')!==0){ applyItemSet(k,false); return; }   /* 내 세트 = 항목+사이즈 줄을 저장해 둔 그대로 복원 */
+  if(gridHasValues() && !confirm('입력해 둔 실측 값 중 사이즈 줄이 달라지는 칸은 지워집니다. 이 세트로 바꿀까요?')) return;
+  applyItemSet(k,true);
+  var it=findItem(k); if(it&&window.PhotoRegister&&PhotoRegister.setTier) PhotoRegister.setTier(1,'사이즈',it.rows);
+  refreshOptHint();
+}); });
 $('sizeChips').addEventListener('click',function(e){ if(e.target.id==='sizeSave'){ saveSizeSet(); return; } setChipClick(e,'data-size',applySizeSet); });
 function applyTplObj(t){
   state.tplId=t?t.id:'';
