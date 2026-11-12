@@ -21,7 +21,7 @@ var LABELS = {
   '수입여부':'수입여부','제조년월':'제조년월','구성품':'구성품','수납공간':'수납공간','굽높이':'굽높이'
 };
 /* 예전 틀에서 매번 똑같이 붙던 고정 안내 이미지(크기로 구분) — 사진으로 가져오지 않는다 */
-var FIXED_SIZES = [[468,112],[597,174],[602,199],[647,128],[646,30],[718,1407]];
+var FIXED_SIZES = [[468,112],[597,174],[602,199],[647,128],[646,30],[718,1407],[702,1090]];
 var FIELD_ORDER = ['상품명','브랜드한글','브랜드','카테고리','수입여부','제조년월','색상','제조국','구성품','소재'];
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -99,7 +99,7 @@ function hashCanvas(c){
   return h.toString(36)+'_'+c.width+'x'+c.height;
 }
 function isFixed(w,h){
-  if(w>=700) return true;
+  if(w>=700 && h>=800) return true; /* 가로 꽉 찬 긴 안내(반품·각인 등). 가로 700 이상이어도 높이가 낮으면 사진일 수 있다 */
   return FIXED_SIZES.some(function(s){ return Math.abs(s[0]-w)<=3 && Math.abs(s[1]-h)<=3; });
 }
 
@@ -115,7 +115,10 @@ function parsePsd(buf){
                .sort(function(a,b){ return a.top-b.top || a.left-b.left; });
     var seen={}, photos=pix.map(function(l,i){
       var w=l.right-l.left, h=l.bottom-l.top, hs=hashCanvas(l.canvas), dup=!!seen[hs]; seen[hs]=1;
-      return {canvas:l.canvas,w:w,h:h,top:l.top,name:l.name,dup:dup,fixed:isFixed(w,h),use:!isFixed(w,h),hash:hs};
+      /* 글자 레이어를 2개 이상 품고 있으면 상세정보 표의 줄무늬 같은 장식 이미지 — 사진이 아니다 */
+      var inside=texts.filter(function(t){ return t.left>=l.left-4 && t.right<=l.right+4 && t.top>=l.top-4 && t.bottom<=l.bottom+4; }).length;
+      var fx=isFixed(w,h) || inside>=2;
+      return {canvas:l.canvas,w:w,h:h,top:l.top,name:l.name,dup:dup,fixed:fx,use:!fx,hash:hs};
     });
     return {width:psd.width,height:psd.height,fields:rf.fields,table:table,photos:photos};
   });
@@ -142,6 +145,7 @@ function newRows(p){
   add('제조국',f['제조국']||'',f['제조국']||'');
   add('구성품',f['구성품']||'',f['구성품']||'');
   add('소재',f['소재']||'',f['소재']||'');
+  ['굽높이','수납공간'].forEach(function(k){ if(f[k]) add(k,f[k],f[k],'예전 PSD에 있던 항목 — 적용하면 항목이 추가돼요'); });
   return rows;
 }
 
