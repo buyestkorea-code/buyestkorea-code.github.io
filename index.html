@@ -6429,7 +6429,25 @@ window.__loadLib = (function(){
         if(candNames.length === 0){ if(!state.ecAuto){ stats.notFound++; results.push({item:it, status:'notFound'}); } return; }  // 서버 전체 재고는 사방넷에 없는 품목이 대부분이라 결과에서 제외
         // 시즌변경 대기(2026-11-05): 이카운트 이름에 '시즌변경'이 붙은 품목은 새 시즌 상품으로 갈아타는 중이라 옛 사방넷 상품에 재고를 반영하지 않는다.
         // 이카운트 이름에서 '시즌변경'을 빼면(새 상품명으로 바꾸면) 다시 자동 반영된다.
-        if(rvmSeasonHold(it.name)){ stats.hold++; results.push({item:it, status:'hold', sbName:candNames.join(' / ')}); return; }
+        if(rvmSeasonHold(it.name)){
+          // 반영은 안 하지만, 표/다운로드에 사방넷상품코드·기존 현재고를 보여주기 위해 규격이 맞는 사방넷 행을 찾아 둔다(2026-11-12).
+          var hLabel = rvmEcountLabel(it.name), hRows = [];
+          candNames.forEach(function(name){
+            if(rvmSabangLabel(name) !== hLabel) return;
+            if(!rvmLabelNumOk(it.name, name)) return;
+            nameGroups[name].forEach(function(ri){
+              if(rvmSpecsMatch(it.spec, aoa[ri][col['옵션상세명칭']])) hRows.push({rowIdx:ri, sbName:name});
+            });
+          });
+          var hr = {item:it, status:'hold', sbName: hRows.length ? hRows[0].sbName : candNames.join(' / ')};
+          if(hRows.length){
+            hr.sbRowIdx = hRows[0].rowIdx;
+            hr.holdRows = hRows.map(function(m){ return m.rowIdx; });
+            var hc = aoa[hRows[0].rowIdx][col['현재고']];
+            hr.curStock = hc==null ? 0 : (Number(hc) || 0);
+          }
+          stats.hold++; results.push(hr); return;
+        }
 
         // 품번이 같은 사방넷 상품명이 여러 개일 수 있다(같은 품번을 시즌/성별 등으로 중복
         // 등록한 경우, 또는 "하자"/"스크래치"처럼 상태 라벨로 별도 등록한 경우). 그런 후보
@@ -6623,12 +6641,15 @@ window.__loadLib = (function(){
     }
     function rvmNewValueDisplay(r){
       if(r.status === 'changed' || r.status === 'dupChanged') return r.newStock;
-      return r.status === 'noChange' ? r.item.remain : '';
+      return (r.status === 'noChange' || r.status === 'hold') ? r.item.remain : '';
     }
     function rvmSbCode(r){
       if(r.sbRowIdx === undefined) return '';
-      var v = state.sabangAoa[r.sbRowIdx][state.sabangCol['사방넷상품코드']];
-      return v == null ? '' : v;
+      var rows = r.holdRows || [r.sbRowIdx];
+      return rows.map(function(ri){
+        var v = state.sabangAoa[ri][state.sabangCol['사방넷상품코드']];
+        return v == null ? '' : v;
+      }).filter(function(v){ return v !== ''; }).join(', ');
     }
 
     function renderRvmResults(results, stats){
