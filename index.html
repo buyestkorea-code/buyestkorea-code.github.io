@@ -6643,11 +6643,11 @@ window.__loadLib = (function(){
       if(r.status === 'changed' || r.status === 'dupChanged') return r.newStock;
       return (r.status === 'noChange' || r.status === 'hold') ? r.item.remain : '';
     }
-    // 재고 차이 = 신규 값(이카운트 잔량) - 기존 현재고(사방넷). 둘 다 숫자일 때만 계산.
+    // 재고 차이 = 기존 현재고(사방넷) - 신규 값(이카운트 잔량). 둘 다 숫자일 때만 계산.
     function rvmDiff(r){
       var nv = rvmNewValueDisplay(r);
       if(r.curStock === undefined || nv === '' || nv == null) return '';
-      return Number(nv) - Number(r.curStock);
+      return Number(r.curStock) - Number(nv);
     }
     function rvmSbCode(r){
       if(r.sbRowIdx === undefined) return '';
