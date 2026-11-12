@@ -5772,17 +5772,44 @@ window.__loadLib = (function(){
       document.getElementById('ikhStatus').innerHTML = ''; document.getElementById('ikhFileList').innerHTML = '';
       document.getElementById('ikhActions').style.display = 'none'; document.getElementById('ikhResultPanel').style.display = 'none';
     });
-    document.getElementById('ikhDownload').addEventListener('click', function(){
+    // ExcelJS(서식을 그대로 입히는 라이브러리)는 내려받을 때만 불러온다.
+    var ikhExcelJsPromise = null;
+    function ikhLoadExcelJs(){
+      if(window.ExcelJS) return Promise.resolve();
+      if(!ikhExcelJsPromise){
+        ikhExcelJsPromise = new Promise(function(res, rej){
+          var s = document.createElement('script'); s.src = 'assets/libs/exceljs-4.4.0.min.js';
+          s.onload = function(){ res(); };
+          s.onerror = function(){ ikhExcelJsPromise = null; rej(new Error('엑셀 서식 라이브러리를 불러오지 못했어요.')); };
+          document.head.appendChild(s);
+        });
+      }
+      return ikhExcelJsPromise;
+    }
+    document.getElementById('ikhDownload').addEventListener('click', async function(){
       var st = document.getElementById('ikhDlStatus');
       try{ ikhKH(); }catch(err){ banner(st, 'err', '준비 실패', err.message); return; }
-      var secs = ikhSections.map(function(s){ return {title:s.title, items:s.items.filter(function(it){ return it.model && isFinite(+it.qty) && +it.qty !== 0; })}; }).filter(function(s){ return s.items.length; });
+      var secs = ikhSections.map(function(s){
+        return {title:s.title, total:(s.check && s.check.status === 'ok') ? s.check.total : null,
+                items:s.items.filter(function(it){ return it.model && isFinite(+it.qty) && +it.qty !== 0; })};
+      }).filter(function(s){ return s.items.length; });
       if(!secs.length){ banner(st, 'err', '내려받을 내용이 없어요', ''); return; }
-      var ws = KH.buildSheet(XLSX, secs);
-      var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-      var arr = XLSX.write(wb, {bookType:'xlsx', type:'array'});
       var d = document.getElementById('ikhDate').value.replace(/-/g, '.') || timestamp();
-      deliverFile({baseName: d + ' 재고추가(경호)', xlsxBlob: new Blob([arr], {type:'application/octet-stream'}), csvText: null}, function(type, title, msg){
-        banner(st, type === 'ok' ? 'ok' : (type === 'warn' ? 'warn' : 'err'), title, msg);
+      var blob, styled = true;
+      try{
+        await ikhLoadExcelJs();
+        var wbx = KH.buildWorkbook(window.ExcelJS, secs);
+        var buf = await wbx.xlsx.writeBuffer();
+        blob = new Blob([buf], {type:'application/octet-stream'});
+      }catch(err){
+        // 서식 라이브러리를 못 쓰면 서식 없는 엑셀로라도 내려받게 한다.
+        styled = false;
+        var ws = KH.buildSheet(XLSX, secs);
+        var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+        blob = new Blob([XLSX.write(wb, {bookType:'xlsx', type:'array'})], {type:'application/octet-stream'});
+      }
+      deliverFile({baseName: d + ' 재고추가(경호)', xlsxBlob: blob, csvText: null}, function(type, title, msg){
+        banner(st, type === 'ok' ? 'ok' : (type === 'warn' ? 'warn' : 'err'), title, msg + (styled ? '' : ' (서식 없이 저장했어요)'));
       });
     });
     // 진단/시험용: 콘솔에서 같은 규칙으로 직접 돌려볼 수 있게 노출

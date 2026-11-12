@@ -229,7 +229,120 @@
     return {status: ok?'ok':'bad', sum:sum, total:best.total, diff:Math.round(best.diff*100)/100};
   }
 
-  /* ---------- (경호) 엑셀 ---------- */
+
+  /* ---------- (경호) 양식 그대로 내려받기 (ExcelJS) ----------
+   * 기준: 2026.11.05 재고추가(경호).xlsx 의 서식 — 맑은 고딕 10, 가운데 정렬, 얇은 테두리, 제목(16pt 굵게, A:D 두 줄 병합),
+   * 머리글 색(A-D 노랑 / E-V 하늘 / W·X 주황), 합계 줄(C·W·Y 연보라 굵게, Z 노랑), 구역 사이 하늘색 가는 줄, 맨 위 검은 줄,
+   * D열 중복 품번 연분홍 강조, 열 너비·확대 85%.
+   */
+  var EUR_NF = '_-[$€-2]\\ * #,##0.00_-;\\-[$€-2]\\ * #,##0.00_-;_-[$€-2]\\ * "-"??_-;_-@_-';
+  var WON_NF = '_-[$₩-412]* #,##0_-;\\-[$₩-412]* #,##0_-;_-[$₩-412]* "-"??_-;_-@_-';
+  var KH_NCOL = 31;      // A..AE
+  var KH_WIDTHS = {1:9.375, 2:9.375, 3:9, 4:32.375, 23:9, 24:10.75, 25:15, 26:11.125, 27:12.25, 28:17.75, 29:14.5, 30:12, 31:9.25, 32:44, 33:26};
+  function buildWorkbook(ExcelJS, sections){
+    var wb = new ExcelJS.Workbook();
+    var ws = wb.addWorksheet('Sheet1', {views:[{zoomScale:85}]});
+    wb.addWorksheet('Sheet2'); wb.addWorksheet('Sheet3');
+    ws.properties.defaultRowHeight = 13.5;
+    for(var ci=1; ci<=33; ci++){ ws.getColumn(ci).width = (ci>=5 && ci<=22) ? 4.625 : (KH_WIDTHS[ci] || 9); }
+    var THIN = {style:'thin'};
+    var BORDER = {top:THIN, left:THIN, bottom:THIN, right:THIN};
+    function solid(rgb){ return {type:'pattern', pattern:'solid', fgColor:{argb:'FF'+rgb}}; }
+    function fmtFor(c){ return (c===24||c===25||(c>=26&&c<=28)) ? EUR_NF : (c===29 ? WON_NF : 'General'); }
+    // 한 줄을 표 모양(얇은 테두리·가운데·맑은 고딕 10)으로 칠한다
+    function gridRow(rn, upto){
+      var row = ws.getRow(rn);
+      for(var c=1; c<=(upto||KH_NCOL); c++){
+        var cell = row.getCell(c);
+        cell.font = {name:'맑은 고딕', size:10};
+        cell.alignment = {horizontal:'center', vertical:'middle'};
+        cell.border = BORDER;
+        cell.numFmt = fmtFor(c);
+      }
+      return row;
+    }
+    function put(rn, col, v, extra){
+      var cell = ws.getRow(rn).getCell(col);
+      cell.value = v;
+      if(extra){ if(extra.bold) cell.font = {name:'맑은 고딕', size:extra.size||10, bold:true}; if(extra.fill) cell.fill = solid(extra.fill); if(extra.nf) cell.numFmt = extra.nf; }
+      return cell;
+    }
+    var r = 2;
+    sections.forEach(function(sec, si){
+      if(si === 0){
+        var band = gridRow(1, KH_NCOL); band.height = 1.5;
+        for(var c0=1; c0<=KH_NCOL; c0++) band.getCell(c0).fill = solid('000000');
+      }
+      // 제목 두 줄
+      var t1 = ws.getRow(r), t2 = ws.getRow(r+1);
+      for(var c1=1; c1<=KH_NCOL; c1++){
+        [t1,t2].forEach(function(rw, k){
+          var cell = rw.getCell(c1);
+          cell.font = {name:'맑은 고딕', size:(c1<=4?11:10), bold:(c1>=5)};
+          cell.alignment = {vertical:'middle'};
+          cell.numFmt = '@';
+          var b = {};
+          if(c1<=4){ b.top = k===0?THIN:undefined; b.bottom = k===1?THIN:undefined; if(c1===1) b.left = THIN; if(c1===4) b.right = THIN; }
+          else { b.top = THIN; b.bottom = THIN; if(c1===5||c1===13) b.left = THIN; if(c1===12) b.right = THIN; }
+          cell.border = b;
+        });
+      }
+      ws.mergeCells(r, 1, r+1, 4);
+      var tc = ws.getRow(r).getCell(1);
+      tc.value = sec.title; tc.font = {name:'맑은 고딕', size:16, bold:true}; tc.alignment = {horizontal:'center', vertical:'middle'}; tc.numFmt = '@';
+      tc.border = BORDER;
+      ws.getRow(r).getCell(5).value = '* 특이사항';
+      ws.getRow(r+1).getCell(5).value = '컨트롤자 : ';
+      // 빈 줄 + 머리글
+      gridRow(r+2);
+      var h = r+3, hr = gridRow(h);
+      var heads = {1:'BRAND', 2:'BRAND', 3:'INV. QTY', 4:'MODEL', 5:'TU', 23:'TOTAL', 24:'UNIT PRICE', 25:'EXTENDED PRICE ', 26:'시즌', 27:'작업여부', 28:'원산지', 29:'소재', 30:'비고', 31:'비고'};
+      Object.keys(heads).forEach(function(k){ hr.getCell(+k).value = heads[k]; });
+      for(var c2=1; c2<=4; c2++) hr.getCell(c2).fill = solid('FFFF00');
+      for(var c3=5; c3<=22; c3++) hr.getCell(c3).fill = solid('00B0F0');
+      hr.getCell(23).fill = solid('FFC000'); hr.getCell(24).fill = solid('FFC000');
+      // 품목
+      var first = h+1, row = first, totQty = 0;
+      sec.items.forEach(function(it){
+        var rw = gridRow(row);
+        rw.getCell(4).numFmt = '@';
+        rw.getCell(3).value = it.qty; totQty += (+it.qty||0);
+        rw.getCell(4).value = String(it.model);
+        rw.getCell(23).value = {formula:'SUM(E'+row+':V'+row+')', result:0};
+        rw.getCell(24).value = it.price;
+        rw.getCell(25).value = {formula:'X'+row+'*W'+row, result:0};
+        if(it.origin) rw.getCell(28).value = it.origin;
+        if(it.mat) rw.getCell(29).value = it.mat;
+        row++;
+      });
+      var blank = row; gridRow(blank);           // 합계 범위에 들어가는 빈 줄
+      var sr = blank+1, srow = gridRow(sr);
+      [3,23,25].forEach(function(c){ srow.getCell(c).font = {name:'맑은 고딕', size:10, bold:true}; srow.getCell(c).fill = solid('B3A2C7'); });
+      srow.getCell(26).font = {name:'맑은 고딕', size:10, bold:true}; srow.getCell(26).fill = solid('FFFF00');
+      srow.getCell(27).font = {name:'맑은 고딕', size:10, bold:true}; srow.getCell(28).font = {name:'맑은 고딕', size:10, bold:true};
+      srow.getCell(3).value = {formula:'SUM(C'+first+':C'+blank+')', result:totQty};
+      srow.getCell(23).value = {formula:'SUM(W'+first+':W'+blank+')', result:0};
+      srow.getCell(25).value = {formula:'SUM(Y'+first+':Y'+blank+')', result:0};
+      gridRow(sr+1);
+      var tr = gridRow(sr+2);                               // 인보이스 총액을 손으로 적는 줄(있으면 채워 줌)
+      if(typeof sec.total === 'number' && isFinite(sec.total)) tr.getCell(25).value = sec.total;
+      gridRow(sr+3); gridRow(sr+4);
+      // 중복 품번 강조 (D열)
+      if(sec.items.length){
+        ws.addConditionalFormatting({ref:'D'+first+':D'+blank, rules:[{type:'expression', priority:1, formulae:['AND($D'+first+'<>"",COUNTIF($D$'+first+':$D$'+blank+',$D'+first+')>1)'], style:{font:{color:{argb:'FF9C0006'}}, fill:{type:'pattern', pattern:'solid', bgColor:{argb:'FFFFC7CE'}}}}]});
+      }
+      // 다음 구역 앞 하늘색 가는 줄
+      var next = sr+6;
+      if(si < sections.length-1){
+        var sep = gridRow(sr+5, 29); sep.height = 2.25;
+        for(var c4=1; c4<=29; c4++) sep.getCell(c4).fill = solid('00B0F0');
+      }
+      r = next;
+    });
+    return wb;
+  }
+
+  /* ---------- (경호) 엑셀 (SheetJS용 예비) ---------- */
   function buildSheet(XLSX, sections){
     var ws={}, merges=[], r=2, maxRow=1;
     function put(a,v,f){ ws[a] = f ? {t:'n', f:f} : (typeof v==='number' ? {t:'n', v:v} : {t:'s', v:String(v)}); }
@@ -255,6 +368,6 @@
     return ws;
   }
 
-  var KH = {normModel:normModel, mergeItems:mergeItems, parsers:(function(){ var o={}; Object.keys(EXTRA).forEach(function(k){ o[k]=EXTRA[k].parse; }); return o; })(), EXTRA:EXTRA, vendorFromName:vendorFromName, sums:sums, docTotals:docTotals, checkTotal:checkTotal, buildSheet:buildSheet, numEu:numEu, SHAPES:SHAPES};
+  var KH = {normModel:normModel, mergeItems:mergeItems, parsers:(function(){ var o={}; Object.keys(EXTRA).forEach(function(k){ o[k]=EXTRA[k].parse; }); return o; })(), EXTRA:EXTRA, vendorFromName:vendorFromName, sums:sums, docTotals:docTotals, checkTotal:checkTotal, buildSheet:buildSheet, buildWorkbook:buildWorkbook, numEu:numEu, SHAPES:SHAPES};
   if(typeof module!=='undefined' && module.exports) module.exports = KH; else root.KH = KH;
 })(typeof window!=='undefined' ? window : this);
