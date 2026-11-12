@@ -2448,6 +2448,9 @@ window.__loadLib = (function(){
 
     var AUTH  = LS.get('buyest.dash.auth', null);          // {id, pass, role}
     var IS_ADMIN = !!(AUTH && AUTH.role === 'admin');
+    // 공유 캘린더 수정·삭제 권한: 관리자 + 지정 직원(서버 toolkit_dashboard_api.php의 $TK_CAL_MANAGERS와 같게 유지)
+    var CAL_MANAGERS = ['조경호'];
+    function calMgr(){ return IS_ADMIN || !!(AUTH && CAL_MANAGERS.indexOf(AUTH.id) > -1); }
     var state = normState(LS.get('buyest.dash.cache', null));
 
     var gate = $('meGate'), gateForm = $('meGateForm'), gateId = $('meGateId'), gatePw = $('meGatePw'),
@@ -2592,7 +2595,8 @@ window.__loadLib = (function(){
       }
       html += '<div class="ln"><span>' + y + ' 복지포인트 잔여</span><b>' + Math.round(r.welfare).toLocaleString('ko-KR') + ' P<em>이월 없음 · 올해 말 소멸</em></b></div>';
       var lv = r.leave || {};
-      if(lv.month || lv.year || lv.extra) html += '<div class="ln"><span>' + y + ' 휴가 부여</span><b>월차 ' + (lv.month || 0) + ' · 연차 ' + (lv.year || 0) + ' · 휴가 ' + (lv.extra || 0) + '</b></div>';
+      var lvN = function(v){ return Math.round((+v || 0) * 10) / 10; };
+      html += '<div class="ln"><span>' + y + ' 남은 휴가</span><b>' + lvN((+lv.month || 0) + (+lv.year || 0) + (+lv.extra || 0)) + ' 일<em>월차 ' + lvN(lv.month) + ' · 연차 ' + lvN(lv.year) + ' · 휴가 ' + lvN(lv.extra) + '</em></b></div>';
       card.innerHTML = html; card.hidden = false;
       // 급여명세서 받기 · 근로계약서 서명 (assets/hr-me.js, 카드를 처음 그릴 때 한 번만 불러옴)
       var mountMe = function(){ if(window.HRME && AUTH) window.HRME.mount(card, HR_API, AUTH); };
@@ -3064,9 +3068,9 @@ window.__loadLib = (function(){
           // 팝업으로 갈 방법이 아예 없어서 관리자가 삭제를 못 하는 문제가 있었다.
           // 관리자는 일정 개수와 상관없이 칩을 클릭하면 항상 하루보기 팝업(수정·삭제 둘 다
           // 가능)으로 열리게 하고, 본인 글인 일반 직원은 기존처럼 바로 수정 폼이 열린다.
-          if(it.author === (AUTH && AUTH.id) || IS_ADMIN){
+          if(it.author === (AUTH && AUTH.id) || calMgr()){
             ev.classList.add('editable');
-            if(IS_ADMIN){
+            if(calMgr()){
               ev.title = '[' + (CAT_LABEL[it.kind] || it.kind) + '] ' + it.title + ' — 클릭하면 수정·삭제';
               ev.addEventListener('click', function(e2){ e2.stopPropagation(); openDayPanel(it.day); });
             } else {
@@ -3114,12 +3118,12 @@ window.__loadLib = (function(){
         var t = document.createElement('span'); t.className = 't'; t.textContent = it.title;
         li.appendChild(dot); li.appendChild(t);
         // 수정: 작성자 본인 또는 관리자. 삭제: 관리자만(직원은 등록한 일정을 스스로 지울 수 없고 수정만 가능).
-        if(it.author === (AUTH && AUTH.id) || IS_ADMIN){
+        if(it.author === (AUTH && AUTH.id) || calMgr()){
           var edit = document.createElement('button'); edit.type = 'button'; edit.className = 'edit'; edit.textContent = '✎'; edit.setAttribute('aria-label','수정');
           edit.addEventListener('click', function(){ closeDayPanel(); openCalPanel(it.day, it); });
           li.appendChild(edit);
         }
-        if(IS_ADMIN){
+        if(calMgr()){
           var del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '×'; del.setAttribute('aria-label','삭제');
           del.addEventListener('click', function(){
             if(!confirm('"' + it.title + '" 일정을 삭제할까요? 되돌릴 수 없어요.')) return;

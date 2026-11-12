@@ -274,7 +274,7 @@
       '<h2>' + h(u.username) + ' <span class="sub" style="display:inline">' + year + '년 기준</span></h2>' +
       '<div class="ptabs"><button data-pp="info">정보</button><button data-pp="ledger">휴가 · 복지포인트</button><button data-pp="rec">근태 · 벌점</button></div>' +
       '<div data-pp-box="info"><div class="f"><label>입사일<input type="date" id="pJoin" value="' + (u.join_date || '') + '"></label><label>생일<input type="date" id="pBirth" value="' + (u.birthday || '') + '"></label>' +
-      '<label>소속 회사<select id="pCo">' + COMPANIES.map(function(c){ return '<option' + (c === (u.company || COMPANIES[0]) ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label><label>계약·수습 만료일<input type="date" id="pEnd" value="' + (u.contract_end || '') + '"></label><label>재직 상태<select id="pAct"><option value="1"' + (u.active ? ' selected' : '') + '>재직</option><option value="0"' + (u.active ? '' : ' selected') + '>퇴사·휴직</option></select></label>' +
+      '<label>소속 회사<select id="pCo">' + COMPANIES.map(function(c){ return '<option' + (c === (u.company || COMPANIES[0]) ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></label><label>계약·수습 만료일 (계약직만)<input type="date" id="pEnd" value="' + (u.contract_end || '') + '"></label><label>재직 상태<select id="pAct"><option value="1"' + (u.active ? ' selected' : '') + '>재직</option><option value="0"' + (u.active ? '' : ' selected') + '>퇴사·휴직</option></select></label>' +
       '<label class="w">메모 (관리자만 보임)<textarea id="pMemo" maxlength="2000">' + h(u.memo || '') + '</textarea></label></div>' +
       '<button class="btn pri" id="pSave">정보 저장</button></div>' +
       '<div class="blk" data-pp-box="ledger"><h2>휴가 · 복지포인트 가감</h2>' +
@@ -357,7 +357,7 @@
     return {err:'재직 칸은 "재직" 또는 "퇴사·휴직"'};
   }
   $('bulkTpl').addEventListener('click', function(){
-    var head = ['이름(아이디)', '소속', '입사일', '생일', '계약·수습 만료일', '재직', '메모', '월차', '연차', '휴가', '복지포인트'];
+    var head = ['이름(아이디)', '소속', '입사일', '생일', '계약·수습 만료일(계약직만)', '재직', '메모', '월차', '연차', '휴가', '복지포인트'];
     var aoa = [head].concat(users.map(function(u){ return [u.username, u.company || COMPANIES[0], u.join_date || '', u.birthday || '', u.contract_end || '', u.active ? '재직' : '퇴사·휴직', u.memo || '', (u.leave||{}).month || 0, (u.leave||{}).year || 0, (u.leave||{}).extra || 0, u.welfare || 0]; }));
     var ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = [{wch:16}, {wch:18}, {wch:13}, {wch:13}, {wch:17}, {wch:10}, {wch:40}, {wch:8}, {wch:8}, {wch:8}, {wch:12}];
@@ -366,6 +366,7 @@
       ['2. 소속: 바이스트 / 에스엘에스 글로벌 / 바이스트로 (SLS글로벌도 인식)'],
       ['3. 날짜: 2024-10-21 또는 2024.10.21 처럼 연-월-일'],
       ['4. 재직: 재직 / 퇴사·휴직'],
+      ['   계약·수습 만료일은 계약직만 적어요. 정규직은 비워 두거나 "없음"이라고 적어도 돼요.'],
       ['5. 빈 칸은 "기존 값 그대로 둠"이에요. 값을 지우려면 직원관리 화면에서 직접 지우세요.'],
       ['6. 월차·연차·휴가(일)·복지포인트는 화면에서 선택한 연도 기준 "올해 잔액"이에요. 올린 값과 현재 값의 차이만 가감 기록으로 남아서, 같은 파일을 다시 올려도 중복 가산되지 않아요. (빈 칸은 그대로 둠)'],
       ['7. 아직 계정이 없는 사람은 올려도 등록되지 않아요 (가입 승인 후 다시 올려 주세요).']];
@@ -403,7 +404,10 @@
           item.company = co;
           ['join_date', 'birthday', 'contract_end'].forEach(function(k){
             if(col[k] == null){ item[k] = ''; return; }
-            var d = normDate(r[col[k]]); if(d.err) item.errs.push(k === 'join_date' ? '입사일: ' + d.err : k === 'birthday' ? '생일: ' + d.err : '만료일: ' + d.err); item[k] = d.v || '';
+            var d = normDate(r[col[k]]);
+            // 만료일은 계약직만 쓰는 선택 칸 — '없음'·'-'·'정규직' 같은 글자나 이상한 값은 막지 않고 빈 칸으로 처리
+            if(k === 'contract_end' && d.err){ item.contract_end = ''; item.warn = '만료일 "' + String(r[col[k]]).trim() + '" → 없음으로 처리'; return; }
+            if(d.err) item.errs.push(k === 'join_date' ? '입사일: ' + d.err : k === 'birthday' ? '생일: ' + d.err : '만료일: ' + d.err); item[k] = d.v || '';
           });
           var a = col.active != null ? normActive(r[col.active]) : {v:null}; if(a.err) item.errs.push(a.err); item.active = a.v;
           [['leave_month','월차'],['leave_year','연차'],['leave_extra','휴가'],['welfare','복지포인트']].forEach(function(k){
@@ -430,7 +434,7 @@
     box.hidden = false;
     box.innerHTML = '<div class="card" style="margin-bottom:14px"><h2>일괄 등록 미리보기 <span class="sub" style="display:inline">· 올릴 수 있는 ' + ok.length + '명 / 문제 ' + (bulkRows.length - ok.length) + '명 (빈 칸은 기존 값 유지)</span></h2><div class="tw"><table><thead><tr><th>이름</th><th>소속</th><th>입사일</th><th>생일</th><th>만료일</th><th>재직</th><th>월차</th><th>연차</th><th>휴가</th><th>복지P</th><th>상태</th></tr></thead><tbody>' +
       bulkRows.map(function(r){
-        return '<tr><td class="nm">' + h(r.name) + '</td><td>' + h(r.company ? shortCo(r.company) : '–') + '</td><td>' + h(r.join_date || '–') + '</td><td>' + h(r.birthday || '–') + '</td><td>' + h(r.contract_end || '–') + '</td><td>' + (r.active == null ? '–' : r.active ? '재직' : '퇴사·휴직') + '</td>' + LK.map(function(k){ return '<td>' + (r[k[0]] == null ? '–' : r[k[0]]) + '</td>'; }).join('') + '<td>' + (r.errs.length ? '<span class="pill bad">' + h(r.errs.join(', ')) + '</span>' : '<span class="pill ok">등록 가능</span>') + '</td></tr>';
+        return '<tr><td class="nm">' + h(r.name) + '</td><td>' + h(r.company ? shortCo(r.company) : '–') + '</td><td>' + h(r.join_date || '–') + '</td><td>' + h(r.birthday || '–') + '</td><td>' + h(r.contract_end || '–') + '</td><td>' + (r.active == null ? '–' : r.active ? '재직' : '퇴사·휴직') + '</td>' + LK.map(function(k){ return '<td>' + (r[k[0]] == null ? '–' : r[k[0]]) + '</td>'; }).join('') + '<td>' + (r.errs.length ? '<span class="pill bad">' + h(r.errs.join(', ')) + '</span>' : '<span class="pill ok">등록 가능</span>' + (r.warn ? ' <span class="pill mut">' + h(r.warn) + '</span>' : '')) + '</td></tr>';
       }).join('') + '</tbody></table></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn pri" id="bulkGo"' + (ok.length ? '' : ' disabled') + '>' + ok.length + '명 등록하기</button><button class="btn" id="bulkCancel">취소</button></div></div>';
     $('bulkCancel').addEventListener('click', function(){ bulkRows = []; renderBulk(); });
     $('bulkGo').addEventListener('click', function(){
