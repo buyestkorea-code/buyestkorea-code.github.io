@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>바이스트팀룸</title>
+<style>
+  :root{
+    --bg:#F3F1EC; --card:#FFFFFF; --soft:#EAE6DC; --line:#DBD5C7; --ink:#20241F; --mut:#5C6259;
+    --acc:#2F5D53; --acc-soft:#E3ECE8; --warn:#B4791B; --warn-soft:#F7E9D2; --bad:#B23B3B; --bad-soft:#F6E2E0; --ok:#3F7D4A; --ok-soft:#E4F1E6;
+  }
+  *{box-sizing:border-box;}
+  [hidden]{display:none !important;}
+  html,body{margin:0;}
+  body{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:var(--bg);color:var(--ink);padding:18px 20px 40px;font-size:13.5px;}
+  h1{font-size:20px;margin:0;letter-spacing:-.01em;}
+  h2{font-size:14px;margin:0 0 10px;}
+  button,input,select,textarea{font:inherit;color:inherit;}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+  .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+  .top .sp{flex:1;}
+  .tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;background:var(--warn-soft);color:var(--warn);}
+  .who{font-size:12.5px;color:var(--mut);}
+  .who b{color:var(--ink);}
+  .btn{font-size:12.5px;font-weight:600;padding:7px 13px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;}
+  .btn:hover{background:var(--soft);}
+  .btn.pri{background:var(--acc);border-color:var(--acc);color:#fff;}
+  .btn.pri:hover{filter:brightness(1.08);}
+  .btn.pri:disabled{opacity:.5;cursor:default;}
+  .btn.sm{padding:4px 9px;font-size:12px;}
+  .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+  .tabs button{font-weight:600;font-size:13px;padding:7px 14px;border-radius:99px;border:1px solid var(--line);background:var(--card);cursor:pointer;color:var(--mut);}
+  .tabs button.on{background:var(--acc);border-color:var(--acc);color:#fff;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+  .grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start;}
+  @media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr);}}
+  label.f{display:block;font-size:11.5px;color:var(--mut);font-weight:600;margin-bottom:5px;}
+  input[type=date],select{border:1px solid var(--line);border-radius:8px;padding:6px 9px;background:var(--card);}
+  textarea#raw{width:100%;min-height:210px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:12px 13px;line-height:1.65;background:#FFFDF8;font-size:14px;}
+  textarea#raw::placeholder{color:#9aa097;}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .row .sp{flex:1;}
+  .hint{font-size:12px;color:var(--mut);margin-top:8px;line-height:1.55;}
+  .note{font-size:12px;padding:7px 10px;border-radius:8px;margin-bottom:10px;}
+  .note.info{background:var(--acc-soft);color:var(--acc);} .note.warn{background:var(--warn-soft);color:var(--warn);}
+
+  /* 읽은 결과: 영수증처럼 업무명 ····· 수량 */
+  .tally{margin:0;padding:0;list-style:none;}
+  .tally li{display:flex;align-items:baseline;gap:8px;padding:6px 0;}
+  .tally .nm{font-weight:700;white-space:nowrap;}
+  .tally .dots{flex:1;border-bottom:1.5px dotted #C9C2B0;transform:translateY(-3px);min-width:14px;}
+  .tally .q{font-weight:800;font-variant-numeric:tabular-nums;font-size:15px;}
+  .tally .q small{font-weight:600;color:var(--mut);font-size:11px;margin-left:1px;}
+  .tally .memo{font-size:11.5px;color:var(--mut);}
+  .tally li.note-li{color:var(--mut);font-size:12.5px;padding:3px 0;}
+  .tally li.note-li::before{content:"· ";}
+  .tally .new{font-size:10.5px;font-weight:700;background:var(--warn-soft);color:var(--warn);padding:1px 7px;border-radius:99px;}
+  .tally select{font-size:11.5px;padding:2px 6px;max-width:150px;}
+  .tot{display:flex;justify-content:space-between;border-top:2px solid var(--ink);margin-top:8px;padding-top:9px;font-weight:800;}
+  .empty{color:#9aa097;padding:20px 0;text-align:center;line-height:1.6;}
+
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 16px;min-width:118px;}
+  .stat b{display:block;font-size:21px;font-weight:800;line-height:1.25;font-variant-numeric:tabular-nums;}
+  .stat span{font-size:11.5px;color:var(--mut);}
+  .tw{overflow-x:auto;}
+  table{border-collapse:collapse;width:100%;font-size:12.8px;}
+  th{font-size:11.5px;color:var(--mut);font-weight:600;text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  td{padding:8px;border-bottom:1px solid var(--soft);white-space:nowrap;}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;}
+  td.raw{white-space:pre-wrap;min-width:260px;line-height:1.55;}
+  tr.sumrow td{font-weight:800;border-top:2px solid var(--ink);border-bottom:0;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .chips button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:4px 12px;font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer;}
+  .chips button.on{background:var(--ink);border-color:var(--ink);color:#fff;}
+  .sec{margin-top:16px;}
+  .bars{display:block;width:100%;height:150px;}
+  .bars text{font-size:10px;fill:#5C6259;}
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:99px;font-size:13px;display:none;z-index:9;}
+  #toast.err{background:var(--bad);}
+  #gate{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:30px;text-align:center;color:var(--mut);line-height:1.7;}
+  @media (prefers-reduced-motion:no-preference){.tally li{animation:in .18s ease-out;} @keyframes in{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:none;}}}
+</style>
+</head>
+<body>
+<div id="gate" hidden></div>
+<div id="app" hidden>
+  <div class="top">
+    <h1>바이스트팀룸</h1><span class="tag">시험판</span>
+    <span class="sp"></span>
+    <span class="who"><b id="whoName"></b> 님</span>
+  </div>
+  <div class="tabs" role="tablist">
+    <button data-tab="write" class="on">오늘 입력</button>
+    <button data-tab="mine">내 기록</button>
+    <button data-tab="report" id="tabReport" hidden>리포트</button>
+  </div>
+
+  <!-- 입력 -->
+  <section id="p-write">
+    <div class="grid2">
+      <div class="card">
+        <div class="row" style="margin-bottom:10px;">
+          <div><label class="f" for="wdate">날짜</label><input type="date" id="wdate"></div>
+          <span class="sp"></span>
+        </div>
+        <div id="loadNote" class="note info" hidden></div>
+        <label class="f" for="raw">오늘 한 일</label>
+        <textarea id="raw" placeholder="쿠팡 - 81개 / 위즈위드 50 / NS 50&#10;사진작업 4개 / 스토어팜 47개&#10;택배찾기"></textarea>
+        <div class="hint">평소처럼 쓰세요. 이름 뒤에 숫자를 붙이면 수량으로 읽고, 숫자가 없으면 메모로 남겨요. 퇴근할 때 한 번 저장하면 되고, 같은 날 다시 저장하면 덮어써요.</div>
+        <div class="row" style="margin-top:12px;">
+          <span class="sp"></span>
+          <button class="btn pri" id="saveBtn">저장</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>읽은 결과</h2>
+        <div id="tallyBox"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 내 기록 -->
+  <section id="p-mine" hidden>
+    <div class="chips" id="mineRange"><button data-r="week" class="on">이번 주</button><button data-r="month">이번 달</button></div>
+    <div class="grid2">
+      <div class="card"><h2>업무별 합계</h2><div id="mineNames"></div></div>
+      <div class="card"><h2>날짜별</h2><div id="mineDays"></div></div>
+    </div>
+  </section>
+
+  <!-- 리포트 (관리자) -->
+  <section id="p-report" hidden>
+    <div class="row" style="margin-bottom:12px;">
+      <div class="chips" id="repRange" style="margin:0;"><button data-r="today">오늘</button><button data-r="week" class="on">이번 주</button><button data-r="month">이번 달</button><button data-r="custom">직접</button></div>
+      <span id="customBox" class="row" hidden><input type="date" id="rfrom" aria-label="시작일"> ~ <input type="date" id="rto" aria-label="종료일"></span>
+      <span class="sp"></span>
+      <button class="btn" id="xlsBtn">엑셀 다운로드</button>
+    </div>
+    <div class="stats" id="repStats"></div>
+    <div class="card">
+      <div class="row" style="margin-bottom:8px;"><h2 style="margin:0;">직원 × 업무</h2><span class="sp"></span>
+        <div class="chips" id="axis" style="margin:0;"><button data-a="name" class="on">업무를 세로로</button><button data-a="user">직원을 세로로</button></div></div>
+      <div class="tw" id="pivot"></div>
+    </div>
+    <div class="card sec"><h2>일별 합계</h2><div id="dayChart"></div></div>
+    <div class="card sec">
+      <div class="row" style="margin-bottom:8px;"><h2 style="margin:0;">원문</h2><span class="sp"></span><select id="entUser" aria-label="직원 필터"><option value="">전체 직원</option></select></div>
+      <div class="tw" id="entries"></div>
+    </div>
+    <div class="card sec"><h2>업무명 묶음</h2><div class="hint" style="margin:0 0 8px;">직원이 "기존 업무로 묶기"로 정한 이름이에요. 잘못 묶였으면 해제하세요.</div><div id="aliases"></div></div>
+  </section>
+</div>
+<div id="toast"></div>
+
+<script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="worklog-parse.js"></script>
+<script>
+(function(){
+  var API = 'https://buyest.co.kr/toolkit_worklog_api.php';
+  var ADMINS = ['buyest', '조경호'];
+  var AUTH = null;
+  try{ AUTH = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); }catch(e){}
+  var gate = document.getElementById('gate'), app = document.getElementById('app');
+  if(!AUTH || !AUTH.id){ gate.hidden = false; gate.textContent = '로그인 후에 열 수 있어요. 툴킷에 로그인한 뒤 새로고침해 주세요.'; return; }
+  app.hidden = false;
+  var $ = function(id){ return document.getElementById(id); };
+  var IS_ADMIN = ADMINS.indexOf(AUTH.id) > -1;
+  $('whoName').textContent = AUTH.id;
+  if(IS_ADMIN) $('tabReport').hidden = false;
+
+  function api(action, extra){
+    var b = {action:action, user:AUTH.id, pass:AUTH.pass};
+    for(var k in extra) b[k] = extra[k];
+    return fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(b)}).then(function(r){ return r.json(); })
+      .catch(function(){ return {ok:false, error:'서버에 연결하지 못했어요'}; });
+  }
+  function toast(t, err){ var e = $('toast'); e.textContent = t; e.className = err ? 'err' : ''; e.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(function(){ e.style.display = 'none'; }, 2600); }
+  function h(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function num(n){ return Number(n || 0).toLocaleString('ko-KR'); }
+  function ymd(d){ return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); }
+  function addDays(d, n){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); return x; }
+  function weekRange(){ var t = new Date(), dow = (t.getDay() + 6) % 7, s = addDays(t, -dow); return [ymd(s), ymd(addDays(s, 6))]; }
+  function monthRange(){ var t = new Date(); return [ymd(new Date(t.getFullYear(), t.getMonth(), 1)), ymd(new Date(t.getFullYear(), t.getMonth()+1, 0))]; }
+  var WK = ['일','월','화','수','목','금','토'];
+  function dlabel(s){ var p = s.split('-'), d = new Date(+p[0], +p[1]-1, +p[2]); return (+p[1]) + '/' + (+p[2]) + ' (' + WK[d.getDay()] + ')'; }
+
+  // ---------- 탭 ----------
+  var tabs = document.querySelectorAll('.tabs button');
+  tabs.forEach(function(b){ b.addEventListener('click', function(){
+    tabs.forEach(function(x){ x.classList.toggle('on', x === b); });
+    ['write','mine','report'].forEach(function(t){ $('p-' + t).hidden = (t !== b.getAttribute('data-tab')); });
+    if(b.getAttribute('data-tab') === 'mine') loadMine();
+    if(b.getAttribute('data-tab') === 'report') loadReport();
+  }); });
+  function chipGroup(id, cb){ var g = $(id); g.addEventListener('click', function(e){ var b = e.target.closest('button'); if(!b) return;
+    g.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x === b); }); cb(b); }); }
+
+  // ---------- 입력 ----------
+  var known = [], alias = {}, loadedRaw = null;
+  var today = ymd(new Date());
+  $('wdate').value = today; $('wdate').max = today;
+
+  function refreshNames(){ return api('wl_names').then(function(r){ if(r && r.ok){ known = r.names || []; alias = r.alias || {}; } renderTally(); }); }
+  function currentItems(){ return parseWorklog($('raw').value, alias).items; }
+
+  function renderTally(){
+    var items = currentItems(), box = $('tallyBox');
+    if(!$('raw').value.trim()){ box.innerHTML = '<div class="empty">오른쪽에 쓰면 여기에<br>업무별 수량으로 정리돼요.</div>'; return; }
+    var html = '<ul class="tally">', total = 0, qn = 0;
+    var firstUse = known.length === 0;
+    items.forEach(function(it, i){
+      if(it.qty === null){ html += '<li class="note-li">' + h(it.memo) + '</li>'; return; }
+      total += it.qty; qn++;
+      var isNew = !firstUse && known.indexOf(it.canonical) < 0;
+      html += '<li><span class="nm">' + h(it.canonical) + '</span>' + (it.canonical !== it.name ? '<span class="memo">(' + h(it.name) + ')</span>' : '') +
+        (it.memo ? '<span class="memo">' + h(it.memo) + '</span>' : '') +
+        (isNew ? '<span class="new">신규</span><select data-i="' + i + '" aria-label="기존 업무로 묶기"><option value="">기존 업무로 묶기</option>' +
+          known.map(function(k){ return '<option>' + h(k) + '</option>'; }).join('') + '</select>' : '') +
+        '<span class="dots"></span><span class="q">' + num(it.qty) + '</span></li>';
+    });
+    html += '</ul>';
+    if(qn){ html += '<div class="tot"><span>합계</span><span>' + num(total) + '</span></div>'; }
+    else { html = '<div class="note warn">읽은 수량이 없어요. 이름 뒤에 숫자를 붙여 주세요. (예: 쿠팡 81) 그대로 저장하면 메모로만 남아요.</div>' + html; }
+    box.innerHTML = html;
+    box.querySelectorAll('select').forEach(function(sel){ sel.addEventListener('change', function(){
+      var it = items[+sel.getAttribute('data-i')]; if(!sel.value) return;
+      api('wl_alias_set', {alias: it.name, canonical: sel.value}).then(function(r){
+        if(r && r.ok){ toast('"' + it.name + '"을(를) "' + sel.value + '"(으)로 묶었어요'); refreshNames(); } else toast((r && r.error) || '묶지 못했어요', true); });
+    }); });
+  }
+  $('raw').addEventListener('input', renderTally);
+
+  function loadDate(){
+    var d = $('wdate').value; if(!d) return;
+    api('wl_get', {date:d}).then(function(r){
+      var n = $('loadNote');
+      if(r && r.ok && r.entry){ $('raw').value = r.entry.raw; loadedRaw = r.entry.raw; n.hidden = false; n.textContent = '이 날짜에 저장한 기록을 불러왔어요. 고쳐서 저장하면 덮어써요.'; }
+      else { $('raw').value = ''; loadedRaw = null; n.hidden = true; }
+      renderTally();
+    });
+  }
+  $('wdate').addEventListener('change', function(){ if($('wdate').value > today) $('wdate').value = today; loadDate(); });
+
+  $('saveBtn').addEventListener('click', function(){
+    var raw = $('raw').value.trim();
+    if(!raw){ toast('내용을 입력해 주세요', true); return; }
+    var items = currentItems().map(function(i){ return {name:i.name, qty:i.qty, memo:i.memo}; });
+    var btn = $('saveBtn'); btn.disabled = true;
+    api('wl_save', {date:$('wdate').value, raw:raw, items:items}).then(function(r){
+      btn.disabled = false;
+      if(r && r.ok){ toast(r.warn === 'no_qty' ? '저장했어요. 읽은 수량은 없어요' : '저장했어요'); loadedRaw = raw; $('loadNote').hidden = false; $('loadNote').textContent = '저장했어요. 고쳐서 다시 저장하면 덮어써요.'; refreshNames(); }
+      else toast((r && r.error) || '저장하지 못했어요', true);
+    });
+  });
+
+  // ---------- 내 기록 ----------
+  var mineR = 'week';
+  chipGroup('mineRange', function(b){ mineR = b.getAttribute('data-r'); loadMine(); });
+  function loadMine(){
+    var rg = mineR === 'week' ? weekRange() : monthRange();
+    api('wl_mine', {from:rg[0], to:rg[1]}).then(function(r){
+      if(!r || !r.ok){ toast((r && r.error) || '불러오지 못했어요', true); return; }
+      var byName = {}, byDay = {}, order = [];
+      (r.rows || []).forEach(function(x){
+        if(!byDay[x.date]){ byDay[x.date] = 0; order.push(x.date); }
+        if(x.name){ byName[x.name] = (byName[x.name] || 0) + x.qty; byDay[x.date] += x.qty; }
+      });
+      var ns = Object.keys(byName).sort(function(a, b){ return byName[b] - byName[a]; });
+      $('mineNames').innerHTML = ns.length ? '<ul class="tally">' + ns.map(function(n){ return '<li><span class="nm">' + h(n) + '</span><span class="dots"></span><span class="q">' + num(byName[n]) + '</span></li>'; }).join('') + '</ul>' : '<div class="empty">이 기간에 저장한 기록이 없어요.</div>';
+      $('mineDays').innerHTML = order.length ? '<ul class="tally">' + order.map(function(d){ return '<li><span class="nm">' + dlabel(d) + '</span><span class="dots"></span><span class="q">' + num(byDay[d]) + '</span></li>'; }).join('') + '</ul>' : '<div class="empty">이 기간에 저장한 기록이 없어요.</div>';
+    });
+  }
+
+  // ---------- 리포트 ----------
+  var repR = 'week', axis = 'name', REP = null, ENT = [];
+  function repRange(){
+    if(repR === 'today') return [today, today];
+    if(repR === 'week') return weekRange();
+    if(repR === 'month') return monthRange();
+    return [$('rfrom').value, $('rto').value];
+  }
+  chipGroup('repRange', function(b){ repR = b.getAttribute('data-r'); $('customBox').hidden = repR !== 'custom';
+    if(repR === 'custom'){ if(!$('rfrom').value){ $('rfrom').value = weekRange()[0]; $('rto').value = today; } }
+    loadReport(); });
+  $('rfrom').addEventListener('change', loadReport); $('rto').addEventListener('change', loadReport);
+  chipGroup('axis', function(b){ axis = b.getAttribute('data-a'); renderPivot(); });
+  $('entUser').addEventListener('change', loadEntries);
+
+  function loadReport(){
+    var rg = repRange(); if(!rg[0] || !rg[1]) return;
+    api('wl_report', {from:rg[0], to:rg[1]}).then(function(r){
+      if(!r || !r.ok){ toast((r && r.error) || '불러오지 못했어요', true); return; }
+      REP = r;
+      var tot = 0; r.by_user_name.forEach(function(x){ tot += x.qty; });
+      $('repStats').innerHTML = '<div class="stat"><b>' + num(tot) + '</b><span>총 수량</span></div><div class="stat"><b>' + r.users.length + '</b><span>입력한 직원</span></div><div class="stat"><b>' + r.by_day.length + '</b><span>기록된 날</span></div>';
+      var sel = $('entUser'), cur = sel.value;
+      sel.innerHTML = '<option value="">전체 직원</option>' + r.users.map(function(u){ return '<option>' + h(u) + '</option>'; }).join('');
+      sel.value = r.users.indexOf(cur) > -1 ? cur : '';
+      renderPivot(); renderBars(); loadEntries(); loadAliases();
+    });
+  }
+  function renderPivot(){
+    if(!REP) return;
+    var rows = {}, cols = {}, cell = {}, rowT = {}, colT = {};
+    REP.by_user_name.forEach(function(x){
+      var r = axis === 'name' ? x.name : x.user, c = axis === 'name' ? x.user : x.name;
+      rows[r] = 1; cols[c] = 1; cell[r + '\u0001' + c] = x.qty; rowT[r] = (rowT[r] || 0) + x.qty; colT[c] = (colT[c] || 0) + x.qty;
+    });
+    var R = Object.keys(rows).sort(function(a, b){ return rowT[b] - rowT[a]; }), C = Object.keys(cols).sort(function(a, b){ return colT[b] - colT[a]; });
+    if(!R.length){ $('pivot').innerHTML = '<div class="empty">이 기간에 읽은 수량이 없어요.</div>'; return; }
+    var t = '<table><thead><tr><th>' + (axis === 'name' ? '업무' : '직원') + '</th>' + C.map(function(c){ return '<th class="n">' + h(c) + '</th>'; }).join('') + '<th class="n">합계</th></tr></thead><tbody>';
+    var all = 0;
+    R.forEach(function(r){ t += '<tr><td><b>' + h(r) + '</b></td>' + C.map(function(c){ var v = cell[r + '\u0001' + c]; return '<td class="n">' + (v ? num(v) : '') + '</td>'; }).join('') + '<td class="n"><b>' + num(rowT[r]) + '</b></td></tr>'; all += rowT[r]; });
+    t += '<tr class="sumrow"><td>합계</td>' + C.map(function(c){ return '<td class="n">' + num(colT[c]) + '</td>'; }).join('') + '<td class="n">' + num(all) + '</td></tr></tbody></table>';
+    $('pivot').innerHTML = t;
+  }
+  function renderBars(){
+    var d = REP.by_day; if(!d.length){ $('dayChart').innerHTML = '<div class="empty">기록이 없어요.</div>'; return; }
+    var W = Math.max(320, d.length * 38), H = 150, pad = 22, mx = Math.max.apply(null, d.map(function(x){ return x.qty; })) || 1, bw = Math.min(26, (W - 10) / d.length - 8);
+    var s = '<div class="tw"><svg class="bars" viewBox="0 0 ' + W + ' ' + H + '" style="min-width:' + W + 'px" role="img" aria-label="일별 합계 막대그래프">';
+    d.forEach(function(x, i){ var bh = Math.round((H - pad - 14) * x.qty / mx), cx = 10 + i * ((W - 10) / d.length) + ((W - 10) / d.length - bw) / 2;
+      s += '<rect x="' + cx + '" y="' + (H - pad - bh) + '" width="' + bw + '" height="' + bh + '" rx="3" fill="#2F5D53"><title>' + dlabel(x.date) + ' ' + num(x.qty) + '</title></rect>' +
+        '<text x="' + (cx + bw/2) + '" y="' + (H - pad - bh - 4) + '" text-anchor="middle">' + num(x.qty) + '</text>' +
+        '<text x="' + (cx + bw/2) + '" y="' + (H - 6) + '" text-anchor="middle">' + x.date.slice(5).replace('-', '/') + '</text>'; });
+    $('dayChart').innerHTML = s + '</svg></div>';
+  }
+  function loadEntries(){
+    var rg = repRange(); if(!rg[0] || !rg[1]) return;
+    api('wl_entries', {from:rg[0], to:rg[1], target:$('entUser').value}).then(function(r){
+      if(!r || !r.ok){ toast((r && r.error) || '원문을 불러오지 못했어요', true); return; }
+      ENT = r.entries || [];
+      $('entries').innerHTML = ENT.length ? '<table><thead><tr><th>날짜</th><th>직원</th><th>원문</th></tr></thead><tbody>' + ENT.map(function(e){ return '<tr><td>' + dlabel(e.date) + '</td><td><b>' + h(e.user) + '</b></td><td class="raw">' + h(e.raw) + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">원문이 없어요.</div>';
+    });
+  }
+  function loadAliases(){
+    api('wl_alias_list').then(function(r){
+      if(!r || !r.ok) return;
+      var a = r.aliases || [];
+      $('aliases').innerHTML = a.length ? '<table><thead><tr><th>입력한 이름</th><th>묶인 업무</th><th>정한 사람</th><th></th></tr></thead><tbody>' + a.map(function(x){ return '<tr><td>' + h(x.alias) + '</td><td><b>' + h(x.canonical) + '</b></td><td>' + h(x.updated_by) + '</td><td><button class="btn sm" data-del="' + h(x.alias) + '">해제</button></td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">묶은 이름이 없어요.</div>';
+      $('aliases').querySelectorAll('[data-del]').forEach(function(b){ b.addEventListener('click', function(){
+        api('wl_alias_del', {alias:b.getAttribute('data-del')}).then(function(r){ if(r && r.ok){ toast('해제했어요'); loadReport(); } else toast((r && r.error) || '해제하지 못했어요', true); }); }); });
+    });
+  }
+  $('xlsBtn').addEventListener('click', function(){
+    if(!REP || typeof XLSX === 'undefined'){ toast('엑셀 도구를 불러오지 못했어요', true); return; }
+    var rg = repRange();
+    var s1 = [['직원', '업무', '수량', '입력한 날 수']].concat(REP.by_user_name.map(function(x){ return [x.user, x.name, x.qty, x.days]; }));
+    var s2 = [['날짜', '직원', '원문']].concat(ENT.map(function(e){ return [e.date, e.user, e.raw]; }));
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s1), '집계');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s2), '원문');
+    XLSX.writeFile(wb, '바이스트팀룸_' + rg[0].replace(/-/g, '') + '-' + rg[1].replace(/-/g, '') + '.xlsx');
+  });
+
+  refreshNames().then(loadDate);
+})();
+</script>
+</body>
+</html>
