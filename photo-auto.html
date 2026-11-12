@@ -202,11 +202,8 @@
   <div class="grid" style="margin-top:12px" id="szBlock">
     <div class="wide">
       <label>실측 표 — 칸을 눌러 바로 입력 (엑셀에서 복사해 붙여넣어도 됩니다. 첫 줄 = 항목 이름, 첫 칸 = 사이즈 이름)</label>
-      <div class="hint" style="margin:2px 0 4px">표 세트 — 누르면 항목(맨 윗줄)과 사이즈 줄이 함께 채워져요. ★ 내 세트는 저장해 둔 항목·사이즈 그대로 복원돼요</div>
-      <div class="row" id="itemChips" style="margin-bottom:8px"></div>
-      <details style="margin:0 0 10px"><summary class="hint" style="cursor:pointer">사이즈 줄만 바꾸기 (항목은 그대로 두고 첫 칸 + 옵션 1 값만 교체)</summary>
-        <div class="row" id="sizeChips" style="margin-top:6px"></div>
-      </details>
+      <div class="hint" style="margin:2px 0 4px">세트 — 항목(상의·하의·신발…)을 누르면 맨 윗줄이, 사이즈(XS S M L XL…)를 누르면 사이즈 줄이 바뀌어요. ★ 내 세트는 항목+사이즈를 저장해 둔 그대로 한 번에 복원돼요</div>
+      <div class="row" id="itemChips" style="margin-bottom:10px"></div>
       <div id="szGrid" style="overflow:auto"></div>
       <div class="row" style="margin-top:8px">
         <button class="btn btn-out btn-sm" id="szAddRow" type="button">＋ 사이즈(줄) 추가</button>
@@ -1660,14 +1657,13 @@ function mineChip(box,label,attr,val,by){
 }
 function saveBtn(id,label){ var a=document.createElement('button'); a.type='button'; a.className='btn btn-sm'; a.id=id; a.style.cssText='background:#eef3ff;color:#1d4ed8;border:1px dashed #1d4ed8'; a.textContent=label; return a; }
 function renderSetChips(){
-  var ib=$('itemChips'), sb=$('sizeChips'), ms=mySets();
-  ib.innerHTML=''; sb.innerHTML='';
+  var ib=$('itemChips'), ms=mySets();
+  ib.innerHTML='';
   TPL.ITEMS.forEach(function(it){ chip(ib,it.name,'data-item',it.k); });
+  TPL.SIZES.forEach(function(z){ chip(ib,z.name,'data-size',z.k); });
   ms.items.forEach(function(it){ mineChip(ib,it.name,'data-item',it.k,it.by); });
-  ib.appendChild(saveBtn('itemSave','＋ 지금 표(항목+사이즈)를 세트로 저장'));
-  TPL.SIZES.forEach(function(z){ chip(sb,z.name,'data-size',z.k); });
-  ms.sizes.forEach(function(z){ mineChip(sb,z.name,'data-size',z.k,z.by); });
-  sb.appendChild(saveBtn('sizeSave','＋ 지금 표의 사이즈 줄을 세트로 저장'));
+  ms.sizes.forEach(function(z){ mineChip(ib,z.name,'data-size',z.k,z.by); });
+  ib.appendChild(saveBtn('itemSave','＋ 지금 표를 세트로 저장'));
   var sy=document.createElement('div'); sy.className='hint'; sy.id='setSync'; sy.style.cssText='width:100%;margin-top:4px'; sy.textContent=SYNC_NOTE; ib.appendChild(sy);
 }
 function saveItemSet(){
@@ -1756,7 +1752,8 @@ $('itemChips').addEventListener('click',function(e){ if(e.target.id==='itemSave'
   var it=findItem(k); if(it&&window.PhotoRegister&&PhotoRegister.setTier) PhotoRegister.setTier(1,'사이즈',it.rows);
   refreshOptHint();
 }); });
-$('sizeChips').addEventListener('click',function(e){ if(e.target.id==='sizeSave'){ saveSizeSet(); return; } setChipClick(e,'data-size',applySizeSet); });
+/* 사이즈 칩도 같은 줄(#itemChips)에 있다 — 누르면 사이즈 줄만 바뀐다 */
+$('itemChips').addEventListener('click',function(e){ var t=e.target.closest('button'); if(t&&t.getAttribute('data-size')) applySizeSet(t.getAttribute('data-size')); });
 function applyTplObj(t){
   state.tplId=t?t.id:'';
   state.defaults=t&&t.defaults||null;
