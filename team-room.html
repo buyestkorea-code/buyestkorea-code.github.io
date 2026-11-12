@@ -93,7 +93,7 @@
   <div class="tabs" role="tablist">
     <button data-tab="write" class="on">오늘 입력</button>
     <button data-tab="mine">내 기록</button>
-    <button data-tab="report" id="tabReport" hidden>리포트</button>
+    <button data-tab="report" id="tabReport">리포트</button>
   </div>
 
   <!-- 입력 -->
@@ -148,7 +148,7 @@
       <div class="row" style="margin-bottom:8px;"><h2 style="margin:0;">원문</h2><span class="sp"></span><select id="entUser" aria-label="직원 필터"><option value="">전체 직원</option></select></div>
       <div class="tw" id="entries"></div>
     </div>
-    <div class="card sec"><h2>업무명 묶음</h2><div class="hint" style="margin:0 0 8px;">직원이 "기존 업무로 묶기"로 정한 이름이에요. 잘못 묶였으면 해제하세요.</div><div id="aliases"></div></div>
+    <div class="card sec"><h2>업무명 묶음</h2><div class="hint" style="margin:0 0 8px;">직원이 "기존 업무로 묶기"로 정한 이름이에요. 잘못 묶인 건 관리자가 해제할 수 있어요.</div><div id="aliases"></div></div>
   </section>
 </div>
 <div id="toast"></div>
@@ -167,7 +167,6 @@
   var $ = function(id){ return document.getElementById(id); };
   var IS_ADMIN = ADMINS.indexOf(AUTH.id) > -1;
   $('whoName').textContent = AUTH.id;
-  if(IS_ADMIN) $('tabReport').hidden = false;
 
   function api(action, extra){
     var b = {action:action, user:AUTH.id, pass:AUTH.pass};
@@ -337,7 +336,7 @@
     api('wl_alias_list').then(function(r){
       if(!r || !r.ok) return;
       var a = r.aliases || [];
-      $('aliases').innerHTML = a.length ? '<table><thead><tr><th>입력한 이름</th><th>묶인 업무</th><th>정한 사람</th><th></th></tr></thead><tbody>' + a.map(function(x){ return '<tr><td>' + h(x.alias) + '</td><td><b>' + h(x.canonical) + '</b></td><td>' + h(x.updated_by) + '</td><td><button class="btn sm" data-del="' + h(x.alias) + '">해제</button></td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">묶은 이름이 없어요.</div>';
+      $('aliases').innerHTML = a.length ? '<table><thead><tr><th>입력한 이름</th><th>묶인 업무</th><th>정한 사람</th>' + (IS_ADMIN ? '<th></th>' : '') + '</tr></thead><tbody>' + a.map(function(x){ return '<tr><td>' + h(x.alias) + '</td><td><b>' + h(x.canonical) + '</b></td><td>' + h(x.updated_by) + '</td>' + (IS_ADMIN ? '<td><button class="btn sm" data-del="' + h(x.alias) + '">해제</button></td>' : '') + '</tr>'; }).join('') + '</tbody></table>' : '<div class="empty">묶은 이름이 없어요.</div>';
       $('aliases').querySelectorAll('[data-del]').forEach(function(b){ b.addEventListener('click', function(){
         api('wl_alias_del', {alias:b.getAttribute('data-del')}).then(function(r){ if(r && r.ok){ toast('해제했어요'); loadReport(); } else toast((r && r.error) || '해제하지 못했어요', true); }); }); });
     });
