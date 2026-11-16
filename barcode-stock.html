@@ -110,6 +110,15 @@
       <label class="card-label" style="margin-bottom:0;">팝업 반입 리스트 (행사장에 실제로 들고 온 상품 — 올리면 스캔할 때 표시됩니다)</label>
       <span id="popupUpdatedBadge" class="updated-badge"></span>
     </div>
+    <div style="font-size:12.5px;line-height:1.65;color:var(--ink-muted);background:#f6f6f8;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+      <b style="color:var(--ink,#222);">올리는 방법</b><br>
+      1. 아래 <b>반입리스트 양식 다운로드</b>를 눌러 엑셀 양식을 받습니다.<br>
+      2. 행사장에 가져온 상품을 한 줄에 하나씩 적습니다. 사이즈가 여러 개면 사이즈마다 한 줄입니다.<br>
+      3. 열 설명: <b>품목명</b>(예: 4078604_27, 품번_사이즈) · <b>바코드</b>(선택, 없으면 비워두세요) · <b>수량</b>(선택, 비우면 1개)<br>
+      4. 첫 줄의 열 이름은 지우지 마세요. 저장한 파일을 아래에 올리면 끝입니다.<br>
+      ※ 새로 올리면 이전 반입 리스트는 <b>통째로 교체</b>됩니다. 모든 직원 휴대폰에 같이 적용돼요.
+    </div>
+    <button class="live-btn" id="popupTemplate" type="button" style="margin:0 0 10px;">⬇ 반입리스트 양식 다운로드</button>
     <div class="dropzone" id="popupDrop" tabindex="0" role="button" aria-label="팝업 반입 리스트 파일 선택">
       <div id="popupDropText">클릭 또는 파일을 끌어다 놓으세요</div>
       <input type="file" id="popupFile" accept=".xlsx,.xls,.csv">
@@ -222,7 +231,7 @@ async function readRowsFromFile(f) {
   }
   const wb = XLSX.read(buf, { type: 'array' });
   const rows = [];
-  for (const name of wb.SheetNames) rows.push(...XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false }));
+  for (const name of wb.SheetNames) if (name !== '작성안내') rows.push(...XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false }));
   return rows;
 }
 
@@ -406,6 +415,31 @@ async function savePopupList(rows) {
   if (!data.ok) throw new Error(data.error || '서버 저장 실패');
 }
 wireDropzone('popupDrop', 'popupFile');
+document.getElementById('popupTemplate').addEventListener('click', () => {
+  const aoa = [
+    ['품목명', '바코드', '수량'],
+    ['4078604_27', '', 2],
+    ['4078604_29', '', 1],
+    ['2619971021 001_L', '8801234567890', 3],
+    ['', '', ''],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 8 }];
+  const guide = XLSX.utils.aoa_to_sheet([
+    ['반입리스트 작성 안내'],
+    ['1. 시트 "반입리스트"에 행사장에 가져온 상품을 한 줄에 하나씩 적습니다. (사이즈마다 한 줄)'],
+    ['2. 품목명: 품번_사이즈 형식 (예: 4078604_27). 재고 리스트의 품목명과 같은 형식이면 됩니다.'],
+    ['3. 바코드: 선택. 없으면 비워두세요. 품목명만 있어도 인식됩니다.'],
+    ['4. 수량: 선택. 비우면 1개로 계산합니다.'],
+    ['5. 첫 줄의 열 이름(품목명/바코드/수량)은 지우지 마세요. 예시 줄은 지우고 쓰세요.'],
+    ['6. 업로드하면 이전 반입 리스트는 통째로 교체됩니다.'],
+  ]);
+  guide['!cols'] = [{ wch: 90 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '반입리스트');
+  XLSX.utils.book_append_sheet(wb, guide, '작성안내');
+  XLSX.writeFile(wb, '반입리스트_양식.xlsx');
+});
 document.getElementById('popupFile').addEventListener('change', async e => {
   const f = e.target.files[0];
   const el = document.getElementById('popupStatus');
