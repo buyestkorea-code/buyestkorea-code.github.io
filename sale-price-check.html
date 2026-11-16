@@ -69,7 +69,7 @@
 <body>
 <h1>판매가 검증 <span class="badge">TEST</span></h1>
 <p class="lead">사방넷 주문서(주문서확인처리) 엑셀을 올리면, 몰별 기준 가격과 실제 판매가를 비교해 다른 건만 골라 줍니다.<br>
-기대 판매가 = 주문서 원가 ÷ 0.87 × 몰별 배수 · 허용 오차 ±100원. 결제금액은 쿠폰·할인이 반영돼 있어 판정하지 않고 참고로만 보여 줍니다.</p>
+기대 판매가 = 필웨이 가격(주문서 원가 ÷ 0.87) × 몰별 배수 · 허용 오차 ±100원. 결제금액은 쿠폰·할인이 반영돼 있어 판정하지 않고 참고로만 보여 줍니다.</p>
 
 <div class="box">
   <div class="drop" id="drop">
@@ -111,7 +111,7 @@
 <script>
 (function(){
   var C = window.SalePriceCore;
-  var LS = 'buyest.salePrice.mults.v1';
+  var LS = 'buyest.salePrice.mults.v2';   // 기본값과 다르게 고친 몰만 저장 (기본값이 바뀌면 자동으로 따라감)
   var $ = function(id){ return document.getElementById(id); };
   var ROWS = [], RES = [], MULTS = loadMults(), FILTER = 'bad', MALL = '', FILENAME = '';
 
@@ -121,10 +121,14 @@
   function loadMults(){
     var m = {}, k, d = C.DEFAULT_MULTS;
     for (k in d) m[k] = d[k];
-    try { var s = JSON.parse(localStorage.getItem(LS) || 'null'); if (s) for (k in s) m[k] = s[k]; } catch(e){}
+    try { var o = JSON.parse(localStorage.getItem(LS) || 'null'); if (o) for (k in o) m[k] = o[k]; } catch(e){}
     return m;
   }
-  function saveMults(){ try { localStorage.setItem(LS, JSON.stringify(MULTS)); } catch(e){} }
+  function saveMults(){
+    var o = {}, k, d = C.DEFAULT_MULTS;
+    for (k in MULTS) if (!(k in d) || d[k] !== MULTS[k]) o[k] = MULTS[k];
+    try { localStorage.setItem(LS, JSON.stringify(o)); } catch(e){}
+  }
   function showErr(msg){ var e = $('err'); e.textContent = msg || ''; e.hidden = !msg; }
 
   function handleFile(f){
@@ -172,11 +176,12 @@
 
     // 몰별 배수 표
     var malls = Object.keys(s.malls).sort(function(a, b){ return s.malls[b].total - s.malls[a].total; });
-    var h = '<tr><th>몰</th><th class="r">건수</th><th class="r">기준 배수</th><th class="r">정상</th><th class="r">이상</th><th class="r">미매핑</th></tr>';
+    var h = '<tr><th>몰</th><th class="r">건수</th><th class="r">기준 배수</th><th>계산</th><th class="r">정상</th><th class="r">이상</th><th class="r">미매핑</th></tr>';
     malls.forEach(function(m){
       var c = s.malls[m], v = MULTS[m], miss = (v == null || v === '');
       h += '<tr><td class="nm"><div>' + esc(m) + '</div></td><td class="r">' + c.total + '</td>' +
         '<td class="r"><input type="number" step="0.01" min="0" class="mult' + (miss ? ' miss' : '') + '" data-m="' + esc(m) + '" value="' + (miss ? '' : v) + '" aria-label="' + esc(m) + ' 기준 배수" placeholder="입력"></td>' +
+        '<td class="hint">' + esc(C.mallNote(m)) + '</td>' +
         '<td class="r">' + c.ok + '</td><td class="r ' + (c.bad ? 'diffneg' : 'dim') + '">' + c.bad + '</td><td class="r dim">' + c.unmapped + '</td></tr>';
     });
     $('mallTbl').innerHTML = h;
