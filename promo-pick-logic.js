@@ -147,13 +147,19 @@
   function cellStr(v) { return v == null ? '' : String(v).replace(/\r?\n/g, ' ').trim(); }
 
   // aoa(2차원 배열) → {rows:[{code,name,brand}], cols}
-  // 상품명 맨 앞 시즌 코드 (예: "26FW 마야 ..." → "26FW"). 없으면 빈 문자열.
+  // 상품명 맨 앞 시즌 코드 (예: "26FW 마야 ..." → "26FW"). 주년 상품("5주년 ...")은 "5주년". 없으면 빈 문자열.
   function seasonOf(name) {
-    var m = /^\s*(\d{2})\s?(SS|FW)\b/i.exec(String(name || ''));
-    return m ? m[1] + m[2].toUpperCase() : '';
+    var t = String(name || '');
+    var m = /^\s*(\d{2})\s?(SS|FW)\b/i.exec(t);
+    if (m) return m[1] + m[2].toUpperCase();
+    var a = /^\s*(\d{1,2})\s?주년/.exec(t);
+    return a ? parseInt(a[1], 10) + '주년' : '';
   }
-  // 시즌 코드 → 정렬용 숫자 (26FW > 26SS > 25FW)
-  function seasonRank(s) { return s ? parseInt(s.slice(0, 2), 10) * 2 + (s.slice(2) === 'FW' ? 1 : 0) : -1; }
+  function isAnniv(s) { return /주년$/.test(s || ''); }
+  // 시즌 코드 → 정렬용 숫자 (26FW > 26SS > 25FW). 주년은 시즌과 따로 다루므로 -1.
+  function seasonRank(s) { return s && !isAnniv(s) ? parseInt(s.slice(0, 2), 10) * 2 + (s.slice(2) === 'FW' ? 1 : 0) : -1; }
+  // 주년 정렬용 숫자 (10주년 > 5주년)
+  function annivRank(s) { return isAnniv(s) ? parseInt(s, 10) : -1; }
 
   // 두 가지 사방넷 형식을 읽는다.
   //  A) 상품대량수정: 한 줄 = 상품 1개 (품번코드, 상품명, 브랜드명 …)
@@ -393,6 +399,6 @@
       return ex.some(function (w) { return n.indexOf(w) >= 0; });
     });
   }
-  var api = { KIND_SPEC: KIND_SPEC, KIND_GROUPS: KIND_GROUPS, KIND_ALIAS: KIND_ALIAS, activeSeasons: activeSeasons, offWords: offWords, kindInSeason: kindInSeason, dropOffSeason: dropOffSeason, excludedByKinds: excludedByKinds, catOkForKinds: catOkForKinds, MALL_COLS: MALL_COLS, OUT_HEAD: OUT_HEAD, mallRecord: mallRecord, groupMalls: groupMalls, mergeMap: mergeMap, mapAsOf: mapAsOf, convert: convert, seasonOf: seasonOf, seasonRank: seasonRank, order: order, brandStats: brandStats, parseSabangnet: parseSabangnet, parseRequest: parseRequest, select: select, KIND_MAP: KIND_MAP };
+  var api = { KIND_SPEC: KIND_SPEC, KIND_GROUPS: KIND_GROUPS, KIND_ALIAS: KIND_ALIAS, activeSeasons: activeSeasons, offWords: offWords, kindInSeason: kindInSeason, dropOffSeason: dropOffSeason, excludedByKinds: excludedByKinds, catOkForKinds: catOkForKinds, MALL_COLS: MALL_COLS, OUT_HEAD: OUT_HEAD, mallRecord: mallRecord, groupMalls: groupMalls, mergeMap: mergeMap, mapAsOf: mapAsOf, convert: convert, seasonOf: seasonOf, seasonRank: seasonRank, isAnniv: isAnniv, annivRank: annivRank, order: order, brandStats: brandStats, parseSabangnet: parseSabangnet, parseRequest: parseRequest, select: select, KIND_MAP: KIND_MAP };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PromoPick = api;
 })(typeof window !== 'undefined' ? window : this);

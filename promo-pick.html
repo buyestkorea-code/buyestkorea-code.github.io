@@ -76,7 +76,7 @@
     <input type="text" id="words" placeholder="패딩, 다운, 푸퍼">
     <div class="hint">비워두면 선택한 브랜드의 모든 상품이 나옵니다. 쉼표로 구분하세요.</div></div>
   <div class="f" id="audWrap" hidden><label class="l">대상</label><div class="chips" id="audChips"></div></div>
-  <div class="f" id="seasonWrap" hidden><label class="l">시즌 <span class="hint">— 아무것도 안 고르면 시즌 상관없이 전부</span></label><div class="chips" id="seasonChips"></div></div>
+  <div class="f" id="seasonWrap" hidden><label class="l">시즌·주년 <span class="hint">— 아무것도 안 고르면 시즌·주년 상관없이 전부</span></label><div class="chips" id="seasonChips"></div></div>
   <div class="f"><label class="l">정렬 (우선해서 보여줄 상품)</label>
     <div class="chips" id="ordChips">
       <label class="chip on" id="ordStockL"><input type="radio" name="ord" value="stock" checked> 재고 많은 순</label>
@@ -228,7 +228,7 @@ function applyBase(d,meta,restored){
   ALLB=Object.keys(BSTAT).sort((a,b)=>BSTAT[b].n-BSTAT[a].n);
   window.BORDER=Object.keys(BSTAT).sort((a,b)=>d.hasStock?BSTAT[b].stock-BSTAT[a].stock:BSTAT[b].n-BSTAT[a].n);
   const ss={}; d.rows.forEach(r=>{ if(r.season) ss[r.season]=(ss[r.season]||0)+1; });
-  window.SEASONS=Object.keys(ss).sort((a,b)=>PromoPick.seasonRank(b)-PromoPick.seasonRank(a)).slice(0,8); window.SCOUNT=ss;
+  const _all=Object.keys(ss); window.SEASONS=_all.filter(k=>!PromoPick.isAnniv(k)).sort((a,b)=>PromoPick.seasonRank(b)-PromoPick.seasonRank(a)).slice(0,8).concat(_all.filter(PromoPick.isAnniv).sort((a,b)=>PromoPick.annivRank(b)-PromoPick.annivRank(a))); window.SCOUNT=ss;
   window.HASREG=d.rows.some(r=>r.reg);
   $('ordStockL').style.display=d.hasStock?'':'none'; $('ordNewL').style.display=HASREG?'':'none';
   { const v=d.hasStock?'stock':(HASREG?'new':'none'); const el=document.querySelector('input[name=ord][value='+v+']'); el.checked=true; document.querySelectorAll('#ordChips .chip').forEach(c=>c.classList.toggle('on',c.querySelector('input').checked)); }
