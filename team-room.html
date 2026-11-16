@@ -79,6 +79,24 @@
   #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:99px;font-size:13px;display:none;z-index:9;}
   #toast.err{background:var(--bad);}
   #gate{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:30px;text-align:center;color:var(--mut);line-height:1.7;}
+  /* AI 직원 탭 */
+  .pill{font-size:12px;font-weight:700;padding:4px 12px;border-radius:99px;display:inline-flex;align-items:center;gap:7px;}
+  .pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;}
+  .pill.on{background:var(--ok-soft);color:var(--ok);} .pill.off{background:var(--soft);color:var(--mut);}
+  textarea.aitext{width:100%;min-height:120px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:10px 12px;line-height:1.6;background:#FFFDF8;font-size:14px;}
+  input.aiin{width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--card);}
+  .jobs{list-style:none;margin:0;padding:0;}
+  .jobs li{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--soft);cursor:pointer;border-radius:8px;}
+  .jobs li:hover,.jobs li.sel{background:var(--acc-soft);}
+  .jobs .t{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .jobs .m{font-size:11.5px;color:var(--mut);white-space:nowrap;}
+  .st{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;white-space:nowrap;background:var(--soft);color:var(--mut);}
+  .st.running,.st.approved{background:var(--acc-soft);color:var(--acc);} .st.awaiting_approval{background:var(--warn-soft);color:var(--warn);}
+  .st.done{background:var(--ok-soft);color:var(--ok);} .st.failed,.st.rejected{background:var(--bad-soft);color:var(--bad);}
+  .box{white-space:pre-wrap;line-height:1.6;background:#FFFDF8;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0 12px;font-size:13px;max-height:340px;overflow:auto;}
+  .box.plan{background:var(--warn-soft);border-color:#E7D2A8;}
+  .evs{list-style:none;margin:6px 0 0;padding:0;font-size:12px;color:var(--mut);}
+  .evs li{padding:3px 0;} .evs .e-error{color:var(--bad);} .evs .e-warn{color:var(--warn);}
   @media (prefers-reduced-motion:no-preference){.tally li{animation:in .18s ease-out;} @keyframes in{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:none;}}}
 </style>
 </head>
@@ -94,6 +112,7 @@
     <button data-tab="write" class="on">오늘 입력</button>
     <button data-tab="mine">내 기록</button>
     <button data-tab="report" id="tabReport">리포트</button>
+    <button data-tab="ai" id="tabAi">AI 직원</button>
   </div>
 
   <!-- 입력 -->
@@ -150,6 +169,33 @@
     </div>
     <div class="card sec"><h2>업무명 묶음</h2><div class="hint" style="margin:0 0 8px;">직원이 "기존 업무로 묶기"로 정한 이름이에요. 잘못 묶인 건 관리자가 해제할 수 있어요.</div><div id="aliases"></div></div>
   </section>
+
+  <!-- AI 직원 -->
+  <section id="p-ai" hidden>
+    <div class="row" style="margin-bottom:12px;">
+      <span class="pill off" id="aiWorker">AI 직원 확인 중…</span>
+      <span class="sp"></span>
+      <div class="chips" id="aiScope" style="margin:0;" hidden><button data-s="mine" class="on">내 요청</button><button data-s="all">전체</button></div>
+    </div>
+    <div class="grid2">
+      <div>
+        <div class="card" id="aiForm">
+          <h2>AI 직원에게 시키기</h2>
+          <label class="f" for="aiKind">할 일</label>
+          <select id="aiKind" style="width:100%;margin-bottom:10px;"></select>
+          <label class="f" for="aiBody">요청 내용</label>
+          <textarea id="aiBody" class="aitext" placeholder="예: 이 폴더의 상품 목록에서 품번이 중복된 줄을 찾아서 알려줘"></textarea>
+          <label class="f" for="aiFolder" style="margin-top:10px;">작업 폴더 <span style="font-weight:400;">(OneDrive 요청 폴더 안의 이름, 없으면 비워두기)</span></label>
+          <input type="text" id="aiFolder" class="aiin" placeholder="예: 1116_홍길동_품번확인" autocomplete="off">
+          <div class="hint" id="aiKindHint"></div>
+          <div class="row" style="margin-top:12px;"><span class="sp"></span><button class="btn pri" id="aiSend">AI 직원에게 보내기</button></div>
+        </div>
+        <div class="card" id="aiNoCreate" hidden><div class="empty">아직 AI 직원에게 시킬 수 있는 계정이 아니에요.<br>시험이 끝나면 열어드릴게요.</div></div>
+        <div class="card sec"><h2>요청 목록</h2><div id="aiList"></div></div>
+      </div>
+      <div class="card" id="aiDetail"><div class="empty">왼쪽 목록에서 요청을 고르면<br>진행 상황이 여기에 보여요.</div></div>
+    </div>
+  </section>
 </div>
 <div id="toast"></div>
 
@@ -188,7 +234,8 @@
   var tabs = document.querySelectorAll('.tabs button');
   tabs.forEach(function(b){ b.addEventListener('click', function(){
     tabs.forEach(function(x){ x.classList.toggle('on', x === b); });
-    ['write','mine','report'].forEach(function(t){ $('p-' + t).hidden = (t !== b.getAttribute('data-tab')); });
+    ['write','mine','report','ai'].forEach(function(t){ $('p-' + t).hidden = (t !== b.getAttribute('data-tab')); });
+    aiActive(b.getAttribute('data-tab') === 'ai');
     if(b.getAttribute('data-tab') === 'mine') loadMine();
     if(b.getAttribute('data-tab') === 'report') loadReport();
   }); });
@@ -350,6 +397,97 @@
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s1), '집계');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s2), '원문');
     XLSX.writeFile(wb, '바이스트팀룸_' + rg[0].replace(/-/g, '') + '-' + rg[1].replace(/-/g, '') + '.xlsx');
+  });
+
+  // ---------- AI 직원 ----------
+  var AIAPI = 'https://buyest.co.kr/toolkit_aijob_api.php';
+  var ST = {queued:'대기중', running:'실행중', awaiting_approval:'승인 기다림', approved:'승인됨·이어서 실행 대기', done:'완료', failed:'실패', rejected:'거절됨', cancelled:'취소됨'};
+  var KIND_HINT = {ping:'AI를 쓰지 않고 새 PC가 살아 있는지만 확인해요.', ai_ask:'AI가 읽기만 해요. 파일을 바꾸거나 어디로 보내지 않아요.', approval_demo:'승인 버튼이 잘 동작하는지 보는 시험이에요. 실제로 바뀌는 건 없어요.'};
+  var aiTimer = null, aiScope = 'mine', aiSel = 0, aiLoaded = false;
+  function aiApi(action, extra){
+    var b = {action:action, user:AUTH.id, pass:AUTH.pass};
+    for(var k in extra) b[k] = extra[k];
+    return fetch(AIAPI, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(b)}).then(function(r){ return r.json(); })
+      .catch(function(){ return {ok:false, error:'서버에 연결하지 못했어요'}; });
+  }
+  function aiActive(on){
+    clearInterval(aiTimer); aiTimer = null;
+    if(!on) return;
+    if(!aiLoaded) aiInit();
+    aiRefresh();
+    aiTimer = setInterval(function(){ if(!document.hidden) aiRefresh(); }, 5000);
+  }
+  function aiPill(w){
+    var p = $('aiWorker');
+    if(!w || !w.online){ p.className = 'pill off'; p.textContent = 'AI 직원 오프라인' + (w && w.last_seen ? ' · 마지막 ' + w.last_seen.slice(5, 16) : ' · 아직 연결된 적 없어요'); }
+    else { p.className = 'pill on'; p.textContent = 'AI 직원 대기 중'; }
+  }
+  function aiInit(){
+    aiApi('aj_status').then(function(r){
+      if(!r || !r.ok){ toast((r && r.error) || 'AI 직원 정보를 불러오지 못했어요', true); return; }
+      aiLoaded = true;
+      var sel = $('aiKind'); sel.innerHTML = '';
+      Object.keys(r.kinds).forEach(function(k){ var o = document.createElement('option'); o.value = k; o.textContent = r.kinds[k]; sel.appendChild(o); });
+      $('aiForm').hidden = !r.can_create; $('aiNoCreate').hidden = r.can_create;
+      $('aiScope').hidden = !r.is_admin;
+      kindHint();
+    });
+  }
+  function kindHint(){ $('aiKindHint').textContent = KIND_HINT[$('aiKind').value] || ''; }
+  $('aiKind').addEventListener('change', kindHint);
+  chipGroup('aiScope', function(b){ aiScope = b.getAttribute('data-s'); aiRefresh(); });
+  function aiRefresh(){
+    aiApi('aj_list', {scope:aiScope}).then(function(r){
+      if(!r || !r.ok){ return; }
+      aiPill(r.worker);
+      var jobs = r.jobs || [];
+      $('aiList').innerHTML = jobs.length ? '<ul class="jobs">' + jobs.map(function(j){
+        return '<li data-id="' + j.id + '"' + (j.id === aiSel ? ' class="sel"' : '') + '><span class="t">' + h(j.title) + '</span>' + (aiScope === 'all' ? '<span class="m">' + h(j.requester) + '</span>' : '') +
+          '<span class="m">' + h(j.created_at.slice(5, 16)) + '</span><span class="st ' + h(j.status) + '">' + h(ST[j.status] || j.status) + '</span></li>'; }).join('') + '</ul>'
+        : '<div class="empty">아직 요청이 없어요.</div>';
+      $('aiList').querySelectorAll('li').forEach(function(li){ li.addEventListener('click', function(){ aiSel = +li.getAttribute('data-id'); aiRefresh(); }); });
+      if(aiSel) aiDetail();
+    });
+  }
+  function aiDetail(){
+    aiApi('aj_get', {id:aiSel}).then(function(r){
+      var d = $('aiDetail');
+      if(!r || !r.ok){ d.innerHTML = '<div class="empty">' + h((r && r.error) || '불러오지 못했어요') + '</div>'; return; }
+      var j = r.job, html = '<div class="row" style="margin-bottom:8px;"><h2 style="margin:0;">' + h(j.title) + '</h2><span class="st ' + h(j.status) + '">' + h(ST[j.status] || j.status) + '</span></div>' +
+        '<div class="hint" style="margin:0 0 8px;">' + h(j.kind_label) + ' · ' + h(j.requester) + ' · ' + h(j.created_at.slice(5, 16)) + (j.folder ? ' · 폴더 ' + h(j.folder) : '') + '</div>';
+      if(j.body) html += '<label class="f">요청 내용</label><div class="box">' + h(j.body) + '</div>';
+      if(j.status === 'awaiting_approval'){
+        html += '<label class="f">AI 직원이 하려는 일</label><div class="box plan">' + h(j.plan || '') + '</div>' +
+          '<div class="row" style="margin-bottom:12px;"><button class="btn pri" id="aiOk">승인하고 실행</button><button class="btn" id="aiNo">거절</button></div>';
+      }
+      if(j.result) html += '<label class="f">결과</label><div class="box">' + h(j.result) + '</div>';
+      if(j.status === 'queued') html += '<div class="row" style="margin-bottom:10px;"><button class="btn" id="aiCancel">요청 취소</button></div>';
+      html += '<label class="f">진행 기록</label><ul class="evs">' + r.events.map(function(e){ return '<li class="e-' + h(e.level) + '">' + h(e.at.slice(5, 16)) + ' · ' + h(e.msg) + '</li>'; }).join('') + '</ul>';
+      d.innerHTML = html;
+      // 버튼은 "지금 화면에 그려진 작업"(jid)에 묶는다. 목록에서 다른 작업을 눌러도 엉뚱한 작업이 승인되지 않게.
+      var jid = j.id;
+      var bind = function(id, fn){ var el = $(id); if(el) el.addEventListener('click', fn); };
+      bind('aiOk', function(){ aiDecide(jid, 'approve'); }); bind('aiNo', function(){ aiDecide(jid, 'reject'); });
+      bind('aiCancel', function(){ aiApi('aj_cancel', {id:jid}).then(function(r){ if(r && r.ok){ toast('취소했어요'); aiRefresh(); } else toast((r && r.error) || '취소하지 못했어요', true); }); });
+    });
+  }
+  function aiDecide(id, dec){
+    aiApi('aj_decide', {id:id, decision:dec}).then(function(r){
+      if(r && r.ok){ toast(dec === 'approve' ? '승인했어요. AI 직원이 이어서 진행해요' : '거절했어요'); aiRefresh(); }
+      else toast((r && r.error) || '처리하지 못했어요', true);
+    });
+  }
+  $('aiSend').addEventListener('click', function(){
+    var btn = $('aiSend'), kind = $('aiKind').value; if(!kind) return;
+    btn.disabled = true;
+    aiApi('aj_create', {kind:kind, body:$('aiBody').value, folder:$('aiFolder').value}).then(function(r){
+      btn.disabled = false;
+      if(r && r.ok){
+        $('aiBody').value = ''; $('aiFolder').value = ''; aiSel = r.id; aiPill(r.worker);
+        toast(r.worker && r.worker.online ? '보냈어요. AI 직원이 곧 시작해요' : '보냈어요. AI 직원이 꺼져 있어서 켜지면 시작해요');
+        aiRefresh();
+      } else toast((r && r.error) || '보내지 못했어요', true);
+    });
   });
 
   refreshNames().then(loadDate);
