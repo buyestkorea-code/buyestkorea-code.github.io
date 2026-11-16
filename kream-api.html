@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>크림 API</title>
+<style>
+  @import url("assets/fonts/pretendard/pretendard.css");
+  :root{
+    --bg:#f6f6f4; --card:#fff; --ink:#15171a; --sub:#6a6f76; --line:#e4e4e0;
+    --pri:#15171a; --ok:#0f766e; --okbg:#ecf8f5; --warn:#a15c07; --warnbg:#fdf3e0; --bad:#b42318; --badbg:#fdeceb; --blue:#1d4ed8; --bluebg:#eef3ff;
+    --font:"Pretendard Variable","Pretendard",-apple-system,"Malgun Gothic",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);margin:0;padding:16px;font-size:14px;}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
+  h1 .badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--warnbg);color:var(--warn);}
+  .lead{color:var(--sub);font-size:13px;margin:0 0 14px;line-height:1.6;}
+  .btn{font:600 14px var(--font);padding:9px 15px;border:1px solid transparent;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .btn:focus-visible,input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .btn-pri{background:var(--pri);color:#fff;} .btn-out{background:#fff;color:var(--ink);border-color:var(--line);}
+  .btn-sm{padding:6px 11px;font-size:12.5px;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  input[type=text],input[type=number],select{font:14px var(--font);padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);}
+  select{padding:7px 8px;}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
+  .hint{font-size:12px;color:var(--sub);line-height:1.55;}
+  .filebtn{position:relative;overflow:hidden;display:inline-block;}
+  .filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;}
+  .drop{border:1.5px dashed #c9c9c2;border-radius:12px;padding:22px 14px;text-align:center;color:var(--sub);background:#fcfcfa;}
+  .drop.on{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+  .drop b{display:block;color:var(--ink);font-size:14px;margin-bottom:4px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;}
+  .stat .lab{font-size:12px;color:var(--sub);} .stat .n{font-size:24px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.2;}
+  .stat.ok .n{color:var(--ok);} .stat.bad .n{color:var(--bad);} .stat.warn .n{color:var(--warn);}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px;}
+  .tools .sp{flex:1;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;flex-wrap:wrap;}
+  .seg button{font:600 12.5px var(--font);padding:7px 11px;border:0;background:#fff;cursor:pointer;color:var(--sub);white-space:nowrap;}
+  .seg button.on{background:var(--pri);color:#fff;} .seg button b{font-weight:700;margin-left:3px;opacity:.75;}
+  .lst{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:auto;margin-bottom:14px;max-height:62vh;}
+  table.l{width:100%;border-collapse:collapse;font-size:13px;}
+  table.l th{font-size:11.5px;color:var(--sub);font-weight:700;text-align:left;padding:8px 10px;background:#fafaf8;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;z-index:1;}
+  table.l td{padding:7px 10px;border-bottom:1px solid #f0f0ec;vertical-align:middle;}
+  table.l td.r,table.l th.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  table.l td.nm{max-width:240px;} table.l td.nm div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  table.l td.nm small{color:var(--sub);font-size:11.5px;}
+  table.l tr.done td{background:#f6fbf9;}
+  table.l tr.sel td{background:var(--bluebg);}
+  .gap{font-weight:800;} .gap.g3{color:var(--bad);} .gap.g2{color:#c4551a;} .gap.g1{color:var(--warn);}
+  .chip{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 10px;line-height:1.35;border-radius:999px;white-space:nowrap;}
+  .chip.ok{background:var(--okbg);color:var(--ok);} .chip.warn{background:var(--warnbg);color:var(--warn);} .chip.gray{background:#eee;color:#666;} .chip.bad{background:var(--badbg);color:var(--bad);}
+  .pin{width:92px;text-align:right;font-variant-numeric:tabular-nums;padding:5px 8px;}
+  .newp{font-weight:800;font-variant-numeric:tabular-nums;} .newp small{display:block;font-weight:600;color:var(--sub);font-size:11.5px;}
+  .empty{padding:28px 14px;text-align:center;color:var(--sub);}
+  .err{background:var(--badbg);color:var(--bad);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.55;}
+  .bar{position:sticky;bottom:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;box-shadow:0 -4px 14px rgba(0,0,0,.05);}
+  .bar .info{font-size:13px;color:var(--sub);margin-right:auto;} .bar .info b{color:var(--ink);}
+  details.rule{margin-bottom:12px;} details.rule summary{cursor:pointer;font-weight:600;font-size:13.5px;}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 14px;flex-wrap:wrap;}
+  .tabs button{font:600 14px var(--font);padding:9px 14px;border:0;background:none;color:var(--sub);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tabs button.on{color:var(--ink);border-bottom-color:var(--ink);}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;}
+  label.f{display:block;font-size:12.5px;color:var(--sub);font-weight:600;margin-bottom:10px;}
+  label.f input,label.f select{display:block;margin-top:4px;width:100%;}
+  label.f.chk{display:flex;gap:8px;align-items:center;} label.f.chk input{width:auto;margin:0;}
+  .res{border-radius:12px;padding:12px 14px;background:var(--bluebg);color:var(--ink);font-size:14px;line-height:1.6;}
+  .res b{font-size:22px;letter-spacing:-.02em;display:block;}
+  pre.code{background:#15171a;color:#e8e8e4;border-radius:10px;padding:12px 14px;font-size:12.5px;overflow:auto;margin:8px 0;}
+  ul.todo{list-style:none;margin:0;padding:0;} ul.todo li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #f0f0ec;line-height:1.5;}
+  ul.todo li:last-child{border-bottom:0;} ul.todo .chip{margin-top:1px;} ul.todo small{display:block;color:var(--sub);font-size:12px;}
+  [hidden]{display:none !important;}
+  @media(max-width:640px){body{padding:12px;}}
+</style>
+</head>
+<body>
+<h1>크림 API <span class="badge">TEST</span></h1>
+<div class="tabs" id="tabs" role="tablist">
+  <button type="button" role="tab" data-tab="review" class="on">가격 검토</button>
+  <button type="button" role="tab" data-tab="policy">가격 정책</button>
+  <button type="button" role="tab" data-tab="status">진행 현황</button>
+</div>
+
+<div data-tab="review">
+<p class="lead">크림 최저가가 우리가 정한 할인 한도보다 더 낮은 상품만 모아서 보여 줍니다. 상품마다 가격을 정하고 내려받으면, 그 파일로 크림에 가격을 반영합니다.<br>
+차이(%)는 <b>(크림 최저가 ÷ 우리 판매가 − 1)</b> 입니다. 표시 순서는 차이가 큰 것부터입니다.</p>
+
+<div class="box" id="loadBox">
+  <div class="drop" id="drop">
+    <b>검토 목록(review_queue.csv)을 여기에 놓거나 아래 버튼으로 선택하세요</b>
+    <span class="hint">가격 동기화 프로그램(kream_sync.py)이 만든 파일입니다. 이미 결정을 채운 파일도 다시 열 수 있어요.</span>
+    <div style="margin-top:12px;" class="row" style="justify-content:center;">
+      <span class="filebtn"><button class="btn btn-pri" type="button">CSV 파일 선택</button><input id="file" type="file" accept=".csv,text/csv" aria-label="검토 목록 CSV 선택"></span>
+      <button class="btn btn-out" type="button" id="demoBtn">예시 데이터로 써 보기</button>
+    </div>
+  </div>
+  <div class="hint" id="fileInfo" style="margin-top:8px;" hidden></div>
+</div>
+<div class="err" id="err" hidden></div>
+
+<div id="main" hidden>
+  <div class="stats" id="stats"></div>
+
+  <details class="rule box" open>
+    <summary>한 번에 정하기</summary>
+    <div class="row" style="margin-top:10px;">
+      <span class="hint">차이가</span>
+      <input id="ruleX" type="number" min="1" max="99" value="15" style="width:70px;" aria-label="차이 기준 퍼센트"> <span class="hint">% 이내인 건은 크림 최저가에 맞춤</span>
+      <button class="btn btn-out btn-sm" id="ruleApply" type="button">조건에 맞는 건 적용</button>
+      <span class="hint" style="margin-left:8px;">그보다 더 낮은 건은 직접 확인합니다.</span>
+    </div>
+  </details>
+
+  <div class="tools">
+    <div class="seg" id="bands" role="group" aria-label="차이 구간"></div>
+    <div class="seg" id="stat" role="group" aria-label="결정 상태"></div>
+    <input id="q" type="text" placeholder="품번·사이즈 검색" aria-label="검색" style="width:170px;">
+    <span class="sp"></span>
+    <button class="btn btn-out btn-sm" id="exportBtn" type="button">결정 파일 내려받기</button>
+  </div>
+
+  <div class="lst">
+    <table class="l">
+      <thead><tr>
+        <th><input type="checkbox" id="all" aria-label="보이는 줄 전체 선택"></th>
+        <th>품번 · 사이즈</th><th class="r">수량</th><th class="r">우리 판매가</th><th class="r">크림 최저가</th><th class="r">차이</th>
+        <th>결정</th><th class="r">새 가격</th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+    <div class="empty" id="emptyMsg" hidden>조건에 맞는 줄이 없어요. 구간이나 검색어를 바꿔 보세요.</div>
+  </div>
+
+  <div class="bar" id="bar">
+    <span class="info" id="barInfo">줄을 선택하면 한 번에 정할 수 있어요.</span>
+    <button class="btn btn-out btn-sm" data-bulk="최저가" type="button">선택 건 최저가에 맞춤</button>
+    <button class="btn btn-out btn-sm" data-bulk="최저선" type="button">허용 최저선으로</button>
+    <button class="btn btn-out btn-sm" data-bulk="기본가" type="button">기본 판매가로</button>
+    <button class="btn btn-out btn-sm" data-bulk="보류" type="button">보류</button>
+    <button class="btn btn-out btn-sm" data-bulk="" type="button">결정 지우기</button>
+  </div>
+  <p class="hint" style="margin-top:10px;">가격은 천원 단위, 최소 20,000원으로 반영됩니다. 결정 파일을 내려받은 뒤 <code>kream_sync.py --stock 재고.csv --decisions 결정파일.csv --apply</code> 로 크림에 보냅니다. 서버 연동 후에는 이 화면의 승인 버튼으로 바로 전송할 예정입니다.</p>
+</div>
+
+</div><!-- /review -->
+
+<div data-tab="policy" hidden>
+  <p class="lead">우리 판매가에서 몇 %까지 내려 팔지, 최저가가 그보다 더 낮을 때 어떻게 할지 정합니다. 값을 바꾸면 아래 계산기에서 바로 결과를 볼 수 있어요.</p>
+  <div class="grid2">
+    <div class="box">
+      <label class="f">최대 할인율 (%)<input id="pMax" type="number" min="0" max="90" step="0.5" value="10"></label>
+      <label class="f">최저가보다 더 낮출 금액 (원)<input id="pUnder" type="number" min="0" step="1000" value="0"></label>
+      <label class="f">최저가가 할인 한도보다 더 낮을 때
+        <select id="pBelow"><option value="review">검토 목록에 모아 승인 후 반영 (권장)</option><option value="floor">허용 최저선에 등록</option><option value="base">기본 판매가로 등록</option><option value="skip">등록 안 함</option></select></label>
+      <label class="f chk"><input id="pRaise" type="checkbox"> 경쟁 최저가가 우리 판매가보다 높으면 시세 수준까지 올림</label>
+    </div>
+    <div class="box">
+      <div class="row">
+        <label class="f" style="flex:1;min-width:110px;">우리 판매가<input id="cBase" type="number" step="1000" value="100000"></label>
+        <label class="f" style="flex:1;min-width:110px;">크림 최저가<input id="cLow" type="number" step="1000" placeholder="없으면 비워 둠" value="93000"></label>
+        <label class="f" style="flex:1;min-width:110px;">내 현재 입찰가<input id="cOwn" type="number" step="1000" placeholder="없으면 비워 둠"></label>
+      </div>
+      <div class="res" id="cRes" aria-live="polite"></div>
+      <p class="hint" style="margin-top:8px;">허용 최저선 = 판매가 × (1 − 최대 할인율), 천원 단위로 올림. 가격은 최소 20,000원, 천원 단위입니다.</p>
+    </div>
+  </div>
+  <div class="box">
+    <b style="font-size:13.5px;">설정 값 (가격 동기화 프로그램의 <code>kream_config.json</code> 안 <code>"pricing"</code> 에 붙여넣기)</b>
+    <pre class="code" id="pJson"></pre>
+    <button class="btn btn-out btn-sm" id="pCopy" type="button">복사</button>
+    <span class="hint" id="pCopied" style="margin-left:8px;"></span>
+  </div>
+</div>
+
+<div data-tab="status" hidden>
+  <p class="lead">크림 API 연동 작업이 어디까지 됐는지 보여 줍니다. (2026-11-17 기준)</p>
+  <div class="box">
+    <ul class="todo">
+      <li><span class="chip ok">완료</span><div>개발 환경 API 연결<small>키·Secret 연결, 계정 확인(C2C 전문셀러)</small></div></li>
+      <li><span class="chip ok">완료</span><div>재고·가격 반영 시험 (개발 환경)<small>고시 작성 → 재고 설정 → 입찰 생성·수정·삭제 → 품절 처리 한 사이클 통과</small></div></li>
+      <li><span class="chip ok">완료</span><div>품번·사이즈 매핑 규칙<small>품번 느슨한 비교(앞자리 0, 하이픈·공백 무시), 사이즈 <code>US 7 (EU 38)</code> 같은 표기 보정, 단위 테스트 통과</small></div></li>
+      <li><span class="chip ok">완료</span><div>가격 정책 + 검토 대기 흐름<small>할인 한도 안에서 최저가에 맞춤, 한도 밖은 이 화면에서 승인 후 반영</small></div></li>
+      <li><span class="chip warn">진행 중</span><div>KREAM 매칭 시스템 점검<small>재고 품번 13,153종 업로드(11-17 00:30), 결과 대기. 성공 목록으로 KREAM 상품번호를 확보합니다.</small></div></li>
+      <li><span class="chip gray">대기</span><div>서버 IP 허용<small>KREAM에 바이스트 서버 IP 등록 요청 → 허용되면 이 화면에서 바로 전송</small></div></li>
+      <li><span class="chip gray">대기</span><div>본계정 API 키 연결<small>키·Secret만 교체. 실제 시세로 검토 대상 규모 확인</small></div></li>
+      <li><span class="chip gray">대기</span><div>상품 정보(고시) 일괄 등록<small>본계정에서 실제 문구로. 병행수입 고지 문구 확정 필요</small></div></li>
+      <li><span class="chip gray">대기</span><div>대량 반영·자동 실행<small>매핑 완료 상품부터 단계적으로</small></div></li>
+    </ul>
+  </div>
+</div>
+
+<script>
+(function(){
+  var DECS = ['최저가','최저선','기본가','직접','보류'];
+  var rows = [], band = 'all', statF = 'all', q = '', sel = {};
+  var $ = function(id){ return document.getElementById(id); };
+  var fmt = function(n){ return (n===null||n===undefined||n==='') ? '-' : Number(n).toLocaleString('ko-KR'); };
+  var r1000 = function(x, mode){ var v = x/1000; return 1000 * (mode==='up' ? Math.ceil(v) : mode==='down' ? Math.floor(v) : Math.round(v)); };
+  function key(r){ return r.style_code + '|' + r.size; }
+
+  /* ---------- CSV ---------- */
+  function parseCSV(text){
+    text = text.replace(/^﻿/, '');
+    var out = [], row = [], cur = '', inq = false;
+    for(var i=0;i<text.length;i++){
+      var c = text[i];
+      if(inq){ if(c==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else inq=false; } else cur+=c; }
+      else if(c==='"') inq = true;
+      else if(c===','){ row.push(cur); cur=''; }
+      else if(c==='\n'){ row.push(cur); out.push(row); row=[]; cur=''; }
+      else if(c!=='\r') cur+=c;
+    }
+    if(cur!==''||row.length){ row.push(cur); out.push(row); }
+    return out;
+  }
+  function csvCell(v){ v = (v===null||v===undefined) ? '' : String(v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+
+  function load(text, name){
+    $('err').hidden = true;
+    var t = parseCSV(text); if(t.length < 2){ return fail('줄이 없는 파일이에요. kream_sync.py가 만든 review_queue.csv인지 확인해 주세요.'); }
+    var h = t[0].map(function(x){ return x.trim(); });
+    var need = ['style_code','size','base_price','kream_lowest','floor_price'];
+    for(var i=0;i<need.length;i++){ if(h.indexOf(need[i])<0) return fail('"'+need[i]+'" 열이 없어요. 검토 목록 파일(review_queue.csv)을 올려 주세요.'); }
+    var col = function(n){ return h.indexOf(n); };
+    rows = [];
+    t.slice(1).forEach(function(c){
+      if(!c[col('style_code')]) return;
+      var g = function(n){ var j=col(n); return j<0 ? '' : (c[j]||'').trim(); };
+      var base = parseFloat(g('base_price')), low = parseFloat(g('kream_lowest'));
+      rows.push({ style_code:g('style_code'), size:g('size'), qty:g('qty'), product_id:g('product_id'), option:g('option'),
+        base:base, low:low, gap:(low && base) ? (low/base-1)*100 : null,
+        floor:parseFloat(g('floor_price'))||r1000(base*0.9,'up'), decision:g('decision'), approved:g('approved_price') });
+    });
+    if(!rows.length) return fail('읽을 수 있는 줄이 없어요.');
+    restore();
+    rows.sort(function(a,b){ return (a.gap===null) - (b.gap===null) || a.gap - b.gap; });
+    sel = {}; band = 'all'; statF = 'all'; q = '';
+    $('fileInfo').hidden = false; $('fileInfo').textContent = name + ' · ' + rows.length.toLocaleString() + '줄';
+    $('main').hidden = false; render();
+  }
+  function fail(m){ $('err').textContent = m; $('err').hidden = false; $('main').hidden = true; }
+
+  /* ---------- 가격 계산 ---------- */
+  function priceOf(r){
+    var d = r.decision;
+    if(d==='최저가' && r.low) return Math.max(20000, r1000(r.low,'down'));
+    if(d==='최저선') return Math.max(20000, r.floor);
+    if(d==='기본가') return Math.max(20000, r1000(r.base));
+    if(d==='직접'){ var v = parseFloat(String(r.approved).replace(/,/g,'')); return v ? Math.max(20000, r1000(v)) : null; }
+    return null;
+  }
+  function state(r){ if(r.decision==='보류') return 'hold'; if(!r.decision) return 'todo'; return priceOf(r)===null ? 'todo' : 'done'; }
+  function bandOf(r){ var g = r.gap; if(g===null) return 'x'; return g<=-40 ? 'b3' : g<=-25 ? 'b2' : 'b1'; }
+
+  /* ---------- 저장(브라우저, 실패해도 동작) ---------- */
+  function persist(){ try{ var m = {}; rows.forEach(function(r){ if(r.decision) m[key(r)] = [r.decision, r.approved]; }); localStorage.setItem('krv.v1', JSON.stringify(m)); }catch(e){} }
+  function restore(){ try{ var m = JSON.parse(localStorage.getItem('krv.v1')||'{}'); rows.forEach(function(r){ if(!r.decision && m[key(r)]){ r.decision = m[key(r)][0]; r.approved = m[key(r)][1]; } }); }catch(e){} }
+
+  /* ---------- 화면 ---------- */
+  function visible(){
+    return rows.filter(function(r){
+      if(band!=='all' && bandOf(r)!==band) return false;
+      if(statF!=='all' && state(r)!==statF) return false;
+      if(q && (r.style_code+' '+r.size).toLowerCase().indexOf(q)<0) return false;
+      return true;
+    });
+  }
+  function render(){
+    var c = { todo:0, done:0, hold:0 }; rows.forEach(function(r){ c[state(r)]++; });
+    var worst = rows.reduce(function(m,r){ return (r.gap!==null && r.gap<m) ? r.gap : m; }, 0);
+    $('stats').innerHTML =
+      '<div class="stat"><div class="lab">검토할 줄</div><div class="n">'+rows.length.toLocaleString()+'</div></div>'+
+      '<div class="stat warn"><div class="lab">아직 안 정함</div><div class="n">'+c.todo.toLocaleString()+'</div></div>'+
+      '<div class="stat ok"><div class="lab">가격 정함</div><div class="n">'+c.done.toLocaleString()+'</div></div>'+
+      '<div class="stat"><div class="lab">보류</div><div class="n">'+c.hold.toLocaleString()+'</div></div>'+
+      '<div class="stat bad"><div class="lab">가장 큰 차이</div><div class="n">'+worst.toFixed(1)+'%</div></div>';
+    var bc = { all:rows.length, b3:0, b2:0, b1:0 }; rows.forEach(function(r){ var b = bandOf(r); if(bc[b]!==undefined) bc[b]++; });
+    $('bands').innerHTML = [['all','전체'],['b3','−40% 이하'],['b2','−40~−25%'],['b1','−25% 이내']].map(function(b){
+      return '<button type="button" data-band="'+b[0]+'" class="'+(band===b[0]?'on':'')+'">'+b[1]+'<b>'+bc[b[0]]+'</b></button>'; }).join('');
+    $('stat').innerHTML = [['all','모두'],['todo','안 정함'],['done','정함'],['hold','보류']].map(function(b){
+      return '<button type="button" data-st="'+b[0]+'" class="'+(statF===b[0]?'on':'')+'">'+b[1]+'</button>'; }).join('');
+    var list = visible(), html = '', show = list.slice(0, 500);
+    show.forEach(function(r){
+      var i = rows.indexOf(r), p = priceOf(r), s = state(r);
+      var gcls = r.gap===null ? '' : r.gap<=-40 ? 'g3' : r.gap<=-25 ? 'g2' : 'g1';
+      var disc = (p && r.base) ? ((p/r.base-1)*100).toFixed(1)+'%' : '';
+      html += '<tr class="'+(s==='done'?'done ':'')+(sel[i]?'sel':'')+'" data-i="'+i+'">'+
+        '<td><input type="checkbox" class="rc" '+(sel[i]?'checked':'')+' aria-label="줄 선택"></td>'+
+        '<td class="nm"><div title="'+r.style_code+'">'+r.style_code+'</div><small>사이즈 '+r.size+(r.option && r.option!==r.size ? ' · 크림 옵션 '+r.option : '')+'</small></td>'+
+        '<td class="r">'+fmt(r.qty)+'</td><td class="r">'+fmt(r.base)+'</td><td class="r">'+fmt(r.low)+'</td>'+
+        '<td class="r"><span class="gap '+gcls+'">'+(r.gap===null?'-':r.gap.toFixed(1)+'%')+'</span></td>'+
+        '<td><select class="dec" aria-label="결정"><option value="">선택…</option>'+DECS.map(function(d){ return '<option'+(r.decision===d?' selected':'')+'>'+d+'</option>'; }).join('')+'</select> '+
+          (r.decision==='직접' ? '<input class="pin" type="text" inputmode="numeric" value="'+(r.approved||'')+'" placeholder="가격" aria-label="직접 입력 가격">' : '')+'</td>'+
+        '<td class="r newp">'+(s==='hold' ? '<span class="chip gray">보류</span>' : p ? fmt(p)+'<small>판매가 대비 '+disc+'</small>' : '<span class="chip warn">정해 주세요</span>')+'</td></tr>';
+    });
+    $('tb').innerHTML = html;
+    $('emptyMsg').hidden = list.length>0;
+    if(list.length>500) $('tb').insertAdjacentHTML('beforeend','<tr><td colspan="8" class="hint" style="text-align:center;">처음 500줄만 보여 줍니다. 구간·검색으로 좁혀 주세요. (전체 '+list.length.toLocaleString()+'줄)</td></tr>');
+    var n = Object.keys(sel).filter(function(k){ return sel[k]; }).length;
+    $('barInfo').innerHTML = n ? '<b>'+n+'</b>줄 선택됨' : '줄을 선택하면 한 번에 정할 수 있어요.';
+    document.querySelectorAll('#bar [data-bulk]').forEach(function(b){ b.disabled = !n; });
+    $('all').checked = show.length>0 && show.every(function(r){ return sel[rows.indexOf(r)]; });
+  }
+
+  /* ---------- 이벤트 ---------- */
+  $('bands').addEventListener('click', function(e){ var b = e.target.closest('[data-band]'); if(b){ band = b.dataset.band; render(); } });
+  $('stat').addEventListener('click', function(e){ var b = e.target.closest('[data-st]'); if(b){ statF = b.dataset.st; render(); } });
+  $('q').addEventListener('input', function(){ q = this.value.trim().toLowerCase(); render(); });
+  $('all').addEventListener('change', function(){ var on = this.checked; visible().slice(0,500).forEach(function(r){ sel[rows.indexOf(r)] = on; }); render(); });
+  $('tb').addEventListener('change', function(e){
+    var tr = e.target.closest('tr[data-i]'); if(!tr) return; var i = +tr.dataset.i, r = rows[i];
+    if(e.target.classList.contains('rc')){ sel[i] = e.target.checked; render(); return; }
+    if(e.target.classList.contains('dec')){ r.decision = e.target.value; persist(); render(); return; }
+    if(e.target.classList.contains('pin')){ r.approved = e.target.value.replace(/[^\d]/g,''); persist(); render(); }
+  });
+  document.querySelectorAll('#bar [data-bulk]').forEach(function(b){
+    b.addEventListener('click', function(){
+      Object.keys(sel).forEach(function(k){ if(sel[k]){ rows[k].decision = b.dataset.bulk; } }); persist(); render();
+    });
+  });
+  $('ruleApply').addEventListener('click', function(){
+    var x = parseFloat($('ruleX').value); if(!x || x<=0) return; var n = 0;
+    rows.forEach(function(r){ if(!r.decision && r.gap!==null && r.gap >= -x){ r.decision = '최저가'; n++; } });
+    persist(); render(); $('ruleApply').textContent = n+'건 적용됨';
+    setTimeout(function(){ $('ruleApply').textContent = '조건에 맞는 건 적용'; }, 2200);
+  });
+  $('exportBtn').addEventListener('click', function(){
+    var head = ['style_code','size','qty','product_id','option','base_price','kream_lowest','gap_pct','floor_price','match_lowest_price','decision','approved_price'];
+    var lines = [head.join(',')];
+    rows.forEach(function(r){
+      var v = [r.style_code, r.size, r.qty, r.product_id, r.option, r.base, r.low, r.gap===null?'':r.gap.toFixed(1), r.floor, r.low?r1000(r.low,'down'):'', r.decision, r.decision==='직접'?r.approved:''];
+      lines.push(v.map(csvCell).join(','));
+    });
+    var blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'review_decided_' + new Date().toISOString().slice(0,10) + '.csv'; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  });
+  var fi = $('file');
+  fi.addEventListener('change', function(){ var f = fi.files[0]; if(!f) return; var rd = new FileReader(); rd.onload = function(){ load(rd.result, f.name); }; rd.readAsText(f, 'utf-8'); fi.value=''; });
+  var dr = $('drop');
+  ['dragenter','dragover'].forEach(function(ev){ dr.addEventListener(ev, function(e){ e.preventDefault(); dr.classList.add('on'); }); });
+  ['dragleave','drop'].forEach(function(ev){ dr.addEventListener(ev, function(e){ e.preventDefault(); dr.classList.remove('on'); }); });
+  dr.addEventListener('drop', function(e){ var f = e.dataTransfer.files[0]; if(!f) return; var rd = new FileReader(); rd.onload = function(){ load(rd.result, f.name); }; rd.readAsText(f, 'utf-8'); });
+
+  $('demoBtn').addEventListener('click', function(){
+    var d = [['JR 6368','230','1',42213,'230',105000,30000],['A09FW733 BLACK','41','2',50111,'41',509000,260000],['A09FW724 BLACK','42','1',50112,'42',569000,420000],
+      ['MV26.112.VIC003.51','M','1',50113,'M',329000,255000],['751630311 V0155','12A','2',50114,'12A',209000,150000],['K1250W25 606','S','3',50115,'S',189000,152000],
+      ['8Q7AG0 Z0142 613GL','38','1',50116,'38',419000,330000],['25280102 99','TU','2',50117,'TU',129000,98000],['DI0020 AD5','40','1',50118,'40',259000,190000],
+      ['F26002 221DA','L','1',50119,'L',349000,270000],['S25029 221BN','XL','2',50120,'XL',239000,199000],['B126AC055 721','8A','1',50121,'8A',159000,119000]];
+    var t = ['style_code,size,qty,product_id,option,base_price,kream_lowest,gap_pct,floor_price,match_lowest_price,decision,approved_price'];
+    d.forEach(function(x){ var g=(x[6]/x[5]-1)*100; t.push([x[0],x[1],x[2],x[3],x[4],x[5],x[6],g.toFixed(1),r1000(x[5]*0.9,'up'),r1000(x[6],'down'),'',''].join(',')); });
+    load(t.join('\n'), '예시 데이터(실제 가격 아님)');
+  });
+
+  /* ---------- 탭 ---------- */
+  var tabsEl = document.getElementById('tabs');
+  function showTab(t){
+    document.querySelectorAll('div[data-tab]').forEach(function(el){ el.hidden = el.dataset.tab!==t; });
+    tabsEl.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.dataset.tab===t); });
+    try{ sessionStorage.setItem('kapi.tab', t); }catch(e){}
+  }
+  tabsEl.addEventListener('click', function(e){ var b = e.target.closest('button[data-tab]'); if(b) showTab(b.dataset.tab); });
+  try{ var st0 = sessionStorage.getItem('kapi.tab'); if(st0) showTab(st0); }catch(e){}
+
+  /* ---------- 가격 정책 계산기 (kream_sync.py 의 price_rule 과 같은 규칙) ---------- */
+  function policy(){ return { max_discount_pct: parseFloat($('pMax').value)||0, undercut: parseInt($('pUnder').value,10)||0, below_floor: $('pBelow').value, raise_to_market: $('pRaise').checked }; }
+  function rule(base, low, own, p){
+    if(!base) return ['보류','우리 판매가가 없어요', null];
+    var baseP = Math.max(20000, r1000(base)), floor = Math.max(20000, r1000(base*(1-p.max_discount_pct/100),'up'));
+    if(low && own && low===own){ if(floor<=own && own<=baseP) return ['유지','내 입찰이 지금 최저가라서 그대로 둡니다', own]; low = 0; }
+    if(!low) return ['기본가','경쟁 입찰이 없어서 기본 판매가로 등록합니다', baseP];
+    if(low>=baseP){ return p.raise_to_market ? ['시세까지','경쟁이 더 비싸서 시세 수준으로 올립니다', Math.max(baseP, r1000(low-p.undercut))] : ['기본가','경쟁 최저가가 우리 판매가 이상이라 기본 판매가로 등록합니다', baseP]; }
+    if(low>=floor) return ['최저가','할인 한도 안이라 최저가에 맞춥니다', Math.max(20000, r1000(low-p.undercut,'down'))];
+    if(p.below_floor==='review') return ['검토','최저가가 할인 한도보다 더 낮아요. 가격 검토 탭에서 정해 주세요', null];
+    if(p.below_floor==='skip') return ['보류','최저가가 할인 한도보다 더 낮아서 등록하지 않습니다', null];
+    if(p.below_floor==='base') return ['범위밖','최저가가 할인 한도보다 더 낮아서 기본 판매가로 등록합니다', baseP];
+    return ['범위밖','최저가가 할인 한도보다 더 낮아서 허용 최저선에 등록합니다', floor];
+  }
+  function calc(){
+    var p = policy(), base = parseFloat($('cBase').value)||0, low = parseFloat($('cLow').value)||0, own = parseFloat($('cOwn').value)||0;
+    var r = rule(base, low, own, p), floor = base ? Math.max(20000, r1000(base*(1-p.max_discount_pct/100),'up')) : 0;
+    var gap = (low && base) ? ' · 크림 최저가는 판매가보다 '+((low/base-1)*100).toFixed(1)+'%' : '';
+    $('cRes').innerHTML = '<b>'+(r[2]===null ? '가격 정하지 않음' : fmt(r[2])+'원')+'</b>'+r[1]+'<br><span class="hint">허용 최저선 '+fmt(floor)+'원'+gap+'</span>';
+    $('pJson').textContent = JSON.stringify({ pricing: p }, null, 2);
+  }
+  ['pMax','pUnder','pBelow','pRaise','cBase','cLow','cOwn'].forEach(function(id){ $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  $('pCopy').addEventListener('click', function(){
+    var t = $('pJson').textContent;
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function(){ $('pCopied').textContent = '복사했어요'; }, function(){ $('pCopied').textContent = '복사하지 못했어요. 직접 선택해서 복사해 주세요.'; });
+    setTimeout(function(){ $('pCopied').textContent = ''; }, 2500);
+  });
+  calc();
+})();
+</script>
+</body>
+</html>
