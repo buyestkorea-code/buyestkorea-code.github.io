@@ -124,7 +124,7 @@
 <script src="assets/xlsx-fast.js"></script>
 <script src="assets/ec-cache.js"></script>
 <script src="assets/libs/exceljs-4.4.0.min.js"></script>
-<script src="promo-pick-logic.js"></script>
+<script src="promo-pick-logic.js?v=20261116b"></script>
 <script>
 const $=id=>document.getElementById(id);
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -223,7 +223,7 @@ function ageDays(d,meta){
 }
 function applyBase(d,meta,restored){
   DATA=d;
-  d.rows.forEach(r=>{ if(r.season===undefined) r.season=PromoPick.seasonOf(r.name); });
+  d.rows.forEach(r=>{ r.season=PromoPick.seasonOf(r.name); }); // 저장돼 있던 값(주년 도입 전엔 빈 값)이 아니라 항상 다시 계산
   window.BSTAT=PromoPick.brandStats(d.rows);
   ALLB=Object.keys(BSTAT).sort((a,b)=>BSTAT[b].n-BSTAT[a].n);
   window.BORDER=Object.keys(BSTAT).sort((a,b)=>d.hasStock?BSTAT[b].stock-BSTAT[a].stock:BSTAT[b].n-BSTAT[a].n);
