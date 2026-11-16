@@ -413,9 +413,8 @@
   function aiActive(on){
     clearInterval(aiTimer); aiTimer = null;
     if(!on) return;
-    if(!aiLoaded) aiInit();
-    aiRefresh();
-    aiTimer = setInterval(function(){ if(!document.hidden) aiRefresh(); }, 5000);
+    if(!aiLoaded){ aiInit(); } else { aiRefresh(); }
+    aiTimer = setInterval(function(){ if(!document.hidden && aiLoaded) aiRefresh(); }, 5000);   // 로그인 실패 상태에서는 서버를 반복 호출하지 않음
   }
   function aiPill(w){
     var p = $('aiWorker');
@@ -424,13 +423,20 @@
   }
   function aiInit(){
     aiApi('aj_status').then(function(r){
-      if(!r || !r.ok){ toast((r && r.error) || 'AI 직원 정보를 불러오지 못했어요', true); return; }
+      if(!r || !r.ok){
+        var msg = (r && r.error) || 'AI 직원 정보를 불러오지 못했어요';
+        toast(msg, true);
+        $('aiWorker').className = 'pill off'; $('aiWorker').textContent = 'AI 직원 정보를 불러오지 못했어요';
+        $('aiKindHint').textContent = msg.indexOf('로그인') > -1 ? '저장된 로그인 정보가 서버와 맞지 않아요. 툴킷에서 로그아웃한 뒤 다시 로그인하고, 이 화면을 새로고침해 주세요.' : msg;
+        return;   // aiLoaded는 그대로 두어 탭을 다시 열면 재시도
+      }
       aiLoaded = true;
       var sel = $('aiKind'); sel.innerHTML = '';
       Object.keys(r.kinds).forEach(function(k){ var o = document.createElement('option'); o.value = k; o.textContent = r.kinds[k]; sel.appendChild(o); });
       $('aiForm').hidden = !r.can_create; $('aiNoCreate').hidden = r.can_create;
       $('aiScope').hidden = !r.is_admin;
       kindHint();
+      aiRefresh();
     });
   }
   function kindHint(){ $('aiKindHint').textContent = KIND_HINT[$('aiKind').value] || ''; }
