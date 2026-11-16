@@ -137,7 +137,11 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){retu
 function won(n){ n=Math.round(Number(n)||0); return n.toLocaleString('ko-KR'); }
 function getAuth(){ try { var a = JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return (a && a.id && a.pass) ? a : null; } catch(e){ return null; } }
 var AUTH = getAuth();
-if(!AUTH){ $('gate').hidden = false; return; }
+if(!AUTH){
+  var rawA = null; try { rawA = JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); } catch(e){}
+  if(rawA && rawA.id){ $('gate').querySelector('.lead').innerHTML = '<b>'+esc(rawA.id)+'</b> 로그인은 확인되지만 이 화면이 쓸 비밀번호 정보가 없어요.<br>툴킷에서 한 번 로그아웃하고 다시 로그인한 뒤 새로고침해 주세요.'; }
+  $('gate').hidden = false; return;
+}
 $('app').hidden = false;
 
 var state = { period: defaultPeriod(), tx: [], entries: {}, banks: {}, months: {}, filter: 'all', open: null, drafts: {} };
@@ -150,7 +154,7 @@ function call(action, body){
   var payload = Object.assign({ action: action, user: AUTH.id, pass: AUTH.pass }, body||{});
   return fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
-    .then(function(j){ if(!j.ok) throw new Error(j.error||'요청에 실패했어요'); return j; });
+    .then(function(j){ if(!j.ok) throw new Error(j.error==='로그인이 필요해요' ? '서버가 '+AUTH.id+' 계정의 로그인 정보를 확인하지 못했어요. 툴킷에서 로그아웃 후 다시 로그인해 주세요.' : (j.error||'요청에 실패했어요')); return j; });
 }
 
 function load(){
