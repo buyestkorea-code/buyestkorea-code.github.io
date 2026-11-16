@@ -104,7 +104,11 @@
     <span class="hint">신한 · 국민 · 우리 · 농협 · 신한SLS — 여러 개 한꺼번에, 다시 올려도 중복 없이 합쳐져요.</span>
   </div>
 
-  <div class="box" id="banksBox"><h2>이 달 통장 업로드 현황</h2><div class="banks" id="banks"></div><div class="hint" style="margin-top:8px" id="banksHint"></div></div>
+  <div class="box" id="banksBox"><h2>이 달 통장 업로드 현황</h2><div class="banks" id="banks"></div><div class="hint" style="margin-top:8px" id="banksHint"></div>
+    <details id="upBox" style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;font-size:13px">올린 통장 파일 관리 · 삭제</summary>
+      <div style="margin-top:8px;overflow:auto"><table class="tx" id="upList"></table></div>
+      <div style="margin-top:8px"><button class="btn btn-out btn-sm" type="button" id="clearMonth" style="color:var(--bad)">이 달 통장 내역 전체 삭제</button> <span class="hint">정산금 입력은 지워지지 않아요. 지운 뒤 다시 올릴 수 있어요.</span></div>
+    </details></div>
 
   <div class="stats" id="stats"></div>
 
@@ -144,7 +148,7 @@ if(!AUTH){
 }
 $('app').hidden = false;
 
-var state = { period: defaultPeriod(), tx: [], entries: {}, banks: {}, months: {}, filter: 'all', open: null, drafts: {} };
+var state = { period: defaultPeriod(), tx: [], entries: {}, batches: [], banks: {}, months: {}, filter: 'all', open: null, drafts: {} };
 
 function defaultPeriod(){ var d = new Date(); return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2); }
 function shiftPeriod(p, delta){ var y = +p.slice(0,4), m = +p.slice(5,7) - 1 + delta; var d = new Date(y, m, 1); return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2); }
@@ -160,7 +164,7 @@ function call(action, body){
 function load(){
   $('pLabel').textContent = state.period.replace('-', '년 ') + '월';
   return call('stl_state', { period: state.period }).then(function(j){
-    state.tx = j.tx || []; state.entries = j.entries || {}; state.banks = j.banks || {}; state.months = j.months || {};
+    state.batches = j.batches || []; state.tx = j.tx || []; state.entries = j.entries || {}; state.banks = j.banks || {}; state.months = j.months || {};
     state.drafts = {};
     render();
   }).catch(function(e){
@@ -186,7 +190,7 @@ var cur; // 마지막 계산 결과
 function render(){
   var byKey = {}; state.tx.forEach(function(t){ t.bank_label=(S.BANKS[t.bank]||{}).label||t.bank; });
   cur = S.compute(state.tx, state.entries);
-  renderBanks(); renderStats(); renderSeg(); renderRows(); renderUnmatched();
+  renderBanks(); renderUploads(); renderStats(); renderSeg(); renderRows(); renderUnmatched();
 }
 function renderBanks(){
   var h = '';
@@ -198,6 +202,12 @@ function renderBanks(){
   $('banks').innerHTML = h;
   var missing = Object.keys(S.BANKS).filter(function(k){return !state.banks[k];});
   $('banksHint').textContent = missing.length ? '올린 내역이 없는 통장은 그 통장으로 들어오는 쇼핑몰이 "입금 없음"으로 보여요. 월말까지 조회한 엑셀을 올려 주세요.' : '';
+}
+function renderUploads(){
+  var b = state.batches;
+  $('upList').innerHTML = b.length ? b.map(function(x,i){
+    return '<tr><td class="bkc">'+esc((S.BANKS[x.bank]||{}).label||x.bank)+'</td><td class="pt">'+esc(x.file||'(이전에 올린 내역)')+'</td><td class="bkc">'+x.count+'건 · '+esc(x.first.slice(0,10))+' ~ '+esc(x.last.slice(0,10))+'</td><td class="bkc">'+esc((x.uploaded_at||'').slice(5,16))+'</td><td><button class="btn btn-out btn-sm" type="button" data-delb="'+i+'">삭제</button></td></tr>';
+  }).join('') : '<tr><td class="hint">올린 통장 파일이 없어요.</td></tr>';
 }
 function renderStats(){
   var rows = cur.rows, ok=0, diff=0, todo=0, entered=0;
@@ -292,6 +302,20 @@ function renderUnmatched(){
 /* ---------- 이벤트 ---------- */
 $('pPrev').onclick = function(){ state.period = shiftPeriod(state.period,-1); state.open=null; load(); };
 $('pNext').onclick = function(){ state.period = shiftPeriod(state.period, 1); state.open=null; load(); };
+$('upList').addEventListener('click', function(e){
+  var i = e.target.dataset && e.target.dataset.delb; if(i===undefined) return;
+  var x = state.batches[+i]; if(!x) return;
+  if(!confirm((x.file||'이전에 올린 내역')+' — '+x.count+'건을 삭제할까요?
+(같은 파일을 다시 올릴 수 있어요)')) return;
+  call('stl_batch_delete', { batch:x.batch, bank:x.bank }).then(function(j){ toast(j.deleted+'건 삭제했어요'); load(); }).catch(function(er){ toast(er.message); });
+});
+$('clearMonth').addEventListener('click', function(){
+  var n = 0; Object.keys(state.banks).forEach(function(k){ n += state.banks[k].count; });
+  if(!n){ toast('이 달에 올린 통장 내역이 없어요'); return; }
+  if(!confirm(state.period+' 통장 내역 '+n+'건을 모두 삭제할까요?
+정산금 입력은 그대로 남아요.')) return;
+  call('stl_tx_clear_month', { period:state.period }).then(function(j){ toast(j.deleted+'건 삭제했어요'); load(); }).catch(function(er){ toast(er.message); });
+});
 $('seg').addEventListener('click', function(e){ var b=e.target.closest('button[data-f]'); if(!b) return; state.filter=b.dataset.f; render(); });
 $('rows').addEventListener('click', function(e){
   if(e.target.closest('tr.exp')) return;
@@ -357,8 +381,8 @@ function saveEntry(r){
 $('bankFile').addEventListener('change', function(e){
   var files = Array.prototype.slice.call(e.target.files||[]); e.target.value='';
   if(!files.length) return;
-  var chain = Promise.resolve(), report = [];
-  files.forEach(function(f){
+  var chain = Promise.resolve(), report = [], batchBase = Date.now().toString(36);
+  files.forEach(function(f, fi){
     chain = chain.then(function(){ return f.arrayBuffer(); }).then(function(buf){
       var wb = XLSX.read(buf, { type:'array' });
       var aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'', raw:true });
@@ -366,7 +390,7 @@ $('bankFile').addEventListener('change', function(e){
       if(!p.bank){ report.push(f.name+': '+p.error); return; }
       if(!p.rows.length){ report.push(f.name+': 거래가 없어요'); return; }
       toast(f.name+' 올리는 중…');
-      return call('stl_tx_import', { rows:p.rows }).then(function(j){
+      return call('stl_tx_import', { rows:p.rows, file:f.name, batch:batchBase+'-'+fi }).then(function(j){
         report.push(S.BANKS[p.bank].label+' '+f.name+' — 새로 '+j.inserted+'건'+(j.duplicate?', 이미 있던 '+j.duplicate+'건':'')+' ('+j.from.slice(0,10)+' ~ '+j.to.slice(0,10)+')');
       });
     }).catch(function(err){ report.push(f.name+': '+err.message); });
