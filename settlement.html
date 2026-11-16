@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>정산 검증</title>
+<style>
+  @import url("assets/fonts/pretendard/pretendard.css");
+  :root{
+    --bg:#f6f6f4; --card:#fff; --ink:#15171a; --sub:#6a6f76; --line:#e4e4e0;
+    --pri:#15171a; --ok:#0f766e; --okbg:#ecf8f5; --warn:#a15c07; --warnbg:#fdf3e0; --bad:#b42318; --badbg:#fdeceb; --blue:#1d4ed8; --bluebg:#eef3ff;
+    --font:"Pretendard Variable","Pretendard",-apple-system,"Malgun Gothic",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);margin:0;padding:16px;font-size:14px;}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
+  h1 .badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--warnbg);color:var(--warn);}
+  h2{font-size:15px;margin:0 0 8px;letter-spacing:-.01em;}
+  .lead{color:var(--sub);font-size:13px;margin:0 0 14px;line-height:1.6;}
+  .btn{font:600 14px var(--font);padding:9px 15px;border:1px solid transparent;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,tr[data-k]:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .btn-pri{background:var(--pri);color:#fff;} .btn-out{background:#fff;color:var(--ink);border-color:var(--line);}
+  .btn-sm{padding:6px 11px;font-size:12.5px;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  input[type=text],select,textarea{font:14px var(--font);padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);}
+  select{padding:7px 8px;}
+  textarea{width:100%;min-height:58px;resize:vertical;line-height:1.5;}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
+  .hint{font-size:12px;color:var(--sub);line-height:1.55;}
+  .filebtn{position:relative;overflow:hidden;display:inline-block;}
+  .filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;}
+
+  .top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  .period{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden;}
+  .period button{border:0;background:#fff;font:700 15px var(--font);padding:8px 13px;cursor:pointer;}
+  .period button:hover{background:#f4f4f1;}
+  .period b{font-size:15px;padding:0 6px;min-width:96px;text-align:center;font-variant-numeric:tabular-nums;}
+  .grow{flex:1;}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;}
+  .stat .lab{font-size:12px;color:var(--sub);} .stat .n{font-size:22px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.2;}
+  .stat .n small{font-size:12.5px;font-weight:600;color:var(--sub);margin-left:2px;}
+  .stat.ok .n{color:var(--ok);} .stat.bad .n{color:var(--bad);} .stat.warn .n{color:var(--warn);}
+
+  .banks{display:flex;gap:8px;flex-wrap:wrap;}
+  .bk{border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-size:12.5px;background:#fff;min-width:150px;}
+  .bk b{display:block;font-size:13px;margin-bottom:1px;}
+  .bk.none{background:var(--warnbg);border-color:#f1dcb1;color:var(--warn);}
+  .bk .d{color:var(--sub);font-size:12px;font-variant-numeric:tabular-nums;}
+
+  .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;flex-wrap:wrap;}
+  .seg button{font:600 12.5px var(--font);padding:7px 11px;border:0;background:#fff;cursor:pointer;color:var(--sub);white-space:nowrap;}
+  .seg button.on{background:var(--pri);color:#fff;} .seg button b{font-weight:700;margin-left:3px;opacity:.75;}
+  .lst{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px;}
+  table.l{width:100%;border-collapse:collapse;font-size:13px;}
+  table.l th{font-size:11.5px;color:var(--sub);font-weight:700;text-align:left;padding:8px 10px;background:#fafaf8;border-bottom:1px solid var(--line);white-space:nowrap;}
+  table.l td{padding:9px 10px;border-bottom:1px solid #f0f0ec;vertical-align:middle;}
+  table.l tr[data-k]{cursor:pointer;} table.l tr[data-k]:hover td{background:#fafaf8;} table.l tr[data-k].open td{background:#f4f6ff;}
+  table.l td.r,table.l th.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  table.l td.dim{color:#9aa0a7;}
+  table.l .nm{font-weight:700;} table.l .bkn{font-size:11.5px;color:var(--sub);margin-top:1px;}
+  table.l tr.exp > td{padding:0;background:#fff;border-bottom:2px solid var(--line);cursor:default;}
+  .chip{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 10px;line-height:1.35;border-radius:999px;white-space:nowrap;}
+  .chip.ok{background:var(--okbg);color:var(--ok);} .chip.warn{background:var(--warnbg);color:var(--warn);} .chip.bad{background:var(--badbg);color:var(--bad);} .chip.gray{background:#eee;color:#666;} .chip.blue{background:var(--bluebg);color:var(--blue);}
+  .diffneg{color:var(--bad);font-weight:700;} .diffpos{color:var(--warn);font-weight:700;} .diff0{color:var(--ok);font-weight:700;}
+
+  .det{display:grid;grid-template-columns:1.15fr 1fr;gap:18px;padding:14px;}
+  @media(max-width:860px){.det{grid-template-columns:1fr;}}
+  .how{background:#fafaf8;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.65;color:#3a3d42;margin-bottom:12px;white-space:pre-wrap;}
+  .how b{display:block;font-size:11.5px;color:var(--sub);margin-bottom:2px;}
+  .ln{display:grid;grid-template-columns:1fr 150px 28px;gap:6px;margin-bottom:6px;align-items:center;}
+  .ln input{width:100%;} .ln input.amt{text-align:right;font-variant-numeric:tabular-nums;}
+  .ln .x{border:0;background:none;color:#9aa0a7;font-size:18px;cursor:pointer;line-height:1;} .ln .x:hover{color:var(--bad);}
+  .ln .minus{font-size:11px;color:var(--bad);font-weight:700;margin-left:5px;} .ln .ref{font-size:11px;color:var(--sub);font-weight:700;margin-left:5px;}
+  .sum{display:flex;justify-content:space-between;padding:8px 2px;border-top:1px solid var(--line);margin-top:6px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .tx{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .tx td{padding:5px 4px;border-bottom:1px solid #f0f0ec;vertical-align:middle;}
+  .tx td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .tx .pt{overflow-wrap:anywhere;} .tx .bkc{color:var(--sub);font-size:11.5px;}
+  .empty{padding:26px 16px;text-align:center;color:var(--sub);line-height:1.7;}
+  .msg{font-size:12.5px;min-height:18px;margin-top:8px;} .msg.ok{color:var(--ok);font-weight:600;} .msg.bad{color:var(--bad);font-weight:600;}
+  .gate{max-width:420px;margin:60px auto;text-align:center;line-height:1.7;}
+  .unm td.pt{max-width:240px;}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--pri);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9;max-width:90vw;}
+  .toast.on{opacity:1;}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+<div id="gate" class="gate" hidden>
+  <h1 style="justify-content:center">정산 검증</h1>
+  <p class="lead">통장 거래내역을 다루는 메뉴라 관리자 로그인이 필요해요.<br>툴킷에 로그인한 뒤 이 화면을 새로고침해 주세요.</p>
+</div>
+
+<div id="app" hidden>
+  <h1>정산 검증 <span class="badge">TEST</span></h1>
+  <p class="lead">쇼핑몰별 정산금(어드민에서 확인한 금액)을 입력하고 통장 엑셀을 올리면, 그 달에 실제로 입금된 금액과 자동으로 맞춰봅니다. 기준은 <b>입금월</b>이에요 — 8월 판매분이 9월에 들어오면 9월 칸에서 확인합니다.</p>
+
+  <div class="top">
+    <div class="period"><button id="pPrev" aria-label="이전 달">‹</button><b id="pLabel"></b><button id="pNext" aria-label="다음 달">›</button></div>
+    <span class="filebtn"><button class="btn btn-pri" type="button">통장 엑셀 올리기</button><input id="bankFile" type="file" accept=".xls,.xlsx" multiple aria-label="통장 엑셀 올리기"></span>
+    <span class="hint">신한 · 국민 · 우리 · 농협 · 신한SLS — 여러 개 한꺼번에, 다시 올려도 중복 없이 합쳐져요.</span>
+  </div>
+
+  <div class="box" id="banksBox"><h2>이 달 통장 업로드 현황</h2><div class="banks" id="banks"></div><div class="hint" style="margin-top:8px" id="banksHint"></div></div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="tools">
+    <div class="seg" id="seg"></div>
+  </div>
+  <div class="lst"><table class="l">
+    <thead><tr><th>쇼핑몰</th><th class="r">정산금 합계</th><th class="r">통장 입금</th><th class="r">차액</th><th>상태</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+
+  <div class="box" id="unmBox">
+    <h2>어느 쇼핑몰인지 모르는 입금 <span id="unmCount" class="chip gray"></span></h2>
+    <div class="hint" style="margin-bottom:8px">이 달 입금 중 쇼핑몰 규칙에 안 맞은 건이에요. 쇼핑몰을 골라 지정하면 위 대조에 바로 반영됩니다. 대표 이체·개인 입금처럼 정산과 무관한 건은 <b>정산 무관</b>으로 빼 주세요.</div>
+    <div id="unmTools" style="margin-bottom:8px"></div>
+    <div style="overflow:auto"><table class="tx unm" id="unm"></table></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="settlement-core.js"></script>
+<script>
+(function(){
+'use strict';
+var API = 'https://buyest.co.kr/settlement_api.php';
+var S = window.STL;
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function won(n){ n=Math.round(Number(n)||0); return n.toLocaleString('ko-KR'); }
+function getAuth(){ try { var a = JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return (a && a.id && a.pass) ? a : null; } catch(e){ return null; } }
+var AUTH = getAuth();
+if(!AUTH){ $('gate').hidden = false; return; }
+$('app').hidden = false;
+
+var state = { period: defaultPeriod(), tx: [], entries: {}, banks: {}, months: {}, filter: 'all', open: null, drafts: {} };
+
+function defaultPeriod(){ var d = new Date(); return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2); }
+function shiftPeriod(p, delta){ var y = +p.slice(0,4), m = +p.slice(5,7) - 1 + delta; var d = new Date(y, m, 1); return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2); }
+function toast(t){ var e=$('toast'); e.textContent=t; e.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(function(){e.classList.remove('on');},2600); }
+
+function call(action, body){
+  var payload = Object.assign({ action: action, user: AUTH.id, pass: AUTH.pass }, body||{});
+  return fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    .then(function(r){ return r.json(); })
+    .then(function(j){ if(!j.ok) throw new Error(j.error||'요청에 실패했어요'); return j; });
+}
+
+function load(){
+  $('pLabel').textContent = state.period.replace('-', '년 ') + '월';
+  return call('stl_state', { period: state.period }).then(function(j){
+    state.tx = j.tx || []; state.entries = j.entries || {}; state.banks = j.banks || {}; state.months = j.months || {};
+    state.drafts = {};
+    render();
+  }).catch(function(e){
+    $('rows').innerHTML = '<tr><td colspan="5"><div class="empty">'+esc(e.message)+'</div></td></tr>';
+  });
+}
+
+/* ---------- 렌더 ---------- */
+var STATUS = {
+  ok:      { t:'일치', c:'ok' },
+  diff:    { t:'차액 있음', c:'bad' },
+  noentry: { t:'정산금 미입력', c:'warn' },
+  nopay:   { t:'입금 없음', c:'warn' },
+  nobank:  { t:'통장 대조 없음', c:'gray' },
+  empty:   { t:'이 달 해당 없음', c:'gray' }
+};
+function diffCell(r){
+  if(r.status==='empty'||r.status==='nobank') return '<span class="dim">–</span>';
+  if(Math.abs(r.diff)<1) return '<span class="diff0">0</span>';
+  return '<span class="'+(r.diff<0?'diffneg':'diffpos')+'">'+(r.diff>0?'+':'')+won(r.diff)+'</span>';
+}
+var cur; // 마지막 계산 결과
+function render(){
+  var byKey = {}; state.tx.forEach(function(t){ t.bank_label=(S.BANKS[t.bank]||{}).label||t.bank; });
+  cur = S.compute(state.tx, state.entries);
+  renderBanks(); renderStats(); renderSeg(); renderRows(); renderUnmatched();
+}
+function renderBanks(){
+  var h = '';
+  Object.keys(S.BANKS).forEach(function(k){
+    var b = state.banks[k];
+    if(b) h += '<div class="bk"><b>'+esc(S.BANKS[k].label)+'</b><span class="d">'+b.count+'건 · '+esc(b.first.slice(5,10))+' ~ '+esc(b.last.slice(5,10))+'</span></div>';
+    else h += '<div class="bk none"><b>'+esc(S.BANKS[k].label)+'</b><span class="d">올린 내역 없음</span></div>';
+  });
+  $('banks').innerHTML = h;
+  var missing = Object.keys(S.BANKS).filter(function(k){return !state.banks[k];});
+  $('banksHint').textContent = missing.length ? '올린 내역이 없는 통장은 그 통장으로 들어오는 쇼핑몰이 "입금 없음"으로 보여요. 월말까지 조회한 엑셀을 올려 주세요.' : '';
+}
+function renderStats(){
+  var rows = cur.rows, ok=0, diff=0, todo=0, entered=0;
+  rows.forEach(function(r){ if(r.status==='ok') ok++; else if(r.status==='diff') diff++; else if(r.status==='noentry'||r.status==='nopay') todo++; if(r.entered) entered++; });
+  var unm = 0; cur.unmatched.forEach(function(t){ unm += t.amt_in; });
+  var tot = 0; rows.forEach(function(r){ tot += r.paid; });
+  function st(c,l,n,u){ return '<div class="stat '+c+'"><div class="lab">'+l+'</div><div class="n">'+n+'<small>'+(u||'')+'</small></div></div>'; }
+  $('stats').innerHTML = st('', '정산금 입력한 쇼핑몰', entered, '/ '+rows.length) + st('ok','일치',ok,'곳') + st(diff?'bad':'','차액 있음',diff,'곳') + st(todo?'warn':'','입력·입금 확인 필요',todo,'곳') +
+    st(cur.unmatched.length?'warn':'','분류 안 된 입금',cur.unmatched.length,'건') + st('','쇼핑몰 입금 합계',won(tot),'원');
+}
+function renderSeg(){
+  var c = { all:cur.rows.length, check:0, ok:0, empty:0 };
+  cur.rows.forEach(function(r){ if(r.status==='diff'||r.status==='noentry'||r.status==='nopay') c.check++; else if(r.status==='ok') c.ok++; else c.empty++; });
+  var defs = [['all','전체'],['check','확인 필요'],['ok','일치'],['empty','해당 없음']];
+  $('seg').innerHTML = defs.map(function(d){ return '<button type="button" data-f="'+d[0]+'" class="'+(state.filter===d[0]?'on':'')+'">'+d[1]+'<b>'+c[d[0]]+'</b></button>'; }).join('');
+}
+function passFilter(r){
+  if(state.filter==='all') return true;
+  if(state.filter==='check') return r.status==='diff'||r.status==='noentry'||r.status==='nopay';
+  if(state.filter==='ok') return r.status==='ok';
+  return r.status==='empty'||r.status==='nobank';
+}
+function renderRows(){
+  var h = '';
+  cur.rows.forEach(function(r){
+    if(!passFilter(r) && state.open!==r.shop.key) return;
+    var s = STATUS[r.status];
+    var open = state.open===r.shop.key;
+    h += '<tr data-k="'+esc(r.shop.key)+'" tabindex="0" class="'+(open?'open':'')+'" aria-expanded="'+open+'"><td><div class="nm">'+esc(r.shop.name)+'</div><div class="bkn">'+esc(r.shop.bank)+'</div></td>'+
+      '<td class="r'+(r.entered?'':' dim')+'">'+(r.entered?won(r.total):'–')+'</td>'+
+      '<td class="r'+(r.txs.length?'':' dim')+'">'+(r.txs.length?won(r.paid)+' <span class="hint">('+r.txs.length+'건)</span>':'–')+'</td>'+
+      '<td class="r">'+diffCell(r)+'</td><td><span class="chip '+s.c+'">'+s.t+'</span></td></tr>';
+    if(open) h += '<tr class="exp"><td colspan="5">'+detailHTML(r)+'</td></tr>';
+  });
+  if(!h) h = '<tr><td colspan="5"><div class="empty">조건에 맞는 쇼핑몰이 없어요.</div></td></tr>';
+  $('rows').innerHTML = h;
+}
+
+function draftFor(r){
+  var k = r.shop.key;
+  if(state.drafts[k]) return state.drafts[k];
+  var e = state.entries[k];
+  var lines;
+  if(e && e.lines && e.lines.length) lines = e.lines.map(function(l){ return { label:l.label, amount:l.amount }; });
+  else lines = r.shop.lines.map(function(l){ return { label:l, amount:'' }; });
+  var d = { lines: lines, note: e ? e.note : '' };
+  state.drafts[k] = d; return d;
+}
+function lineRow(l, i){
+  var minus = S.lineIsMinus(l.label), ref = S.lineIsRef(l.label);
+  var amt = (l.amount===''||l.amount==null) ? '' : won(l.amount);
+  return '<div class="ln"><span><input type="text" data-i="'+i+'" data-f="label" value="'+esc(S.linePlain(l.label))+'" style="width:100%" aria-label="항목 이름">'+'</span>'+
+    '<input class="amt" type="text" inputmode="numeric" data-i="'+i+'" data-f="amount" value="'+esc(amt)+'" placeholder="0" aria-label="금액">'+
+    '<button class="x" type="button" data-rm="'+i+'" aria-label="항목 지우기">×</button></div>' +
+    ((minus||ref)?'<div class="hint" style="margin:-3px 0 6px">'+(minus?'차감 항목 — 숫자만 넣으면 자동으로 빼요':'참고용 — 통장 대조 합계에는 넣지 않아요')+'</div>':'');
+}
+function previewTotal(r){
+  var d = draftFor(r);
+  return S.sumLines(d.lines.map(function(l){ var a = S.num(l.amount); if(S.lineIsMinus(l.label) && a>0) a=-a; return { label:l.label, amount:a }; }));
+}
+function detailHTML(r){
+  var d = draftFor(r);
+  var txh = r.txs.length ? '<table class="tx">'+r.txs.map(function(t){
+    return '<tr><td class="bkc">'+esc(t.tx_at.slice(5,10))+'</td><td class="bkc">'+esc(t.bank_label)+'</td><td class="pt">'+esc(t.party)+(t.shop_override?' <span class="chip blue">직접 지정</span>':'')+'</td><td class="r">'+won(t.amt_in)+'</td>'+
+      '<td><select data-assign="'+t.id+'" aria-label="다른 쇼핑몰로 옮기기"><option value="">옮기기…</option>'+(t.shop_override?'<option value="__auto">자동으로 되돌리기</option>':'')+shopOptions(r.shop.key)+'<option value="'+S.IGNORE+'">정산 무관</option></select></td></tr>';
+  }).join('')+'</table>' : '<div class="hint">이 달에 이 쇼핑몰로 분류된 입금이 없어요.</div>';
+  return '<div class="det"><div>'+
+    '<div class="how"><b>정산 확인 방법 (매뉴얼)</b>'+esc(r.shop.how)+'</div>'+
+    '<h2>정산금 입력 <span class="hint" style="font-weight:400">어드민에서 확인한 금액을 항목별로</span></h2>'+
+    '<div id="lines">'+d.lines.map(lineRow).join('')+'</div>'+
+    '<button class="btn btn-out btn-sm" type="button" data-add="1">+ 항목 추가</button>'+
+    '<div class="sum"><span>정산금 합계</span><span id="sumv">'+won(previewTotal(r))+'</span></div>'+
+    '<div style="margin-top:8px"><textarea data-note="1" placeholder="메모 (예: 8월 판매분, 광고비 후정산 포함)" aria-label="메모">'+esc(d.note)+'</textarea></div>'+
+    '<div style="margin-top:8px;display:flex;gap:8px;align-items:center"><button class="btn btn-pri btn-sm" type="button" data-save="1">저장</button><span class="msg" id="smsg"></span></div>'+
+    '</div><div><h2>이 달 통장 입금 <span class="hint" style="font-weight:400">'+r.txs.length+'건 · '+won(r.paid)+'원</span></h2>'+txh+'</div></div>';
+}
+function shopOptions(except){
+  return S.SHOPS.filter(function(s){return s.key!==except;}).map(function(s){ return '<option value="'+esc(s.key)+'">'+esc(s.name)+'</option>'; }).join('');
+}
+function renderUnmatched(){
+  var u = cur.unmatched;
+  $('unmCount').textContent = u.length + '건';
+  $('unmBox').style.display = u.length ? '' : 'none';
+  var nh = u.filter(function(t){return t.bank==='농협';}).length;
+  $('unmTools').innerHTML = nh ? '<button class="btn btn-out btn-sm" type="button" data-bulk="nh">농협 미분류 '+nh+'건 → 바이스트 무통장으로</button> <span class="hint">사이트 무통장 입금이 농협으로 들어오는 경우예요.</span>' : '';
+  $('unm').innerHTML = u.map(function(t){
+    return '<tr><td class="bkc">'+esc(t.tx_at.slice(5,10))+'</td><td class="bkc">'+esc(t.bank_label)+'</td><td class="pt">'+esc(t.party)+'</td><td class="r">'+won(t.amt_in)+'</td>'+
+      '<td><select data-assign="'+t.id+'" aria-label="쇼핑몰 지정"><option value="">쇼핑몰 지정…</option>'+shopOptions('')+'<option value="'+S.IGNORE+'">정산 무관</option></select></td></tr>';
+  }).join('');
+}
+
+/* ---------- 이벤트 ---------- */
+$('pPrev').onclick = function(){ state.period = shiftPeriod(state.period,-1); state.open=null; load(); };
+$('pNext').onclick = function(){ state.period = shiftPeriod(state.period, 1); state.open=null; load(); };
+$('seg').addEventListener('click', function(e){ var b=e.target.closest('button[data-f]'); if(!b) return; state.filter=b.dataset.f; render(); });
+$('rows').addEventListener('click', function(e){
+  if(e.target.closest('tr.exp')) return;
+  var tr = e.target.closest('tr[data-k]'); if(!tr) return;
+  state.open = state.open===tr.dataset.k ? null : tr.dataset.k; renderRows();
+});
+$('rows').addEventListener('keydown', function(e){ if((e.key==='Enter'||e.key===' ') && e.target.matches('tr[data-k]')){ e.preventDefault(); e.target.click(); } });
+
+function curRow(){ return cur.rows.filter(function(r){return r.shop.key===state.open;})[0]; }
+function refreshSum(){ var r=curRow(); if(r && $('sumv')) $('sumv').textContent = won(previewTotal(r)); }
+
+$('rows').addEventListener('input', function(e){
+  var r = curRow(); if(!r) return; var d = draftFor(r), t = e.target;
+  if(t.dataset.note){ d.note = t.value; return; }
+  if(t.dataset.i===undefined) return;
+  var i = +t.dataset.i, f = t.dataset.f;
+  if(f==='label'){
+    var old = d.lines[i].label, suffix = /[-*]$/.test(old) ? old.slice(-1) : '';
+    d.lines[i].label = t.value + suffix;
+  } else {
+    var v = t.value.replace(/[^0-9.\-]/g,''); d.lines[i].amount = v;
+  }
+  refreshSum();
+});
+$('rows').addEventListener('focusout', function(e){
+  var t = e.target; if(t.dataset && t.dataset.f==='amount'){ var r=curRow(); if(!r) return; var d=draftFor(r), v=d.lines[+t.dataset.i].amount; if(v!==''&&v!=null&&!isNaN(Number(v))) t.value = won(v); }
+});
+$('rows').addEventListener('click', function(e){
+  var r = curRow(); if(!r) return; var d = draftFor(r);
+  if(e.target.dataset.rm!==undefined){ d.lines.splice(+e.target.dataset.rm,1); renderRows(); }
+  else if(e.target.dataset.add){ d.lines.push({label:'',amount:''}); renderRows(); var ls=document.querySelectorAll('#lines .ln input[data-f=label]'); if(ls.length) ls[ls.length-1].focus(); }
+  else if(e.target.dataset.save){ saveEntry(r); }
+});
+$('rows').addEventListener('change', function(e){ if(e.target.dataset.assign) assign(+e.target.dataset.assign, e.target.value); });
+$('unm').addEventListener('change', function(e){ if(e.target.dataset.assign) assign(+e.target.dataset.assign, e.target.value); });
+$('unmTools').addEventListener('click', function(e){
+  if(!e.target.dataset.bulk) return;
+  var ids = cur.unmatched.filter(function(t){return t.bank==='농협';});
+  if(!confirm('농협 미분류 입금 '+ids.length+'건을 모두 "바이스트 / 바이스트키즈"로 지정할까요?')) return;
+  Promise.all(ids.map(function(t){ return call('stl_tx_assign',{id:t.id,shop:'바이스트'}); })).then(function(){ toast('지정했어요'); load(); }).catch(function(e){ toast(e.message); });
+});
+
+function assign(id, val){
+  if(!val) return;
+  var shop = val==='__auto' ? '' : val;
+  call('stl_tx_assign', { id:id, shop:shop }).then(function(){
+    state.tx.forEach(function(t){ if(t.id===id) t.shop_override = shop || null; });
+    render(); toast(shop===S.IGNORE?'정산 무관으로 뺐어요':'지정했어요');
+  }).catch(function(e){ toast(e.message); });
+}
+function saveEntry(r){
+  var d = draftFor(r);
+  var lines = d.lines.map(function(l){ var a=S.num(l.amount); if(S.lineIsMinus(l.label)&&a>0) a=-a; return { label:l.label.trim(), amount:a }; })
+    .filter(function(l){ return l.label || l.amount; });
+  var m = $('smsg'); m.className='msg'; m.textContent='저장 중…';
+  call('stl_entry_save', { period:state.period, shop:r.shop.key, lines:lines, note:d.note }).then(function(){
+    if(lines.length||d.note) state.entries[r.shop.key] = { lines:lines, note:d.note }; else delete state.entries[r.shop.key];
+    delete state.drafts[r.shop.key]; render(); toast('저장했어요');
+  }).catch(function(e){ m.className='msg bad'; m.textContent=e.message; });
+}
+
+/* ---------- 통장 업로드 ---------- */
+$('bankFile').addEventListener('change', function(e){
+  var files = Array.prototype.slice.call(e.target.files||[]); e.target.value='';
+  if(!files.length) return;
+  var chain = Promise.resolve(), report = [];
+  files.forEach(function(f){
+    chain = chain.then(function(){ return f.arrayBuffer(); }).then(function(buf){
+      var wb = XLSX.read(buf, { type:'array' });
+      var aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'', raw:true });
+      var p = S.parseBank(aoa);
+      if(!p.bank){ report.push(f.name+': '+p.error); return; }
+      if(!p.rows.length){ report.push(f.name+': 거래가 없어요'); return; }
+      toast(f.name+' 올리는 중…');
+      return call('stl_tx_import', { rows:p.rows }).then(function(j){
+        report.push(S.BANKS[p.bank].label+' '+f.name+' — 새로 '+j.inserted+'건'+(j.duplicate?', 이미 있던 '+j.duplicate+'건':'')+' ('+j.from.slice(0,10)+' ~ '+j.to.slice(0,10)+')');
+      });
+    }).catch(function(err){ report.push(f.name+': '+err.message); });
+  });
+  chain.then(function(){ alert(report.join('\n')); return load(); });
+});
+
+load();
+})();
+</script>
+</body>
+</html>
