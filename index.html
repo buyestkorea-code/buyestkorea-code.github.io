@@ -2583,7 +2583,7 @@ window.__loadLib = (function(){
       var isHr = !!(inn && AUTH && HR_ADMINS.indexOf(AUTH.id) > -1);
       var nv = $('navHrAdmin'); if(nv) nv.hidden = !isHr;
       var nsp = $('navSpc'); if(nsp) nsp.hidden = !(inn && AUTH && HR_ADMINS.indexOf(AUTH.id) > -1);   // 판매가 검증(시험판): 관리자만
-      var nkr = $('navKrv'); if(nkr) nkr.hidden = !(inn && AUTH && HR_ADMINS.indexOf(AUTH.id) > -1);   // 크림 API(시험판): 관리자만
+      var nkr = $('navKrv'); if(nkr) nkr.hidden = !(inn && AUTH);   // 크림 API(시험판): 로그인한 직원 모두(같이 테스트)
       var ns = $('navStl'); if(ns) ns.hidden = !(inn && AUTH && ['buyest','조경호','김상미'].indexOf(AUTH.id) > -1);   // 정산 검증: 관리자 + 정산 담당자 (서버가 다시 검사)
       if(inn && AUTH) loadHrMe(); else { var c = $('meHrCard'); if(c) c.hidden = true; }
     }
