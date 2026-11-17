@@ -342,7 +342,12 @@
     var out = oldMap || {};
     Object.keys(newMap).forEach(function (code) {
       var o = out[code], n = newMap[code];
-      if (!o || (n[13] || '') >= (o[13] || '')) out[code] = n;
+      if (!o) { out[code] = n; return; }
+      var newer = (n[13] || '') >= (o[13] || '');
+      var win = newer ? n : o, lose = newer ? o : n;
+      // 부가정보제목은 날짜와 상관없이 값이 있는 쪽을 살린다 (옛 저장본에 열이 없었거나, 이긴 쪽이 비어 있는 경우)
+      if (!String(win[14] || '').trim() && String(lose[14] || '').trim()) { win = win.slice(); win[14] = lose[14]; }
+      out[code] = win;
     });
     return out;
   }
