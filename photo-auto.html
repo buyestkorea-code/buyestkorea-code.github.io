@@ -131,6 +131,7 @@
   .sv-p img{width:96px;height:96px;object-fit:contain;background:#f0f0ee;border-radius:6px;}
   .sv-fx{margin-top:10px;font-size:12.5px;color:var(--sub);} .sv-fx summary{cursor:pointer;margin-bottom:8px;}
   #seasonDrop:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.hsearch{display:flex;align-items:center;gap:10px;margin:8px 0}.hsearch input{flex:1;max-width:420px;padding:8px 12px;border:1px solid #d6d6d6;border-radius:8px;font:inherit;font-size:13px}.hsearch input:focus-visible{outline:2px solid #1a56db;outline-offset:1px}
 </style>
 </head>
 <body>
@@ -139,7 +140,7 @@
   <button type="button" role="tab" id="tabNew" class="on" aria-selected="true">상세페이지 만들기</button>
   <button type="button" role="tab" id="tabSeason" aria-selected="false">시즌변경</button>
 </div>
-<p class="lead" id="leadNew">사진 + 기본틀 엑셀 + 상품명만 넣으면 상세페이지 이미지(폭 720px)를 자동으로 조립합니다. <b>실측</b>은 직접 입력하세요. 만드는 작업은 이 브라우저 안에서 처리되고, 결과와 사진은 <b>서버에 3일간 보관</b>돼 아래 '최근 작업'에서 다시 불러올 수 있습니다.</p>
+<p class="lead" id="leadNew">사진 + 기본틀 엑셀 + 상품명만 넣으면 상세페이지 이미지(폭 720px)를 자동으로 조립합니다. <b>실측</b>은 직접 입력하세요. 만드는 작업은 이 브라우저 안에서 처리되고, 결과와 사진은 <b>서버에 30일간 보관</b>돼 아래 '최근 작업'에서 다시 불러올 수 있습니다.</p>
 <p class="lead" id="leadSeason" style="display:none">예전 틀로 만든 상세페이지 PSD를 올리면 글자·실측표·사진을 읽어 <b>현재 템플릿</b>에 옮겨 줍니다. 시즌·원산지·소재처럼 바뀐 값은 고쳐 쓰고, 그 뒤는 상세페이지 만들기 · 수정 · 사이트 등록까지 똑같이 진행해요.</p>
 
 <div class="box" id="seasonBox">
@@ -151,7 +152,8 @@
 </div>
 
 <div class="box hist">
-  <h2>최근 작업 <span class="hint">(서버에 마지막 작업 후 3일간 보관 · 팀 공용)</span> <button class="btn btn-out btn-sm" id="histRefresh" type="button">새로고침</button> <button class="btn btn-out btn-sm" id="histFold" type="button" aria-expanded="true">목록 접기 ▲</button></h2>
+  <h2>최근 작업 <span class="hint">(서버에 마지막 작업 후 30일간 보관 · 팀 공용)</span> <button class="btn btn-out btn-sm" id="histRefresh" type="button">새로고침</button> <button class="btn btn-out btn-sm" id="histFold" type="button" aria-expanded="true">목록 접기 ▲</button></h2>
+  <div class="hsearch"><input type="search" id="histQ" placeholder="상품명·품번·작업자·날짜(예: 11/17)로 검색" aria-label="최근 작업 검색" autocomplete="off"><span class="hint" id="histCount"></span></div>
   <div id="histList" class="hint">불러오는 중…</div>
   <div id="histMore" style="display:none;margin-top:8px"><button class="btn btn-out btn-sm" id="histMoreBtn" type="button"></button></div>
   <div class="hint" id="histNote" style="margin-top:6px"></div>
@@ -1423,7 +1425,8 @@ $('dlp').addEventListener('click',function(){
   }).catch(function(e){ $('status').textContent='PSD 저장 실패: '+e.message; console.error(e); }).then(function(){ b.disabled=false; });
 });
 
-/* ---------- 작업 내역 서버 보관(3일) ---------- */
+/* ---------- 작업 내역 서버 보관(30일) ---------- */
+var HIST_TTL_H=720;
 var HIST_API='https://buyest.co.kr/photo_history_api.php';
 function actorId(){ try{ var a=JSON.parse(localStorage.getItem('buyest.dash.auth')||'null'); return a&&a.id?String(a.id):''; }catch(e){ return ''; } }
 function newId(){ var a=new Uint8Array(8); window.crypto.getRandomValues(a); return [].map.call(a,function(b){return ('0'+b.toString(16)).slice(-2);}).join(''); }
@@ -1464,24 +1467,31 @@ function saveHistory(){
   .then(function(){ return encodeJpeg(canvas); })
   .then(function(b){ return phJson('put',{job:id,kind:'jpg'},b); })
   .then(function(){ return phJson('meta',{job:id,meta:JSON.stringify(meta)}); })
-  .then(function(){ setHist('✔ 서버에 3일간 보관됨'); loadHistList(); })
+  .then(function(){ setHist('✔ 서버에 30일간 보관됨'); loadHistList(); })
   .catch(function(e){ setHist('서버 보관 실패(만든 이미지는 그대로 저장 가능): '+e.message); console.error(e); })
   .then(function(){ saving=false; });
 }
 function fmtTime(ts){ var d=new Date(ts*1000), p=function(n){return ('0'+n).slice(-2);}; return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes()); }
-function fmtLeft(ts){ var h=Math.max(0,72-(Date.now()/1000-ts)/3600); return h>=24?'약 '+Math.floor(h/24)+'일 '+Math.round(h%24)+'시간 남음':'약 '+Math.round(h)+'시간 남음'; }
+function fmtLeft(ts){ var h=Math.max(0,HIST_TTL_H-(Date.now()/1000-ts)/3600); return h>=24?'약 '+Math.floor(h/24)+'일 '+Math.round(h%24)+'시간 남음':'약 '+Math.round(h)+'시간 남음'; }
 var HFOLD_KEY='buyest.photoauto.histFold.v1', HIST_SHOW=3;
 function hfGet(){ try{ return JSON.parse(localStorage.getItem(HFOLD_KEY)||'{}'); }catch(e){ return {}; } }
 function hfSet(o){ try{ localStorage.setItem(HFOLD_KEY,JSON.stringify(o)); }catch(e){} }
 /* 기본: 최근 3개만 보이고 나머지는 접힘. '목록 접기'를 누르면 목록 전체를 숨김(상태는 이 브라우저에 기억) */
 function applyHistFold(){
   var box=$('histList'), rows=[].slice.call(box.querySelectorAll('.hrow')), st=hfGet(), allOpen=!!st.all, hidden=!!st.hide;
+  var q=($('histQ').value||'').trim().toLowerCase().replace(/\s+/g,' '), terms=q?q.split(' '):[];
   var fb=$('histFold'); fb.textContent=hidden?'목록 펼치기 ▼':'목록 접기 ▲'; fb.setAttribute('aria-expanded',hidden?'false':'true');
-  box.style.display=hidden?'none':''; var more=$('histMore');
+  box.style.display=hidden?'none':''; var more=$('histMore'), cnt=$('histCount'), empty=$('histEmpty');
+  if(!empty){ empty=document.createElement('div'); empty.id='histEmpty'; empty.className='hint'; empty.style.display='none'; empty.textContent='검색 결과가 없어요. 다른 단어로 찾아보세요.'; box.appendChild(empty); }
+  if(terms.length){ /* 검색 중에는 접힘과 상관없이 일치하는 작업을 전부 보여줌 */
+    var n=0; rows.forEach(function(r){ var ok=terms.every(function(t){ return r.dataset.q.indexOf(t)>=0; }); r.style.display=ok?'':'none'; if(ok) n++; });
+    cnt.textContent='총 '+rows.length+'건 중 '+n+'건'; empty.style.display=n?'none':''; more.style.display='none'; box.style.display=''; return; }
+  empty.style.display='none'; cnt.textContent=rows.length?'총 '+rows.length+'건':'';
   if(hidden||rows.length<=HIST_SHOW){ more.style.display='none'; rows.forEach(function(r){ r.style.display=''; }); return; }
   rows.forEach(function(r,i){ r.style.display=(allOpen||i<HIST_SHOW)?'':'none'; });
   more.style.display=''; $('histMoreBtn').textContent=allOpen?'최근 '+HIST_SHOW+'개만 보기 ▲':'나머지 '+(rows.length-HIST_SHOW)+'개 더 보기 ▼';
 }
+$('histQ').addEventListener('input',applyHistFold);
 $('histFold').addEventListener('click',function(){ var st=hfGet(); st.hide=!st.hide; hfSet(st); applyHistFold(); });
 $('histMoreBtn').addEventListener('click',function(){ var st=hfGet(); st.all=!st.all; hfSet(st); applyHistFold(); });
 function loadHistList(){
@@ -1489,12 +1499,14 @@ function loadHistList(){
   if(!actorId()){ box.textContent='로그인 후 이용할 수 있어요.'; return; }
   phJson('list',{}).then(function(j){
     if(!j.jobs.length){ box.textContent='아직 보관된 작업이 없어요. 상세페이지를 만들면 자동으로 보관돼요.'; return; }
+    if(j.ttl_hours) HIST_TTL_H=j.ttl_hours;
     box.innerHTML='';
     j.jobs.forEach(function(it){
       var d=document.createElement('div'); d.className='hrow';
       d.innerHTML='<img class="hth" alt=""><div class="hmeta"><b></b><span></span></div>'+
         '<button class="btn btn-out btn-sm" data-a="load">불러오기</button><button class="btn btn-out btn-sm" data-a="jpg">JPG 받기</button><button class="btn btn-out btn-sm" data-a="del">삭제</button>';
       d.querySelector('b').textContent=it.pname||'(이름 없음)';
+      d.dataset.q=[it.pname,it.code,it.actor,fmtTime(it.updated),(it.season?'시즌변경':'')].join(' ').toLowerCase();
       if(it.season){ var sb=document.createElement('em'); sb.className='hseason'; sb.textContent='시즌변경'; d.querySelector('b').insertBefore(sb,d.querySelector('b').firstChild); }
       d.querySelector('span').textContent=it.actor+' · '+fmtTime(it.updated)+' · 사진 '+it.photos+'장 · '+(it.bytes/1048576).toFixed(1)+'MB · '+fmtLeft(it.updated);
       if(it.has_thumb) phCall('file',{job:it.id,kind:'thumb'}).then(function(r){return r.blob();}).then(function(b){ d.querySelector('img').src=URL.createObjectURL(b); });
