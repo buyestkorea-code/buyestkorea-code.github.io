@@ -127,6 +127,10 @@
   .pill::before{content:"";width:9px;height:9px;border-radius:50%;background:#C5CAD1;}
   .pill.on{color:var(--ok);} .pill.on::before{background:#16A36F;box-shadow:0 0 0 3px #D6F1E5;}
   .statusbar{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 18px;margin-bottom:20px;flex-wrap:wrap;}
+  .drop{position:relative;border:1.5px dashed #B8C0CC;border-radius:8px;padding:20px 16px;text-align:center;color:var(--sub);background:#FAFBFC;cursor:pointer;}
+  .drop:hover,.drop.over{border-color:var(--pri);background:var(--pri-soft);color:var(--pri-d);}
+  .drop.has{border-style:solid;border-color:var(--pri);background:var(--pri-soft);color:var(--ink);font-weight:600;}
+  .drop input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;}
   .jobs{list-style:none;margin:0;padding:0;}
   .jobs li{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line2);cursor:pointer;border-left:3px solid transparent;}
   .jobs li:last-child{border-bottom:0;}
@@ -266,8 +270,15 @@
             <select id="aiKind" style="width:100%;margin-bottom:14px;"></select>
             <label class="f" for="aiBody" id="aiBodyLabel">요청 내용</label>
             <textarea id="aiBody" class="aitext" placeholder="예: 이 폴더의 상품 목록에서 품번이 중복된 줄을 찾아서 알려줘"></textarea>
+            <div id="aiFolderWrap">
             <label class="f" for="aiFolder" style="margin-top:14px;">작업 폴더 <span id="aiFolderNote" style="font-weight:400;color:var(--faint);">(OneDrive 요청 폴더 안의 이름, 없으면 비워두기)</span></label>
             <input type="text" id="aiFolder" class="aiin" placeholder="예: 1116_홍길동_품번확인" autocomplete="off">
+            </div>
+            <div id="aiZipWrap" hidden>
+              <label class="f" for="aiZip" style="margin-top:14px;">등록용 ZIP 파일 <span style="font-weight:400;color:var(--faint);">(20MB까지)</span></label>
+              <div class="drop" id="aiDrop"><input type="file" id="aiZip" accept=".zip,application/zip"><span id="aiZipName">ZIP 파일을 여기에 끌어다 놓거나 눌러서 고르세요</span></div>
+              <div class="hint" style="margin-top:8px;">ZIP 안에는 등록용 엑셀(여러 개 가능)과, 엑셀의 모델NO와 같은 이름의 폴더를 넣어 주세요. 폴더 안 사진은 <b>모델명_01_.jpg</b>, <b>모델명_0012.jpg</b>처럼 끝 번호를 붙입니다. 알집은 저장 형식을 <b>ZIP</b>으로 골라야 해요(.alz는 안 돼요).</div>
+            </div>
             <div class="hint" id="aiKindHint"></div>
           </div>
           <div class="composer-foot"><span class="sp"></span><button class="btn pri" id="aiSend">AI 직원에게 보내기</button></div>
@@ -493,9 +504,10 @@
   // ---------- AI 직원 ----------
   var AIAPI = 'https://buyest.co.kr/toolkit_aijob_api.php';
   var ST = {queued:'대기중', running:'실행중', awaiting_approval:'승인 기다림', approved:'승인됨·이어서 실행 대기', done:'완료', failed:'실패', rejected:'거절됨', cancelled:'취소됨'};
-  var KIND_HINT = {ping:'AI를 쓰지 않고 새 PC가 살아 있는지만 확인해요.', ai_ask:'AI가 읽기만 해요. 파일을 바꾸거나 어디로 보내지 않아요.', approval_demo:'승인 버튼이 잘 동작하는지 보는 시험이에요. 실제로 바뀌는 건 없어요.', sabangnet_register:'엑셀과 사진을 먼저 점검하고, 승인하면 AI 직원이 사방넷에 신규 등록해요. 쇼핑몰 송신은 하지 않아요. 지금은 한 번에 1건만 돼요.'};
+  var KIND_HINT = {ping:'AI를 쓰지 않고 새 PC가 살아 있는지만 확인해요.', ai_ask:'AI가 읽기만 해요. 파일을 바꾸거나 어디로 보내지 않아요.', approval_demo:'승인 버튼이 잘 동작하는지 보는 시험이에요. 실제로 바뀌는 건 없어요.', sabangnet_register:'ZIP 안의 엑셀과 모델별 사진을 먼저 점검해서 계획을 보여 드려요. 승인하면 AI 직원이 사방넷에 신규 등록해요. 쇼핑몰 송신은 하지 않고, 지금은 한 번에 3개 모델까지예요.'};
+  var AIZIPMAX = 20;
   var KIND_SHOW = ['ping', 'sabangnet_register'];   // 새 요청에 보이는 종류(질문·승인 시험은 서버에 남겨 두고 화면에서만 숨김)
-  var KIND_BODY_PH = {sabangnet_register:'예: 1건 등록해 주세요', ai_ask:'예: 이 폴더의 상품 목록에서 품번이 중복된 줄을 찾아서 알려줘'};
+  var KIND_BODY_PH = {sabangnet_register:'(선택) 참고할 내용이 있으면 적어 주세요', ai_ask:'예: 이 폴더의 상품 목록에서 품번이 중복된 줄을 찾아서 알려줘'};
   var aiTimer = null, aiScope = 'mine', aiSel = 0, aiLoaded = false;
   function aiApi(action, extra){
     var b = {action:action, user:AUTH.id, pass:AUTH.pass};
@@ -529,6 +541,7 @@
       Object.keys(r.kinds).filter(function(k){ return KIND_SHOW.indexOf(k) > -1; }).forEach(function(k){ var o = document.createElement('option'); o.value = k; o.textContent = r.kinds[k]; sel.appendChild(o); });
       $('aiForm').hidden = !r.can_create; $('aiNoCreate').hidden = r.can_create;
       $('aiScope').hidden = !r.is_admin;
+      if(r.zip_max_mb) AIZIPMAX = r.zip_max_mb;
       kindHint();
       aiRefresh();
     });
@@ -537,9 +550,26 @@
     var k = $('aiKind').value, reg = k === 'sabangnet_register';
     $('aiKindHint').textContent = KIND_HINT[k] || '';
     $('aiBody').placeholder = KIND_BODY_PH[k] || '(필요하면 적어 주세요)';
-    $('aiFolderNote').textContent = reg ? '(필수 · 등록용 엑셀 1개와 모델별 JPG를 넣은 OneDrive 요청 폴더 이름)' : '(OneDrive 요청 폴더 안의 이름, 없으면 비워두기)';
-    $('aiBodyLabel').textContent = reg ? '요청 내용 (등록할 상품 수를 "1건"처럼 적어 주세요)' : '요청 내용';
+    $('aiFolderWrap').hidden = reg; $('aiZipWrap').hidden = !reg;
+    $('aiFolderNote').textContent = '(OneDrive 요청 폴더 안의 이름, 없으면 비워두기)';
+    $('aiBodyLabel').textContent = reg ? '메모 (선택)' : '요청 내용';
   }
+  function zipShow(f){
+    var d = $('aiDrop');
+    if(!f){ d.classList.remove('has'); $('aiZipName').textContent = 'ZIP 파일을 여기에 끌어다 놓거나 눌러서 고르세요'; return; }
+    d.classList.add('has'); $('aiZipName').textContent = f.name + ' (' + (f.size / 1048576).toFixed(1) + 'MB)';
+  }
+  function zipCheck(f){
+    if(!f) return '등록용 ZIP 파일을 올려 주세요';
+    if(/\.alz$/i.test(f.name)) return '알집 전용(.alz) 형식은 안 돼요. 압축할 때 ZIP 형식을 고르거나 윈도우 "압축(ZIP) 폴더"를 써 주세요';
+    if(!/\.zip$/i.test(f.name)) return 'ZIP 형식만 올릴 수 있어요';
+    if(f.size > AIZIPMAX * 1048576) return 'ZIP 파일이 너무 커요 (' + AIZIPMAX + 'MB까지)';
+    return '';
+  }
+  $('aiZip').addEventListener('change', function(){ zipShow(this.files[0]); });
+  ['dragenter', 'dragover'].forEach(function(ev){ $('aiDrop').addEventListener(ev, function(e){ e.preventDefault(); $('aiDrop').classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function(ev){ $('aiDrop').addEventListener(ev, function(){ $('aiDrop').classList.remove('over'); }); });
+  $('aiDrop').addEventListener('drop', function(e){ e.preventDefault(); var f = e.dataTransfer.files[0]; if(f){ try{ var dt = new DataTransfer(); dt.items.add(f); $('aiZip').files = dt.files; }catch(x){} zipShow(f); } });
   $('aiKind').addEventListener('change', kindHint);
   chipGroup('aiScope', function(b){ aiScope = b.getAttribute('data-s'); aiRefresh(); });
   function aiRefresh(){
@@ -586,8 +616,21 @@
   $('aiSend').addEventListener('click', function(){
     var btn = $('aiSend'), kind = $('aiKind').value; if(!kind) return;
     if(kind === 'sabangnet_register'){
-      if(!$('aiFolder').value.trim()){ toast('작업 폴더 이름을 적어 주세요', true); return; }
-      if(!/\d+\s*건/.test($('aiBody').value)){ toast('요청 내용에 등록할 상품 수를 적어 주세요 (예: 1건)', true); return; }
+      var zf = $('aiZip').files[0], ze = zipCheck(zf);
+      if(ze){ toast(ze, true); return; }
+      btn.disabled = true;
+      var fd = new FormData();
+      fd.append('action', 'aj_create'); fd.append('user', AUTH.id); fd.append('pass', AUTH.pass);
+      fd.append('kind', kind); fd.append('body', $('aiBody').value); fd.append('zip', zf, zf.name);
+      fetch(AIAPI, {method:'POST', body:fd}).then(function(r){ return r.json(); }).catch(function(){ return {ok:false, error:'서버에 연결하지 못했어요'}; }).then(function(r){
+        btn.disabled = false;
+        if(r && r.ok){
+          $('aiBody').value = ''; $('aiZip').value = ''; zipShow(null); aiSel = r.id; aiPill(r.worker);
+          toast(r.worker && r.worker.online ? '올렸어요. AI 직원이 곧 점검을 시작해요' : '올렸어요. AI 직원이 꺼져 있어서 켜지면 시작해요');
+          aiRefresh();
+        } else toast((r && r.error) || '올리지 못했어요', true);
+      });
+      return;
     }
     btn.disabled = true;
     aiApi('aj_create', {kind:kind, body:$('aiBody').value, folder:$('aiFolder').value}).then(function(r){
