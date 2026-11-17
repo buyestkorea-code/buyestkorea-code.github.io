@@ -138,7 +138,7 @@ function collect(){
   return {brand:$('rBrand').value.trim(),material:$('rMaterial').value.trim(),origin:$('rOrigin').value.trim(),
     kids:$('rKids').checked,kidsPrice:$('rKidsPrice').value.trim(),kidsShow:$('rKidsShow').checked,
     tiers:tiers,cats:cats,
-    extras:(function(){ var o={}, base=['상품명','브랜드한글','브랜드','카테고리','수입여부','제조년월','색상','제조국','구성품','수납공간','소재']; Object.keys(f).forEach(function(k){ if(base.indexOf(k)<0) o[k]=f[k]; }); return o; })(),
+    extras:(function(){ var o={}, base=['상품명','브랜드한글','상단브랜드','브랜드','카테고리','수입여부','제조년월','색상','제조국','구성품','수납공간','소재']; Object.keys(f).forEach(function(k){ if(base.indexOf(k)<0) o[k]=f[k]; }); return o; })(),
     sizeText:PA.sizeText?PA.sizeText():'',
     brandKo:f['브랜드한글'],categoryWord:f['카테고리'],imported:f['수입여부'],mfg:f['제조년월'],color:f['색상'],parts:f['구성품'],storage:f['수납공간'],
     sizeTable:PA.sizeTableRows()};

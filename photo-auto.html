@@ -313,7 +313,7 @@
 var W=720, SLOT_X=33, SLOT_W=653, SLOT_H=653, PHOTO_MAX_W=650;
 var DARK='#191919', MID='#7c7c7c', LIGHT='#8c8c8c', VAL='#4a4a4a'; /* VAL: 정보 입력값·신발(MM) 실측값 — PSD(이거신발폰트바꾼거) Pretendard Medium #4A4A4A */
 var INFO_ROWS=['상품명','브랜드','카테고리','수입여부','제조년월','색상','제조국','구성품','수납공간','소재'];
-var FIELD_KEYS=['상품명','브랜드한글','브랜드','카테고리','수입여부','제조년월','색상','제조국','구성품','수납공간','소재'];
+var FIELD_KEYS=['상품명','브랜드한글','상단브랜드','브랜드','카테고리','수입여부','제조년월','색상','제조국','구성품','수납공간','소재'];
 var CATEGORY_WORDS=['카드지갑','반지갑','장지갑','중지갑','명함지갑','키지갑','동전지갑','지갑','벨트','키링','키홀더','숄더백','크로스백','토트백','백팩','클러치','파우치','버킷백','미니백','핸드백','가방','쇼퍼백','스니커즈','로퍼','부츠','샌들','슬리퍼','구두','플랫','티셔츠','맨투맨','후드티','후드','니트','스웨터','셔츠','자켓','재킷','코트','패딩','점퍼','바지','팬츠','청바지','스커트','원피스','가디건','조끼','머플러','스카프','모자','캡','비니','선글라스'].sort(function(a,b){return b.length-a.length;});
 var COLOR_WORDS=['블랙','화이트','그레이','네이비','베이지','브라운','카키','그린','블루','레드','핑크','옐로우','오렌지','퍼플','아이보리','크림','실버','골드','차콜','민트','와인','버건디','멀티','카멜','라벤더','데님'];
 var DEFAULTS={'수입여부':'병행 수입','구성품':'정품택 + 더스트백 + 정품제품 + 자체보증서'};
@@ -325,10 +325,11 @@ var state={extra:[], infoRows:null, xl:{}, photos:[], dirty:{}, info:null, canva
 
 /* ---------- 필드 입력칸 ---------- */
 var fieldBox=$('fields');
-var ALWAYS_SHOWN=['브랜드한글'];
+var ALWAYS_SHOWN=['브랜드한글','상단브랜드'];
+var FIELD_LABEL={'상단브랜드':'상단 브랜드 (맨 위 큰 제목 · 정보표와 따로 수정)','브랜드':'브랜드 (정보표)'};
 function addFieldBox(k){
   var d=document.createElement('div'); d.setAttribute('data-wrap',k);
-  var lb=document.createElement('label'); lb.textContent=k; var inp; if(k==='소재'||k==='상품명'){ inp=document.createElement('textarea'); inp.rows=2; inp.style.minHeight='0'; inp.placeholder='여러 줄이면 Enter로 줄바꿈'+(k==='소재'?' (내피 / 외피 등)':''); } else { inp=document.createElement('input'); inp.type='text'; } inp.setAttribute('data-k',k);
+  var lb=document.createElement('label'); lb.textContent=FIELD_LABEL[k]||k; var inp; if(k==='소재'||k==='상품명'){ inp=document.createElement('textarea'); inp.rows=2; inp.style.minHeight='0'; inp.placeholder='여러 줄이면 Enter로 줄바꿈'+(k==='소재'?' (내피 / 외피 등)':''); } else { inp=document.createElement('input'); inp.type='text'; } inp.setAttribute('data-k',k);
   d.appendChild(lb); d.appendChild(inp); fieldBox.appendChild(d);
 }
 FIELD_KEYS.forEach(addFieldBox);
@@ -423,7 +424,7 @@ renderRowChips();
 function activeRows(f){
   return state.infoRows?state.infoRows:INFO_ROWS.filter(function(k){ return k!=='수납공간' || f['수납공간'] || BAGS.indexOf(f['카테고리'])>=0; });
 }
-fieldBox.addEventListener('input',function(e){ if(e.target.dataset.k){ state.dirty[e.target.dataset.k]=true; mark(); if(state.last){ state.stale=true; setApplyBtn(); } if(window.PhotoRegister&&PhotoRegister.mirror) PhotoRegister.mirror(e.target.dataset.k,e.target.value); } });
+fieldBox.addEventListener('input',function(e){ if(e.target.dataset.k){ state.dirty[e.target.dataset.k]=true; if(e.target.dataset.k==='브랜드'&&!state.dirty['상단브랜드']&&fld('상단브랜드')) fld('상단브랜드').value=e.target.value; /* 상단 제목은 직접 고치기 전까지만 정보표 브랜드를 따라감 */ mark(); if(state.last){ state.stale=true; setApplyBtn(); } if(window.PhotoRegister&&PhotoRegister.mirror) PhotoRegister.mirror(e.target.dataset.k,e.target.value); } });
 function mark(){
   ['브랜드','카테고리','제조년월','색상','제조국','소재','수납공간'].forEach(function(k){
     if(fld(k)) fld(k).classList.toggle('need', !fld(k).value.trim());
@@ -454,7 +455,8 @@ function applyAuto(){
   var auto={'상품명':info.name,'브랜드한글':info.brandKo,'브랜드':state.xl.brand||'','카테고리':info.category,
     '수입여부':DEFAULTS['수입여부'],'제조년월':info.mfg,'색상':info.color,'제조국':state.xl.origin||'',
     '구성품':(state.defaults&&state.defaults['구성품'])||DEFAULTS['구성품'],'수납공간':'','소재':state.xl.material||''};
-  FIELD_KEYS.forEach(function(k){ if(!state.dirty[k]) fld(k).value=auto[k]; });
+  FIELD_KEYS.forEach(function(k){ if(auto[k]!=null && !state.dirty[k]) fld(k).value=auto[k]; });
+  if(!state.dirty['상단브랜드']) fld('상단브랜드').value=fld('브랜드').value;
   mark();
 }
 $('pname').addEventListener('input',applyAuto);
@@ -479,7 +481,7 @@ function readXlsx(file){
 function setXlsx(file){
   readXlsx(file).then(function(o){
     state.xl=o; state.xlFile=file; $('xName').textContent='✔ '+file.name+' — 브랜드 '+(o.brand||'?')+' · 제조국 '+(o.origin||'?')+' · 소재 '+(o.material||'?');
-    ['브랜드','제조국','소재'].forEach(function(k){ state.dirty[k]=false; });
+    ['브랜드','상단브랜드','제조국','소재'].forEach(function(k){ state.dirty[k]=false; });
     applyAuto(); if(window.PhotoRegister) PhotoRegister.onXlsx(file);
   }).catch(function(e){ $('xName').textContent='엑셀을 읽지 못했습니다: '+e.message; });
 }
@@ -985,7 +987,7 @@ function render(f,chart,slots,ov){
   function fxSl(k){ var v=state.sv[k]||{}; return {key:k,fixed:true,dx:v.dx||0,dy:v.dy||0,px:100,py:100}; }
   var fTop=fxSl('#top');
   img(topImg,mvX(fTop),mvY(fTop),W,topH,'상단 안내(고정)',fTop);
-  text(f['브랜드'],360,1206.84,50,'Bold',DARK,'center',{id:'f:브랜드',type:'field',name:'브랜드'});
+  text(f['상단브랜드']||f['브랜드'],360,1206.84,50,'Bold',DARK,'center',{id:'f:상단브랜드',type:'field',name:'상단브랜드'}); /* 정보표 '브랜드'와 별개 값 */
   if(f['브랜드한글']) text(f['브랜드한글'],360,1261.84,24,'Regular',LIGHT,'center',{id:'f:브랜드한글',type:'field',name:'브랜드한글'});
 
   var main=slots[0], top=1509, slotH=main.full?main.h:SLOT_H;
