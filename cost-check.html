@@ -46,7 +46,7 @@
 <body>
 <div id="app">
   <h1>상품가격체크</h1>
-  <p class="desc">재고추가 엑셀을 올리고 환율과 추가비용을 넣으면, 원본 양식은 그대로 두고 <b>오른쪽 끝에 원가 · 예상판매가 · 판매상태 · 최근 판매이력</b> 열만 덧붙여 줘요. 판매상태와 판매이력은 「품번 리스트 재고확인」과 같은 데이터를 써요.</p>
+  <p class="desc">재고추가 엑셀을 올리고 환율과 추가비용을 넣으면, 원본 양식은 그대로 두고 <b>오른쪽 끝에 원가 · 예상판매가 · 판매상태 · 이카운트 재고 · 최근 판매이력</b> 열만 덧붙여 줘요. 판매상태와 판매이력은 「품번 리스트 재고확인」과 같은 데이터를 써요.</p>
 
   <div class="step">
     <h3>1. 재고추가 파일</h3>
@@ -73,7 +73,7 @@
     <div id="asOf" style="font-size:13px;color:var(--mute);"></div>
     <div class="stats" id="stats"></div>
     <div style="margin:8px 0;"><button class="btn btn-sub" id="dlBtn">원본 양식 + 새 열 엑셀로 받기</button></div>
-    <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>UNIT PRICE</th><th>원가</th><th>예상판매가</th><th>판매상태</th><th>최근 판매이력</th></tr></thead><tbody id="tbody"></tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>UNIT PRICE</th><th>원가</th><th>예상판매가</th><th>판매상태</th><th>이카운트 재고</th><th>최근 판매이력</th></tr></thead><tbody id="tbody"></tbody></table></div>
     <div class="note">판매상태는 바이스트 사이트 기준이에요. 「판매중」은 노출 중이고 살 수 있는 옵션이 있는 상품, 「품절」은 노출 중인데 옵션이 모두 품절, 「미노출」은 사이트에서 숨김, 「미등록」은 사이트에 없는 품번이에요. 판매이력은 이카운트 판매현황(순판매 = 판매 − 반품)이고, 판매현황이 올라간 기간까지만 반영돼요.</div>
   </div>
 </div>
@@ -154,6 +154,12 @@ function pickKey(hits){
   const ex = (hits || []).find(h => h.type === 'exact'); if (ex) return { key: ex.key, exact: true };
   const pf = (hits || [])[0]; return pf ? { key: pf.key, exact: false } : null;
 }
+function ecText(it, exact){
+  if (!exact || !it || !it.ec) return '이카운트 없음';
+  const q = it.ec.qty;
+  if (!(q > 0)) return '재고 0';
+  return q + '개' + (it.ec.sizes && it.ec.sizes.length ? ' (' + it.ec.sizes.map(([s, n]) => s + ' ' + n).join(' · ') + ')' : '');
+}
 function saleText(it, hasMeta){
   if (!hasMeta) return '판매현황 없음';
   const sl = it && it.sales;
@@ -195,7 +201,7 @@ $('runBtn').addEventListener('click', async () => {
       const pk = pickKey(hits[i.model]), it = pk ? items[pk.key] : null;
       let status = siteStatus(it);
       if (pk && !pk.exact) status = '미등록 (같은 모델 다른 컬러 있음)';
-      return { ...i, cost: i.price * rate * mult, sell: i.price * rate * mult * (1 + margin / 100), status, sale: pk && !pk.exact ? saleText(null, !!salesMeta) : saleText(it, !!salesMeta) };
+      return { ...i, cost: i.price * rate * mult, sell: i.price * rate * mult * (1 + margin / 100), status, ec: ecText(it, !!(pk && pk.exact)), sale: pk && !pk.exact ? saleText(null, !!salesMeta) : saleText(it, !!salesMeta) };
     });
     // 한 화면에 보이도록: 상품 줄에 아무 값도 없는 열(사이즈 칸·소재·비고 등)은 숨긴다. 핵심 머리글 열은 항상 보인다.
     const KEEP = ['TOTAL', 'UNIT PRICE', 'EXTENDED PRICE', '시즌', '작업여부', '원산지'], keepCols = new Set(), used = new Set();
@@ -217,9 +223,9 @@ function renderResult(){
   $('stats').innerHTML = [['전체 상품 줄', R.length], ['판매중', cnt('판매중')], ['품절', cnt('품절')], ['미노출', cnt('미노출')], ['미등록', R.filter(r => r.status.startsWith('미등록')).length]]
     .map(([t, n]) => `<span class="chip">${t} <b>${n.toLocaleString()}</b></span>`).join('');
   const sm = S.salesMeta;
-  $('asOf').innerHTML = `환율 ${S.params.rate.toLocaleString()} · 추가비용 ${S.params.extra}% · 판매마진 ${S.params.margin}%` + (sm ? ` · 판매현황 기준 <b>${esc(sm.from)} ~ ${esc(sm.to)}</b>` : ' · <span style="color:#b45309">판매현황이 아직 없어요 (「품번 리스트 재고확인」에서 올려 주세요)</span>');
+  $('asOf').innerHTML = (S.asOf ? `이카운트 재고 기준 ${new Date(S.asOf * 1000).toLocaleString('ko-KR')} · ` : '') + `환율 ${S.params.rate.toLocaleString()} · 추가비용 ${S.params.extra}% · 판매마진 ${S.params.margin}%` + (sm ? ` · 판매현황 기준 <b>${esc(sm.from)} ~ ${esc(sm.to)}</b>` : ' · <span style="color:#b45309">판매현황이 아직 없어요 (「품번 리스트 재고확인」에서 올려 주세요)</span>');
   $('tbody').innerHTML = R.map(r => `<tr><td class="num">${r.row}</td><td class="code">${esc(r.model)}</td><td class="num">${r.price.toLocaleString()}</td><td class="num">${Math.round(r.cost).toLocaleString()}</td><td class="num"><b>${Math.round(r.sell).toLocaleString()}</b></td>
-    <td><span class="tag ${statusCls(r.status)}">${esc(r.status)}</span></td><td>${esc(r.sale)}</td></tr>`).join('');
+    <td><span class="tag ${statusCls(r.status)}">${esc(r.status)}</span></td><td>${esc(r.ec)}</td><td>${esc(r.sale)}</td></tr>`).join('');
 }
 
 /* ---------- 원본 양식 그대로 + 오른쪽 열 추가 (엑셀 파일 안의 XML 을 직접 고쳐서 원본의 서식·수식·조건부서식을 그대로 보존) ---------- */
@@ -243,8 +249,8 @@ async function buildXlsx(buf, scan, results, p){
   const dim = (sx.match(/<dimension ref="[A-Z]+\d+:([A-Z]+)(\d+)"/) || []);
   const lastColLetters = dim[1] || 'AF';
   const lastCol = [...lastColLetters].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0);
-  const cCost = lastCol + 1, cSell = lastCol + 2, cStat = lastCol + 3, cSale = lastCol + 4;
-  const L = { cost: colLetter(cCost), sell: colLetter(cSell), stat: colLetter(cStat), sale: colLetter(cSale) };
+  const cCost = lastCol + 1, cSell = lastCol + 2, cStat = lastCol + 3, cEc = lastCol + 4, cSale = lastCol + 5;
+  const L = { cost: colLetter(cCost), sell: colLetter(cSell), stat: colLetter(cStat), ec: colLetter(cEc), sale: colLetter(cSale) };
 
   // 스타일: 원본 UNIT PRICE 칸의 서식을 복제해서 숫자 서식·가운데 정렬만 바꾼 새 서식 만들기
   const m = st.match(/<cellXfs count="(\d+)">([\s\S]*?)<\/cellXfs>/);
@@ -281,7 +287,7 @@ async function buildXlsx(buf, scan, results, p){
   scan.headers.forEach(h => {
     const base = cellStyle(rowsXml.get(h.row) || '', pcol(h.priceCol)), s = makeStyle(base, 0, 'center');
     const sHead = makeStyle(base, 0, 'center', 'head');
-    [[L.cost, '원가'], [L.sell, '예상판매가'], [L.stat, '판매상태'], [L.sale, '최근 판매이력']].forEach(([c, t]) => put(h.row, `<c r="${c}${h.row}" s="${t === '예상판매가' ? sHead : s}" t="inlineStr"><is><t>${xmlEsc(t)}</t></is></c>`));
+    [[L.cost, '원가'], [L.sell, '예상판매가'], [L.stat, '판매상태'], [L.ec, '이카운트 재고'], [L.sale, '최근 판매이력']].forEach(([c, t]) => put(h.row, `<c r="${c}${h.row}" s="${t === '예상판매가' ? sHead : s}" t="inlineStr"><is><t>${xmlEsc(t)}</t></is></c>`));
   });
   results.forEach(r => {
     const x = pcol(r.hdr.priceCol), base = cellStyle(rowsXml.get(r.row) || '', x);
@@ -289,6 +295,7 @@ async function buildXlsx(buf, scan, results, p){
     put(r.row, `<c r="${L.cost}${r.row}" s="${sNum}"><f>${x}${r.row}*${p.rate}*${p.mult}</f><v>${r.cost}</v></c>`
       + `<c r="${L.sell}${r.row}" s="${sSell}"><f>${L.cost}${r.row}*${p.mm}</f><v>${r.sell}</v></c>`
       + `<c r="${L.stat}${r.row}" s="${sCtr}" t="inlineStr"><is><t>${xmlEsc(r.status)}</t></is></c>`
+      + `<c r="${L.ec}${r.row}" s="${sLeft}" t="inlineStr"><is><t>${xmlEsc(r.ec)}</t></is></c>`
       + `<c r="${L.sale}${r.row}" s="${sLeft}" t="inlineStr"><is><t>${xmlEsc(r.sale)}</t></is></c>`);
   });
 
@@ -316,7 +323,7 @@ async function buildXlsx(buf, scan, results, p){
     if (run && run.at === at && run.hid === hid) run.b = c; else { flush(); run = { a: c, b: c, at, hid }; }
   }
   flush();
-  const newCols = [[cCost, 14], [cSell, 15], [cStat, 14], [cSale, 40]].map(([c, w]) => `<col min="${c}" max="${c}" width="${w}" customWidth="1"${tail.replace(/\s(width|customWidth|bestFit)="[^"]*"/g, '')}/>`).join('');
+  const newCols = [[cCost, 14], [cSell, 15], [cStat, 14], [cEc, 30], [cSale, 40]].map(([c, w]) => `<col min="${c}" max="${c}" width="${w}" customWidth="1"${tail.replace(/\s(width|customWidth|bestFit)="[^"]*"/g, '')}/>`).join('');
   const colsXml = `<cols>${out.join('')}${newCols}<col min="${cSale + 1}" max="16384"${tail}/></cols>`;
   sx = colsM ? sx.replace(colsM[0], colsXml) : sx.replace(/(<sheetData>)/, colsXml + '$1');
   sx = sx.replace(/<sheetView\b[^>]*>/, tag => tag.replace(/\s(zoomScale|zoomScaleNormal)="[^"]*"/g, '').replace(/^<sheetView/, '<sheetView zoomScale="85" zoomScaleNormal="85"'));

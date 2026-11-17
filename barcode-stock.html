@@ -70,6 +70,14 @@
   .live-btn:disabled { opacity: .55; cursor: default; }
   .live-msg { font-size: 12px; text-align: center; margin-top: 6px; color: var(--warn-fg); }
 
+  /* 팝업(행사장) 반입 표시 */
+  .popup-badge { display: block; margin: 10px 0 2px; padding: 9px 12px; border-radius: 8px; font-size: 14px; font-weight: 700; text-align: center; line-height: 1.45; }
+  .popup-badge.here { background: #ede9fe; color: #5b21b6; }
+  .popup-badge.partial { background: var(--warn-bg); color: var(--warn-fg); }
+  .popup-badge small { display: block; font-weight: 600; font-size: 12px; opacity: .85; }
+  table.size-tbl tr.at-popup td.sz { background: #f5f3ff; }
+  .pop-chip { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #7c3aed; color: #fff; font-size: 11.5px; font-weight: 700; vertical-align: 2px; }
+  .hist-pop { color: #5b21b6; font-weight: 700; }
   .history-head { font-size: 12px; font-weight: 700; color: var(--ink-muted); margin: 18px 0 6px; display: flex; justify-content: space-between; align-items: center; }
   .history-head button { font-size: 12px; background: none; border: none; color: var(--accent); font-weight: 700; cursor: pointer; padding: 2px; }
   table.hist { width: 100%; border-collapse: collapse; font-size: 12.5px; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
@@ -95,6 +103,28 @@
       <input type="file" id="listFile" accept=".xlsx,.xls,.csv">
     </div>
     <div class="list-status" id="listStatus">불러오는 중…</div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <label class="card-label" style="margin-bottom:0;">팝업 반입 리스트 (행사장에 실제로 들고 온 상품 — 올리면 스캔할 때 표시됩니다)</label>
+      <span id="popupUpdatedBadge" class="updated-badge"></span>
+    </div>
+    <div style="font-size:12.5px;line-height:1.65;color:var(--ink-muted);background:#f6f6f8;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+      <b style="color:var(--ink,#222);">올리는 방법</b><br>
+      1. 아래 <b>반입리스트 양식 다운로드</b>를 눌러 엑셀 양식을 받습니다.<br>
+      2. 행사장에 가져온 상품을 한 줄에 하나씩 적습니다. 사이즈가 여러 개면 사이즈마다 한 줄입니다.<br>
+      3. 열 설명: <b>품목명</b>(예: 4078604_27, 품번_사이즈) · <b>바코드</b>(선택, 없으면 비워두세요) · <b>수량</b>(선택, 비우면 1개)<br>
+      4. 첫 줄의 열 이름은 지우지 마세요. 저장한 파일을 아래에 올리면 끝입니다.<br>
+      ※ 새로 올리면 이전 반입 리스트는 <b>통째로 교체</b>됩니다. 모든 직원 휴대폰에 같이 적용돼요.
+    </div>
+    <button class="live-btn" id="popupTemplate" type="button" style="margin:0 0 10px;">⬇ 반입리스트 양식 다운로드</button>
+    <div class="dropzone" id="popupDrop" tabindex="0" role="button" aria-label="팝업 반입 리스트 파일 선택">
+      <div id="popupDropText">클릭 또는 파일을 끌어다 놓으세요</div>
+      <input type="file" id="popupFile" accept=".xlsx,.xls,.csv">
+    </div>
+    <div class="list-status" id="popupStatus">불러오는 중…</div>
+    <button class="live-btn" id="popupClear" type="button" style="display:none;">반입 리스트 비우기</button>
   </div>
 
   <div class="card">
@@ -185,60 +215,69 @@ async function loadSavedList() {
     statusEl.className = 'list-status';
   }
 }
-loadSavedList();
+const listLoaded = loadSavedList();
+
+// 엑셀/HTML 파일 -> 2차원 배열
+async function readRowsFromFile(f) {
+  const buf = await f.arrayBuffer();
+  const head = new TextDecoder('utf-8').decode(buf.slice(0, 300));
+  if (/<html|<table|<meta/i.test(head)) {
+    const encMatch = /charset=([\w-]+)/i.exec(head);
+    let enc = (encMatch ? encMatch[1] : 'utf-8').toLowerCase();
+    if (enc === 'ks_c_5601-1987' || enc === 'euc-kr') enc = 'euc-kr';
+    const text = new TextDecoder(enc).decode(buf);
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    return Array.from(doc.querySelectorAll('table tr')).map(tr => Array.from(tr.children).map(td => td.textContent.trim()));
+  }
+  const wb = XLSX.read(buf, { type: 'array' });
+  const rows = [];
+  for (const name of wb.SheetNames) if (name !== '작성안내') rows.push(...XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false }));
+  return rows;
+}
+
+// 헤더 행에서 열 위치를 찾는다. withQty=false: 재고 리스트(바코드+품목명 둘 다 필요), true: 반입 리스트(둘 중 하나만 있어도 되고 수량 열은 선택).
+function parseListRows(rows, withQty) {
+  let cBar = -1, cName = -1, cQty = -1, started = false;
+  const out = [];
+  for (const row of rows) {
+    if (!row) continue;
+    if (!started) {
+      let b = -1, n = -1, q = -1;
+      for (let i = 0; i < row.length; i++) {
+        const t = S(row[i]).replace(/\s/g, '');
+        if (/바코드|barcode/i.test(t)) b = i;
+        if (/품목명|품명|상품명|PROD_?DES/i.test(t)) n = i;
+        if (/^(수량|재고량?|반입수량|qty|quantity)$/i.test(t)) q = i;
+      }
+      const ok = withQty ? (b >= 0 || n >= 0) : (b >= 0 && n >= 0);
+      if (ok) { cBar = b; cName = n; cQty = q; started = true; }
+      continue;
+    }
+    const bar = cBar >= 0 ? S(row[cBar]) : '';
+    const nm = cName >= 0 ? S(row[cName]) : '';
+    if (withQty ? (!bar && !nm) : (!bar || !nm)) continue;
+    const o = { barcode: bar, name: nm };
+    if (withQty) { const q = cQty >= 0 ? parseInt(S(row[cQty]).replace(/,/g, ''), 10) : NaN; o.qty = (isNaN(q) || q < 0) ? 1 : q; }
+    out.push(o);
+  }
+  return out;
+}
 
 document.getElementById('listFile').addEventListener('change', async e => {
   const f = e.target.files[0];
   const statusEl = document.getElementById('listStatus');
   if (!f) return;
   try {
-    const buf = await f.arrayBuffer();
-    const head = new TextDecoder('utf-8').decode(buf.slice(0, 300));
-    let rows;
-    if (/<html|<table|<meta/i.test(head)) {
-      const encMatch = /charset=([\w-]+)/i.exec(head);
-      let enc = (encMatch ? encMatch[1] : 'utf-8').toLowerCase();
-      if (enc === 'ks_c_5601-1987' || enc === 'euc-kr') enc = 'euc-kr';
-      const text = new TextDecoder(enc).decode(buf);
-      const doc = new DOMParser().parseFromString(text, 'text/html');
-      rows = Array.from(doc.querySelectorAll('table tr')).map(tr =>
-        Array.from(tr.children).map(td => td.textContent.trim())
-      );
-    } else {
-      const wb = XLSX.read(buf, { type: 'array' });
-      rows = [];
-      for (const name of wb.SheetNames) {
-        rows.push(...XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false }));
-      }
-    }
-
-    codeMap = new Map();
-    const parsedRows = [];
-    let cBar = -1, cName = -1, started = false, count = 0;
-    for (const row of rows) {
-      if (!row) continue;
-      if (!started) {
-        for (let i = 0; i < row.length; i++) {
-          const t = S(row[i]).replace(/\s/g, '');
-          if (/바코드|barcode/i.test(t)) cBar = i;
-          if (/품목명|품명|상품명|PROD_?DES/i.test(t)) cName = i;
-        }
-        if (cBar >= 0 && cName >= 0) { started = true; continue; }
-        continue;
-      }
-      const bar = cBar >= 0 ? S(row[cBar]) : '';
-      const nm = cName >= 0 ? S(row[cName]) : '';
-      if (!bar || !nm) continue;
-      codeMap.set(bar, { name: nm });
-      parsedRows.push({ barcode: bar, name: nm });
-      count++;
-    }
-
+    const parsedRows = parseListRows(await readRowsFromFile(f), false);
+    const count = parsedRows.length;
     if (!count) {
       statusEl.textContent = '리스트에서 "바코드"·"품목명" 열을 못 찾았어요. 파일 형식을 확인해주세요.';
       statusEl.className = 'list-status';
       return;
     }
+    codeMap = new Map();
+    for (const r of parsedRows) codeMap.set(r.barcode, { name: r.name });
+    if (typeof rebuildPopupIndex === 'function') rebuildPopupIndex();
 
     statusEl.textContent = `${count}건 불러왔습니다. 서버에 저장하는 중…`;
     statusEl.className = 'list-status ok';
@@ -290,6 +329,139 @@ function isValidStyleCode(code) {
   const c = S(code);
   return c.length >= 4 && /[0-9A-Za-z]/.test(c);
 }
+
+// ---- 팝업(행사장) 반입 리스트: 이카운트 전체 재고 중 행사장에 실제로 들고 온 상품 ----
+// 재고 리스트와 같은 방식으로 올리고(서버 저장, 모든 휴대폰 공유), 스캔한 상품이 여기에 있으면 표시한다.
+// 열: 바코드 / 품목명 / 수량(없으면 1개). 품목명이 "스타일코드_사이즈" 형식이면 사이즈별로, 사이즈가 없으면 상품 단위로 표시.
+const POPUP_API_URL = 'https://buyest.co.kr/barcode_popup_api.php';
+let popupRows = [];                 // [{barcode,name,qty}]
+let popupByBarcode = new Map();     // 바코드 -> {name,qty}
+let popupByStyle = new Map();       // 정규화 스타일코드 -> { total, sizes: Map(정규화 사이즈 -> {label,qty}) }
+
+const normStyle = s => S(s).toUpperCase().replace(/\s+/g, ' ').trim();
+const normSize = s => S(s).toUpperCase().replace(/\s+/g, '');
+function extractSize(name) {
+  const s = S(name).trim().replace(/^[가-힣]+_/, '');
+  const us = s.lastIndexOf('_');
+  return us >= 0 ? s.slice(us + 1).trim() : '';
+}
+function popupNameOf(r) { return r.name || (codeMap.get(r.barcode) || {}).name || ''; }
+function rebuildPopupIndex() {
+  popupByBarcode = new Map(); popupByStyle = new Map();
+  for (const r of popupRows) {
+    if (r.barcode) popupByBarcode.set(r.barcode, r);
+    const nm = popupNameOf(r);   // 반입 파일에 품목명이 없으면 재고 리스트에서 바코드로 찾는다
+    if (!nm) continue;
+    const st = normStyle(extractStyleCode(nm));
+    if (!st) continue;
+    const sz = extractSize(nm);
+    let e = popupByStyle.get(st);
+    if (!e) { e = { total: 0, sizes: new Map() }; popupByStyle.set(st, e); }
+    e.total += r.qty;
+    const k = normSize(sz);
+    const cur = e.sizes.get(k) || { label: sz, qty: 0 };
+    cur.qty += r.qty; e.sizes.set(k, cur);
+  }
+}
+function popupInfoFor(styleCode) { return popupByStyle.get(normStyle(styleCode)) || null; }
+function sizeListText(info) {
+  const arr = Array.from(info.sizes.values()).filter(x => x.label).sort((a, b) => compareSizes(a.label, b.label));
+  return arr.map(x => x.qty > 1 ? `${x.label}(${x.qty})` : x.label).join(', ');
+}
+// 스캔한 상품이 반입 리스트에 있는지, 어떤 사이즈를 들고 왔는지 알려주는 배지
+function popupBadgeHtml(rawBarcode, styleCode) {
+  if (!popupRows.length) return '';
+  const info = popupInfoFor(styleCode);
+  const exact = popupByBarcode.get(rawBarcode);
+  if (!info && !exact) return `<div class="popup-badge partial">팝업 반입 리스트에 없는 상품이에요</div>`;
+  const nSizes = info ? Array.from(info.sizes.values()).filter(x => x.label).length : 0;
+  const head = nSizes ? `🎪 이 상품 ${nSizes}사이즈는 팝업에 들고 왔어요` : `🎪 이 상품은 팝업에 들고 왔어요${info ? ` · ${info.total}개` : ''}`;
+  const sub = [];
+  if (nSizes) sub.push(`반입: ${sizeListText(info)}`);
+  if (exact) {
+    const sz = extractSize(popupNameOf(exact));
+    sub.push(`스캔한 ${sz ? sz + ' 사이즈' : '바코드'}: 행사장에 ${exact.qty}개`);
+  } else if (nSizes && rawBarcode !== styleCode) sub.push('스캔한 사이즈는 반입 목록에 없어요');
+  return `<div class="popup-badge here">${head}${sub.length ? '<small>' + escHtml(sub.join(' · ')) + '</small>' : ''}</div>`;
+}
+function popupQtyForSize(styleCode, size) {
+  const info = popupInfoFor(styleCode);
+  const e = info && info.sizes.get(normSize(size));
+  return e ? e.qty : 0;
+}
+
+function showPopupStatus(count, iso) {
+  const el = document.getElementById('popupStatus');
+  const clr = document.getElementById('popupClear');
+  document.getElementById('popupUpdatedBadge').textContent = (count && iso) ? `업데이트 ${fmtUpdatedAt(iso)}` : '';
+  if (!count) { el.textContent = '아직 올린 반입 리스트가 없습니다. 올리면 스캔할 때 "팝업에 들고 옴" 표시가 붙습니다.'; el.className = 'list-status'; clr.style.display = 'none'; return; }
+  el.textContent = `${count}건 반입 등록됨 (총 ${popupRows.reduce((a, r) => a + r.qty, 0)}개) — 모든 직원 휴대폰에서 같이 보입니다.`;
+  el.className = 'list-status ok'; clr.style.display = 'block';
+}
+async function loadPopupList() {
+  try {
+    const data = await (await fetch(POPUP_API_URL)).json();
+    if (!data.ok) throw new Error('응답 오류');
+    popupRows = (data.rows || []).map(r => ({ barcode: r.barcode || '', name: r.name || '', qty: typeof r.qty === 'number' ? r.qty : 1 }));
+    rebuildPopupIndex(); showPopupStatus(popupRows.length, data.updated_at);
+  } catch (err) {
+    const el = document.getElementById('popupStatus');
+    el.textContent = '팝업 반입 리스트를 불러오지 못했습니다. 잠시 후 새로고침해주세요.'; el.className = 'list-status';
+  }
+}
+async function savePopupList(rows) {
+  const res = await fetch(POPUP_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }) });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || '서버 저장 실패');
+}
+wireDropzone('popupDrop', 'popupFile');
+document.getElementById('popupTemplate').addEventListener('click', () => {
+  const aoa = [
+    ['품목명', '바코드', '수량'],
+    ['4078604_27', '', 2],
+    ['4078604_29', '', 1],
+    ['2619971021 001_L', '8801234567890', 3],
+    ['', '', ''],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 8 }];
+  const guide = XLSX.utils.aoa_to_sheet([
+    ['반입리스트 작성 안내'],
+    ['1. 시트 "반입리스트"에 행사장에 가져온 상품을 한 줄에 하나씩 적습니다. (사이즈마다 한 줄)'],
+    ['2. 품목명: 품번_사이즈 형식 (예: 4078604_27). 재고 리스트의 품목명과 같은 형식이면 됩니다.'],
+    ['3. 바코드: 선택. 없으면 비워두세요. 품목명만 있어도 인식됩니다.'],
+    ['4. 수량: 선택. 비우면 1개로 계산합니다.'],
+    ['5. 첫 줄의 열 이름(품목명/바코드/수량)은 지우지 마세요. 예시 줄은 지우고 쓰세요.'],
+    ['6. 업로드하면 이전 반입 리스트는 통째로 교체됩니다.'],
+  ]);
+  guide['!cols'] = [{ wch: 90 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '반입리스트');
+  XLSX.utils.book_append_sheet(wb, guide, '작성안내');
+  XLSX.writeFile(wb, '반입리스트_양식.xlsx');
+});
+document.getElementById('popupFile').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  const el = document.getElementById('popupStatus');
+  if (!f) return;
+  try {
+    const rows = parseListRows(await readRowsFromFile(f), true);
+    if (!rows.length) { el.textContent = '반입 리스트에서 "바코드" 또는 "품목명" 열을 못 찾았어요. 파일 형식을 확인해주세요.'; el.className = 'list-status'; return; }
+    popupRows = rows; rebuildPopupIndex();
+    el.textContent = `${rows.length}건 불러왔습니다. 서버에 저장하는 중…`; el.className = 'list-status ok';
+    try { await savePopupList(rows); showPopupStatus(rows.length, new Date().toISOString()); }
+    catch (err) { el.textContent = `${rows.length}건 불러왔지만 서버 저장에 실패했습니다(이 화면에서만 사용 가능): ${err.message}`; }
+  } catch (err) { el.textContent = '반입 리스트를 읽지 못했습니다: ' + err.message; el.className = 'list-status'; }
+});
+document.getElementById('popupClear').addEventListener('click', async () => {
+  if (!confirm('팝업 반입 리스트를 비울까요? 모든 직원 화면에서 표시가 사라집니다.')) return;
+  try {
+    await savePopupList([]); popupRows = []; rebuildPopupIndex(); showPopupStatus(0, null);
+    document.getElementById('popupDropText').textContent = '클릭 또는 파일을 끌어다 놓으세요';
+    document.getElementById('popupDrop').classList.remove('has-file');
+  } catch (err) { document.getElementById('popupStatus').textContent = '비우지 못했습니다: ' + err.message; }
+});
+listLoaded.then(loadPopupList);   // 재고 리스트(바코드→품목명)가 먼저 로드돼야 이름 없는 반입행도 풀린다
 
 // ---- 카메라 스캔 (html5-qrcode + assets/camera-scan.js 오인식 방지 래퍼) ----
 // 예전엔 한 프레임만 읽혀도 바로 조회로 넘어가서, 흐릿한 프레임이 엉뚱한 값으로 읽히면 엉뚱한 상품이 뜨고 기록에 쌓였다.
@@ -372,6 +544,7 @@ function handleCode(raw) {
   lookup(val);
 }
 
+let currentRaw = '';
 async function lookup(raw) {
   const entry = codeMap.get(raw);
   // 목록에 있으면 품목명에서 스타일코드를 뽑고, 없으면 스캔값 자체를 스타일코드로 시도
@@ -379,6 +552,7 @@ async function lookup(raw) {
   const name = entry ? entry.name : '';
   const styleCode = entry ? extractStyleCode(entry.name) : raw;
 
+  currentRaw = raw;
   showLoading(styleCode, name);
   try {
     // 스타일코드를 못 뽑았으면 서버(이카운트)로 보내지 않는다 — 불필요한 호출이 쌓이면 이카운트가 412로 차단한다.
@@ -406,13 +580,13 @@ async function lookup(raw) {
 function showLoading(styleCode, name) {
   const box = document.getElementById('result');
   box.className = 'result show loading';
-  box.innerHTML = `<div class="result-head"><div class="result-name">${escHtml(name)}</div><div class="result-code">${escHtml(styleCode)}</div></div><div class="result-note">조회 중…</div>`;
+  box.innerHTML = `<div class="result-head"><div class="result-name">${escHtml(name)}</div><div class="result-code">${escHtml(styleCode)}</div></div>${popupBadgeHtml(currentRaw, styleCode)}<div class="result-note">조회 중…</div>`;
 }
 
 function showError(styleCode, name, msg) {
   const box = document.getElementById('result');
   box.className = 'result show warn';
-  box.innerHTML = `<div class="result-head"><div class="result-name">${escHtml(name)}</div><div class="result-code">${escHtml(styleCode)}</div></div><div class="result-note">조회 실패: ${escHtml(msg)}</div>`;
+  box.innerHTML = `<div class="result-head"><div class="result-name">${escHtml(name)}</div><div class="result-code">${escHtml(styleCode)}</div></div>${popupBadgeHtml(currentRaw, styleCode)}<div class="result-note">조회 실패: ${escHtml(msg)}</div>`;
 }
 
 // 사이즈 정렬: 문자사이즈(XXS~XXXL 등)는 옷 사이즈 순서로, 숫자사이즈(신발 등)는 오름차순으로.
@@ -481,14 +655,16 @@ function renderItems(styleCode, name, items, truncated, meta) {
     const rows = sorted.map(it => {
       const cls = it.qty === null || it.qty === undefined ? 'unknown' : it.qty > 0 ? 'ok' : 'zero';
       const qtyLabel = (it.qty === null || it.qty === undefined) ? '조회안됨' : it.qty;
-      return `<tr class="${cls}"><td class="sz">${escHtml(it.size || '-')}</td><td class="qty">${escHtml(qtyLabel)}</td></tr>`;
+      const pq = popupQtyForSize(styleCode, it.size);
+      const chip = pq ? `<span class="pop-chip">🎪 ${pq}</span>` : '';
+      return `<tr class="${cls}${pq ? ' at-popup' : ''}"><td class="sz">${escHtml(it.size || '-')}${chip}</td><td class="qty">${escHtml(qtyLabel)}</td></tr>`;
     }).join('');
     body = `<table class="size-tbl"><thead><tr><th>사이즈</th><th>재고</th></tr></thead><tbody>${rows}</tbody></table>`
       + (truncated ? `<div class="truncate-note">일치 품목이 많아 상위 60개만 표시했어요.</div>` : '');
   }
   const footer = fmtAsOf(meta)
     + `<button class="live-btn" id="liveBtn" type="button">실시간 확인</button><div class="live-msg" id="liveMsg"></div>`;
-  box.innerHTML = `<div class="result-head"><div class="result-name">${escHtml(name)}</div><div class="result-code">${escHtml(styleCode)}</div></div>${body}${footer}`;
+  box.innerHTML = `<div class="result-head"><div class="result-name">${escHtml(name)}</div><div class="result-code">${escHtml(styleCode)}</div></div>${popupBadgeHtml(currentRaw, styleCode)}${body}${footer}`;
   document.getElementById('liveBtn').addEventListener('click', doLiveCheck);
 }
 
@@ -502,6 +678,7 @@ function addHistory(styleCode, name, items, errMsg) {
     summary = `${items.length}사이즈 · 합계 ${total}`;
     cls = total > 0 ? 'ok' : 'zero';
   }
+  if (popupInfoFor(styleCode)) summary += ' · 🎪반입';
   histEntries.unshift({ time: new Date().toLocaleTimeString('ko-KR', { hour12: false }), styleCode, name, summary, cls });
   if (histEntries.length > 50) histEntries.length = 50;
   renderHistory();

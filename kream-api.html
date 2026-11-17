@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>크림 운영</title>
+<style>
+  @import url("assets/fonts/pretendard/pretendard.css");
+  :root{
+    --bg:#f5f5f2; --paper:#fff; --ink:#17191c; --sub:#555b63; --faint:#868c94; --line:#dddcd6; --line2:#ecebe6; --hov:#f8f8f5; --sz:#f9f9f6;
+    --red:#c42b1c; --amber:#b25e09; --green:#16805a; --blue:#1a4fd6; --bluebg:#eaf0ff; --accent:#17191c;
+    --font:"Pretendard Variable","Pretendard",-apple-system,"Malgun Gothic",sans-serif;
+    --topH:100px;
+  }
+  *{box-sizing:border-box;}
+  html{overflow-x:auto;}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);margin:0;font-size:14px;line-height:1.45;min-width:1240px;-webkit-font-smoothing:antialiased;}
+  body:has(dialog[open]){overflow:hidden;}
+  button,input,select{font:inherit;color:inherit;}
+  .num{font-variant-numeric:tabular-nums;}
+  :focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+
+  /* 상단 */
+  .top{position:sticky;top:0;z-index:20;background:var(--bg);padding:18px 24px 0;border-bottom:1px solid var(--line);}
+  .titlebar{display:flex;align-items:center;gap:14px;margin-bottom:6px;}
+  h1{font-size:20px;margin:0;letter-spacing:-.025em;font-weight:800;}
+  .demo{font-size:12.5px;color:var(--amber);font-weight:600;}
+  .fresh{color:var(--sub);font-size:13px;display:flex;align-items:center;gap:7px;}
+  .fresh i{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;}
+  .sp{flex:1;}
+  .btn{height:36px;padding:0 15px;font-weight:600;border:1px solid #cfcec8;border-radius:7px;background:#fff;cursor:pointer;white-space:nowrap;}
+  .btn:hover{background:#f1f1ed;}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);} .btn.pri:hover{background:#33373d;}
+  .btn.sm{height:30px;padding:0 11px;font-size:13px;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .cnt{display:inline-block;min-width:22px;height:22px;padding:0 7px;margin-left:8px;border-radius:11px;background:#fff;color:var(--ink);font-size:12.5px;line-height:22px;text-align:center;font-weight:700;}
+  .cnt.zero{background:rgba(255,255,255,.22);color:#fff;}
+
+  .views{display:flex;gap:22px;overflow-x:auto;}
+  .views button{border:0;background:none;padding:10px 0 11px;cursor:pointer;color:var(--sub);font-weight:600;border-bottom:2px solid transparent;white-space:nowrap;font-size:14.5px;}
+  .views button span{font-weight:500;margin-left:6px;font-variant-numeric:tabular-nums;color:var(--faint);}
+  .views button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--ink);} .views button[aria-selected=true] span{color:var(--ink);font-weight:700;}
+  .views button.alert span{color:var(--red);font-weight:700;}
+
+  .tools{display:flex;gap:10px;align-items:center;padding:14px 24px;flex-wrap:wrap;}
+  .tools input[type=search],.tools select{height:36px;padding:0 12px;border:1px solid #cfcec8;border-radius:7px;background:#fff;}
+  .tools input[type=search]{width:280px;}
+  .chk{display:inline-flex;align-items:center;gap:7px;color:var(--sub);cursor:pointer;user-select:none;}
+  .total{color:var(--sub);}
+
+  .note{margin:0 24px 14px;padding:11px 16px;border-left:3px solid var(--ink);background:#fff;color:var(--sub);line-height:1.6;display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+  .note b{color:var(--ink);font-weight:700;}
+  .note.alert{border-left-color:var(--red);}
+
+  /* 표 */
+  .wrap{padding:0 24px 100px;}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:var(--paper);border:1px solid var(--line);border-radius:8px;}
+  thead th{position:sticky;top:var(--topH);z-index:5;background:#efefea;text-align:left;font-size:12.5px;font-weight:600;color:var(--sub);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  thead th:first-child{border-top-left-radius:7px;} thead th:last-child{border-top-right-radius:7px;}
+  th.r,td.r{text-align:right;}
+  td{padding:12px;border-bottom:1px solid var(--line2);vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:0;}
+  tr.p{cursor:pointer;} tr.p:hover td{background:var(--hov);}
+  tr.p.sel td{background:var(--bluebg);}
+  tr.p.open td{border-bottom-color:transparent;background:var(--hov);}
+  tr.s td{background:var(--sz);padding:8px 12px;}
+  tr.s.last td{border-bottom:1px solid var(--line);}
+  .prod{display:flex;gap:14px;align-items:center;}
+  .thumb{flex:none;width:56px;height:56px;border-radius:6px;background:#ebebe6;object-fit:cover;display:block;}
+  .ph{flex:none;width:56px;height:56px;border-radius:6px;background:#ebebe6;}
+  .brand{font-size:13px;color:var(--sub);font-weight:600;}
+  .pname{font-weight:600;font-size:14.5px;line-height:1.35;margin:1px 0 2px;}
+  .code{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--faint);}
+  .chev{flex:none;width:14px;height:14px;color:var(--faint);transition:transform .12s;margin-left:-4px;}
+  tr.open .chev{transform:rotate(90deg);}
+  .big{font-size:15px;font-weight:600;white-space:nowrap;}
+  .sub2{font-size:12.5px;color:var(--faint);}
+  .gap{font-size:15px;font-weight:700;} .gap.bad{color:var(--red);} .gap.warn{color:var(--amber);} .gap.zero{color:var(--faint);font-weight:500;}
+  .st{display:inline-flex;align-items:center;gap:7px;font-weight:700;white-space:nowrap;}
+  .st::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;}
+  .st.bad{color:var(--red);} .st.warn{color:var(--amber);} .st.ok{color:var(--green);} .st.gray{color:var(--faint);font-weight:600;}
+  .staged{color:var(--blue);font-weight:700;margin-left:12px;white-space:nowrap;}
+  .newtag{color:var(--blue);font-size:12.5px;font-weight:700;margin-left:6px;}
+  .szlab{padding-left:84px;display:flex;align-items:baseline;gap:10px;}
+  .szlab b{font-size:15px;min-width:42px;}
+  .mine{font-size:12px;font-weight:700;color:var(--green);margin-left:8px;}
+  .priceedit{display:flex;gap:6px;align-items:center;justify-content:flex-end;}
+  .priceedit input{width:104px;height:34px;text-align:right;padding:0 10px;border:1px solid #cfcec8;border-radius:6px;background:#fff;font-variant-numeric:tabular-nums;font-size:14.5px;}
+  .priceedit input.on{border-color:var(--blue);background:var(--bluebg);font-weight:700;}
+  .priceedit input::placeholder{color:#a3a8af;}
+  .mini{height:34px;padding:0 11px;border:1px solid #cfcec8;background:#fff;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;color:var(--sub);}
+  .mini:hover:not(:disabled){background:#f1f1ed;color:var(--ink);} .mini:disabled{opacity:.4;cursor:default;}
+  .why{font-size:12.5px;color:var(--faint);text-align:right;margin-top:4px;}
+  .why.bad{color:var(--red);font-weight:600;}
+  .empty{padding:70px 20px;text-align:center;color:var(--sub);line-height:1.9;font-size:14.5px;}
+  .more{display:block;margin:18px auto 0;} .more[hidden]{display:none;}
+
+  /* 일괄 작업 */
+  .bulk{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--ink);color:#fff;padding:12px 24px;display:none;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 -8px 28px rgba(0,0,0,.2);}
+  .bulk.on{display:flex;}
+  .bulk .who{font-weight:700;margin-right:10px;font-size:15px;}
+  .bulk button{height:36px;border:1px solid #484d55;background:#24282e;color:#fff;border-radius:7px;padding:0 14px;font-weight:600;cursor:pointer;}
+  .bulk button:hover{background:#363b43;}
+  .bulk .pctbox{display:inline-flex;align-items:center;gap:5px;border:1px solid #484d55;border-radius:7px;padding:0 4px 0 12px;background:#24282e;height:36px;}
+  .bulk .pctbox input{width:40px;text-align:right;background:none;border:0;color:#fff;height:34px;} .bulk .pctbox button{border:0;background:none;height:34px;padding:0 10px;}
+  .bulk .x{margin-left:auto;border-color:transparent;background:none;color:#b8bdc5;}
+
+  /* 서랍·창 */
+  dialog{border:0;padding:0;color:var(--ink);font-family:var(--font);font-size:14px;}
+  dialog::backdrop{background:rgba(20,22,26,.45);}
+  dialog.drawer{margin:0 0 0 auto;height:100dvh;max-height:none;width:min(580px,100vw);background:#fff;display:none;flex-direction:column;box-shadow:-10px 0 40px rgba(0,0,0,.22);}
+  dialog.drawer[open]{display:flex;}
+  dialog.modal{border-radius:10px;width:min(480px,calc(100vw - 32px));background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .dh{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line);}
+  .dh h2{margin:0;font-size:17px;letter-spacing:-.01em;}
+  .dh .x{margin-left:auto;border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:var(--sub);padding:2px 8px;}
+  .db{padding:18px 22px;overflow:auto;flex:1;}
+  .df{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;background:#faf9f7;}
+  .ob{width:100%;border:0;border-radius:0;background:none;}
+  .ob td{padding:8px 4px;border-bottom:1px solid var(--line2);}
+  .ob .arrow{color:var(--faint);padding:0 8px;}
+  .ob .rm{border:0;background:none;color:var(--faint);cursor:pointer;font-size:20px;}
+  .obgrp td{padding:16px 0 6px;font-weight:700;border-bottom:0;}
+  .obgrp span{font-weight:400;color:var(--faint);font-size:12.5px;margin-left:8px;}
+  .prog{height:8px;background:#ebebe6;border-radius:99px;overflow:hidden;margin:14px 0;} .prog i{display:block;height:100%;width:0;background:var(--green);transition:width .2s;}
+  .fld{margin:0 0 18px;} .fld>label{display:block;font-weight:700;margin-bottom:6px;}
+  .fld input[type=number],.fld input[type=text]{height:38px;padding:0 12px;border:1px solid #cfcec8;border-radius:7px;width:100%;}
+  .fld .h{font-size:13px;color:var(--sub);margin-top:6px;line-height:1.55;}
+  .radio{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border:1px solid var(--line);border-radius:8px;margin-bottom:7px;cursor:pointer;}
+  .radio:has(input:checked){border-color:var(--ink);background:#faf9f7;}
+  .radio b{display:block;} .radio span{color:var(--sub);font-size:13px;}
+  .preview{border-left:3px solid var(--blue);background:var(--bluebg);padding:11px 14px;line-height:1.7;}
+
+  #toast{position:fixed;left:24px;bottom:24px;z-index:60;display:flex;flex-direction:column;gap:8px;}
+  .t{background:var(--ink);color:#fff;padding:11px 16px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);display:flex;gap:14px;align-items:center;max-width:540px;}
+  .t button{background:none;border:0;color:#9db8ff;font-weight:700;cursor:pointer;padding:0;}
+  body:has(.bulk.on) #toast{bottom:80px;}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+
+<header class="top" id="top">
+  <div class="titlebar">
+    <h1>크림 운영</h1><span class="demo" id="demoTag" hidden>시험 데이터 · 실제로 전송하지 않음</span>
+    <span class="fresh"><i></i><span id="freshTxt">시세 불러오는 중</span></span>
+    <span class="sp"></span>
+    <button class="btn" id="btnRefresh" title="보이는 상품의 크림 시세를 지금 다시 받아옵니다">시세 지금 갱신</button>
+    <button class="btn" id="btnPolicy">가격 정책 <span class="num" id="polTxt"></span></button>
+    <button class="btn pri" id="btnOutbox">송신 대기함<span class="cnt num" id="outCnt">0</span></button>
+  </div>
+  <div class="views" id="views" role="tablist" aria-label="상품 보기"></div>
+</header>
+
+<div class="tools" id="tools">
+  <input type="search" id="q" placeholder="품번 · 상품명 · 브랜드 검색" aria-label="검색">
+  <select id="brand" aria-label="브랜드"><option value="">브랜드 전체</option></select>
+  <select id="sort" aria-label="정렬">
+    <option value="gap">시세 차이 큰 순</option><option value="stock">재고 많은 순</option>
+    <option value="price">기준가 높은 순</option><option value="brand">브랜드 순</option>
+  </select>
+  <label class="chk"><input type="checkbox" id="stockOnly" checked> 재고 있는 상품만</label>
+  <span class="sp"></span><span class="total num" id="total"></span>
+</div>
+
+<div id="note"></div>
+
+<main class="wrap">
+  <table>
+    <colgroup><col style="width:44px"><col><col style="width:84px"><col style="width:108px"><col style="width:196px"><col style="width:84px"><col style="width:120px"><col style="width:350px"></colgroup>
+    <thead><tr>
+      <th><input type="checkbox" id="selAll" aria-label="보이는 상품 전체 선택"></th>
+      <th>상품</th><th class="r">재고</th><th class="r">우리 기준가</th><th class="r">크림 최저가</th><th class="r">차이</th><th class="r">내 입찰가</th><th class="r">새 가격 · 상태</th>
+    </tr></thead>
+    <tbody id="tb"></tbody>
+  </table>
+  <button class="btn more" id="more" hidden></button>
+</main>
+
+<div class="bulk" id="bulk" role="region" aria-label="선택한 상품 일괄 작업">
+  <span class="who"><span class="num" id="bulkN">0</span>개 선택</span>
+  <button data-b="rec">추천가로 담기</button>
+  <button data-b="low">최저가에 맞춤</button>
+  <button data-b="base">기준가로</button>
+  <span class="pctbox">기준가 −<input type="number" id="bulkPct" value="5" min="0" max="50"> % <button data-b="pct">담기</button></span>
+  <button data-b="clear">담은 것 취소</button>
+  <button class="x" data-b="off">선택 해제</button>
+</div>
+
+<dialog class="drawer" id="outbox" aria-labelledby="obT">
+  <div class="dh"><h2 id="obT">송신 대기함</h2><span class="sub2 num" id="obN"></span><button class="x" data-close aria-label="닫기">×</button></div>
+  <div class="db" id="obBody"></div>
+  <div class="df" id="obFoot"></div>
+</dialog>
+
+<dialog class="modal" id="policy" aria-labelledby="polT">
+  <div class="dh"><h2 id="polT">가격 정책</h2><button class="x" data-close aria-label="닫기">×</button></div>
+  <div class="db">
+    <div class="fld"><label for="pMax">우리 기준가에서 최대 몇 %까지 내려 팔까요</label>
+      <input type="number" id="pMax" min="0" max="50" step="1">
+      <div class="h">크림 최저가가 이 범위 안이면 최저가에 맞추고, 경쟁이 없거나 더 비싸면 기준가로 등록합니다.</div></div>
+    <div class="fld"><label for="pUnder">최저가보다 더 낮출 금액(원)</label>
+      <input type="number" id="pUnder" min="0" step="1000"><div class="h">0이면 최저가와 같은 가격으로 맞춥니다.</div></div>
+    <div class="fld"><label>최저가가 허용선 아래로 내려갔을 때</label>
+      <label class="radio"><input type="radio" name="pBelow" value="review"><div><b>확인 필요 목록에 모으기</b><span>자동으로 보내지 않고, 사람이 가격을 정해 담습니다.</span></div></label>
+      <label class="radio"><input type="radio" name="pBelow" value="floor"><div><b>허용선 가격으로 등록</b><span>기준가 −N% 가격에 입찰합니다.</span></div></label>
+      <label class="radio"><input type="radio" name="pBelow" value="base"><div><b>기준가로 등록</b><span>시세와 상관없이 기준가에 입찰합니다.</span></div></label>
+    </div>
+    <div class="preview" id="pPrev"></div>
+  </div>
+  <div class="df"><span class="sp"></span><button class="btn" data-close>닫기</button><button class="btn pri" id="pSave">적용</button></div>
+</dialog>
+
+<dialog class="modal" id="mapdlg" aria-labelledby="mapT">
+  <div class="dh"><h2 id="mapT">크림 상품 직접 연결</h2><button class="x" data-close aria-label="닫기">×</button></div>
+  <div class="db">
+    <p id="mapWho" style="margin:0 0 14px;line-height:1.6"></p>
+    <div class="fld"><label for="mapId">크림 상품번호</label><input type="text" id="mapId" inputmode="numeric" placeholder="예: 52714">
+      <div class="h">크림 상품 주소 끝의 숫자입니다. 자동으로 못 찾는 품번을 사람이 연결할 때 씁니다.</div></div>
+  </div>
+  <div class="df"><span class="sp"></span><button class="btn" data-close>취소</button><button class="btn pri" id="mapOk">연결</button></div>
+</dialog>
+
+<div id="toast" aria-live="polite"></div>
+
+<script>
+(function(){
+  'use strict';
+  /* 데이터 원본: 지금은 시험 파일. 서버 API가 준비되면 이 주소만 바꾼다(형식 동일). */
+  var DATA_SRC = 'kream-demo.json';
+  var IMG_BASE = 'https://buyest.co.kr/data/product/';
+  var MIN_PRICE = 20000;
+  var $ = function(id){ return document.getElementById(id); };
+  var S = { items:[], view:'all', q:'', brand:'', sort:'gap', stockOnly:true, sel:new Set(), open:new Set(),
+            staged:{}, limit:60, pol:{max:10, under:0, below:'review'}, demo:false, shown:[] };
+  var undoSnap = null;
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function won(n){ return n==null ? '-' : Number(n).toLocaleString('ko-KR'); }
+  function pct(x){ if(x==null) return ''; var v=Math.round(x*1000)/10; return (v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(1)+'%'; }
+  function ago(m){ return m==null ? '' : m<=0 ? '방금' : m+'분 전'; }
+  function r1000(x){ return Math.round(x/1000)*1000; }
+  function floorOf(base){ return Math.max(MIN_PRICE, Math.ceil(base*(1-S.pol.max/100)/1000)*1000); }
+  function toast(msg, undoFn){
+    var t=document.createElement('div'); t.className='t'; t.appendChild(document.createTextNode(msg));
+    if(undoFn){ var b=document.createElement('button'); b.textContent='되돌리기'; b.onclick=function(){ undoFn(); t.remove(); }; t.appendChild(b); }
+    $('toast').appendChild(t); setTimeout(function(){ t.remove(); }, undoFn?7000:3800);
+  }
+  function saveStaged(){ try{ localStorage.setItem('kream.staged.v1', JSON.stringify(S.staged)); }catch(e){} }
+  function loadStaged(){ try{ var v=JSON.parse(localStorage.getItem('kream.staged.v1')||'{}'); if(v&&typeof v==='object') S.staged=v; }catch(e){} }
+  function savePol(){ try{ localStorage.setItem('kream.pol.v1', JSON.stringify(S.pol)); }catch(e){} }
+  function loadPol(){ try{ var v=JSON.parse(localStorage.getItem('kream.pol.v1')||'null'); if(v&&typeof v.max==='number') S.pol=v; }catch(e){} }
+  var skey = function(p,d){ return p.id+'|'+d.s; };
+  var byId = function(id){ return S.items.filter(function(x){return x.id===id;})[0]; };
+
+  /* ---------- 가격 규칙 (kream_sync.py 의 price_rule 과 같은 규칙) ---------- */
+  function rec(p, d){
+    var base=p.base, F=floorOf(base), low=d.low;
+    if(low==null) return {p:base,k:'base',t:'경쟁 없음 → 기준가'};
+    if(d.mine && d.own!=null && d.own>=F) return {p:d.own,k:'keep',t:'내 입찰이 최저가'};
+    if(low>=base) return {p:base,k:'base',t:'최저가가 기준가 이상 → 기준가'};
+    if(low>=F) return {p:Math.max(F,low-S.pol.under),k:'match',t:'최저가에 맞춤'};
+    if(S.pol.below==='floor') return {p:F,k:'floor',t:'허용선 가격으로 등록'};
+    if(S.pol.below==='base') return {p:base,k:'base',t:'기준가로 등록'};
+    return {p:null,k:'review',t:'최저가가 허용선('+won(F)+') 아래'};
+  }
+  function calc(p){
+    p._rv=0; p._adj=0; p._own=0; p._stg=0; p._qty=0; p._gap=null; p._low=null; p._lowMax=null; p._at=null;
+    p.sizes.forEach(function(d){
+      p._qty+=d.q;
+      if(p.map!=='mapped') return;
+      d.r=rec(p,d);
+      var st=S.staged[skey(p,d)];
+      d.st = (st!=null && st!==d.own) ? st : null;
+      if(d.st!=null) p._stg++;
+      if(d.own!=null) p._own++;
+      if(d.r.k==='review' && d.st==null) p._rv++;
+      else if(d.own!=null && d.r.p!=null && d.r.p!==d.own && d.st==null) p._adj++;
+      if(d.low!=null){
+        p._low = p._low==null ? d.low : Math.min(p._low,d.low);
+        p._lowMax = p._lowMax==null ? d.low : Math.max(p._lowMax,d.low);
+        var g=d.low/p.base-1; if(p._gap==null||g<p._gap) p._gap=g;
+        p._at = p._at==null ? d.at : Math.max(p._at,d.at);
+      }
+    });
+  }
+  function calcAll(){ S.items.forEach(calc); }
+
+  var VIEWS=[
+    ['all','전체',function(p){return true;}],
+    ['rv','확인 필요',function(p){return p.map==='mapped'&&p._rv>0;},'alert'],
+    ['adj','가격 조정',function(p){return p.map==='mapped'&&p._adj>0&&p._rv===0;}],
+    ['bid','입찰 중',function(p){return p.map==='mapped'&&p._own>0;}],
+    ['new','입찰 전',function(p){return p.map==='mapped'&&p._own===0;}],
+    ['un','미매핑',function(p){return p.map==='unmapped';}],
+    ['no','크림 미입점',function(p){return p.map==='nolist';}]
+  ];
+  function baseFilter(p){
+    if(S.stockOnly && p._qty<=0) return false;
+    if(S.brand && p.brand!==S.brand) return false;
+    if(S.q){ var h=(p.brand+' '+p.name+' '+p.style).toLowerCase(); if(!S.q.split(/\s+/).every(function(t){return h.indexOf(t)>=0;})) return false; }
+    return true;
+  }
+  function visible(){
+    var vf=VIEWS.filter(function(v){return v[0]===S.view;})[0][2];
+    var a=S.items.filter(function(p){return baseFilter(p)&&vf(p);});
+    var by={
+      gap:function(x,y){ return (x._gap==null?9:x._gap)-(y._gap==null?9:y._gap); },
+      stock:function(x,y){ return y._qty-x._qty; },
+      price:function(x,y){ return y.base-x.base; },
+      brand:function(x,y){ return x.brand.localeCompare(y.brand,'ko')||x.name.localeCompare(y.name,'ko'); }
+    }[S.sort];
+    return a.sort(by);
+  }
+
+  /* ---------- 그리기 ---------- */
+  function renderViews(){
+    var pool=S.items.filter(baseFilter);
+    $('views').innerHTML=VIEWS.map(function(v){
+      var n=pool.filter(v[2]).length;
+      return '<button role="tab" data-v="'+v[0]+'" aria-selected="'+(S.view===v[0])+'" class="'+(v[3]&&n?v[3]:'')+'">'+v[1]+'<span>'+n.toLocaleString()+'</span></button>';
+    }).join('');
+  }
+  function stateTxt(p){
+    if(p._rv) return '<span class="st bad">확인 필요 '+p._rv+'</span>';
+    if(p._adj) return '<span class="st warn">가격 조정 '+p._adj+'</span>';
+    if(p._own) return '<span class="st ok">입찰 중</span>';
+    return '<span class="st gray">입찰 전</span>';
+  }
+  function gapCls(p,g){ if(g==null) return 'zero'; var F=floorOf(p.base)/p.base-1; return g<F?'bad':g<-0.001?'warn':'zero'; }
+  var CHEV='<svg class="chev" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5L9 7l-4.5 4.5"/></svg>';
+  function thumb(p){ return p.img ? '<img class="thumb" src="'+IMG_BASE+encodeURI(p.img)+'" alt="" loading="lazy" decoding="async" width="56" height="56" onerror="this.className=\'ph\';this.removeAttribute(\'src\')">' : '<span class="ph"></span>'; }
+
+  function rowP(p){
+    var open=S.open.has(p.id), sel=S.sel.has(p.id), m=p.map==='mapped';
+    var h='<tr class="p'+(open?' open':'')+(sel?' sel':'')+'" data-id="'+p.id+'">';
+    h+='<td><input type="checkbox" data-sel="'+p.id+'"'+(sel?' checked':'')+(m?'':' disabled')+' aria-label="선택"></td>';
+    h+='<td><div class="prod">'+(m?CHEV:'<span class="chev"></span>')+thumb(p)+'<div><div class="brand">'+esc(p.brand)+'</div><div class="pname">'+esc(p.name)+(p.fresh?'<span class="newtag">새로 매핑</span>':'')+'</div><div class="code">'+esc(p.style)+'</div></div></div></td>';
+    h+='<td class="r num"><div class="big">'+p._qty+'개</div><div class="sub2">'+p.sizes.length+'사이즈</div></td>';
+    h+='<td class="r num big">'+won(p.base)+'</td>';
+    if(m){
+      var lowTxt = p._low==null ? '<span class="sub2">경쟁 없음</span>' : '<span class="big">'+(p._low===p._lowMax?won(p._low):won(p._low)+'<span class="sub2"> ~ </span>'+won(p._lowMax))+'</span>';
+      h+='<td class="r num">'+lowTxt+(p._at!=null?'<div class="sub2">'+ago(p._at)+' 확인</div>':'')+'</td>';
+      h+='<td class="r num"><span class="gap '+gapCls(p,p._gap)+'">'+(p._gap==null?'':pct(p._gap))+'</span></td>';
+      h+='<td class="r num">'+(p._own? '<span class="big">'+p._own+'</span><span class="sub2"> / '+p.sizes.length+' 사이즈</span>':'<span class="sub2">없음</span>')+'</td>';
+      h+='<td class="r">'+stateTxt(p)+(p._stg?'<span class="staged">담음 '+p._stg+'</span>':'')+'</td>';
+    }else if(p.map==='unmapped'){
+      h+='<td class="r" colspan="3" style="color:var(--sub)">크림에서 아직 못 찾음<div class="sub2">마지막 확인 '+(p.tried?p.tried+'일 전':'방금')+'</div></td>';
+      h+='<td class="r"><button class="mini" data-act="retry" data-id="'+p.id+'">다시 찾기</button> <button class="mini" data-act="map" data-id="'+p.id+'">직접 연결</button></td>';
+    }else{
+      h+='<td class="r" colspan="3" style="color:var(--sub)">크림에 입점하지 않은 브랜드</td>';
+      h+='<td class="r"><button class="mini" data-act="retry" data-id="'+p.id+'">그래도 확인</button></td>';
+    }
+    return h+'</tr>';
+  }
+  function rowS(p,d,last){
+    var r=d.r, shown=d.st!=null?d.st:'';
+    var gap=d.low!=null?d.low/p.base-1:null;
+    var h='<tr class="s'+(last?' last':'')+'" data-id="'+p.id+'" data-s="'+esc(d.s)+'">';
+    h+='<td></td><td><div class="szlab"><b>'+esc(d.s)+'</b><span class="sub2">재고 '+d.q+'개</span></div></td>';
+    h+='<td></td><td class="r num sub2">'+won(p.base)+'</td>';
+    h+='<td class="r num">'+(d.low==null?'<span class="sub2">경쟁 없음</span>':'<span class="big">'+won(d.low)+'</span>'+(d.mine?'<span class="mine">내 입찰</span>':'')+'<div class="sub2">'+ago(d.at)+' 확인</div>')+'</td>';
+    h+='<td class="r num"><span class="gap '+gapCls(p,gap)+'">'+(gap==null?'':pct(gap))+'</span></td>';
+    h+='<td class="r num">'+(d.own!=null?'<span class="big">'+won(d.own)+'</span>':'<span class="sub2">입찰 없음</span>')+'</td>';
+    h+='<td><div class="priceedit"><button class="mini" data-act="low" title="크림 최저가에 맞춤"'+(d.low==null?' disabled':'')+'>최저가</button><button class="mini" data-act="baseP" title="우리 기준가로">기준가</button>';
+    h+='<input type="text" inputmode="numeric" class="'+(d.st!=null?'on':'')+'" value="'+(shown!==''?won(shown):'')+'" placeholder="'+(r.p!=null?won(r.p):'직접 입력')+'" aria-label="'+esc(d.s)+' 새 가격">';
+    h+='<button class="mini" data-act="clr" title="담은 것 취소"'+(d.st==null?' disabled':'')+'>취소</button></div>';
+    h+='<div class="why'+(r.k==='review'&&d.st==null?' bad':'')+'">'+(d.st!=null?'담음 · '+(d.own!=null?won(d.own)+' → ':'')+won(d.st)+'원':(r.p!=null&&r.p===d.own?'변경 없음 · ':'')+r.t)+'</div></td>';
+    return h+'</tr>';
+  }
+  function render(){
+    calcAll(); renderViews();
+    var list=visible(); S.shown=list;
+    var rows=list.slice(0,S.limit), h='';
+    rows.forEach(function(p){
+      h+=rowP(p);
+      if(S.open.has(p.id)&&p.map==='mapped') p.sizes.forEach(function(d,i){ h+=rowS(p,d,i===p.sizes.length-1); });
+    });
+    if(!list.length) h='<tr><td colspan="8"><div class="empty">'+emptyMsg()+'</div></td></tr>';
+    $('tb').innerHTML=h;
+    $('total').textContent=list.length.toLocaleString()+'개 상품';
+    var more=$('more'); more.hidden=list.length<=S.limit; more.textContent='더 보기 ('+(list.length-S.limit).toLocaleString()+'개 남음)';
+    renderNote(); renderBulk(); renderOutCnt(); renderFresh();
+    var vis=rows.filter(function(p){return p.map==='mapped';});
+    $('selAll').checked = vis.length>0 && vis.every(function(p){return S.sel.has(p.id);});
+  }
+  function emptyMsg(){
+    if(S.view==='rv') return '확인할 상품이 없습니다.<br>최저가가 허용선 아래로 내려가면 여기에 모입니다.';
+    if(S.view==='adj') return '손볼 입찰가가 없습니다.<br>담아 둔 가격은 오른쪽 위 <b>송신 대기함</b>에서 확인하고 보내세요.';
+    if(S.view==='un') return '미매핑 상품이 없습니다.';
+    return '조건에 맞는 상품이 없습니다.<br>검색어나 필터를 바꿔 보세요.';
+  }
+  function renderNote(){
+    var h='', a=S.view;
+    if(a==='rv') h='<div class="note alert"><span>크림 최저가가 <b>허용선(기준가 −'+S.pol.max+'%) 아래</b>로 내려간 상품입니다. 사이즈별로 최저가·기준가·직접 입력 중 하나로 가격을 정해 담으면 이 목록에서 빠집니다.</span></div>';
+    else if(a==='adj') h='<div class="note"><span>크림 시세가 바뀌어 <b>내 입찰가를 손볼 상품</b>입니다. 선택한 뒤 <b>추천가로 담기</b>를 누르세요.</span></div>';
+    else if(a==='un'){
+      var n=S.items.filter(function(p){return p.map==='unmapped';}).length;
+      h='<div class="note"><span>크림에는 매일 새 상품이 올라옵니다. <b>매일 04:00에 미매핑 품번을 자동으로 다시 찾고</b>, 새로 찾은 상품은 입찰 전으로 옮겨집니다. 마지막 자동 확인: 오늘 04:00</span><span class="sp"></span><button class="btn sm" data-act="retryAll">미매핑 '+n.toLocaleString()+'건 지금 다시 찾기</button></div>';
+    }
+    else if(a==='no') h='<div class="note"><span>크림에 입점하지 않은 브랜드입니다. 크림이 브랜드를 추가하면 <b>매일 자동 확인</b>에서 바로 잡힙니다.</span></div>';
+    $('note').innerHTML=h;
+  }
+  function renderBulk(){ var n=S.sel.size; $('bulk').classList.toggle('on',n>0); $('bulkN').textContent=n; }
+  function stagedList(){
+    var out=[];
+    S.items.forEach(function(p){ if(p.map!=='mapped') return;
+      p.sizes.forEach(function(d){ var v=S.staged[skey(p,d)]; if(v!=null && v!==d.own) out.push({p:p,d:d,v:v}); }); });
+    return out;
+  }
+  function renderOutCnt(){ var n=stagedList().length, c=$('outCnt'); c.textContent=n; c.classList.toggle('zero',n===0); }
+  function renderFresh(){
+    var m=null; S.items.forEach(function(p){ p.sizes.forEach(function(d){ if(d.at!=null) m=m==null?d.at:Math.min(m,d.at); }); });
+    $('freshTxt').textContent = m==null ? '시세 없음' : '가장 최근 시세 '+ago(m);
+    $('polTxt').textContent='· −'+S.pol.max+'%';
+  }
+
+  /* ---------- 담기 ---------- */
+  function stage(p,d,v){
+    var k=skey(p,d);
+    if(v==null||isNaN(v)){ delete S.staged[k]; return; }
+    S.staged[k]=Math.max(MIN_PRICE, r1000(v));
+  }
+  function snapshot(){ undoSnap=JSON.stringify(S.staged); }
+  function undo(){ if(undoSnap!=null){ S.staged=JSON.parse(undoSnap); saveStaged(); render(); } }
+  function bulk(kind){
+    var ps=S.items.filter(function(p){return S.sel.has(p.id)&&p.map==='mapped';});
+    snapshot(); var n=0, under=0;
+    var pc=Math.min(50,Math.max(0,parseFloat($('bulkPct').value)||0));
+    ps.forEach(function(p){ p.sizes.forEach(function(d){
+      if(kind==='clear'){ if(S.staged[skey(p,d)]!=null){ delete S.staged[skey(p,d)]; n++; } return; }
+      var v=null;
+      if(kind==='rec') v=d.r.p; else if(kind==='low') v=d.low; else if(kind==='base') v=p.base; else if(kind==='pct') v=p.base*(1-pc/100);
+      if(v==null) return;
+      if(kind==='low' && v<floorOf(p.base)) under++;
+      v=Math.max(MIN_PRICE,r1000(v)); if(v===d.own){ delete S.staged[skey(p,d)]; return; }
+      S.staged[skey(p,d)]=v; n++;
+    }); });
+    S.sel.clear(); saveStaged(); render();
+    toast(kind==='clear'?n+'건 담은 것을 취소했습니다.':n+'건을 송신 대기함에 담았습니다.'+(under?' (허용선 아래 '+under+'건 포함)':''), n?undo:null);
+  }
+
+  /* ---------- 송신 대기함 ---------- */
+  var sending=false;
+  function openOutbox(){ renderOutbox(); $('outbox').showModal(); }
+  function renderOutbox(done){
+    var L=stagedList(); $('obN').textContent=L.length+'건';
+    var b=$('obBody'), f=$('obFoot');
+    if(done){
+      b.innerHTML='<div class="empty"><b style="color:var(--ink);font-size:16px">'+done.n+'건 처리했습니다</b><br>성공 '+done.n+' · 실패 0'+(S.demo?'<br><span style="color:var(--amber)">시험 데이터라 크림에는 실제로 보내지 않았습니다.</span>':'')+'</div>';
+      f.innerHTML='<span class="sp"></span><button class="btn pri" data-close>닫기</button>'; return;
+    }
+    if(!L.length){ b.innerHTML='<div class="empty">담아 둔 가격이 없습니다.<br>상품 표에서 가격을 정해 담으면 여기에 모입니다.</div>'; f.innerHTML='<span class="sp"></span><button class="btn" data-close>닫기</button>'; return; }
+    var g={}, order=[];
+    L.forEach(function(x){ if(!g[x.p.id]){ g[x.p.id]=[]; order.push(x.p); } g[x.p.id].push(x); });
+    var h='<table class="ob"><tbody>';
+    order.forEach(function(p){
+      h+='<tr class="obgrp"><td colspan="5">'+esc(p.brand)+' · '+esc(p.name)+'<span>'+esc(p.style)+'</span></td></tr>';
+      g[p.id].forEach(function(x){
+        var gp=x.d.low!=null?x.v/x.d.low-1:null;
+        h+='<tr><td style="width:60px"><b>'+esc(x.d.s)+'</b></td><td class="num" style="color:var(--sub)">'+(x.d.own!=null?won(x.d.own):'신규')+'</td><td class="arrow">→</td><td class="num"><b>'+won(x.v)+'</b>'+(gp!=null?' <span class="sub2">'+(Math.abs(gp)<0.0005?'최저가와 같음':'최저가 대비 '+pct(gp))+'</span>':'')+'</td>';
+        h+='<td style="width:30px"><button class="rm" data-rm="'+p.id+'|'+esc(x.d.s)+'" aria-label="빼기">×</button></td></tr>';
+      });
+    });
+    b.innerHTML=h+'</tbody></table>';
+    var sec=Math.ceil(L.length*0.4);
+    f.innerHTML='<span style="color:var(--sub);line-height:1.5">'+L.length+'건 · 크림 호출 한도를 지키며<br>순서대로 보냅니다 (약 '+(sec<60?sec+'초':Math.ceil(sec/60)+'분')+')</span><span class="sp"></span><button class="btn" data-act="obClear">모두 비우기</button><button class="btn pri" id="obSend">'+L.length+'건 크림에 보내기</button>';
+  }
+  function sendAll(){
+    if(sending) return; var L=stagedList(); if(!L.length) return; sending=true;
+    $('obBody').innerHTML='<div class="empty"><b style="color:var(--ink)">보내는 중…</b><div class="prog"><i id="progI"></i></div><span id="progT">0 / '+L.length+'</span></div>';
+    $('obFoot').innerHTML='<span style="color:var(--sub)">창을 닫아도 계속 진행됩니다.</span>';
+    var i=0, step=Math.max(1,Math.ceil(L.length/40));
+    var tm=setInterval(function(){
+      for(var k=0;k<step&&i<L.length;k++,i++){ var x=L[i]; x.d.own=x.v; if(x.d.low==null||x.v<=x.d.low){ x.d.low=x.v; x.d.mine=1; x.d.at=0; } delete S.staged[skey(x.p,x.d)]; }
+      var pi=$('progI'); if(pi){ pi.style.width=Math.round(i/L.length*100)+'%'; $('progT').textContent=i+' / '+L.length; }
+      if(i>=L.length){ clearInterval(tm); sending=false; saveStaged(); render(); if($('outbox').open) renderOutbox({n:L.length}); else toast(L.length+'건 송신 완료'); }
+    },90);
+  }
+
+  /* ---------- 매핑 다시 시도 (시험용 흉내. 실제로는 서버가 크림 상품 검색 API로 확인) ---------- */
+  function fakeMap(p){
+    var mult=0.88+Math.random()*0.14;
+    p.map='mapped'; p.kid=50000+Math.floor(Math.random()*40000); p.fresh=1;
+    p.sizes.forEach(function(d){ d.low=Math.max(MIN_PRICE,r1000(p.base*mult*(0.97+Math.random()*0.06))); d.at=0; });
+  }
+  function retryOne(id){
+    var p=byId(id); if(!p) return;
+    if(Math.random()<0.25){ fakeMap(p); toast('크림에서 찾았습니다: '+p.name+' → 입찰 전 목록으로 이동'); }
+    else { p.tried=0; toast('방금 확인했지만 아직 크림에 없습니다.'); }
+    render();
+  }
+  function retryAll(){
+    var L=S.items.filter(function(p){return p.map==='unmapped';}), n=0;
+    toast('미매핑 '+L.length+'건을 확인하는 중…');
+    setTimeout(function(){ L.forEach(function(p){ if(Math.random()<0.07){ fakeMap(p); n++; } else p.tried=0; }); render();
+      toast(n?('새로 '+n+'건을 찾았습니다. 입찰 전 목록에서 확인하세요.'):'새로 올라온 상품이 없습니다.'); },900);
+  }
+  var mapTarget=null;
+  function openMap(id){ mapTarget=byId(id); $('mapWho').innerHTML='<b>'+esc(mapTarget.brand)+'</b> '+esc(mapTarget.name)+'<br><span class="code">'+esc(mapTarget.style)+'</span>'; $('mapId').value=''; $('mapdlg').showModal(); $('mapId').focus(); }
+
+  /* ---------- 정책 창 ---------- */
+  function openPolicy(){
+    $('pMax').value=S.pol.max; $('pUnder').value=S.pol.under;
+    document.querySelectorAll('input[name=pBelow]').forEach(function(r){ r.checked=r.value===S.pol.below; });
+    polPrev(); $('policy').showModal();
+  }
+  function polDraft(){ var b=document.querySelector('input[name=pBelow]:checked'); return {max:Math.min(50,Math.max(0,parseFloat($('pMax').value)||0)), under:Math.max(0,parseInt($('pUnder').value)||0), below:b?b.value:'review'}; }
+  function polPrev(){
+    var old=S.pol; S.pol=polDraft(); calcAll();
+    var rv=S.items.filter(function(p){return p.map==='mapped'&&p._rv>0;}).length;
+    var adj=S.items.filter(function(p){return p.map==='mapped'&&p._adj>0&&p._rv===0;}).length;
+    S.pol=old; calcAll();
+    $('pPrev').innerHTML='이 설정이면<br>확인 필요 <b class="num">'+rv+'</b>개 · 가격 조정 <b class="num">'+adj+'</b>개';
+  }
+
+  /* ---------- 이벤트 ---------- */
+  document.addEventListener('click',function(e){
+    var t=e.target, c=t.closest('[data-close]'); if(c){ c.closest('dialog').close(); return; }
+    var v=t.closest('[data-v]'); if(v){ S.view=v.dataset.v; S.limit=60; render(); window.scrollTo({top:0}); return; }
+    var bb=t.closest('[data-b]'); if(bb){ var k=bb.dataset.b; if(k==='off'){ S.sel.clear(); render(); } else bulk(k); return; }
+    var rm=t.closest('[data-rm]'); if(rm){ var a=rm.dataset.rm.split('|'); delete S.staged[a[0]+'|'+a.slice(1).join('|')]; saveStaged(); renderOutbox(); render(); return; }
+    var ac=t.closest('[data-act]');
+    if(ac){
+      var act=ac.dataset.act, tr=ac.closest('tr');
+      if(act==='retryAll'){ retryAll(); return; }
+      if(act==='obClear'){ snapshot(); S.staged={}; saveStaged(); renderOutbox(); render(); toast('담아 둔 가격을 모두 비웠습니다.',undo); return; }
+      if(act==='retry'){ retryOne(+ac.dataset.id); return; }
+      if(act==='map'){ openMap(+ac.dataset.id); return; }
+      if(tr&&tr.classList.contains('s')){
+        var p=byId(+tr.dataset.id), d=p.sizes.filter(function(x){return x.s===tr.dataset.s;})[0];
+        if(act==='low') stage(p,d,d.low); else if(act==='baseP') stage(p,d,p.base); else if(act==='clr') stage(p,d,null);
+        if(S.staged[skey(p,d)]===d.own) delete S.staged[skey(p,d)];
+        saveStaged(); render(); return;
+      }
+    }
+    if(t.id==='obSend'){ sendAll(); return; }
+    if(t.tagName==='DIALOG'){ t.close(); return; }
+    var chk=t.closest('[data-sel]'); if(chk){ var id=+chk.dataset.sel; chk.checked?S.sel.add(id):S.sel.delete(id); render(); e.stopPropagation(); return; }
+    var tr2=t.closest('tr.p'); if(tr2 && !t.closest('button,input')){
+      var pid=+tr2.dataset.id, pp=byId(pid);
+      if(pp.map==='mapped'){ S.open.has(pid)?S.open.delete(pid):S.open.add(pid); render(); }
+    }
+  });
+  $('tb').addEventListener('change',function(e){
+    var inp=e.target; if(inp.tagName!=='INPUT'||inp.type!=='text') return;
+    var tr=inp.closest('tr.s'); if(!tr) return;
+    var p=byId(+tr.dataset.id), d=p.sizes.filter(function(x){return x.s===tr.dataset.s;})[0];
+    var raw=inp.value.replace(/[^0-9]/g,''); stage(p,d,raw?parseInt(raw):null);
+    if(S.staged[skey(p,d)]===d.own) delete S.staged[skey(p,d)];
+    saveStaged(); render();
+  });
+  $('tb').addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.tagName==='INPUT') e.target.blur(); });
+  $('selAll').addEventListener('change',function(e){
+    S.shown.slice(0,S.limit).forEach(function(p){ if(p.map==='mapped') e.target.checked?S.sel.add(p.id):S.sel.delete(p.id); }); render();
+  });
+  var qt; $('q').addEventListener('input',function(e){ clearTimeout(qt); qt=setTimeout(function(){ S.q=e.target.value.trim().toLowerCase(); S.limit=60; render(); },150); });
+  $('brand').addEventListener('change',function(e){ S.brand=e.target.value; S.limit=60; render(); });
+  $('sort').addEventListener('change',function(e){ S.sort=e.target.value; render(); });
+  $('stockOnly').addEventListener('change',function(e){ S.stockOnly=e.target.checked; S.limit=60; render(); });
+  $('more').addEventListener('click',function(){ S.limit+=100; render(); });
+  $('btnOutbox').addEventListener('click',openOutbox);
+  $('btnPolicy').addEventListener('click',openPolicy);
+  ['pMax','pUnder'].forEach(function(i){ $(i).addEventListener('input',polPrev); });
+  document.querySelectorAll('input[name=pBelow]').forEach(function(r){ r.addEventListener('change',polPrev); });
+  $('pSave').addEventListener('click',function(){ S.pol=polDraft(); savePol(); $('policy').close(); render(); toast('가격 정책을 적용했습니다. 추천가와 확인 필요 목록이 다시 계산됐습니다.'); });
+  $('mapOk').addEventListener('click',function(){
+    var v=$('mapId').value.replace(/\D/g,''); if(!v){ $('mapId').focus(); return; }
+    fakeMap(mapTarget); mapTarget.kid=+v; $('mapdlg').close(); render(); toast('크림 상품 '+v+'번에 연결했습니다.');
+  });
+  $('btnRefresh').addEventListener('click',function(){
+    var n=0; S.shown.slice(0,S.limit).forEach(function(p){ p.sizes.forEach(function(d){ if(d.low!=null&&!d.mine){ d.low=Math.max(MIN_PRICE,d.low+(Math.random()<.3?(Math.random()<.5?-1000:1000)*Math.ceil(Math.random()*3):0)); } if(d.low!=null) d.at=0; }); n++; });
+    render(); toast('보이는 '+n+'개 상품의 시세를 갱신했습니다.');
+  });
+
+  function setTop(){ document.documentElement.style.setProperty('--topH',$('top').offsetHeight+'px'); }
+
+  /* ---------- 시작 ---------- */
+  loadStaged(); loadPol();
+  fetch(DATA_SRC).then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); }).then(function(j){
+    S.items=j.items; S.demo=!!(j.meta&&j.meta.demo); $('demoTag').hidden=!S.demo;
+    var bs={}; S.items.forEach(function(p){ bs[p.brand]=1; });
+    $('brand').innerHTML='<option value="">브랜드 전체</option>'+Object.keys(bs).sort(function(a,b){return a.localeCompare(b,'ko');}).map(function(b){return '<option>'+esc(b)+'</option>';}).join('');
+    render(); setTop();
+  }).catch(function(e){ $('tb').innerHTML='<tr><td colspan="8"><div class="empty">상품 데이터를 불러오지 못했습니다.<br>'+esc(e.message)+'</div></td></tr>'; });
+  if(window.ResizeObserver) new ResizeObserver(setTop).observe($('top')); else window.addEventListener('resize',setTop);
+})();
+</script>
+</body>
+</html>
