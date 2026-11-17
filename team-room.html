@@ -264,9 +264,9 @@
           <div class="cb">
             <label class="f" for="aiKind">할 일</label>
             <select id="aiKind" style="width:100%;margin-bottom:14px;"></select>
-            <label class="f" for="aiBody">요청 내용</label>
+            <label class="f" for="aiBody" id="aiBodyLabel">요청 내용</label>
             <textarea id="aiBody" class="aitext" placeholder="예: 이 폴더의 상품 목록에서 품번이 중복된 줄을 찾아서 알려줘"></textarea>
-            <label class="f" for="aiFolder" style="margin-top:14px;">작업 폴더 <span style="font-weight:400;color:var(--faint);">(OneDrive 요청 폴더 안의 이름, 없으면 비워두기)</span></label>
+            <label class="f" for="aiFolder" style="margin-top:14px;">작업 폴더 <span id="aiFolderNote" style="font-weight:400;color:var(--faint);">(OneDrive 요청 폴더 안의 이름, 없으면 비워두기)</span></label>
             <input type="text" id="aiFolder" class="aiin" placeholder="예: 1116_홍길동_품번확인" autocomplete="off">
             <div class="hint" id="aiKindHint"></div>
           </div>
@@ -493,7 +493,9 @@
   // ---------- AI 직원 ----------
   var AIAPI = 'https://buyest.co.kr/toolkit_aijob_api.php';
   var ST = {queued:'대기중', running:'실행중', awaiting_approval:'승인 기다림', approved:'승인됨·이어서 실행 대기', done:'완료', failed:'실패', rejected:'거절됨', cancelled:'취소됨'};
-  var KIND_HINT = {ping:'AI를 쓰지 않고 새 PC가 살아 있는지만 확인해요.', ai_ask:'AI가 읽기만 해요. 파일을 바꾸거나 어디로 보내지 않아요.', approval_demo:'승인 버튼이 잘 동작하는지 보는 시험이에요. 실제로 바뀌는 건 없어요.'};
+  var KIND_HINT = {ping:'AI를 쓰지 않고 새 PC가 살아 있는지만 확인해요.', ai_ask:'AI가 읽기만 해요. 파일을 바꾸거나 어디로 보내지 않아요.', approval_demo:'승인 버튼이 잘 동작하는지 보는 시험이에요. 실제로 바뀌는 건 없어요.', sabangnet_register:'엑셀과 사진을 먼저 점검하고, 승인하면 AI 직원이 사방넷에 신규 등록해요. 쇼핑몰 송신은 하지 않아요. 지금은 한 번에 1건만 돼요.'};
+  var KIND_SHOW = ['ping', 'sabangnet_register'];   // 새 요청에 보이는 종류(질문·승인 시험은 서버에 남겨 두고 화면에서만 숨김)
+  var KIND_BODY_PH = {sabangnet_register:'예: 1건 등록해 주세요', ai_ask:'예: 이 폴더의 상품 목록에서 품번이 중복된 줄을 찾아서 알려줘'};
   var aiTimer = null, aiScope = 'mine', aiSel = 0, aiLoaded = false;
   function aiApi(action, extra){
     var b = {action:action, user:AUTH.id, pass:AUTH.pass};
@@ -524,14 +526,20 @@
       }
       aiLoaded = true;
       var sel = $('aiKind'); sel.innerHTML = '';
-      Object.keys(r.kinds).forEach(function(k){ var o = document.createElement('option'); o.value = k; o.textContent = r.kinds[k]; sel.appendChild(o); });
+      Object.keys(r.kinds).filter(function(k){ return KIND_SHOW.indexOf(k) > -1; }).forEach(function(k){ var o = document.createElement('option'); o.value = k; o.textContent = r.kinds[k]; sel.appendChild(o); });
       $('aiForm').hidden = !r.can_create; $('aiNoCreate').hidden = r.can_create;
       $('aiScope').hidden = !r.is_admin;
       kindHint();
       aiRefresh();
     });
   }
-  function kindHint(){ $('aiKindHint').textContent = KIND_HINT[$('aiKind').value] || ''; }
+  function kindHint(){
+    var k = $('aiKind').value, reg = k === 'sabangnet_register';
+    $('aiKindHint').textContent = KIND_HINT[k] || '';
+    $('aiBody').placeholder = KIND_BODY_PH[k] || '(필요하면 적어 주세요)';
+    $('aiFolderNote').textContent = reg ? '(필수 · 등록용 엑셀 1개와 모델별 JPG를 넣은 OneDrive 요청 폴더 이름)' : '(OneDrive 요청 폴더 안의 이름, 없으면 비워두기)';
+    $('aiBodyLabel').textContent = reg ? '요청 내용 (등록할 상품 수를 "1건"처럼 적어 주세요)' : '요청 내용';
+  }
   $('aiKind').addEventListener('change', kindHint);
   chipGroup('aiScope', function(b){ aiScope = b.getAttribute('data-s'); aiRefresh(); });
   function aiRefresh(){
@@ -577,6 +585,10 @@
   }
   $('aiSend').addEventListener('click', function(){
     var btn = $('aiSend'), kind = $('aiKind').value; if(!kind) return;
+    if(kind === 'sabangnet_register'){
+      if(!$('aiFolder').value.trim()){ toast('작업 폴더 이름을 적어 주세요', true); return; }
+      if(!/\d+\s*건/.test($('aiBody').value)){ toast('요청 내용에 등록할 상품 수를 적어 주세요 (예: 1건)', true); return; }
+    }
     btn.disabled = true;
     aiApi('aj_create', {kind:kind, body:$('aiBody').value, folder:$('aiFolder').value}).then(function(r){
       btn.disabled = false;
