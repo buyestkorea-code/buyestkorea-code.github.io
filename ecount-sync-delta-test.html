@@ -49,12 +49,39 @@
   .cand small { color:#6b7280; }
   .chip-warn { background:#fef3c7; color:#92400e; }
   .chip-grey { background:#e5e7eb; color:#374151; }
+  .tabs { display:flex; gap:4px; margin:14px 0 16px; border-bottom:1px solid #d1d5db; }
+  .tab { font:inherit; font-size:14px; padding:9px 18px; border:1px solid transparent; border-bottom:none; border-radius:8px 8px 0 0; background:none; color:#6b7280; cursor:pointer; margin-bottom:-1px; }
+  .tab:hover { color:#222; }
+  .tab.on { background:#fff; border-color:#d1d5db; color:#111827; font-weight:700; }
+  .mp-help { font-size:13px; color:#4b5563; line-height:1.6; margin:0 0 12px; }
+  .mp-bar { display:flex; gap:8px; }
+  .mp-q { flex:1; padding:10px 12px; font:inherit; font-size:14px; border:1px solid #9ca3af; border-radius:6px; }
+  .mp-q:focus { outline:2px solid #2563eb; outline-offset:1px; }
+  .mp-bar .btn { margin-right:0; padding:10px 20px; }
+  .mp-info { font-size:12.5px; color:#6b7280; margin:6px 0 0; }
+  .mp-pager { display:flex; align-items:center; gap:10px; margin:14px 0 40px; font-size:13px; }
+  .mp-pager .btn { padding:6px 14px; font-size:13px; margin-right:0; }
+  .mp-site { display:block; padding:3px 0; }
+  .mp-site small { color:#6b7280; }
+  .mp-edit td { background:#f9fafb; }
+  .mp-edit input { padding:6px 8px; border:1px solid #9ca3af; border-radius:4px; font:inherit; width:320px; max-width:100%; }
+  .mp-edit .btn { padding:6px 14px; font-size:13px; }
+  .mp-note { font-size:12px; color:#6b7280; margin-top:6px; }
+  .btn-sm { font:inherit; font-size:12px; padding:4px 10px; border:1px solid #9ca3af; border-radius:6px; background:#fff; cursor:pointer; }
+  .btn-sm:hover { background:#f3f4f6; }
+  td.num { text-align:right; white-space:nowrap; }
 </style>
 </head>
 <body>
   <h1>TEST 이카운트 변동분 → BUYEST 품절 반영 <span class="badge warn">시험판</span> <a href="soldout-manual.html" target="_blank" style="font-size:13px; font-weight:normal; color:#2563eb;">📖 사용법 보기</a></h1>
   <p>이카운트에서 다운받은 재고변동표 엑셀을 올리면, 그 품목들만 이카운트 API로 최신 재고를 다시 확인해요. 매핑 실패·재확인 건은 아래 후보 버튼을 눌러 고르거나 BUYEST 상품코드를 직접 입력하세요. 위쪽 칸을 누르면 그 항목만 볼 수 있어요.</p>
 
+  <div class="tabs" role="tablist">
+    <button type="button" class="tab on" id="tabUpload" role="tab" onclick="showPane('upload')">엑셀로 품절 반영</button>
+    <button type="button" class="tab" id="tabMap" role="tab" onclick="showPane('map')">매핑 조회·수정</button>
+  </div>
+
+  <div id="paneUpload">
   <div class="dropzone" id="fileDrop" tabindex="0" role="button" aria-label="재고변동표 엑셀 선택">
     <div id="fileDropText">클릭 또는 끌어다 놓기 (Ctrl+V 붙여넣기도 가능)</div>
     <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadFromExcel(this.files[0])">
@@ -70,6 +97,19 @@
   <div id="status"></div>
   <div id="result"></div>
   <div id="tableWrap"></div>
+  </div>
+
+  <div id="paneMap" style="display:none">
+    <p class="mp-help">이카운트코드·품번·상품명·사이트 상품코드로 검색하면 지금 어떤 사이트 상품에 연결돼 있는지 보여줘요. 단어는 띄어쓰기로 여러 개 넣을 수 있어요. 검색어를 비우면 전체목록이에요. <b>연결을 바꿔도 품절/판매 상태는 바뀌지 않아요</b> — 상태 반영은 "엑셀로 품절 반영"에서 해요.</p>
+    <div class="mp-bar">
+      <input type="search" id="mpQ" class="mp-q" placeholder="예) 00040769 · L2S16 4100005 S0483 · ESAX-ZQF3 · 코듀라 립스탁" autocomplete="off" oninput="mpTyping()">
+      <button type="button" class="btn btn-secondary" onclick="mpLoad(1)">검색</button>
+    </div>
+    <div id="mpFilters" class="fbar"></div>
+    <div id="mpInfo" class="mp-info"></div>
+    <div id="mpTable"></div>
+    <div id="mpPager" class="mp-pager"></div>
+  </div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
 <script>
@@ -486,6 +526,140 @@ async function execute() {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+</script>
+<script>
+// ───── 매핑 조회·수정 ─────
+const LOOKUP_URL = 'https://buyest.co.kr/ecount_sync_mapping_lookup_api.php';
+const MP_FILTERS = [['all', '전체'], ['mapped', '연결됨'], ['unmapped', '연결 안 됨'], ['multi', '여러 상품에 연결(콜라보)'], ['dead', '사이트에 없는 상품코드']];
+const mp = { q: '', filter: 'all', page: 1, per: 100, rows: [], editing: null, timer: null, loaded: false, seq: 0 };
+
+function showPane(name) {
+  document.getElementById('paneUpload').style.display = name === 'upload' ? '' : 'none';
+  document.getElementById('paneMap').style.display = name === 'map' ? '' : 'none';
+  document.getElementById('tabUpload').classList.toggle('on', name === 'upload');
+  document.getElementById('tabMap').classList.toggle('on', name === 'map');
+  if (name === 'map' && !mp.loaded) mpLoad(1);
+}
+
+function mpTyping() {
+  clearTimeout(mp.timer);
+  mp.timer = setTimeout(() => mpLoad(1), 400);
+}
+
+async function mpLoad(page) {
+  mp.q = document.getElementById('mpQ').value.trim();
+  mp.page = page || 1;
+  mp.editing = null;
+  const mine = ++mp.seq;   // 늦게 도착한 옛 응답이 화면을 덮어쓰지 않게
+  const info = document.getElementById('mpInfo');
+  info.textContent = '불러오는 중...';
+  try {
+    const res = await fetch(LOOKUP_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: mp.q, filter: mp.filter, page: mp.page, per: mp.per })
+    });
+    const d = await res.json();
+    if (mine !== mp.seq) return;
+    if (!d.ok) throw new Error(d.error || '알 수 없는 오류');
+    mp.loaded = true; mp.data = d; mp.rows = d.rows;
+    mpRender();
+  } catch (e) {
+    if (mine !== mp.seq) return;
+    info.innerHTML = '<span style="color:#b91c1c">조회 실패: ' + escapeHtml(e.message) + ' — 잠시 후 다시 검색해 주세요.</span>';
+  }
+}
+
+function mpSetFilter(f) { mp.filter = f; mpLoad(1); }
+
+function mpOptChip(it) {
+  if (!it.found) return '<span class="chip chip-warn">⚠ 사이트에 없는 상품코드</span>';
+  if (!it.opt_found) return '<span class="chip chip-warn">⚠ 이 사이즈 옵션 없음</span>';
+  return it.opt_sold_out ? '<span class="chip chip-soldout">이 사이즈 품절</span>' : '<span class="chip chip-sale">이 사이즈 판매중</span>';
+}
+
+function mpRender() {
+  const d = mp.data;
+  document.getElementById('mpFilters').innerHTML = MP_FILTERS.map(([k, label]) =>
+    `<button type="button" class="fchip${mp.filter === k ? ' on' : ''}" onclick="mpSetFilter('${k}')">${label}<b>${(d.counts[k] || 0).toLocaleString()}</b></button>`).join('');
+  const from = d.total ? (d.page - 1) * d.per + 1 : 0, to = Math.min(d.total, d.page * d.per);
+  const t = d.synced_at ? new Date(d.synced_at * 1000).toLocaleString('ko-KR') : '-';
+  document.getElementById('mpInfo').textContent = `${d.total.toLocaleString()}건 중 ${from.toLocaleString()}–${to.toLocaleString()} · 이카운트 재고 기준 ${t}`;
+
+  if (!d.rows.length) {
+    document.getElementById('mpTable').innerHTML = '<p style="color:#6b7280;margin-top:16px">검색 결과가 없어요. 품번 일부만 넣거나 필터를 "전체"로 바꿔 보세요.</p>';
+  } else {
+    document.getElementById('mpTable').innerHTML = `<table>
+      <thead><tr><th>이카운트코드</th><th>이카운트 상품명 · 사이즈</th><th class="num">재고</th><th>연결된 사이트 상품</th><th></th></tr></thead>
+      <tbody>${d.rows.map((r, i) => mpRowHtml(r, i)).join('')}</tbody></table>`;
+  }
+  const pages = Math.max(1, Math.ceil(d.total / d.per));
+  document.getElementById('mpPager').innerHTML = d.total <= d.per ? '' :
+    `<button class="btn btn-secondary" ${d.page <= 1 ? 'disabled' : ''} onclick="mpLoad(${d.page - 1})">이전</button>
+     <span>${d.page} / ${pages.toLocaleString()} 쪽</span>
+     <button class="btn btn-secondary" ${d.page >= pages ? 'disabled' : ''} onclick="mpLoad(${d.page + 1})">다음</button>`;
+}
+
+function mpRowHtml(r, i) {
+  const sites = r.items.length ? r.items.map(it => it.found
+    ? `<span class="mp-site">${escapeHtml(it.name)} <small>(${escapeHtml(it.product_code)})</small> ${mpOptChip(it)}${it.display ? '' : ' <span class="chip chip-grey">미노출 상품</span>'}</span>`
+    : `<span class="mp-site"><small>(${escapeHtml(it.product_code)})</small> ${mpOptChip(it)}</span>`).join('')
+    : '<span class="chip chip-grey">연결 안 됨</span>';
+  const qty = r.ec_qty === null ? '-' : Number(r.ec_qty).toLocaleString();
+  let html = `<tr>
+    <td>${escapeHtml(r.ec_code)}</td>
+    <td>${escapeHtml(r.ec_name)}${r.size ? ' <small style="color:#6b7280">· ' + escapeHtml(r.size) + '</small>' : ''}</td>
+    <td class="num">${qty}</td><td>${sites}</td>
+    <td><button type="button" class="btn-sm" onclick="mpEdit(${i})">${r.mapped ? '연결 바꾸기' : '연결하기'}</button></td></tr>`;
+  if (mp.editing === i) {
+    const cur = r.items.map(it => it.product_code).join(',');
+    html += `<tr class="mp-edit"><td colspan="5">
+      <label>사이트 상품코드 <input id="mpEditInput" value="${escapeHtml(cur)}" placeholder="예) HR3T-ZRLR" onkeydown="if(event.key==='Enter')mpSave(${i})"></label>
+      <button type="button" class="btn btn-primary" onclick="mpSave(${i})">저장</button>
+      <button type="button" class="btn-sm" onclick="mpEdit(-1)">취소</button>
+      <div class="mp-note">여러 상품에 연결하려면 쉼표(,)로 구분해요. 저장하면 매핑만 바뀌고, 품절/판매 상태는 다음에 엑셀로 반영할 때 새 연결 기준으로 적용돼요.</div>
+    </td></tr>`;
+  }
+  return html;
+}
+
+function mpEdit(i) {
+  mp.editing = i >= 0 ? i : null;
+  mpRender();
+  if (i >= 0) { const el = document.getElementById('mpEditInput'); if (el) { el.focus(); el.select(); } }
+}
+
+async function mpSave(i) {
+  const r = mp.rows[i];
+  const code = document.getElementById('mpEditInput').value.trim();
+  if (!code) { alert('사이트 상품코드를 입력해 주세요.'); return; }
+  const before = r.items.map(it => it.product_code).join(',') || '(연결 없음)';
+  if (code === r.items.map(it => it.product_code).join(',')) { alert('지금 연결과 같아요. 바꿀 내용이 없습니다.'); return; }
+  if (!confirm(`${r.ec_code}  ${r.ec_name} · ${r.size || ''}\n\n연결 변경: ${before}  →  ${code}\n\n저장할까요?`)) return;
+  try {
+    const res = await fetch(SAVE_MAP_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: [{ ec_code: r.ec_code, size: r.size || '', qty: r.ec_qty ?? 0, buyest_product_code: code }] })
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || '알 수 없는 오류');
+    if (d.errors && d.errors.length) { alert('저장되지 않았어요:\n' + d.errors.join('\n')); return; }
+    // 저장 결과를 다시 조회해서 이름·옵션 상태를 확인시킨다
+    document.getElementById('mpQ').value = r.ec_code;
+    await mpLoad(1);
+    const now = mp.rows.find(x => x.ec_code === r.ec_code);
+    if (now) {
+      const a = genderOf(now.ec_name);
+      const clash = now.items.filter(it => it.found && a && genderOf(it.name) && genderOf(it.name) !== a);
+      const noOpt = now.items.filter(it => it.found && !it.opt_found);
+      let warn = '';
+      if (clash.length) warn += '\n⚠ 키즈/여성이 다른 상품에 연결됐어요: ' + clash.map(it => it.product_code).join(', ');
+      if (noOpt.length) warn += '\n⚠ 이 사이즈 옵션이 없는 상품이에요: ' + noOpt.map(it => it.product_code).join(', ');
+      alert('저장했어요.' + warn);
+    }
+  } catch (e) {
+    alert('저장 실패: ' + e.message);
+  }
 }
 </script>
 <script src="colresize.js"></script>
