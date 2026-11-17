@@ -131,6 +131,33 @@
   .radio b{display:block;} .radio span{color:var(--sub);font-size:13px;}
   .preview{border-left:3px solid var(--blue);background:var(--bluebg);padding:11px 14px;line-height:1.7;}
 
+
+  /* 모드 전환 · 매핑 관리 */
+  .modes{display:inline-flex;border:1px solid #cfcec8;border-radius:8px;overflow:hidden;background:#fff;}
+  .modes button{height:34px;padding:0 15px;border:0;background:none;font-weight:600;color:var(--sub);cursor:pointer;white-space:nowrap;}
+  .modes button+button{border-left:1px solid #cfcec8;}
+  .modes button[aria-selected=true]{background:var(--ink);color:#fff;}
+  .modes .mb{display:inline-block;min-width:20px;margin-left:7px;padding:0 6px;border-radius:10px;background:var(--red);color:#fff;font-size:12px;line-height:20px;text-align:center;font-weight:700;}
+  .modes .mb:empty{display:none;}
+  body.mapmode #views,body.mapmode #tools,body.mapmode #note,body.mapmode .wrap,body.mapmode .fresh,body.mapmode #btnRefresh,body.mapmode #btnPolicy,body.mapmode #btnOutbox,body.mapmode .bulk{display:none!important;}
+  body:not(.mapmode) #mapPanel{display:none;}
+  .mp{padding:0 24px 80px;}
+  .mp-bar{display:flex;gap:10px;align-items:center;padding:14px 0;flex-wrap:wrap;}
+  .mp-bar input[type=search]{height:36px;width:280px;padding:0 12px;border:1px solid #cfcec8;border-radius:7px;background:#fff;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .chips button{height:34px;padding:0 13px;border:1px solid #cfcec8;border-radius:17px;background:#fff;cursor:pointer;font-weight:600;color:var(--sub);white-space:nowrap;}
+  .chips button span{margin-left:6px;font-weight:500;color:var(--faint);font-variant-numeric:tabular-nums;}
+  .chips button[aria-selected=true]{background:var(--ink);border-color:var(--ink);color:#fff;} .chips button[aria-selected=true] span{color:#d6d9de;}
+  .chips button.alert:not([aria-selected=true]) span{color:var(--red);font-weight:700;}
+  .mp .note{margin:0 0 14px;}
+  table.mpt thead th{top:var(--topH);}
+  .mpt td .code{display:block;margin-top:2px;}
+  .mpt .acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;}
+  .mini.pri{background:var(--ink);border-color:var(--ink);color:#fff;} .mini.pri:hover:not(:disabled){background:#33373d;color:#fff;}
+  .mpt a.kid{font-weight:700;color:var(--blue);text-decoration:none;font-variant-numeric:tabular-nums;} .mpt a.kid:hover{text-decoration:underline;}
+  .mpt .why2{font-size:12.5px;color:var(--faint);margin-top:2px;}
+  .mpt tr.busy td{opacity:.5;pointer-events:none;}
+
   #toast{position:fixed;left:24px;bottom:24px;z-index:60;display:flex;flex-direction:column;gap:8px;}
   .t{background:var(--ink);color:#fff;padding:11px 16px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);display:flex;gap:14px;align-items:center;max-width:540px;}
   .t button{background:none;border:0;color:#9db8ff;font-weight:700;cursor:pointer;padding:0;}
@@ -142,7 +169,11 @@
 
 <header class="top" id="top">
   <div class="titlebar">
-    <h1>크림 운영</h1><span class="demo" id="demoTag" hidden>시험 데이터 · 실제로 전송하지 않음</span>
+    <h1>크림 운영</h1>
+    <div class="modes" role="tablist" aria-label="작업 선택">
+      <button type="button" data-mode="ops" aria-selected="true">가격 운영</button><button type="button" data-mode="map" aria-selected="false">매핑 관리<span class="mb num" id="mapBadge"></span></button>
+    </div>
+    <span class="demo" id="demoTag" hidden>시험 데이터 · 실제로 전송하지 않음</span>
     <span class="fresh"><i></i><span id="freshTxt">시세 불러오는 중</span></span>
     <span class="sp"></span>
     <button class="btn" id="btnRefresh" title="보이는 상품의 크림 시세를 지금 다시 받아옵니다">시세 지금 갱신</button>
@@ -219,6 +250,33 @@
       <div class="h">크림 상품 주소 끝의 숫자입니다. 자동으로 못 찾는 품번을 사람이 연결할 때 씁니다.</div></div>
   </div>
   <div class="df"><span class="sp"></span><button class="btn" data-close>취소</button><button class="btn pri" id="mapOk">연결</button></div>
+</dialog>
+
+<section class="mp" id="mapPanel" aria-label="크림 매핑 관리">
+  <div class="mp-bar">
+    <div class="chips" id="mpChips" role="tablist" aria-label="매핑 상태"></div>
+    <input type="search" id="mpQ" placeholder="품번 · 브랜드 검색" aria-label="품번 또는 브랜드 검색">
+    <span class="sp"></span><span class="total num" id="mpTotal"></span>
+    <button class="btn sm" type="button" id="mpReload">새로고침</button>
+  </div>
+  <div class="note" id="mpNote"></div>
+  <table class="mpt">
+    <colgroup><col><col style="width:230px"><col style="width:190px"><col style="width:110px"><col style="width:330px"></colgroup>
+    <thead><tr><th>우리 품번</th><th>크림 상품</th><th>상태</th><th>마지막 확인</th><th class="r">작업</th></tr></thead>
+    <tbody id="mpBody"></tbody>
+  </table>
+  <button class="btn more" type="button" id="mpMore" hidden>더 보기</button>
+</section>
+
+<dialog class="modal" id="mpDlg" aria-labelledby="mpDlgT">
+  <div class="dh"><h2 id="mpDlgT">크림 상품 직접 연결</h2><button class="x" data-close aria-label="닫기">×</button></div>
+  <div class="db">
+    <p id="mpWho" style="margin:0 0 14px;line-height:1.6"></p>
+    <div class="fld"><label for="mpId">크림 상품번호</label><input type="text" id="mpId" inputmode="numeric" placeholder="예: 52714">
+      <div class="h">크림 상품 주소 끝의 숫자입니다(kream.co.kr/products/<b>52714</b>). 연결하면 이 품번은 자동 확인 대상에서 빠집니다.</div></div>
+    <div class="h" id="mpErr" style="color:var(--red);font-weight:600" hidden></div>
+  </div>
+  <div class="df"><span class="sp"></span><button class="btn" data-close>취소</button><button class="btn pri" id="mpOk">연결</button></div>
 </dialog>
 
 <div id="toast" aria-live="polite"></div>
@@ -584,6 +642,126 @@
     render(); setTop();
   }).catch(function(e){ $('tb').innerHTML='<tr><td colspan="8"><div class="empty">상품 데이터를 불러오지 못했습니다.<br>'+esc(e.message)+'</div></td></tr>'; });
   if(window.ResizeObserver) new ResizeObserver(setTop).observe($('top')); else window.addEventListener('resize',setTop);
+})();
+</script>
+
+<script>
+/* 매핑 관리: 서버 kream_map_api.php 와 직접 통신. 로그인은 툴킷 로그인(localStorage buyest.dash.auth)을 그대로 쓴다. */
+(function(){
+  'use strict';
+  var API='https://buyest.co.kr/kream_map_api.php';
+  var ENV=(new URLSearchParams(location.search).get('env')==='dev')?'dev':'';
+  var PER=50;
+  var ST={ambiguous:['확인 필요','bad'],unmapped:['아직 못 찾음','warn'],nolist:['크림에 없음','gray'],mapped:['연결됨','ok'],conflict:['품번 표기 충돌','bad']};
+  var CHIPS=[['all','전체'],['ambiguous','확인 필요'],['unmapped','아직 못 찾음'],['nolist','크림에 없음'],['mapped','연결됨'],['conflict','표기 충돌']];
+  var M={status:null,q:'',page:1,rows:[],total:0,counts:null,loaded:false,target:null};
+  function $(i){return document.getElementById(i);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function getAuth(){ try{ var a=JSON.parse(localStorage.getItem('buyest.dash.auth')); return (a&&a.id)?a:null; }catch(e){ return null; } }
+  function toast(msg){ var d=document.createElement('div'); d.className='t'; d.textContent=msg; $('toast').appendChild(d); setTimeout(function(){ d.remove(); },3600); }
+  function ago(ts){ ts=+ts||0; if(!ts) return '아직 안 함'; var m=Math.floor((Date.now()/1000-ts)/60); if(m<1) return '방금'; if(m<60) return m+'분 전'; var h=Math.floor(m/60); if(h<24) return h+'시간 전'; return Math.floor(h/24)+'일 전'; }
+  function api(body){
+    var a=getAuth(); if(!a) return Promise.reject(new Error('툴킷에 로그인한 뒤 새로고침해 주세요.'));
+    var b={user:a.id,pass:a.pass,env:ENV}; for(var k in body) b[k]=body[k];
+    return fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){
+      return r.json().then(function(j){ if(!j.ok) throw new Error(j.need_login?'툴킷에 다시 로그인해 주세요.':(j.error||('서버 오류 '+r.status))); return j; });
+    });
+  }
+  function setMode(m){
+    document.body.classList.toggle('mapmode',m==='map');
+    document.querySelectorAll('.modes button').forEach(function(b){ b.setAttribute('aria-selected',String(b.dataset.mode===m)); });
+    if(m==='map'){ if(!M.loaded) boot(); }
+    window.scrollTo({top:0});
+    setTimeout(function(){ document.documentElement.style.setProperty('--topH',$('top').offsetHeight+'px'); },0);
+  }
+  function renderChips(){
+    var c=M.counts||{}; var total=c.total||0;
+    $('mpChips').innerHTML=CHIPS.map(function(x){
+      var n=x[0]==='all'?total:((c.counts&&c.counts[x[0]])||0), sel=(M.status||'all')===x[0];
+      return '<button type="button" role="tab" data-st="'+x[0]+'" aria-selected="'+sel+'"'+(x[0]==='ambiguous'&&n>0?' class="alert"':'')+'>'+x[1]+'<span>'+n.toLocaleString('ko-KR')+'</span></button>';
+    }).join('');
+    var amb=(c.counts&&c.counts.ambiguous)||0; $('mapBadge').textContent=amb>0?amb:'';
+  }
+  function note(){
+    var c=M.counts&&M.counts.counts, h='';
+    if(ENV==='dev') h+='<b>개발 시험 표</b>를 보고 있습니다(kream_map_dev). ';
+    if(!c||!M.counts.total) h+='아직 매핑 대상이 없습니다. 운영 키 연결 후 서버가 재고 있는 품번을 크림에서 찾기 시작합니다.';
+    else {
+      h+='재고 있는 품번 <b class="num">'+M.counts.total.toLocaleString('ko-KR')+'</b>개 중 <b class="num">'+c.mapped.toLocaleString('ko-KR')+'</b>개가 크림 상품에 연결돼 있습니다.';
+      if(c.ambiguous) h+=' <b>확인 필요 '+c.ambiguous+'개</b>는 후보를 찾았지만 맞는지 사람이 봐야 합니다. 맞으면 확정해 주세요.';
+    }
+    $('mpNote').className='note'+((c&&c.ambiguous)?' alert':''); $('mpNote').innerHTML=h;
+  }
+  function stateCell(r){
+    var s=ST[r.status]||[r.status,'gray'], why='';
+    if(r.status==='ambiguous'){ why=String(r.reason||'').indexOf('variant:')===0?'색상 접미사를 뗀 품번으로 찾은 후보예요':(String(r.reason||'').indexOf('multiple')===0?'같은 품번의 크림 상품이 여러 개예요':'후보가 애매해요'); }
+    else if(r.status==='nolist') why='주 1회 다시 확인해요';
+    else if(r.status==='mapped') why=r.source==='manual'?'직접 연결':'자동 연결';
+    else if(r.status==='conflict') why=String(r.reason||'');
+    return '<span class="st '+s[1]+'">'+s[0]+'</span>'+(why?'<div class="why2">'+esc(why)+'</div>':'');
+  }
+  function kreamCell(r){
+    if(!+r.kream_product_id) return '<span class="sub2">-</span>';
+    return '<a class="kid" href="https://kream.co.kr/products/'+(+r.kream_product_id)+'" target="_blank" rel="noopener">'+(+r.kream_product_id)+'</a>'+(r.product_code?'<span class="code">'+esc(r.product_code)+'</span>':'');
+  }
+  function actions(r){
+    var n=esc(r.style_norm), b=function(a,t,pri){ return '<button type="button" class="mini'+(pri?' pri':'')+'" data-ma="'+a+'" data-n="'+n+'">'+t+'</button>'; }, o='';
+    if(r.status==='ambiguous'){ if(+r.kream_product_id) o+=b('confirm','이 상품으로 확정',1); o+=b('manual','직접 연결')+b('requeue','다시 찾기'); }
+    else if(r.status==='nolist'){ o+=b('requeue','다시 찾기')+b('manual','직접 연결'); }
+    else if(r.status==='unmapped'){ o+=b('manual','직접 연결'); }
+    else if(r.status==='mapped'){ o+=b('unmap','연결 해제'); }
+    return '<div class="acts">'+o+'</div>';
+  }
+  function renderRows(){
+    if(!M.rows.length){ $('mpBody').innerHTML='<tr><td colspan="5"><div class="empty">'+(M.q?'검색 결과가 없습니다.<br>품번이나 브랜드를 다르게 입력해 보세요.':'이 상태의 품번이 없습니다.')+'</div></td></tr>'; }
+    else $('mpBody').innerHTML=M.rows.map(function(r){
+      return '<tr data-n="'+esc(r.style_norm)+'"><td><div class="brand">'+esc(r.brand||'')+'</div><span class="big" style="font-size:14.5px">'+esc(r.style_raw)+'</span></td><td>'+kreamCell(r)+'</td><td>'+stateCell(r)+'</td><td class="sub2">'+ago(r.last_try)+(r.tries>0?' · '+r.tries+'회':'')+'</td><td>'+actions(r)+'</td></tr>';
+    }).join('');
+    $('mpTotal').textContent=M.total.toLocaleString('ko-KR')+'개';
+    $('mpMore').hidden=M.rows.length>=M.total;
+    if(!$('mpMore').hidden) $('mpMore').textContent='더 보기 ('+(M.total-M.rows.length).toLocaleString('ko-KR')+'개 남음)';
+  }
+  function loadSummary(){ return api({action:'summary'}).then(function(j){ M.counts=j; renderChips(); note(); }); }
+  function loadList(append){
+    return api({action:'list',status:M.status||'',q:M.q,page:M.page,per_page:PER}).then(function(j){
+      M.rows=append?M.rows.concat(j.rows):j.rows; M.total=j.total; renderRows();
+    });
+  }
+  function fail(e){ $('mpBody').innerHTML='<tr><td colspan="5"><div class="empty">매핑 목록을 불러오지 못했습니다.<br>'+esc(e.message)+'</div></td></tr>'; $('mpMore').hidden=true; }
+  function boot(){
+    M.loaded=true;
+    loadSummary().then(function(){
+      var c=M.counts.counts; if(M.status===null) M.status=c.ambiguous>0?'ambiguous':(c.unmapped>0?'unmapped':'');
+      renderChips(); return loadList(false);
+    }).catch(function(e){ M.loaded=false; fail(e); });
+  }
+  function reload(){ M.page=1; return Promise.all([loadSummary(),loadList(false)]).catch(fail); }
+  function findRow(n){ return M.rows.filter(function(r){return r.style_norm===n;})[0]; }
+  function act(a,n,btn){
+    var r=findRow(n); if(!r) return;
+    if(a==='manual'){ M.target=r; $('mpWho').innerHTML='<b>'+esc(r.brand||'')+'</b><br><span class="code">'+esc(r.style_raw)+'</span>'; $('mpId').value=''; $('mpErr').hidden=true; $('mpDlg').showModal(); $('mpId').focus(); return; }
+    if(a==='unmap' && !confirm('이 품번의 크림 연결을 해제할까요?\n해제하면 다시 자동 확인 대상이 됩니다.')) return;
+    var req=a==='confirm'?{action:'set_manual',style_norm:n,kream_product_id:r.kream_product_id,product_code:r.product_code||undefined}:{action:a,style_norm:n};
+    var tr=btn.closest('tr'); tr.classList.add('busy');
+    api(req).then(function(){ toast(a==='confirm'?'연결을 확정했습니다.':a==='requeue'?'다음 자동 확인 때 다시 찾습니다.':'연결을 해제했습니다.'); return reload(); })
+      .catch(function(e){ tr.classList.remove('busy'); toast(e.message); });
+  }
+  document.addEventListener('click',function(e){
+    var m=e.target.closest('.modes [data-mode]'); if(m){ setMode(m.dataset.mode); return; }
+    var c=e.target.closest('#mpChips [data-st]'); if(c){ M.status=c.dataset.st==='all'?'':c.dataset.st; M.page=1; renderChips(); loadList(false).catch(fail); return; }
+    var b=e.target.closest('[data-ma]'); if(b){ act(b.dataset.ma,b.dataset.n,b); return; }
+  });
+  $('mpMore').addEventListener('click',function(){ M.page++; loadList(true).catch(function(e){ M.page--; toast(e.message); }); });
+  $('mpReload').addEventListener('click',function(){ reload().then(function(){ toast('목록을 새로 불러왔습니다.'); }); });
+  var qt; $('mpQ').addEventListener('input',function(e){ clearTimeout(qt); qt=setTimeout(function(){ M.q=e.target.value.trim(); M.page=1; loadList(false).catch(fail); },250); });
+  $('mpOk').addEventListener('click',function(){
+    var v=$('mpId').value.replace(/\D/g,''); if(!v){ $('mpErr').textContent='크림 상품번호(숫자)를 입력해 주세요.'; $('mpErr').hidden=false; $('mpId').focus(); return; }
+    $('mpOk').disabled=true;
+    api({action:'set_manual',style_norm:M.target.style_norm,kream_product_id:+v}).then(function(){ $('mpDlg').close(); toast('크림 상품 '+v+'번에 연결했습니다.'); return reload(); })
+      .catch(function(e){ $('mpErr').textContent=e.message; $('mpErr').hidden=false; }).then(function(){ $('mpOk').disabled=false; });
+  });
+  $('mpId').addEventListener('keydown',function(e){ if(e.key==='Enter') $('mpOk').click(); });
+  if(location.hash==='#map'||new URLSearchParams(location.search).get('mode')==='map') setMode('map');
 })();
 </script>
 </body>
