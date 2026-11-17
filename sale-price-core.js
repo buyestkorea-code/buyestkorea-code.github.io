@@ -20,7 +20,8 @@
 
   // 기본 세팅 — 사장님 지정(2026-11-16): 전체 필웨이 가격(= 사방넷 기준가) 기준
   //   11번가 ×1.05 · 웰스토리몰/삼성카드 ×0.88(100원 단위 올림) · 스마트스토어/크림 ×1.17 · 쿠팡 ×0.92 · 트렌비 ×0.94 · 롯데온 ×1.09 · 바이마 ×0.93
-  // 목록에 없는 몰 중 ×1.00(필웨이 가격 그대로)로 확인된 몰은 아래 1.00으로 둔다. 이터널저니·REEBONZ는 지정 전이라 비워 둠(배수 없음으로 표시).
+  // 목록에 없는 몰은 모두 ×1.00(필웨이 가격 그대로, 사장님 확정 11-16). 아래 1.00 항목은 화면 표에 보이도록 적어 둔 것.
+  // KREAM은 행사가 ×0.96도 정상(ALT_MULTS), BUYMA는 엔화 판매가를 환율로 환산해 0.93~1.10 범위(RANGES).
   var DEFAULT_MULTS = {
     '11번가': 1.05,
     '웰스토리몰2.0(메인몰)': 0.88,
@@ -30,7 +31,6 @@
     '쿠팡': 0.92,
     '트렌비': 0.94,
     '롯데온': 1.09,
-    'BUYMA': 0.93,
     'SSG.COM': 1.00,
     '카카오스타일 (지그재그, 포스티)': 1.00,
     '머스트잇': 1.00,
@@ -48,7 +48,12 @@
 
   // 기대가를 100원 단위로 올림하는 몰 (웰스토리몰, 삼성카드). 나머지는 10원 단위 반올림.
   function isCeil100(mall) { return /삼성카드|웰스토리/.test(mall || ''); }
-  function mallNote(mall) { return isCeil100(mall) ? '100원 단위 올림' : ''; }
+  function mallNote(mall) {
+    if (rangeOf(mall)) return '엔화 판매가를 환율로 원화 환산 · 0.93~1.10 범위면 정상';
+    if (isCeil100(mall)) return '100원 단위 올림';
+    if (/^KREAM/i.test(mall || '')) return '행사가 ×0.96도 정상';
+    return '';
+  }
   // 몰 이름 찾기: 정확히 같은 이름이 없으면 "쿠팡 (…)" 처럼 앞부분이 같은 항목으로 본다
   function resolveMall(mall, mults) {
     if (mall in mults) return mall;
@@ -99,27 +104,67 @@
     return rows;
   }
 
-  // 상태: ok 정상 · bad 가격 다름 · unmapped 미매핑(기준가 없음) · nomult 몰 배수 없음 · hold 보류(배수 null)
-  function check(rows, mults, tol) {
+  // 지정 몰: 배수가 범위로 정해지는 몰 (BUYMA: 환율에 따라 0.93~1.10, 판매가는 엔화 → 환율로 원화 환산해 비교)
+  var RANGES = { 'BUYMA': { lo: 0.93, hi: 1.10, jpy: true } };
+  // 주 배수 외에 정상으로 인정하는 배수 (KREAM: 등록가 1.17 / 행사가 0.96)
+  var ALT_MULTS = { 'KREAM': [0.96] };
+  function rangeOf(mall) {
+    var k, u = String(mall || '').toUpperCase();
+    for (k in RANGES) if (u.indexOf(k) === 0) return RANGES[k];
+    return null;
+  }
+
+  // 상태: ok 정상 · bad 가격 다름 · unmapped 미매핑(기준가 없음) · hold 보류(배수 비움/환율 없음)
+  // 목록에 없는 몰은 필웨이 가격 그대로(×1.0)로 본다.
+  // opts.jpyKrw: 엔→원 환율 (BUYMA 환산용)
+  function check(rows, mults, tol, opts) {
     tol = tol == null ? TOLERANCE : tol;
+    opts = opts || {};
     return rows.map(function (r) {
       var o = {}, k;
       for (k in r) o[k] = r[k];
       var unmapped = r.code === UNMAPPED_CODE || !r.cost;
-      var mk = resolveMall(r.mall, mults);
-      var m = mk == null ? undefined : mults[mk];
       o.base = r.cost ? r.cost / COST_RATE : 0;
-      o.mult = (m == null || m === '') ? null : Number(m);
-      var raw = o.base * (o.mult || 0);
-      o.expect = (o.mult != null && o.base) ? (isCeil100(r.mall) ? Math.ceil(raw / 100 - 1e-9) * 100 : Math.round(raw / 10) * 10) : 0;
-      o.diff = o.expect ? r.price - o.expect : 0;
       o.payRate = r.price ? r.pay / r.price : 0;
-      if (unmapped) o.status = 'unmapped';
-      else if (mk == null) o.status = 'nomult';
-      else if (o.mult == null) o.status = 'hold';
-      else if (Math.abs(r.price - o.expect) <= tol) o.status = 'ok';
-      else if (r.qty > 1 && Math.abs(r.price - o.expect * r.qty) <= tol * r.qty) { o.status = 'ok'; o.note = '수량 ' + r.qty + '개 합계가'; }
-      else o.status = 'bad';
+      if (unmapped) { o.status = 'unmapped'; return o; }
+
+      var rg = rangeOf(r.mall);
+      if (rg) {
+        o.mult = null; o.range = [rg.lo, rg.hi];
+        if (!opts.jpyKrw) { o.status = 'hold'; o.note = '엔 환율이 없어 검증 못 함'; return o; }
+        var lo = o.base * rg.lo, hi = o.base * rg.hi;
+        var krw = r.price * opts.jpyKrw, q = r.qty > 1 ? r.qty : 1;
+        o.krw = krw; o.ratio = krw / o.base;
+        o.expect = Math.round(lo / 10) * 10; o.expectHi = Math.round(hi / 10) * 10;
+        o.diff = krw < lo ? krw - lo : (krw > hi ? krw - hi : 0);
+        if (krw >= lo - tol && krw <= hi + tol) o.status = 'ok';
+        else if (q > 1 && krw / q >= lo - tol && krw / q <= hi + tol) { o.status = 'ok'; o.note = '수량 ' + q + '개 합계가'; }
+        else o.status = 'bad';
+        return o;
+      }
+
+      var mk = resolveMall(r.mall, mults);
+      var m = mk == null ? 1.0 : mults[mk];                 // 목록 외 몰 → ×1.0
+      if (mk == null) o.note = '목록 외 몰 ×1.0';
+      o.mult = (m == null || m === '') ? null : Number(m);
+      if (o.mult == null) { o.status = 'hold'; return o; }
+      function expectFor(mult) {
+        var raw = o.base * mult;
+        return isCeil100(r.mall) ? Math.ceil(raw / 100 - 1e-9) * 100 : Math.round(raw / 10) * 10;
+      }
+      o.expect = expectFor(o.mult);
+      o.diff = r.price - o.expect;
+      var q2 = r.qty > 1 ? r.qty : 1;
+      if (Math.abs(r.price - o.expect) <= tol) o.status = 'ok';
+      else if (q2 > 1 && Math.abs(r.price - o.expect * q2) <= tol * q2) { o.status = 'ok'; o.note = '수량 ' + q2 + '개 합계가'; }
+      else {
+        o.status = 'bad';
+        var alts = (mk != null && ALT_MULTS[mk]) || [], a;
+        for (a = 0; a < alts.length; a++) {
+          var ex = expectFor(alts[a]);
+          if (Math.abs(r.price - ex) <= tol) { o.status = 'ok'; o.note = '행사가 ×' + alts[a]; o.diff = r.price - ex; break; }
+        }
+      }
       return o;
     });
   }
@@ -134,6 +179,6 @@
     return s;
   }
 
-  return { COST_RATE: COST_RATE, TOLERANCE: TOLERANCE, UNMAPPED_CODE: UNMAPPED_CODE, DEFAULT_MULTS: DEFAULT_MULTS, mallNote: mallNote, resolveMall: resolveMall,
+  return { COST_RATE: COST_RATE, TOLERANCE: TOLERANCE, UNMAPPED_CODE: UNMAPPED_CODE, DEFAULT_MULTS: DEFAULT_MULTS, mallNote: mallNote, resolveMall: resolveMall, RANGES: RANGES, ALT_MULTS: ALT_MULTS, rangeOf: rangeOf,
            parseOrders: parseOrders, check: check, summarize: summarize };
 });

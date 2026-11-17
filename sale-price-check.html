@@ -69,7 +69,7 @@
 <body>
 <h1>판매가 검증 <span class="badge">TEST</span></h1>
 <p class="lead">사방넷 주문서(주문서확인처리) 엑셀을 올리면, 몰별 기준 가격과 실제 판매가를 비교해 다른 건만 골라 줍니다.<br>
-기대 판매가 = 필웨이 가격(주문서 원가 ÷ 0.87) × 몰별 배수 · 허용 오차 ±100원. 결제금액은 쿠폰·할인이 반영돼 있어 판정하지 않고 참고로만 보여 줍니다.</p>
+기대 판매가 = 필웨이 가격(주문서 원가 ÷ 0.87) × 몰별 배수 · 허용 오차 ±100원. 목록에 없는 몰은 ×1.0, KREAM은 행사가 ×0.96도 정상, BUYMA는 엔화 판매가를 환율로 환산해 0.93~1.10 범위면 정상입니다. 결제금액은 쿠폰·할인이 반영돼 있어 판정하지 않고 참고로만 보여 줍니다.</p>
 
 <div class="box">
   <div class="drop" id="drop">
@@ -83,6 +83,14 @@
 <div class="err" id="err" hidden></div>
 
 <div id="result" hidden>
+  <div class="box row" id="fxBox">
+    <b>BUYMA 엔 환율</b>
+    <input type="number" step="0.01" min="0" id="jpy" class="mult" style="width:96px;" aria-label="엔 환율 (1엔당 원)" placeholder="1엔당 원">
+    <span class="hint">원 / 1엔</span>
+    <button class="btn btn-out btn-sm" id="btnFx" type="button">시세 다시 조회</button>
+    <span class="hint grow" id="fxInfo">조회 중…</span>
+  </div>
+
   <div class="stats" id="stats"></div>
 
   <details class="box" id="multBox">
@@ -103,7 +111,7 @@
     <button class="btn btn-pri btn-sm" id="btnXlsx" type="button">확인할 건 엑셀로 받기</button>
   </div>
   <div class="lst"><table class="l" id="tbl"></table></div>
-  <p class="hint">배수가 다른 예외 상품은 직접 확인해 주세요. "확인할 건 엑셀"에는 가격 이상 · 미매핑 · 배수 없음 건이 들어갑니다.</p>
+  <p class="hint">배수가 다른 예외 상품은 직접 확인해 주세요. "확인할 건 엑셀"에는 가격 이상 · 미매핑 · 검증 못 한 건이 들어갑니다.</p>
 </div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
@@ -114,6 +122,8 @@
   var LS = 'buyest.salePrice.mults.v2';   // 기본값과 다르게 고친 몰만 저장 (기본값이 바뀌면 자동으로 따라감)
   var $ = function(id){ return document.getElementById(id); };
   var ROWS = [], RES = [], MULTS = loadMults(), FILTER = 'bad', MALL = '', FILENAME = '';
+  var FX_LS = 'buyest.salePrice.jpy.v1', JPY = 0, FX_MANUAL = false;
+  try { var fx0 = JSON.parse(localStorage.getItem(FX_LS) || 'null'); if (fx0 && fx0.manual && fx0.rate > 0) { JPY = fx0.rate; FX_MANUAL = true; } } catch(e){}
 
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function won(n){ return n ? Math.round(n).toLocaleString('ko-KR') : '-'; }
@@ -153,8 +163,28 @@
     rd.readAsArrayBuffer(f);
   }
 
+  function fxShow(msg){ $('jpy').value = JPY ? JPY : ''; $('fxInfo').textContent = msg; }
+  function fxFetch(){
+    fxShow('시세 조회 중…');
+    fetch('https://open.er-api.com/v6/latest/JPY', { cache:'no-store' })
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(d){
+        var rate = d && d.rates && d.rates.KRW;
+        if (!(rate > 0)) throw new Error('KRW 없음');
+        FX_MANUAL = false; try { localStorage.removeItem(FX_LS); } catch(e){}
+        JPY = Math.round(rate * 10000) / 10000;
+        var dt = d.time_last_update_utc ? new Date(d.time_last_update_utc) : null;
+        fxShow('자동 조회한 시세 (' + (dt ? (dt.getMonth() + 1) + '/' + dt.getDate() + ' 기준' : '오늘') + '). 실제 쓰는 환율이 다르면 직접 입력하세요.');
+        if (ROWS.length) run();
+      })
+      .catch(function(){
+        fxShow(JPY ? '시세 조회에 실패해 입력된 환율을 씁니다.' : '시세를 가져오지 못했습니다. 환율을 직접 입력하면 BUYMA도 검증합니다.');
+        if (ROWS.length) run();
+      });
+  }
+
   function run(){
-    RES = C.check(ROWS, MULTS, C.TOLERANCE);
+    RES = C.check(ROWS, MULTS, C.TOLERANCE, { jpyKrw: JPY });
     $('result').hidden = false;
     render();
   }
@@ -172,23 +202,27 @@
       '<div class="stat ok"><div class="lab">가격 정상</div><div class="n">' + s.ok + '<small>건</small></div></div>' +
       '<div class="stat ' + (s.bad ? 'bad' : 'ok') + '"><div class="lab">가격 이상</div><div class="n">' + s.bad + '<small>건</small></div></div>' +
       '<div class="stat ' + (s.unmapped ? 'warn' : '') + '"><div class="lab">미매핑 (기준가 없음)</div><div class="n">' + s.unmapped + '<small>건</small></div></div>' +
-      '<div class="stat ' + ((s.nomult + s.hold) ? 'warn' : '') + '"><div class="lab">검증 못 함 (배수 없음)</div><div class="n">' + (s.nomult + s.hold) + '<small>건</small></div></div>';
+      '<div class="stat ' + ((s.nomult + s.hold) ? 'warn' : '') + '"><div class="lab">검증 못 함</div><div class="n">' + (s.nomult + s.hold) + '<small>건</small></div></div>';
 
     // 몰별 배수 표
     var malls = Object.keys(s.malls).sort(function(a, b){ return s.malls[b].total - s.malls[a].total; });
     var h = '<tr><th>몰</th><th class="r">건수</th><th class="r">기준 배수</th><th>계산</th><th class="r">정상</th><th class="r">이상</th><th class="r">미매핑</th></tr>';
     malls.forEach(function(m){
-      var c = s.malls[m], v = MULTS[m], miss = (v == null || v === '');
+      var c = s.malls[m], rg = C.rangeOf(m), known = !!C.resolveMall(m, MULTS);
+      var v = known ? MULTS[C.resolveMall(m, MULTS)] : 1, miss = (v == null || v === '');
+      var cell = rg ? '<b>' + rg.lo + ' ~ ' + rg.hi.toFixed(2) + '</b>'
+        : '<input type="number" step="0.01" min="0" class="mult' + (miss ? ' miss' : '') + '" data-m="' + esc(m) + '" value="' + (miss ? '' : v) + '" aria-label="' + esc(m) + ' 기준 배수" placeholder="입력">';
+      var note = C.mallNote(m) || (!known && !rg ? '목록 외 몰 ×1.0' : '');
       h += '<tr><td class="nm"><div>' + esc(m) + '</div></td><td class="r">' + c.total + '</td>' +
-        '<td class="r"><input type="number" step="0.01" min="0" class="mult' + (miss ? ' miss' : '') + '" data-m="' + esc(m) + '" value="' + (miss ? '' : v) + '" aria-label="' + esc(m) + ' 기준 배수" placeholder="입력"></td>' +
-        '<td class="hint">' + esc(C.mallNote(m)) + '</td>' +
+        '<td class="r">' + cell + '</td>' +
+        '<td class="hint">' + esc(note) + '</td>' +
         '<td class="r">' + c.ok + '</td><td class="r ' + (c.bad ? 'diffneg' : 'dim') + '">' + c.bad + '</td><td class="r dim">' + c.unmapped + '</td></tr>';
     });
     $('mallTbl').innerHTML = h;
     $('multSum').textContent = malls.length + '개 몰 · 눌러서 펼치기';
 
     // 필터
-    var segs = [['bad','가격 이상',s.bad],['unmapped','미매핑',s.unmapped],['nomult','배수 없음',s.nomult + s.hold],['ok','정상',s.ok],['all','전체',s.total]];
+    var segs = [['bad','가격 이상',s.bad],['unmapped','미매핑',s.unmapped],['nomult','검증 못 함',s.nomult + s.hold],['ok','정상',s.ok],['all','전체',s.total]];
     $('seg').innerHTML = segs.map(function(x){ return '<button type="button" data-f="' + x[0] + '" class="' + (FILTER === x[0] ? 'on' : '') + '">' + x[1] + '<b>' + x[2] + '</b></button>'; }).join('');
     var opts = '<option value="">모든 몰</option>' + malls.map(function(m){ return '<option value="' + esc(m) + '"' + (m === MALL ? ' selected' : '') + '>' + esc(m) + ' (' + s.malls[m].total + ')</option>'; }).join('');
     $('mallSel').innerHTML = opts;
@@ -216,9 +250,9 @@
         '<td>' + esc(r.mall) + '</td><td>' + esc(r.mallOrd) + '</td><td>' + esc(r.code) + '</td>' +
         '<td class="nm"><div title="' + esc(r.name) + '">' + esc(r.name) + '</div><small>' + esc(r.opt) + (r.qty > 1 ? ' · 수량 ' + r.qty : '') + '</small></td>' +
         '<td class="r' + (r.base ? '' : ' dim') + '">' + won(r.base) + '</td>' +
-        '<td class="r' + (r.mult == null ? ' dim' : '') + '">' + (r.mult == null ? '-' : r.mult) + '</td>' +
-        '<td class="r' + (r.expect ? '' : ' dim') + '">' + won(r.expect) + '</td>' +
-        '<td class="r"><b>' + won(r.price) + '</b></td>' +
+        '<td class="r' + (r.mult == null && !r.range ? ' dim' : '') + '">' + (r.range ? r.range[0] + '~' + r.range[1].toFixed(2) : (r.mult == null ? '-' : r.mult)) + '</td>' +
+        '<td class="r' + (r.expect ? '' : ' dim') + '">' + (r.range && r.expect ? won(r.expect) + ' ~ ' + won(r.expectHi) : won(r.expect)) + '</td>' +
+        '<td class="r"><b>' + won(r.price) + (r.range ? '엔' : '') + '</b>' + (r.range && r.krw ? '<div class="hint">' + won(r.krw) + '원 (×' + r.ratio.toFixed(3) + ')</div>' : '') + '</td>' +
         '<td class="r ' + dc + '">' + (r.expect ? sgn(d) : '-') + '</td>' +
         '<td class="r dim">' + won(r.pay) + '</td></tr>';
     });
@@ -232,7 +266,7 @@
     var head = ['상태','쇼핑몰','쇼핑몰 주문번호','상품코드','상품명','옵션','수량','사방넷 기준가','기준 배수','기대 판매가','실제 판매가','차이','결제금액'];
     var aoa = [head];
     list.forEach(function(r){
-      aoa.push([STAT_LABEL[r.status], r.mall, r.mallOrd, r.code, r.name, r.opt, r.qty, Math.round(r.base) || '', r.mult == null ? '' : r.mult, r.expect || '', r.price, r.expect ? r.diff : '', r.pay]);
+      aoa.push([STAT_LABEL[r.status], r.mall, r.mallOrd, r.code, r.name, r.opt, r.qty, Math.round(r.base) || '', r.range ? (r.range[0] + '~' + r.range[1].toFixed(2)) : (r.mult == null ? '' : r.mult), r.range && r.expect ? (r.expect + ' ~ ' + r.expectHi) : (r.expect || ''), r.price + (r.range ? '엔' : ''), r.expect ? r.diff : '', r.pay]);
     });
     var ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = [10,18,22,14,46,14,6,12,8,12,12,10,12].map(function(w){ return { wch:w }; });
@@ -255,7 +289,7 @@
     MULTS[i.dataset.m] = v === '' ? null : parseFloat(v);
     saveMults();
     // 입력 칸 포커스를 잃지 않게 결과만 갱신
-    RES = C.check(ROWS, MULTS, C.TOLERANCE); render();
+    RES = C.check(ROWS, MULTS, C.TOLERANCE, { jpyKrw: JPY }); render();
   });
   $('btnReset').addEventListener('click', function(){
     if (!confirm('몰별 배수를 기본값으로 되돌릴까요?')) return;
@@ -263,6 +297,14 @@
     MULTS = loadMults(); run();
   });
   $('btnXlsx').addEventListener('click', exportXlsx);
+  $('btnFx').addEventListener('click', fxFetch);
+  $('jpy').addEventListener('change', function(e){
+    var v = parseFloat(e.target.value);
+    if (v > 0) { JPY = v; FX_MANUAL = true; try { localStorage.setItem(FX_LS, JSON.stringify({ rate: v, manual: true })); } catch(x){} fxShow('직접 입력한 환율을 씁니다.'); }
+    else { JPY = 0; fxFetch(); return; }
+    if (ROWS.length) run();
+  });
+  if (FX_MANUAL) fxShow('직접 입력한 환율을 씁니다. (시세 다시 조회를 누르면 시세로 바뀝니다)'); else fxFetch();
 })();
 </script>
 </body>
