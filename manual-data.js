@@ -323,7 +323,7 @@ window.TOOLKIT_MANUALS = {
 },
 
 /* ───────── 사이트 품절 ───────── */
-{ id:'buyestSoldOutTest', g:'sold', title:'TEST 바이스트사이트 품절', st:'test',
+{ id:'buyestSoldOutTest', g:'sold', title:'최종 바이스트사이트 품절', st:'ok',
   login:'로그인 필요.',
   what:'이카운트에서 받은 재고변동표를 올리면, 그 품목들의 최신 재고를 다시 확인해서 **BUYEST 사이트의 품절/판매중 상태를 직접 바꿔** 줘요.',
   when:'이카운트 재고가 바뀐 날, 사이트 품절 표시를 실제 재고와 맞추고 싶을 때 써요.',
