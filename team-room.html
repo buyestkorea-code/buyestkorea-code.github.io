@@ -130,7 +130,12 @@
   .drop{position:relative;border:1.5px dashed #B8C0CC;border-radius:8px;padding:20px 16px;text-align:center;color:var(--sub);background:#FAFBFC;cursor:pointer;}
   .drop:hover,.drop.over{border-color:var(--pri);background:var(--pri-soft);color:var(--pri-d);}
   .drop.has{border-style:solid;border-color:var(--pri);background:var(--pri-soft);color:var(--ink);font-weight:600;}
-  .drop input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;}
+  .drop input[type=file]{display:none;}
+  .drop{cursor:default;}
+  .drop .sub{display:block;margin-top:4px;font-size:13px;font-weight:400;color:var(--sub);}
+  .drop .sub.warn{color:#B45309;}
+  .drop .pick{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;}
+  .drop label.btn{display:inline-flex;align-items:center;height:36px;font-size:13px;color:var(--ink);}
   .jobs{list-style:none;margin:0;padding:0;}
   .jobs li{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line2);cursor:pointer;border-left:3px solid transparent;}
   .jobs li:last-child{border-bottom:0;}
@@ -275,9 +280,16 @@
             <input type="text" id="aiFolder" class="aiin" placeholder="예: 1116_홍길동_품번확인" autocomplete="off">
             </div>
             <div id="aiZipWrap" hidden>
-              <label class="f" for="aiZip" style="margin-top:14px;">등록용 ZIP 파일 <span style="font-weight:400;color:var(--faint);">(20MB까지)</span></label>
-              <div class="drop" id="aiDrop"><input type="file" id="aiZip" accept=".zip,application/zip"><span id="aiZipName">ZIP 파일을 여기에 끌어다 놓거나 눌러서 고르세요</span></div>
-              <div class="hint" style="margin-top:8px;">ZIP 안에는 등록용 엑셀(여러 개 가능)과, 엑셀의 모델NO와 같은 이름의 폴더를 넣어 주세요. 폴더 안 사진은 <b>모델명_01_.jpg</b>, <b>모델명_0012.jpg</b>처럼 끝 번호를 붙입니다. 알집은 저장 형식을 <b>ZIP</b>으로 골라야 해요(.alz는 안 돼요).</div>
+              <label class="f" style="margin-top:14px;">등록할 폴더 <span style="font-weight:400;color:var(--faint);">(올라가는 용량 20MB까지)</span></label>
+              <div class="drop" id="aiDrop">
+                <span id="aiZipName">폴더를 여기에 끌어다 놓거나, 아래 버튼으로 고르세요</span>
+                <span class="sub" id="aiZipSub">PSD 파일은 자동으로 빼고 엑셀과 JPG 사진만 올려요</span>
+                <div class="pick">
+                  <label class="btn"><input type="file" id="aiDir" webkitdirectory multiple>폴더 고르기</label>
+                  <label class="btn"><input type="file" id="aiZip" accept=".zip,application/zip">ZIP 파일 고르기</label>
+                </div>
+              </div>
+              <div class="hint" style="margin-top:8px;">폴더 안에는 등록용 엑셀(여러 개 가능)과, 엑셀의 모델NO와 같은 이름의 폴더를 두세요. 폴더 안 사진은 <b>모델명_01_.jpg</b>, <b>모델명_0012.jpg</b>처럼 끝 번호를 붙입니다. 이미 만든 ZIP도 올릴 수 있지만, 그 안에 PSD가 있으면 용량이 커져요. 폴더로 고르면 PSD는 자동으로 빠져요.</div>
             </div>
             <div class="hint" id="aiKindHint"></div>
           </div>
@@ -504,7 +516,7 @@
   // ---------- AI 직원 ----------
   var AIAPI = 'https://buyest.co.kr/toolkit_aijob_api.php';
   var ST = {queued:'대기중', running:'실행중', awaiting_approval:'승인 기다림', approved:'승인됨·이어서 실행 대기', done:'완료', failed:'실패', rejected:'거절됨', cancelled:'취소됨'};
-  var KIND_HINT = {ping:'AI를 쓰지 않고 새 PC가 살아 있는지만 확인해요.', ai_ask:'AI가 읽기만 해요. 파일을 바꾸거나 어디로 보내지 않아요.', approval_demo:'승인 버튼이 잘 동작하는지 보는 시험이에요. 실제로 바뀌는 건 없어요.', sabangnet_register:'ZIP 안의 엑셀과 모델별 사진을 먼저 점검해서 계획을 보여 드려요. 승인하면 AI 직원이 사방넷에 신규 등록해요. 쇼핑몰 송신은 하지 않고, 지금은 한 번에 3개 모델까지예요.'};
+  var KIND_HINT = {ping:'AI를 쓰지 않고 새 PC가 살아 있는지만 확인해요.', ai_ask:'AI가 읽기만 해요. 파일을 바꾸거나 어디로 보내지 않아요.', approval_demo:'승인 버튼이 잘 동작하는지 보는 시험이에요. 실제로 바뀌는 건 없어요.', sabangnet_register:'폴더 안의 엑셀과 모델별 사진을 먼저 점검해서 계획을 보여 드려요. 승인하면 AI 직원이 사방넷에 신규 등록해요. 쇼핑몰 송신은 하지 않고, 지금은 한 번에 3개 모델까지예요.'};
   var AIZIPMAX = 20;
   var KIND_SHOW = ['ping', 'sabangnet_register'];   // 새 요청에 보이는 종류(질문·승인 시험은 서버에 남겨 두고 화면에서만 숨김)
   var KIND_BODY_PH = {sabangnet_register:'(선택) 참고할 내용이 있으면 적어 주세요', ai_ask:'예: 이 폴더의 상품 목록에서 품번이 중복된 줄을 찾아서 알려줘'};
@@ -554,22 +566,117 @@
     $('aiFolderNote').textContent = '(OneDrive 요청 폴더 안의 이름, 없으면 비워두기)';
     $('aiBodyLabel').textContent = reg ? '메모 (선택)' : '요청 내용';
   }
-  function zipShow(f){
-    var d = $('aiDrop');
-    if(!f){ d.classList.remove('has'); $('aiZipName').textContent = 'ZIP 파일을 여기에 끌어다 놓거나 눌러서 고르세요'; return; }
-    d.classList.add('has'); $('aiZipName').textContent = f.name + ' (' + (f.size / 1048576).toFixed(1) + 'MB)';
+  // ---- 등록용 입력: 폴더(PSD 자동 제외, 브라우저에서 ZIP으로 묶음) 또는 이미 만든 ZIP ----
+  var aiPick = null;   // {mode:'zip', file} | {mode:'dir', name, items:[{name,file}], bytes, zipBytes, xl, ph, psd, other}
+  var KEEP_EXT = {xlsx:1, csv:1, jpg:1, jpeg:1};
+  function mb(n){ return (n / 1048576).toFixed(1) + 'MB'; }
+  function pickReset(){ aiPick = null; $('aiZip').value = ''; $('aiDir').value = ''; pickShow(); }
+  function pickShow(){
+    var d = $('aiDrop'), sub = $('aiZipSub'); sub.classList.remove('warn');
+    if(!aiPick){ d.classList.remove('has'); $('aiZipName').textContent = '폴더를 여기에 끌어다 놓거나, 아래 버튼으로 고르세요'; sub.textContent = 'PSD 파일은 자동으로 빼고 엑셀과 JPG 사진만 올려요'; return; }
+    d.classList.add('has');
+    if(aiPick.mode === 'zip'){ $('aiZipName').textContent = aiPick.file.name + ' (' + mb(aiPick.file.size) + ')'; sub.textContent = 'ZIP 파일 그대로 올려요'; var ez = pickCheck(); if(ez){ sub.textContent = ez; sub.classList.add('warn'); } return; }
+    $('aiZipName').textContent = aiPick.name + ' — 엑셀 ' + aiPick.xl + '개 · 사진 ' + aiPick.ph + '장 · ' + mb(aiPick.bytes);
+    var skip = [];
+    if(aiPick.psd) skip.push('PSD ' + aiPick.psd + '개');
+    if(aiPick.other) skip.push('그 밖의 파일 ' + aiPick.other + '개');
+    sub.textContent = skip.length ? skip.join(', ') + '는 올리지 않아요' : '올리지 않는 파일은 없어요';
+    var e = pickCheck(); if(e){ sub.textContent += ' · ' + e; sub.classList.add('warn'); }
   }
-  function zipCheck(f){
-    if(!f) return '등록용 ZIP 파일을 올려 주세요';
-    if(/\.alz$/i.test(f.name)) return '알집 전용(.alz) 형식은 안 돼요. 압축할 때 ZIP 형식을 고르거나 윈도우 "압축(ZIP) 폴더"를 써 주세요';
-    if(!/\.zip$/i.test(f.name)) return 'ZIP 형식만 올릴 수 있어요';
-    if(f.size > AIZIPMAX * 1048576) return 'ZIP 파일이 너무 커요 (' + AIZIPMAX + 'MB까지)';
+  function pickCheck(){
+    var lim = AIZIPMAX * 1048576;
+    if(!aiPick) return '등록할 폴더나 ZIP 파일을 골라 주세요';
+    if(aiPick.mode === 'zip'){
+      var f = aiPick.file;
+      if(/\.alz$/i.test(f.name)) return '알집 전용(.alz) 형식은 안 돼요. ZIP 형식으로 만들거나 폴더를 직접 고르세요';
+      if(!/\.zip$/i.test(f.name)) return 'ZIP 형식만 올릴 수 있어요';
+      if(f.size > lim) return 'ZIP 파일이 너무 커요 (' + AIZIPMAX + 'MB까지). PSD가 들어 있다면 폴더로 직접 고르면 자동으로 빠져요';
+      return '';
+    }
+    if(!aiPick.xl) return '폴더에 등록용 엑셀(.xlsx)이 없어요';
+    if(!aiPick.ph) return '폴더에 JPG 사진이 없어요';
+    if(aiPick.items.length > 400) return '파일이 너무 많아요 (400개까지)';
+    if(aiPick.zipBytes > lim) return '올릴 파일이 ' + mb(aiPick.zipBytes) + '라 너무 커요 (' + AIZIPMAX + 'MB까지). 모델 수를 줄여서 나눠 올려 주세요';
     return '';
   }
-  $('aiZip').addEventListener('change', function(){ zipShow(this.files[0]); });
+  // 폴더 안 파일 목록 [{path, file}] → 올릴 것만 추려서 선택 상태로
+  function pickDir(list){
+    if(!list.length){ toast('폴더가 비어 있어요', true); return; }
+    var segs = list.map(function(x){ return x.path.split('/'); });
+    var root = segs[0][0], same = segs.every(function(a){ return a.length > 1 && a[0] === root; });
+    var items = [], psd = 0, other = 0, xl = 0, ph = 0, bytes = 0;
+    list.forEach(function(x, i){
+      var parts = segs[i]; if(same) parts = parts.slice(1);
+      var base = parts[parts.length - 1], rel = parts.join('/');
+      if(/^(\.|~\$)/.test(base) || /^(thumbs\.db|desktop\.ini)$/i.test(base)) return;   // 숨김·임시 파일은 세지 않음
+      var ext = (base.split('.').pop() || '').toLowerCase();
+      if(ext === 'psd' || ext === 'psb'){ psd++; return; }
+      if(!KEEP_EXT[ext]){ other++; return; }
+      if(ext === 'xlsx' || ext === 'csv') xl++; else ph++;
+      items.push({name: rel, file: x.file}); bytes += x.file.size;
+    });
+    var over = 22; items.forEach(function(it){ over += 76 + 2 * it.name.length * 3; });
+    aiPick = {mode:'dir', name: same ? root : '선택한 폴더', items: items, bytes: bytes, zipBytes: bytes + over, xl: xl, ph: ph, psd: psd, other: other};
+    $('aiZip').value = ''; pickShow();
+  }
+  function readAll(reader){ return new Promise(function(res){ var all = []; (function more(){ reader.readEntries(function(a){ if(!a.length) res(all); else { all = all.concat(a); more(); } }, function(){ res(all); }); })(); }); }
+  function walk(entry, prefix, out){
+    if(entry.isFile) return new Promise(function(res){ entry.file(function(f){ out.push({path: prefix + entry.name, file: f}); res(); }, function(){ res(); }); });
+    return readAll(entry.createReader()).then(function(list){ return Promise.all(list.map(function(e){ return walk(e, prefix + entry.name + '/', out); })); });
+  }
+  $('aiDir').addEventListener('change', function(){
+    var fl = Array.prototype.slice.call(this.files || []);
+    pickDir(fl.map(function(f){ return {path: f.webkitRelativePath || f.name, file: f}; }));
+  });
+  $('aiZip').addEventListener('change', function(){
+    var f = this.files[0]; if(!f) return;
+    aiPick = {mode:'zip', file: f}; $('aiDir').value = ''; pickShow(); var e = pickCheck(); if(e) toast(e, true);
+  });
   ['dragenter', 'dragover'].forEach(function(ev){ $('aiDrop').addEventListener(ev, function(e){ e.preventDefault(); $('aiDrop').classList.add('over'); }); });
   ['dragleave', 'drop'].forEach(function(ev){ $('aiDrop').addEventListener(ev, function(){ $('aiDrop').classList.remove('over'); }); });
-  $('aiDrop').addEventListener('drop', function(e){ e.preventDefault(); var f = e.dataTransfer.files[0]; if(f){ try{ var dt = new DataTransfer(); dt.items.add(f); $('aiZip').files = dt.files; }catch(x){} zipShow(f); } });
+  $('aiDrop').addEventListener('drop', function(e){
+    e.preventDefault();
+    var its = Array.prototype.slice.call((e.dataTransfer && e.dataTransfer.items) || []);
+    var ents = its.map(function(i){ return i.webkitGetAsEntry ? i.webkitGetAsEntry() : null; }).filter(Boolean);   // 비동기 전에 먼저 잡아 둠
+    var files = Array.prototype.slice.call(e.dataTransfer.files || []);
+    if(ents.some(function(x){ return x.isDirectory; })){
+      var out = []; Promise.all(ents.map(function(x){ return walk(x, '', out); })).then(function(){ pickDir(out); });
+    } else if(files.length === 1 && /\.(zip|alz)$/i.test(files[0].name)){
+      aiPick = {mode:'zip', file: files[0]}; pickShow(); var er = pickCheck(); if(er) toast(er, true);
+    } else if(files.length){
+      toast('폴더 전체를 끌어다 놓거나 ZIP 파일 하나를 올려 주세요', true);
+    }
+  });
+  // ---- 폴더 → ZIP(저장만, 압축 없음: JPG·XLSX는 이미 압축돼 있음). 한글 이름은 UTF-8 표시 ----
+  var CRCT = (function(){ var t = [], c, n, k; for(n = 0; n < 256; n++){ c = n; for(k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; } return t; })();
+  function crc32(u8){ var c = 0xFFFFFFFF; for(var i = 0; i < u8.length; i++) c = CRCT[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function buildZip(items){
+    var enc = new TextEncoder(), locals = [], centrals = [], off = 0, csize = 0, idx = 0;
+    function step(){
+      if(idx >= items.length) return Promise.resolve();
+      var it = items[idx++];
+      return it.file.arrayBuffer().then(function(buf){
+        var data = new Uint8Array(buf), nm = enc.encode(it.name), crc = crc32(data), d = new Date(it.file.lastModified || Date.now());
+        var yr = Math.max(1980, d.getFullYear()), tm = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), dt = ((yr - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+        var lh = new Uint8Array(30 + nm.length), v = new DataView(lh.buffer);
+        v.setUint32(0, 0x04034b50, true); v.setUint16(4, 20, true); v.setUint16(6, 0x0800, true); v.setUint16(8, 0, true); v.setUint16(10, tm, true); v.setUint16(12, dt, true);
+        v.setUint32(14, crc, true); v.setUint32(18, data.length, true); v.setUint32(22, data.length, true); v.setUint16(26, nm.length, true); v.setUint16(28, 0, true); lh.set(nm, 30);
+        var ch = new Uint8Array(46 + nm.length), w = new DataView(ch.buffer);
+        w.setUint32(0, 0x02014b50, true); w.setUint16(4, 20, true); w.setUint16(6, 20, true); w.setUint16(8, 0x0800, true); w.setUint16(10, 0, true); w.setUint16(12, tm, true); w.setUint16(14, dt, true);
+        w.setUint32(16, crc, true); w.setUint32(20, data.length, true); w.setUint32(24, data.length, true); w.setUint16(28, nm.length, true); w.setUint32(42, off, true); ch.set(nm, 46);
+        locals.push(lh, data); centrals.push(ch); off += lh.length + data.length; csize += ch.length;
+      }).then(step);
+    }
+    return step().then(function(){
+      var end = new Uint8Array(22), e = new DataView(end.buffer);
+      e.setUint32(0, 0x06054b50, true); e.setUint16(8, items.length, true); e.setUint16(10, items.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+      return new Blob(locals.concat(centrals, [end]), {type: 'application/zip'});
+    });
+  }
+  function uploadPart(){   // Promise<{blob, name}>
+    if(aiPick.mode === 'zip') return Promise.resolve({blob: aiPick.file, name: aiPick.file.name});
+    return buildZip(aiPick.items).then(function(b){ return {blob: b, name: (aiPick.name || 'upload').replace(/[\\\/:*?"<>|]/g, '_') + '.zip'}; });
+  }
   $('aiKind').addEventListener('change', kindHint);
   chipGroup('aiScope', function(b){ aiScope = b.getAttribute('data-s'); aiRefresh(); });
   function aiRefresh(){
@@ -616,16 +723,18 @@
   $('aiSend').addEventListener('click', function(){
     var btn = $('aiSend'), kind = $('aiKind').value; if(!kind) return;
     if(kind === 'sabangnet_register'){
-      var zf = $('aiZip').files[0], ze = zipCheck(zf);
+      var ze = pickCheck();
       if(ze){ toast(ze, true); return; }
-      btn.disabled = true;
-      var fd = new FormData();
-      fd.append('action', 'aj_create'); fd.append('user', AUTH.id); fd.append('pass', AUTH.pass);
-      fd.append('kind', kind); fd.append('body', $('aiBody').value); fd.append('zip', zf, zf.name);
-      fetch(AIAPI, {method:'POST', body:fd}).then(function(r){ return r.json(); }).catch(function(){ return {ok:false, error:'서버에 연결하지 못했어요'}; }).then(function(r){
+      btn.disabled = true; toast(aiPick.mode === 'dir' ? '폴더를 묶어서 올리는 중이에요. 잠시만 기다려 주세요' : '올리는 중이에요');
+      uploadPart().then(function(up){
+        var fd = new FormData();
+        fd.append('action', 'aj_create'); fd.append('user', AUTH.id); fd.append('pass', AUTH.pass);
+        fd.append('kind', kind); fd.append('body', $('aiBody').value); fd.append('zip', up.blob, up.name);
+        return fetch(AIAPI, {method:'POST', body:fd}).then(function(r){ return r.json(); });
+      }).catch(function(){ return {ok:false, error:'서버에 연결하지 못했어요'}; }).then(function(r){
         btn.disabled = false;
         if(r && r.ok){
-          $('aiBody').value = ''; $('aiZip').value = ''; zipShow(null); aiSel = r.id; aiPill(r.worker);
+          $('aiBody').value = ''; pickReset(); aiSel = r.id; aiPill(r.worker);
           toast(r.worker && r.worker.online ? '올렸어요. AI 직원이 곧 점검을 시작해요' : '올렸어요. AI 직원이 꺼져 있어서 켜지면 시작해요');
           aiRefresh();
         } else toast((r && r.error) || '올리지 못했어요', true);
