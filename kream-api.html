@@ -189,6 +189,10 @@
   body.stkmode .chips button span,body.mapmode .chips button span{color:#1f9d55;font-weight:600;}
   .kcard table.mpt{border:1px solid #e4e4e7;border-radius:10px;} .kcard table.mpt thead th{background:#fafafa;top:var(--topH);}
   body.mapmode .chips button.alert:not([aria-selected=true]) span{color:var(--red);}
+  .finfo{margin:0 0 14px;color:#52525b;line-height:1.55;} .finfo b{color:var(--ink);}
+  .frow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;} .kin.fin{width:96px;text-align:right;}
+  .fstat{margin:14px 0 0;color:#52525b;min-height:20px;} .fstat b{color:var(--ink);} .fstat.err{color:var(--red);}
+  .kb:disabled{opacity:.45;cursor:not-allowed;}
   @media (max-width:900px){.kf-two{grid-template-columns:1fr;}}
 
   #toast{position:fixed;left:24px;bottom:24px;z-index:60;display:flex;flex-direction:column;gap:8px;}
@@ -312,6 +316,17 @@
 
 <section class="mp" id="mapPanel" aria-label="크림 매핑 관리">
   <div class="note" id="mpNote"></div>
+  <div class="kcard" id="findCard">
+    <h2>자동 찾기</h2>
+    <p class="finfo" id="findInfo">후보 수를 세는 중이에요…</p>
+    <div class="frow">
+      <label class="kl" for="findN" style="margin:0">한 번에</label>
+      <input class="kin fin" type="number" id="findN" min="1" max="100" value="100" inputmode="numeric" aria-label="한 번에 찾을 품번 개수">
+      <span>개</span>
+      <button class="kb pri" type="button" id="findGo">자동 찾기 시작</button>
+    </div>
+    <p class="fstat" id="findStat" role="status" aria-live="polite"></p>
+  </div>
   <form class="kcard" id="mpFilter" onsubmit="return false">
     <h2>연결 조회</h2>
     <div class="kf-row"><label class="kl" for="mpQ">검색어</label>
@@ -794,13 +809,48 @@
   }
   function fail(e){ $('mpBody').innerHTML='<tr><td colspan="5"><div class="empty">매핑 목록을 불러오지 못했습니다.<br>'+esc(e.message)+'</div></td></tr>'; $('mpMore').hidden=true; }
   function boot(){
-    M.loaded=true;
+    M.loaded=true; fdCand().catch(function(){}); fdPoll();
     loadSummary().then(function(){
       var c=M.counts.counts; if(M.status===null) M.status=c.ambiguous>0?'ambiguous':(c.unmapped>0?'unmapped':(c.nolist>0?'nolist':'ambiguous'));
       renderChips(); return loadList(false);
     }).catch(function(e){ M.loaded=false; fail(e); });
   }
   function reload(){ M.page=1; return Promise.all([loadSummary(),loadList(false)]).catch(fail); }
+  /* 자동 찾기: 버튼은 요청만 넣는다. 크림 조회(GET)는 서버 워커가 하고, 화면은 진행 상황만 보여 준다. */
+  var FD={timer:0,watching:false,max:100};
+  function nf(n){ return (+n||0).toLocaleString('ko-KR'); }
+  function fdCand(){
+    return api({action:'find_candidates'}).then(function(j){
+      FD.max=j.max||100; $('findN').max=FD.max;
+      $('findInfo').innerHTML='재고 있는 우리 품번 중 크림에서 아직 찾아보지 않은 품번이 <b class="num">'+nf(j.to_find)+'</b>개 있어요. 버튼을 누르면 서버가 크림에서 상품을 찾아 연결합니다. 크림에서 조회만 하고, 크림에는 아무것도 보내지 않아요.';
+      FD.todo=j.to_find; fdBtn();
+    });
+  }
+  function fdActive(j){ return !!j&&(j.status==='queued'||j.status==='running'); }
+  function fdBtn(){ $('findGo').disabled=FD.busy||!FD.todo; }
+  function fdRender(j){
+    var el=$('findStat'); el.className='fstat';
+    FD.busy=fdActive(j); fdBtn();
+    if(!j){ el.textContent=''; return; }
+    if(j.status==='queued') el.innerHTML='요청을 받았어요. 서버가 곧 시작합니다(최대 1분).';
+    else if(j.status==='running') el.innerHTML='서버가 크림에서 <b class="num">'+nf(j.req_limit)+'</b>개를 찾는 중이에요…';
+    else if(j.status==='done') el.innerHTML='마지막 결과('+when(j.finished_at)+'): <b class="num">'+nf(j.tried)+'</b>개를 찾아 연결 <b class="num">'+nf(j.mapped)+'</b>개, 확인 필요 <b class="num">'+nf(j.ambiguous)+'</b>개, 크림에 없음 <b class="num">'+nf(j.nolist)+'</b>개.';
+    else { el.className='fstat err'; el.textContent='중간에 멈췄어요('+(j.error||'알 수 없음')+'). '+nf(j.tried)+'개까지 처리했어요. 잠시 뒤 다시 눌러 주세요.'; }
+  }
+  function fdPoll(){
+    clearTimeout(FD.timer);
+    return api({action:'find_status'}).then(function(r){
+      fdRender(r.job);
+      if(fdActive(r.job)){ FD.watching=true; FD.timer=setTimeout(fdPoll,4000); }
+      else if(FD.watching){ FD.watching=false; toast('자동 찾기가 끝났어요.'); reload(); fdCand(); }
+    }).catch(function(){ FD.timer=setTimeout(fdPoll,8000); });
+  }
+  $('findGo').addEventListener('click',function(){
+    var n=Math.max(1,Math.min(FD.max,parseInt($('findN').value,10)||0));
+    $('findN').value=n; FD.busy=true; fdBtn();
+    api({action:'find_start',limit:n}).then(function(){ FD.watching=true; return fdPoll(); })
+      .catch(function(e){ FD.busy=false; fdBtn(); toast(e.message); });
+  });
   function findRow(n){ return M.rows.filter(function(r){return r.style_norm===n;})[0]; }
   function act(a,n,btn){
     var r=findRow(n); if(!r) return;
