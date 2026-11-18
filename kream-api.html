@@ -170,7 +170,7 @@
   .lnk{border:0;background:none;color:var(--blue);font:inherit;font-weight:700;cursor:pointer;padding:0;text-decoration:underline;}
   .note.lock{border-left-color:var(--amber);}
   /* ② 크림 판매자 센터 '입찰 내역 관리'와 같은 모양: 청회색 바탕·흰 카드·높이 40 컨트롤·초록 선택 표시 */
-  body.stkmode{--bg:#f3f4f6;--line:#e4e4e7;--hov:#fafafa;}
+  body.stkmode,body.mapmode{--bg:#f3f4f6;--line:#e4e4e7;--hov:#fafafa;}
   .kcard{background:#fff;border-radius:12px;padding:24px;margin:0 0 16px;}
   .kcard h2{margin:0 0 16px;font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;}
   .kcard h2 .g{color:#1f9d55;font-weight:700;}
@@ -183,11 +183,12 @@
   .kb{height:40px;padding:0 20px;border:1px solid #e4e4e7;border-radius:10px;background:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;}
   .kb:hover{background:#fafafa;} .kb.pri{background:#18181b;border-color:#18181b;color:#fff;} .kb.pri:hover{background:#3f3f46;} .kb.sm{height:36px;padding:0 14px;font-size:13px;}
   .kcard .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;} .kcard .hd h2{margin:0;}
-  body.stkmode .chips{margin-bottom:14px;}
-  body.stkmode .chips button{height:36px;padding:0 16px;border:1px solid #e4e4e7;border-radius:20px;font-weight:500;color:#27272a;}
-  body.stkmode .chips button[aria-selected=true]{background:#f1faf4;border-color:#5bc77f;color:#1f9d55;font-weight:600;} body.stkmode .chips button[aria-selected=true] span{color:#1f9d55;}
-  body.stkmode .chips button span{color:#1f9d55;font-weight:600;}
-  .kcard table.stkt{border:1px solid #e4e4e7;border-radius:10px;} .kcard table.stkt thead th{background:#fafafa;top:var(--topH);}
+  body.stkmode .chips,body.mapmode .chips{margin-bottom:14px;}
+  body.stkmode .chips button,body.mapmode .chips button{height:36px;padding:0 16px;border:1px solid #e4e4e7;border-radius:20px;font-weight:500;color:#27272a;}
+  body.stkmode .chips button[aria-selected=true],body.mapmode .chips button[aria-selected=true]{background:#f1faf4;border-color:#5bc77f;color:#1f9d55;font-weight:600;} body.stkmode .chips button[aria-selected=true] span,body.mapmode .chips button[aria-selected=true] span{color:#1f9d55;}
+  body.stkmode .chips button span,body.mapmode .chips button span{color:#1f9d55;font-weight:600;}
+  .kcard table.mpt{border:1px solid #e4e4e7;border-radius:10px;} .kcard table.mpt thead th{background:#fafafa;top:var(--topH);}
+  body.mapmode .chips button.alert:not([aria-selected=true]) span{color:var(--red);}
   @media (max-width:900px){.kf-two{grid-template-columns:1fr;}}
 
   #toast{position:fixed;left:24px;bottom:24px;z-index:60;display:flex;flex-direction:column;gap:8px;}
@@ -310,19 +311,23 @@
 </section>
 
 <section class="mp" id="mapPanel" aria-label="크림 매핑 관리">
-  <div class="mp-bar">
-    <div class="chips" id="mpChips" role="tablist" aria-label="매핑 상태"></div>
-    <input type="search" id="mpQ" placeholder="품번 · 상품명 · 브랜드 검색" aria-label="품번, 상품명 또는 브랜드 검색">
-    <span class="sp"></span><span class="total num" id="mpTotal"></span>
-    <button class="btn sm" type="button" id="mpReload">새로고침</button>
-  </div>
   <div class="note" id="mpNote"></div>
-  <table class="mpt">
-    <colgroup><col><col style="width:230px"><col style="width:190px"><col style="width:110px"><col style="width:330px"></colgroup>
-    <thead><tr><th>우리 품번</th><th>크림 상품</th><th>상태</th><th>마지막 확인</th><th class="r">작업</th></tr></thead>
-    <tbody id="mpBody"></tbody>
-  </table>
-  <button class="btn more" type="button" id="mpMore" hidden>더 보기</button>
+  <form class="kcard" id="mpFilter" onsubmit="return false">
+    <h2>연결 조회</h2>
+    <div class="kf-row"><label class="kl" for="mpQ">검색어</label>
+      <input class="kin" type="search" id="mpQ" placeholder="품번 · 상품명 · 브랜드 입력" aria-label="품번, 상품명 또는 브랜드 검색"></div>
+    <div class="kact"><button class="kb" type="button" id="mpReset">초기화</button><button class="kb pri" type="submit" id="mpGo">검색</button></div>
+  </form>
+  <div class="kcard">
+    <div class="hd"><h2>연결 목록 <b class="g num" id="mpTotal"></b></h2><button class="kb sm" type="button" id="mpReload">새로고침</button></div>
+    <div class="chips" id="mpChips" role="tablist" aria-label="매핑 상태"></div>
+    <table class="mpt">
+      <colgroup><col><col style="width:230px"><col style="width:190px"><col style="width:110px"><col style="width:330px"></colgroup>
+      <thead><tr><th>우리 품번</th><th>크림 상품</th><th>상태</th><th>마지막 확인</th><th class="r">작업</th></tr></thead>
+      <tbody id="mpBody"></tbody>
+    </table>
+    <button class="btn more" type="button" id="mpMore" hidden>더 보기</button>
+  </div>
 </section>
 
 <dialog class="modal" id="mpDlg" aria-labelledby="mpDlgT">
@@ -813,7 +818,9 @@
   });
   $('mpMore').addEventListener('click',function(){ M.page++; loadList(true).catch(function(e){ M.page--; toast(e.message); }); });
   $('mpReload').addEventListener('click',function(){ reload().then(function(){ toast('목록을 새로 불러왔습니다.'); }); });
-  var qt; $('mpQ').addEventListener('input',function(e){ clearTimeout(qt); qt=setTimeout(function(){ M.q=e.target.value.trim(); M.page=1; loadList(false).catch(fail); },250); });
+  function mpSearch(){ M.q=$('mpQ').value.trim(); M.page=1; return loadList(false).catch(fail); }
+  $('mpFilter').addEventListener('submit',function(e){ e.preventDefault(); mpSearch(); });
+  $('mpReset').addEventListener('click',function(){ $('mpQ').value=''; M.status=''; renderChips(); mpSearch(); });
   $('mpOk').addEventListener('click',function(){
     var v=$('mpId').value.replace(/\D/g,''); if(!v){ $('mpErr').textContent='크림 상품번호(숫자)를 입력해 주세요.'; $('mpErr').hidden=false; $('mpId').focus(); return; }
     $('mpOk').disabled=true;
