@@ -106,7 +106,7 @@
 <script src="assets/libs/jszip-3.10.1.min.js"></script>
 <script>
 (function(){
-  const LS_W='buyest.photofinder.worker', LS_R='buyest.photofinder.results', LS_Q='buyest.photofinder.queue', LS_S='buyest.photofinder.sel';
+  const LS_W='buyest.photofinder.worker', LS_R='buyest.photofinder.results', LS_Q='buyest.photofinder.queue', LS_S='buyest.photofinder.sel', LS_H='buyest.photofinder.history';
   // 한 번에 끝까지 조회하되, 외부 사이트에 막히지 않도록 품번 사이에 3~6초(무작위)를 쉰다
   const GAP_MIN=3000, GAP_MAX=6000;
   const gap=()=>GAP_MIN+Math.random()*(GAP_MAX-GAP_MIN);
@@ -118,6 +118,7 @@
 
   let queue=lsGet(LS_Q,[]);        // [{code,color}]
   let results=lsGet(LS_R,{});      // key -> result
+  let hist=lsGet(LS_H,{});         // 조회 기록: key -> {code,color,at,...결과}. '결과 지우기'로 지워지지 않는다
   let sel=lsGet(LS_S,{});          // 체크 상태 key|세트|사진번호 -> true/false
   let running=false, stopFlag=false, flt='all';  // flt: 결과 목록에 보여 줄 상태 탭
   const key=q=>q.code+'|'+(q.color||'');
@@ -171,10 +172,21 @@
     list.forEach(q=>{const k=key(q);if(!seen.has(k)){seen.add(k);queue.push(q);}});
     // 조회 불필요(5자 미만) 미리 처리
     queue.forEach(q=>{if(norm(q.code).length<5&&!results[key(q)])results[key(q)]={status:'skip',reason:'5자 미만'};});
+    // 전에 조회해서 찾은 품번(정확·컬러명 일치·직접 확인)은 다시 검색하지 않고 기록에서 가져온다 (못 찾은 것은 다시 조회)
+    let reused=0;
+    queue.forEach(q=>{const h=hist[key(q)];if(!results[key(q)]&&h&&['exact','color','verify'].includes(h.status)){const r=Object.assign({},h);delete r.at;results[key(q)]=r;reused++;}});
     lsSet(LS_Q,queue);lsSet(LS_R,results);
     render();updateButtons();
+    if(reused)alert('전에 조회한 기록에서 '+reused+'개를 바로 가져왔습니다. (다시 찾고 싶으면 조회 기록 탭에서 확인하세요)');
   };
 
+  function saveHist(q,d){
+    hist[key(q)]=Object.assign({},d,{code:q.code,color:q.color||'',at:Date.now()});
+    const ks=Object.keys(hist);
+    if(ks.length>1500){ks.sort((a,b)=>hist[a].at-hist[b].at).slice(0,ks.length-1500).forEach(k=>delete hist[k]);}
+    lsSet(LS_H,hist);
+  }
+  const fmtAt=t=>{const d=new Date(t);const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());};
   function pending(){return queue.filter(q=>!results[key(q)]);}
   function updateButtons(){
     const n=pending().length;
@@ -224,6 +236,7 @@
         skipped++;continue;
       }
       results[key(q)]=d;
+      saveHist(q,d);
       lsSet(LS_R,results);render();done++;
       await nap(gap());
     }
@@ -237,16 +250,17 @@
     updateButtons();
   };
   $('btnStop').onclick=()=>{stopFlag=true;$('msg').textContent='멈추는 중…';if(ctrl)ctrl.abort();};
-  $('btnReset').onclick=()=>{if(!confirm('조회 결과와 품번 목록을 모두 지울까요?'))return;queue=[];results={};lsSet(LS_Q,[]);lsSet(LS_R,{});render();updateButtons();};
+  $('btnReset').onclick=()=>{if(!confirm('화면의 조회 결과와 품번 목록을 지울까요? (조회 기록 탭의 기록은 남습니다)'))return;queue=[];results={};lsSet(LS_Q,[]);lsSet(LS_R,{});render();updateButtons();};
 
   const LABEL={exact:['정확','ok'],color:['컬러명 일치(확인 권장)','warn'],verify:['직접 확인','blue'],none:['수동 필요','bad'],skip:['조회 안 함','gray']};
 
   function render(){
-    $('resultBox').style.display=queue.length?'':'none';
+    $('resultBox').style.display=(queue.length||Object.keys(hist).length)?'':'none';
     const cnt={exact:0,color:0,verify:0,none:0,skip:0,wait:0};
     const out=[];
     queue.forEach(q=>{const r=results[key(q)];if(!r)cnt.wait++;else cnt[r.status]=(cnt[r.status]||0)+1;});
     queue.forEach((q,idx)=>{
+      if(flt==='hist')return;
       const r=results[key(q)];
       if(!r){
         if(flt==='all'||flt==='wait')out.push('<div class="res"><div class="res-h"><div class="main"><div class="code">'+esc(q.code)+(q.color?' <span style="font-weight:500;color:var(--sub)">'+esc(q.color)+'</span>':'')+'</div></div><span class="chip gray">대기</span></div></div>');
@@ -278,9 +292,16 @@
       h+='</div>';
       out.push(h);
     });
+    if(flt==='hist'){
+      out.length=0;
+      Object.values(hist).sort((a,b)=>b.at-a.at).forEach(h=>{
+        const lab=LABEL[h.status]||['?','gray'];
+        out.push('<div class="res"><div class="res-h"><div class="main"><div class="code">'+esc(h.code)+(h.color?' <span style="font-weight:500;color:var(--sub)">'+esc(h.color)+'</span>':'')+'</div><div class="src">'+fmtAt(h.at)+(h.best?' · '+esc(h.best.source)+' · <a href="'+esc(h.best.page)+'" target="_blank" rel="noopener">상품페이지</a>':(h.reason?' · '+esc(h.reason):''))+'</div></div><span class="chip '+lab[1]+'">'+lab[0]+'</span></div></div>');
+      });
+    }
     $('list').innerHTML=out.join('')||'<div class="none" style="padding:14px 4px">이 분류에 해당하는 품번이 없습니다.</div>';
     const total=cnt.exact+cnt.color+cnt.verify+cnt.none+cnt.skip+cnt.wait;
-    const T=[['all','전체',total],['exact','정확',cnt.exact],['color','컬러명 일치',cnt.color],['verify','직접 확인',cnt.verify],['none','수동 필요',cnt.none],['skip','조회 안 함',cnt.skip],['wait','대기',cnt.wait]];
+    const T=[['all','전체',total],['exact','정확',cnt.exact],['color','컬러명 일치',cnt.color],['verify','직접 확인',cnt.verify],['none','수동 필요',cnt.none],['skip','조회 안 함',cnt.skip],['wait','대기',cnt.wait],['hist','조회 기록',Object.keys(hist).length]];
     $('sum').innerHTML=T.map(t=>'<button type="button" role="tab" class="tab t-'+t[0]+(flt===t[0]?' on':'')+'" aria-selected="'+(flt===t[0])+'" data-f="'+t[0]+'">'+t[1]+'<b>'+t[2]+'</b></button>').join('');
     syncChecks();
   }
@@ -296,7 +317,7 @@
       if(g)setTri(g,n,imgs.length);
     });
     setTri($('chkAll'),on,total);
-    $('btnZip').textContent='체크한 사진 zip 받기 ('+on+'장'+(flt==='all'?'':' · 현재 탭만')+')';
+    $('btnZip').textContent='체크한 사진 zip 받기 ('+on+'장'+(flt==='all'||flt==='hist'?'':' · 현재 탭만')+')';
   }
   function setBoxes(boxes,val){boxes.forEach(b=>{b.checked=val;sel[b.dataset.sk]=val;});lsSet(LS_S,sel);syncChecks();}
   $('chkAll').addEventListener('change',e=>setBoxes([...document.querySelectorAll('#list input[data-sk]')],e.target.checked));
