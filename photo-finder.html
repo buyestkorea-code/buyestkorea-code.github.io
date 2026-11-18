@@ -49,6 +49,13 @@
   .img input{margin:4px 0 0;}
   .allchk{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--sub);cursor:pointer;white-space:nowrap;user-select:none;}
   .allchk input{width:16px;height:16px;margin:0;cursor:pointer;}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px;}
+  .tab{font:700 12.5px var(--font);padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--sub);cursor:pointer;white-space:nowrap;}
+  .tab b{margin-left:4px;font-weight:800;color:var(--ink);}
+  .tab:hover{border-color:#bbb;}
+  .tab:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .tab.on{background:var(--pri);border-color:var(--pri);color:#fff;} .tab.on b{color:#fff;}
+  .tab.t-exact.on{background:var(--ok);border-color:var(--ok);} .tab.t-color.on{background:var(--warn);border-color:var(--warn);} .tab.t-verify.on{background:var(--blue);border-color:var(--blue);} .tab.t-none.on{background:var(--bad);border-color:var(--bad);}
   .none{padding:0 14px 10px;font-size:12.5px;color:var(--sub);}
 </style>
 </head>
@@ -85,7 +92,7 @@
 </div>
 
 <div class="box" id="resultBox" style="display:none;">
-  <div class="sum" id="sum"></div>
+  <div class="tabs" id="sum" role="tablist" aria-label="결과 보기"></div>
   <div class="row" style="margin-top:0;margin-bottom:10px;">
     <button class="btn btn-pri" id="btnZip">체크한 사진 zip 받기</button>
     <button class="btn btn-out" id="btnManual">수동 필요 목록 복사</button>
@@ -112,7 +119,7 @@
   let queue=lsGet(LS_Q,[]);        // [{code,color}]
   let results=lsGet(LS_R,{});      // key -> result
   let sel=lsGet(LS_S,{});          // 체크 상태 key|세트|사진번호 -> true/false
-  let running=false, stopFlag=false;
+  let running=false, stopFlag=false, flt='all';  // flt: 결과 목록에 보여 줄 상태 탭
   const key=q=>q.code+'|'+(q.color||'');
 
   $('worker').value=lsGet(LS_W,'')||'https://buyest-photo-finder.buyest.workers.dev';
@@ -238,10 +245,14 @@
     $('resultBox').style.display=queue.length?'':'none';
     const cnt={exact:0,color:0,verify:0,none:0,skip:0,wait:0};
     const out=[];
+    queue.forEach(q=>{const r=results[key(q)];if(!r)cnt.wait++;else cnt[r.status]=(cnt[r.status]||0)+1;});
     queue.forEach((q,idx)=>{
       const r=results[key(q)];
-      if(!r){cnt.wait++;return;}
-      cnt[r.status]=(cnt[r.status]||0)+1;
+      if(!r){
+        if(flt==='all'||flt==='wait')out.push('<div class="res"><div class="res-h"><div class="main"><div class="code">'+esc(q.code)+(q.color?' <span style="font-weight:500;color:var(--sub)">'+esc(q.color)+'</span>':'')+'</div></div><span class="chip gray">대기</span></div></div>');
+        return;
+      }
+      if(flt!=='all'&&flt!==r.status)return;
       const lab=LABEL[r.status]||['?','gray'];
       let h='<div class="res"><div class="res-h"><div class="main"><div class="code">'+esc(q.code)+(q.color?' <span style="font-weight:500;color:var(--sub)">'+esc(q.color)+'</span>':'')+'</div>';
       if(r.best) h+='<div class="src">'+esc(r.best.source)+' · <a href="'+esc(r.best.page)+'" target="_blank" rel="noopener">상품페이지</a> · '+esc(r.best.name||'')+'</div>';
@@ -267,12 +278,13 @@
       h+='</div>';
       out.push(h);
     });
-    $('list').innerHTML=out.join('');
-    $('sum').innerHTML=
-      '<span class="chip ok">정확 '+cnt.exact+'</span><span class="chip warn">컬러명 일치 '+cnt.color+'</span><span class="chip blue">직접 확인 '+cnt.verify+'</span>'+
-      '<span class="chip bad">수동 필요 '+cnt.none+'</span><span class="chip gray">조회 안 함 '+cnt.skip+'</span><span class="chip gray">대기 '+cnt.wait+'</span>';
+    $('list').innerHTML=out.join('')||'<div class="none" style="padding:14px 4px">이 분류에 해당하는 품번이 없습니다.</div>';
+    const total=cnt.exact+cnt.color+cnt.verify+cnt.none+cnt.skip+cnt.wait;
+    const T=[['all','전체',total],['exact','정확',cnt.exact],['color','컬러명 일치',cnt.color],['verify','직접 확인',cnt.verify],['none','수동 필요',cnt.none],['skip','조회 안 함',cnt.skip],['wait','대기',cnt.wait]];
+    $('sum').innerHTML=T.map(t=>'<button type="button" role="tab" class="tab t-'+t[0]+(flt===t[0]?' on':'')+'" aria-selected="'+(flt===t[0])+'" data-f="'+t[0]+'">'+t[1]+'<b>'+t[2]+'</b></button>').join('');
     syncChecks();
   }
+  $('sum').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)return;flt=b.dataset.f;render();});
   // 제품별 '전체' 체크와 맨 위 '전체 사진 선택'을 실제 사진 체크 상태에 맞춘다 (일부만 체크면 '—' 표시)
   function setTri(b,on,total){b.checked=total>0&&on===total;b.indeterminate=on>0&&on<total;b.disabled=total===0;}
   function syncChecks(){
@@ -284,7 +296,7 @@
       if(g)setTri(g,n,imgs.length);
     });
     setTri($('chkAll'),on,total);
-    $('btnZip').textContent='체크한 사진 zip 받기 ('+on+'장)';
+    $('btnZip').textContent='체크한 사진 zip 받기 ('+on+'장'+(flt==='all'?'':' · 현재 탭만')+')';
   }
   function setBoxes(boxes,val){boxes.forEach(b=>{b.checked=val;sel[b.dataset.sk]=val;});lsSet(LS_S,sel);syncChecks();}
   $('chkAll').addEventListener('change',e=>setBoxes([...document.querySelectorAll('#list input[data-sk]')],e.target.checked));
