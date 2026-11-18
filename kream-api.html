@@ -169,6 +169,26 @@
   .st.blue{color:var(--blue);}
   .lnk{border:0;background:none;color:var(--blue);font:inherit;font-weight:700;cursor:pointer;padding:0;text-decoration:underline;}
   .note.lock{border-left-color:var(--amber);}
+  /* ② 크림 판매자 센터 '입찰 내역 관리'와 같은 모양: 청회색 바탕·흰 카드·높이 40 컨트롤·초록 선택 표시 */
+  body.stkmode{--bg:#f3f4f6;--line:#e4e4e7;--hov:#fafafa;}
+  .kcard{background:#fff;border-radius:12px;padding:24px;margin:0 0 16px;}
+  .kcard h2{margin:0 0 16px;font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .kcard h2 .g{color:#1f9d55;font-weight:700;}
+  .kl{display:block;margin:0 0 8px;font-size:14px;color:#52525b;}
+  .kf-row{margin-bottom:16px;} .kf-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+  .kin{height:40px;width:100%;box-sizing:border-box;padding:0 12px;border:1px solid #e4e4e7;border-radius:10px;background:#fff;font:inherit;font-size:14px;}
+  .kin:focus{outline:2px solid #1f9d55;outline-offset:-1px;border-color:#1f9d55;}
+  .kradio{display:flex;gap:22px;align-items:center;height:28px;} .kradio label{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14px;} .kradio input{accent-color:#18181b;width:18px;height:18px;margin:0;}
+  .kact{display:flex;gap:10px;justify-content:center;margin-top:20px;}
+  .kb{height:40px;padding:0 20px;border:1px solid #e4e4e7;border-radius:10px;background:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;}
+  .kb:hover{background:#fafafa;} .kb.pri{background:#18181b;border-color:#18181b;color:#fff;} .kb.pri:hover{background:#3f3f46;} .kb.sm{height:36px;padding:0 14px;font-size:13px;}
+  .kcard .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;} .kcard .hd h2{margin:0;}
+  body.stkmode .chips{margin-bottom:14px;}
+  body.stkmode .chips button{height:36px;padding:0 16px;border:1px solid #e4e4e7;border-radius:20px;font-weight:500;color:#27272a;}
+  body.stkmode .chips button[aria-selected=true]{background:#f1faf4;border-color:#5bc77f;color:#1f9d55;font-weight:600;} body.stkmode .chips button[aria-selected=true] span{color:#1f9d55;}
+  body.stkmode .chips button span{color:#1f9d55;font-weight:600;}
+  .kcard table.stkt{border:1px solid #e4e4e7;border-radius:10px;} .kcard table.stkt thead th{background:#fafafa;top:var(--topH);}
+  @media (max-width:900px){.kf-two{grid-template-columns:1fr;}}
 
   #toast{position:fixed;left:24px;bottom:24px;z-index:60;display:flex;flex-direction:column;gap:8px;}
   .t{background:var(--ink);color:#fff;padding:11px 16px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);display:flex;gap:14px;align-items:center;max-width:540px;}
@@ -265,19 +285,28 @@
 </dialog>
 
 <section class="mp" id="stkPanel" aria-label="크림 재고별 관리">
-  <div class="mp-bar">
-    <div class="chips" id="stkChips" role="tablist" aria-label="재고 상태"></div>
-    <input type="search" id="stkQ" placeholder="품번 · 상품명 · 브랜드 검색" aria-label="품번, 상품명 또는 브랜드 검색">
-    <span class="sp"></span><span class="total num" id="stkTotal"></span>
-    <button class="btn sm" type="button" id="stkReload">새로고침</button>
-  </div>
   <div class="note lock" id="stkNote"></div>
-  <table class="mpt stkt">
-    <colgroup><col><col style="width:200px"><col style="width:190px"><col style="width:110px"><col style="width:170px"></colgroup>
-    <thead><tr><th>상품</th><th>옵션 (사이즈)</th><th class="r">지금 걸린 입찰</th><th class="r">우리 재고</th><th>상태</th></tr></thead>
-    <tbody id="stkBody"></tbody>
-  </table>
-  <button class="btn more" type="button" id="stkMore" hidden>더 보기</button>
+  <form class="kcard" id="stkFilter" onsubmit="return false">
+    <h2>재고별 입찰 조회</h2>
+    <div class="kf-row"><label class="kl" for="stkQ">검색어</label>
+      <input class="kin" type="search" id="stkQ" placeholder="품번 · 상품명 입력" aria-label="품번 또는 상품명 검색"></div>
+    <div class="kf-two">
+      <div><label class="kl" for="stkBrand">브랜드</label><input class="kin" type="search" id="stkBrand" placeholder="브랜드 입력" aria-label="브랜드 검색"></div>
+      <div><span class="kl">중복 입찰</span><div class="kradio" id="stkDup" role="radiogroup" aria-label="중복 입찰">
+        <label><input type="radio" name="stkdup" value="" checked>전체</label><label><input type="radio" name="stkdup" value="yes">있음</label><label><input type="radio" name="stkdup" value="no">없음</label></div></div>
+    </div>
+    <div class="kact"><button class="kb" type="button" id="stkReset">초기화</button><button class="kb pri" type="submit" id="stkGo">검색</button></div>
+  </form>
+  <div class="kcard">
+    <div class="hd"><h2>재고 목록 <b class="g num" id="stkTotal"></b></h2><button class="kb sm" type="button" id="stkReload">새로고침</button></div>
+    <div class="chips" id="stkChips" role="tablist" aria-label="재고 상태"></div>
+    <table class="mpt stkt">
+      <colgroup><col><col style="width:200px"><col style="width:190px"><col style="width:110px"><col style="width:170px"></colgroup>
+      <thead><tr><th>상품</th><th>옵션 (사이즈)</th><th class="r">지금 걸린 입찰</th><th class="r">우리 재고</th><th>상태</th></tr></thead>
+      <tbody id="stkBody"></tbody>
+    </table>
+    <button class="btn more" type="button" id="stkMore" hidden>더 보기</button>
+  </div>
 </section>
 
 <section class="mp" id="mapPanel" aria-label="크림 매핑 관리">
@@ -794,8 +823,8 @@
   $('mpId').addEventListener('keydown',function(e){ if(e.key==='Enter') $('mpOk').click(); });
 
   /* ② 재고별 관리: 크림 '재고별 입찰 관리'와 같은 단위(품번의 사이즈별 한 줄). 읽기 전용 — 이 화면은 크림으로 아무것도 보내지 않는다. */
-  var SK={filter:'',q:'',page:1,rows:[],total:0,counts:null,asksAt:0,builtAt:0,loaded:false};
-  var SCH=[['','전체','all'],['drop','정리 후보','drop'],['new','신규 후보','new'],['check','사이즈 확인','check'],['dup','중복 입찰','dup'],['keep','유지','keep']];
+  var SK={filter:'',q:'',brand:'',dup:'',page:1,rows:[],total:0,counts:null,asksAt:0,builtAt:0,loaded:false};
+  var SCH=[['','전체','all'],['drop','정리 후보','drop'],['new','신규 후보','new'],['check','사이즈 확인','check'],['keep','유지','keep']];
   function won(n){ return (+n).toLocaleString('ko-KR')+'원'; }
   function when(ts){ ts=+ts||0; if(!ts) return '아직 없음'; var d=new Date(ts*1000), p=function(x){return (x<10?'0':'')+x;}; return (d.getMonth()+1)+'월 '+d.getDate()+'일 '+p(d.getHours())+':'+p(d.getMinutes()); }
   function skChips(){
@@ -821,7 +850,7 @@
     return '<span class="st blue">신규 입찰 후보</span><div class="why2">재고는 있는데 입찰이 없어요</div>';
   }
   function skRows(){
-    if(!SK.rows.length){ $('stkBody').innerHTML='<tr><td colspan="5"><div class="empty">'+(SK.q?'검색 결과가 없습니다.<br>품번이나 브랜드를 다르게 입력해 보세요.':'이 조건의 줄이 없습니다.')+'</div></td></tr>'; }
+    if(!SK.rows.length){ $('stkBody').innerHTML='<tr><td colspan="5"><div class="empty">'+(SK.q||SK.brand||SK.dup?'검색 결과가 없습니다.<br>검색어를 바꾸거나 초기화를 눌러 보세요.':'이 조건의 줄이 없습니다.')+'</div></td></tr>'; }
     else { var prev=''; $('stkBody').innerHTML=SK.rows.map(function(r){
       var first=r.style_norm!==prev; prev=r.style_norm;
       var prod=first?'<div class="brand">'+esc(r.brand||'')+'</div><span class="big" style="font-size:14.5px">'+esc(r.style_raw)+'</span>'+(r.name?'<div class="nm">'+esc(r.name)+'</div>':'')+(+r.kream_product_id?'<div style="margin-top:3px"><a class="kid" href="https://kream.co.kr/products/'+(+r.kream_product_id)+'" target="_blank" rel="noopener">크림 '+(+r.kream_product_id)+'</a></div>':''):'';
@@ -836,7 +865,7 @@
   }
   function skSummary(){ return api({action:'stock_summary'}).then(function(j){ SK.counts=j; SK.builtAt=j.built_at; SK.asksAt=j.asks_at; skChips(); skNote(); }); }
   function skList(append){
-    return api({action:'stock_list',filter:SK.filter,q:SK.q,page:SK.page,per_page:PER}).then(function(j){ SK.rows=append?SK.rows.concat(j.rows):j.rows; SK.total=j.total; skRows(); });
+    return api({action:'stock_list',filter:SK.filter,q:SK.q,brand:SK.brand,dup:SK.dup,page:SK.page,per_page:PER}).then(function(j){ SK.rows=append?SK.rows.concat(j.rows):j.rows; SK.total=j.total; skRows(); });
   }
   function skFail(e){ $('stkBody').innerHTML='<tr><td colspan="5"><div class="empty">재고별 목록을 불러오지 못했습니다.<br>'+esc(e.message)+'</div></td></tr>'; $('stkMore').hidden=true; }
   function skBoot(){ SK.loaded=true; skSummary().then(function(){ return skList(false); }).catch(function(e){ SK.loaded=false; skFail(e); }); }
@@ -846,7 +875,16 @@
   });
   $('stkMore').addEventListener('click',function(){ SK.page++; skList(true).catch(function(e){ SK.page--; toast(e.message); }); });
   $('stkReload').addEventListener('click',function(){ skReload().then(function(){ toast('목록을 새로 불러왔습니다.'); }); });
-  var sqt; $('stkQ').addEventListener('input',function(e){ clearTimeout(sqt); sqt=setTimeout(function(){ SK.q=e.target.value.trim(); SK.page=1; skList(false).catch(skFail); },250); });
+  function skSearch(){
+    SK.q=$('stkQ').value.trim(); SK.brand=$('stkBrand').value.trim();
+    var r=document.querySelector('input[name=stkdup]:checked'); SK.dup=r?r.value:''; SK.page=1;
+    return skList(false).catch(skFail);
+  }
+  $('stkFilter').addEventListener('submit',function(e){ e.preventDefault(); skSearch(); });
+  $('stkReset').addEventListener('click',function(){
+    $('stkQ').value=''; $('stkBrand').value=''; document.querySelector('input[name=stkdup][value=""]').checked=true;
+    SK.filter=''; skChips(); skSearch();
+  });
   var h0=location.hash.replace('#','')||new URLSearchParams(location.search).get('mode')||'stock';
   setMode(h0==='map'||h0==='ops'?h0:'stock');
 })();
