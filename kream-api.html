@@ -199,6 +199,7 @@
   .selbar{display:flex;align-items:center;gap:12px;padding:10px 14px;margin:0 0 12px;background:#f4f4f5;border-radius:10px;font-weight:600;} .selmsg{color:var(--amber);font-weight:500;}
   .stkt td.ck,.stkt th:first-child{text-align:center;padding-left:10px;padding-right:0;} .stkt td.ck input,.stkt th input{width:18px;height:18px;accent-color:#18181b;}
   .selbar[hidden],.fstat:empty{display:none;}
+  .fall{margin-top:20px;padding-top:18px;border-top:1px solid #e4e4e7;} .fall .finfo{margin-bottom:12px;}
   .kin.pin{width:130px;height:34px;text-align:right;} .obtools{display:flex;gap:8px;}
   @media (max-width:900px){.kf-two{grid-template-columns:1fr;}}
 
@@ -377,6 +378,10 @@
       <input class="kin fin" type="number" id="findN" min="1" max="500" value="100" inputmode="numeric" aria-label="한 번에 찾을 품번 개수">
       <span>개</span>
       <button class="kb pri" type="button" id="findGo">자동 찾기 시작</button>
+    </div>
+    <div class="fall">
+      <p class="finfo" id="findAllInfo"></p>
+      <div class="frow"><button class="kb pri" type="button" id="findAllGo">전체 자동 찾기 시작</button><button class="kb" type="button" id="findStop" hidden>중단</button></div>
     </div>
     <p class="fstat" id="findStat" role="status" aria-live="polite"></p>
   </div>
@@ -876,15 +881,27 @@
     return api({action:'find_candidates'}).then(function(j){
       FD.max=j.max||500; $('findN').max=FD.max;
       $('findInfo').innerHTML='재고 있는 우리 품번 중 크림에서 아직 찾아보지 않은 품번이 <b class="num">'+nf(j.to_find)+'</b>개 있어요. 버튼을 누르면 서버가 크림에서 상품을 찾아 연결합니다. 크림에서 조회만 하고, 크림에는 아무것도 보내지 않아요.';
-      FD.todo=j.to_find; fdBtn();
+      FD.todo=j.to_find; FD.avg=+j.avg_sec||0.65;
+      $('findAllInfo').innerHTML=j.to_find>0
+        ? '<b>전체 자동 찾기</b>: 아직 안 찾아본 <b class="num">'+nf(j.to_find)+'</b>개를 한꺼번에 찾아요. 예상 소요 시간은 <b>'+hm(j.to_find*FD.avg)+'</b>이에요(품번 1개당 약 '+FD.avg+'초). <b>이미 연결된 상품은 다시 찾지 않고</b>, 중간에 중단해도 그때까지 찾은 것은 남아요.'
+        : '<b>전체 자동 찾기</b>: 새로 찾을 품번이 없어요.';
+      fdBtn();
     });
   }
+  function hm(sec){ sec=Math.round(sec); if(sec<60) return '1분 미만'; var m=Math.round(sec/60), h=Math.floor(m/60); m=m%60; return '약 '+(h?h+'시간 ':'')+(m||!h?m+'분':''); }
   function fdActive(j){ return !!j&&(j.status==='queued'||j.status==='running'); }
-  function fdBtn(){ $('findGo').disabled=FD.busy||!FD.todo; }
+  function fdBtn(){ $('findGo').disabled=FD.busy||!FD.todo; $('findAllGo').disabled=FD.busy||!FD.todo; }
   function fdRender(j){
     var el=$('findStat'); el.className='fstat';
     FD.busy=fdActive(j); fdBtn();
+    $('findStop').hidden=!(fdActive(j)&&j.kind!=='market');
     if(!j||j.kind==='market'){ el.textContent=''; return; }
+    if(j.kind==='findall'&&j.status==='running'){
+      var left=Math.max(0,j.req_limit-j.tried), el_=Date.now()/1000-j.started_at, rate=j.tried>=10&&el_>0?el_/j.tried:(FD.avg||0.65), pc=j.req_limit?Math.floor(j.tried*100/j.req_limit):0;
+      el.innerHTML='전체 자동 찾기 진행 중… <b class="num">'+nf(j.tried)+'</b> / <b class="num">'+nf(j.req_limit)+'</b>개 ('+pc+'%) · 남은 시간 <b>'+hm(left*rate)+'</b> · 연결 <b class="num">'+nf(j.mapped)+'</b>, 확인 필요 <b class="num">'+nf(j.ambiguous)+'</b>, 없음 <b class="num">'+nf(j.nolist)+'</b>'+(j.stop_req?' · 중단하는 중이에요…':'');
+      return;
+    }
+    if(j.status==='failed'&&j.error==='사용자가 중단했어요'){ el.textContent='중단했어요. '+nf(j.tried)+'개까지 찾았어요(연결 '+nf(j.mapped)+'개, 확인 필요 '+nf(j.ambiguous)+'개, 없음 '+nf(j.nolist)+'개). 다시 누르면 이어서 찾아요.'; return; }
     if(j.status==='queued') el.innerHTML='요청을 받았어요. 서버가 곧 시작합니다(최대 1분).';
     else if(j.status==='running') el.innerHTML='서버가 크림에서 찾는 중이에요… <b class="num">'+nf(j.tried)+'</b> / <b class="num">'+nf(j.req_limit)+'</b>개 처리(연결 <b class="num">'+nf(j.mapped)+'</b>, 확인 필요 <b class="num">'+nf(j.ambiguous)+'</b>, 없음 <b class="num">'+nf(j.nolist)+'</b>)';
     else if(j.status==='done') el.innerHTML='마지막 결과('+when(j.finished_at)+'): <b class="num">'+nf(j.tried)+'</b>개를 찾아 연결 <b class="num">'+nf(j.mapped)+'</b>개, 확인 필요 <b class="num">'+nf(j.ambiguous)+'</b>개, 크림에 없음 <b class="num">'+nf(j.nolist)+'</b>개.';
@@ -894,11 +911,14 @@
     clearTimeout(FD.timer);
     return api({action:'find_status'}).then(function(r){
       fdRender(r.job); mkRender(r.job);
-      if(fdActive(r.job)){ FD.watching=true; FD.timer=setTimeout(fdPoll,4000); }
+      if(fdActive(r.job)){
+        FD.watching=true; FD.timer=setTimeout(fdPoll,4000);
+        if(r.job.kind==='findall'&&r.job.status==='running'&&(FD.tick=(FD.tick||0)+1)%15===0) reload();   // 오래 걸리니 1분마다 목록도 새로 보여 준다
+      }
       else if(FD.watching){
         FD.watching=false;
         if(r.job&&r.job.kind==='market'){ toast('시세 읽기가 끝났어요.'); skReload(); }
-        else { toast('자동 찾기가 끝났어요.'); reload(); fdCand(); }
+        else { toast(r.job&&r.job.error==='사용자가 중단했어요'?'자동 찾기를 중단했어요.':'자동 찾기가 끝났어요.'); reload(); fdCand(); }
       }
     }).catch(function(){ FD.timer=setTimeout(fdPoll,8000); });
   }
@@ -907,6 +927,18 @@
     $('findN').value=n; FD.busy=true; fdBtn();
     api({action:'find_start',limit:n}).then(function(){ FD.watching=true; return fdPoll(); })
       .catch(function(e){ FD.busy=false; fdBtn(); toast(e.message); });
+  });
+  $('findAllGo').addEventListener('click',function(){
+    if(!FD.todo) return;
+    if(!confirm('아직 안 찾아본 '+nf(FD.todo)+'개를 모두 찾습니다. 예상 소요 시간은 '+hm(FD.todo*(FD.avg||0.65))+'이에요.\n이미 연결된 상품은 다시 찾지 않고, 중간에 중단할 수 있어요. 시작할까요?')) return;
+    FD.busy=true; fdBtn();
+    api({action:'find_all_start'}).then(function(){ FD.watching=true; return fdPoll(); })
+      .catch(function(e){ FD.busy=false; fdBtn(); toast(e.message); });
+  });
+  $('findStop').addEventListener('click',function(){
+    $('findStop').disabled=true;
+    api({action:'find_stop'}).then(function(){ toast('중단을 요청했어요. 지금 찾는 품번까지 마치고 멈춰요.'); return fdPoll(); })
+      .catch(function(e){ toast(e.message); }).then(function(){ $('findStop').disabled=false; });
   });
   function findRow(n){ return M.rows.filter(function(r){return r.style_norm===n;})[0]; }
   function act(a,n,btn){
