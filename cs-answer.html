@@ -182,7 +182,7 @@ const NARROW = () => window.matchMedia('(max-width:1180px)').matches;
 let CARDS = [], FILTER = 'todo', SHOWN = 80, STOCKFN = null, FILENAME = '';
 let MODE = LS.get('cs.mode', 'xls'); if(MODE !== 'tt' && MODE !== 'xls') MODE = 'xls';
 const SEL = { xls: null, tt: null };
-const TT = { state: 'wait', threads: [], strip: [], me: '', lock: '', counts: { wait: 0, hold: 0, mine: 0, replied: 0, done: 0 }, data: null, x: {}, timer: null, cfg: null, sending: false, ready: false, err: '' };
+const TT = { sig: {}, state: 'wait', threads: [], strip: [], me: '', lock: '', counts: { wait: 0, hold: 0, mine: 0, replied: 0, done: 0 }, data: null, x: {}, timer: null, cfg: null, sending: false, ready: false, err: '' };
 let SHOWN_KEY = '';   // 가운데 칸에 지금 그려진 대화 (MODE:key)
 
 /* ---------- 인증 · 개인정보 가리기 · 학습 저장소 ---------- */
@@ -316,6 +316,9 @@ async function tapi(action, payload, timeout){
   return d;
 }
 const ttWho = k => '고객 …' + String(k).slice(-4);
+const TT_NICK = {};   // 고객 식별값 → 닉네임(고객이 동의한 경우만 서버가 알고 있다)
+const ttName = k => TT_NICK[k] || ttWho(k);
+const ttLabel = t => t.nick ? t.nick + (t.product ? ' · ' + t.product : '') : (t.product || ttWho(t.user_key));
 const TT_STATE = { wait: '답변 필요', hold: '보류', replied: '답변함', done: '완료' };
 const FAQ_TYPES = [['', '전체 유형'], ['auth', '정품 문의'], ['restock', '재입고'], ['pack', '선물포장·쇼핑백'], ['as', 'A/S·수선'], ['price', '가격·할인'], ['ret', '반품·교환·취소'], ['stock', '재고 확인'], ['sameday', '당일 발송'], ['ship', '배송·출고'], ['meas', '실측 치수'], ['sizerec', '사이즈 추천'], ['mat', '소재·디테일']];
 function ttTail(msgs){ const ins = []; for(let i = msgs.length - 1; i >= 0; i--){ if(msgs[i].dir === 'in') ins.unshift(msgs[i]); else break; } return ins; }
@@ -344,6 +347,7 @@ async function ttRefresh(){
     if(st.configured){
       const d = await tapi('threads', { state: TT.state, limit: 60 });
       TT.threads = d.items; TT.ready = true;
+      d.items.forEach(t => { if(t.nick) TT_NICK[t.user_key] = t.nick; });
       TT.strip = TT.state === 'wait' ? d.items : (await tapi('threads', { state: 'wait', limit: 20 })).items;
       ttNotifyCheck(TT.strip, st.counts.wait);
       $('connMsg').className = 'okc'; $('connMsg').textContent = '톡톡 연결됨 · 마지막 수신 ' + (st.last_event ? tm(st.last_event) : '아직 없음');
@@ -359,6 +363,7 @@ async function ttOpen(key, quiet){
   catch(e){ if(!quiet){ $('center').innerHTML = `<div class="empty"><b>대화를 불러오지 못했어요</b><br>${esc(e.message)}</div>`; } return; }
   if(SEL.tt !== key && quiet) return;   // 그 사이 다른 대화로 옮겼다면 버린다
   SEL.tt = key; TT.data = d;
+  if(d.nick) TT_NICK[key] = d.nick; else delete TT_NICK[key];
   if(d.owner && d.owner !== TT.me){ TT.lock = d.owner; }
   else { try{ await tapi('claim', { user_key: key }); TT.lock = ''; d.owner = TT.me; }catch(e){ TT.lock = (e.data && e.data.owner) || '다른 직원'; } }
   let x = TT.x[key];
@@ -371,7 +376,9 @@ async function ttOpen(key, quiet){
     const ta = $('draft'); if(ta && !x.edited && !x.aiUsed && ta.value !== x.text){ ta.value = x.text; fit(ta); count(); }
     const nq = $('nq'); if(nq) nq.hidden = !x.newQ;
     ttApplyLock();
-  } else { renderCenter(); renderInfo(); }
+    const sig = (d.nick || '') + '|' + (d.nick_state || '');
+    if(TT.sig[key] !== sig){ TT.sig[key] = sig; renderInfo(); }   // 고객 이름이 새로 들어왔으면 오른쪽 정보를 다시 그린다
+  } else { renderCenter(); renderInfo(); TT.sig[key] = (d.nick || '') + '|' + (d.nick_state || ''); }
   renderList(); renderStrip();
 }
 function ttApplyLock(){
@@ -393,6 +400,13 @@ function ttTitle(n){
   try{
     const d = window.top.document; if(TT_BASE_TITLE === null) TT_BASE_TITLE = d.title.replace(/^\(\d+\)\s*/, '');
     d.title = (n ? '(' + n + ') ' : '') + TT_BASE_TITLE;
+    // 탭 제목을 못 보는 경우를 위해 왼쪽 메뉴 항목에도 빨간 숫자를 붙인다
+    const b = d.querySelector('[data-nav="csAnswerTest"]');
+    if(b){
+      let s = b.querySelector('.ttbadge');
+      if(n){ if(!s){ s = d.createElement('span'); s.className = 'ttbadge'; s.style.cssText = 'background:#b42318;color:#fff;border-radius:99px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px;'; b.insertBefore(s, b.querySelector('.navst')); } s.textContent = String(n); }
+      else if(s) s.remove();
+    }
   }catch(_){}
 }
 function notiBtnUpdate(){ const b = $('notiBtn'); if(b) b.hidden = !('Notification' in window) || Notification.permission !== 'default'; }
@@ -415,7 +429,7 @@ function renderStrip(){
   const el = $('strip');
   if(MODE !== 'tt' || !TT.ready || !TT.strip.length){ el.hidden = true; return; }
   el.hidden = false;
-  el.innerHTML = TT.strip.map(t => `<button class="stab hot${t.user_key === SEL.tt ? ' on' : ''}" type="button" data-open="${esc(t.user_key)}"><b>${esc(t.product || ttWho(t.user_key))}</b><span>${t.owner ? esc(t.owner) + ' 담당 · ' : ''}${esc(t.last_q)}</span></button>`).join('');
+  el.innerHTML = TT.strip.map(t => `<button class="stab hot${t.user_key === SEL.tt ? ' on' : ''}" type="button" data-open="${esc(t.user_key)}"><b>${esc(ttLabel(t))}</b><span>${t.owner ? esc(t.owner) + ' 담당 · ' : ''}${esc(t.last_q)}</span></button>`).join('');
 }
 
 /* ---------- 화면 ---------- */
@@ -445,7 +459,7 @@ function renderList(){
     const q = $('search').value.trim().toLowerCase();
     const rows = TT.threads.filter(t => !q || (t.last_q + ' ' + t.product).toLowerCase().includes(q));
     list.innerHTML = !TT.ready ? '' : (rows.map(t => `<button class="row s-${esc(t.state)}${t.user_key === SEL.tt ? ' on' : ''}" type="button" data-open="${esc(t.user_key)}">
-      <div class="r1"><b>${esc(t.product || ttWho(t.user_key))}</b><time>${esc(tm(t.last_in || t.last))}</time></div>
+      <div class="r1"><b>${esc(ttLabel(t))}</b><time>${esc(tm(t.last_in || t.last))}</time></div>
       <div class="r2">${esc(t.last_q)}</div><div class="r3">${esc(TT_STATE[t.state] || '')} · 고객 메시지 ${t.n_in}개${t.owner ? ' · ' + esc(t.owner) + ' 담당' : ''}</div></button>`).join('')
       || `<div class="empty">${TT.state === 'wait' ? '답변이 필요한 문의가 없어요.' : '표시할 대화가 없어요.'}</div>`);
     return;
@@ -507,7 +521,7 @@ function renderCenter(){
   let head;
   if(tt){
     const p = d && d.product;
-    head = `<div class="chead"><button class="btn btn-out sm back" type="button" data-act="back">← 목록</button><div class="ttl"><b>${esc(p && p.name ? p.name : ttWho(x.key))}</b><div>${p && p.name ? esc(ttWho(x.key)) + (p.price ? ' · ' + esc(p.price) : '') + (p.url ? ` · <a href="${esc(p.url)}" target="_blank" rel="noopener">상품 페이지</a>` : '') : '상품 페이지가 아닌 곳에서 시작한 대화'}</div></div><span class="st-badge ${esc(d ? d.state : '')}">${esc(TT_STATE[d && d.state] || '')}</span>${TT.lock ? `<span class="own other">${esc(TT.lock)} 담당</span>` : '<span class="own">내가 맡음</span>'}${d && (d.state === 'done' || d.state === 'hold') ? '<button class="btn btn-out sm" type="button" data-act="reopen">다시 열기</button>' : ''}</div>`;
+    head = `<div class="chead"><button class="btn btn-out sm back" type="button" data-act="back">← 목록</button><div class="ttl"><b>${esc(TT_NICK[x.key] || (p && p.name ? p.name : ttWho(x.key)))}</b><div>${p && p.name ? esc(TT_NICK[x.key] ? p.name : ttWho(x.key)) + (p.price ? ' · ' + esc(p.price) : '') + (p.url ? ` · <a href="${esc(p.url)}" target="_blank" rel="noopener">상품 페이지</a>` : '') : '상품 페이지가 아닌 곳에서 시작한 대화'}</div></div><span class="st-badge ${esc(d ? d.state : '')}">${esc(TT_STATE[d && d.state] || '')}</span>${TT.lock ? `<span class="own other">${esc(TT.lock)} 담당</span>` : '<span class="own">내가 맡음</span>'}${d && (d.state === 'done' || d.state === 'hold') ? '<button class="btn btn-out sm" type="button" data-act="reopen">다시 열기</button>' : ''}</div>`;
   } else {
     head = `<div class="chead"><button class="btn btn-out sm back" type="button" data-act="back">← 목록</button><div class="ttl"><b>${esc(x.r.shop)}</b><div>${esc(x.r.prod || '')}</div></div><span class="tag t-${c.kind}">${KIND[c.kind]}</span><button class="no" type="button" data-act="copyno" data-no="${esc(x.r.no)}" title="사방넷에서 찾을 때 쓰는 문의 번호 (누르면 복사)">#${esc(x.r.no || x.r.idx)}</button></div>`;
   }
@@ -596,7 +610,9 @@ function renderInfo(){
   const tt = MODE === 'tt', d = TT.data, p = tt && d && d.product, mk = x.c.measKey || CSAnswer.measKey(x.r.prod), ms = mk ? measOf(mk) : '';
   const past = (tt && d.past) || [];
   const cust = tt ? `<details class="sec" open><summary>고객 정보</summary><div class="body">
-      <div class="kv"><span>고객</span><span>${esc(ttWho(x.key))}</span></div>
+      <div class="kv"><span>이름</span><span>${TT_NICK[x.key] ? esc(TT_NICK[x.key]) : (d.nick_state === 'asked' ? '고객 동의를 기다리는 중' : '아직 몰라요')}</span></div>
+      ${TT_NICK[x.key] ? '' : (d.nick_state === 'asked' ? '' : `<div class="actr" style="margin:2px 0 4px"><button class="btn btn-out sm" type="button" data-act="profileask">이름 불러오기</button><span class="hint">고객 화면에 동의 확인창이 떠요</span></div>`)}
+      <div class="kv"><span>고객 번호</span><span>${esc(ttWho(x.key).replace('고객 ', ''))}</span></div>
       <div class="kv"><span>첫 문의</span><span>${esc(tm(d.first_at))}</span></div>
       <div class="kv"><span>고객 메시지</span><span>${d.n_all}개</span></div>
       <div class="kv"><span>분류</span><span>${esc(x.c.label)}</span></div>
@@ -780,6 +796,12 @@ document.addEventListener('click', async e => {
   if(act === 'copy') return doCopy(x);
   if(act === 'send') return doSend(x);
   if(act === 'ok'){ setDone(x, !DONE[x.key]); renderCenter(); renderList(); return; }
+  if(act === 'profileask'){
+    if(!confirm('고객 화면에 "개인정보 제공 동의" 확인창이 떠요. 이름을 불러올까요?')) return;
+    try{ await tapi('profile_ask', { user_key: x.key }); st('요청했어요. 고객이 동의하면 이름이 나와요', false); if(TT.data) TT.data.nick_state = 'asked'; renderInfo(); }
+    catch(err){ st(err.message, true); }
+    return;
+  }
   if(act === 'imgpanel'){ const p = $('imgPanel'); if(p){ p.hidden = !p.hidden; if(!p.hidden) tplLoad(); } return; }
   if(act === 'tpladd'){ const f = $('tplFile'); if(f) f.click(); return; }
   if(act === 'tplsend') return tplSend(+t.dataset.id);
