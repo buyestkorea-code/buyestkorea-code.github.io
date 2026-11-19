@@ -108,10 +108,43 @@
   var RANGES = { 'BUYMA': { lo: 0.93, hi: 1.10, jpy: true } };
   // 주 배수 외에 정상으로 인정하는 배수 (KREAM: 등록가 1.17 / 행사가 0.96)
   var ALT_MULTS = { 'KREAM': [0.96] };
-  function rangeOf(mall) {
-    var k, u = String(mall || '').toUpperCase();
-    for (k in RANGES) if (u.indexOf(k) === 0) return RANGES[k];
+  function rangeOf(mall, ranges) {
+    var k, u = String(mall || '').toUpperCase(), R = ranges || RANGES;
+    for (k in R) if (u.indexOf(k) === 0) return R[k];
     return null;
+  }
+
+  // 화면 '몰별 기준 설정'의 출발값. 사장님이 화면에서 고치면 브라우저에 저장된 값이 우선한다.
+  // mults(배수) · alts(배수 외에 정상으로 보는 배수) · round('r10' 10원 반올림 / 'c100' 100원 올림) · note(메모)
+  var DEFAULT_NOTES = {
+    '11번가': '협의표: 필웨이*1.05', '스마트스토어': '협의표: 필웨이*1.17', 'KREAM': '등록가 ×1.17 / 행사가 ×0.96도 정상',
+    '쿠팡': '협의표: 필웨이*0.92', '트렌비': '협의표: 필웨이*0.94', '롯데온': '협의표: 필웨이*1.09',
+    '삼성카드쇼핑': '협의표: 필웨이*0.88, 100원 단위 올림', '웰스토리몰2.0(메인몰)': '협의표: 필웨이*0.88, 100원 단위 올림',
+    '카카오톡쇼핑': '협의표: 필웨이*0.87', '한스타일': '협의표: 필웨이*0.97', '발란': '협의표: 필웨이*1.2',
+    '머스트잇아울렛': '협의표: 필웨이*0.85', 'SSG 사이먼': '협의표: 필웨이*0.92', '페칭': '협의표: 상시 ×0.82 / 행사 ×0.79'
+  };
+  var EXTRA_DEFAULTS = { '카카오톡쇼핑': 0.87, '한스타일': 0.97, '발란': 1.2, '머스트잇아울렛': 0.85, 'SSG 사이먼': 0.92, '페칭': 0.82 };
+  function defaultConfig() {
+    var malls = [], k, seen = {};
+    function add(name, mult) {
+      if (seen[name]) return; seen[name] = 1;
+      malls.push({ name: name, mult: mult, alts: (ALT_MULTS[name] || []).slice(), round: isCeil100(name) ? 'c100' : 'r10', note: DEFAULT_NOTES[name] || '' });
+    }
+    for (k in DEFAULT_MULTS) add(k, DEFAULT_MULTS[k]);
+    for (k in EXTRA_DEFAULTS) add(k, EXTRA_DEFAULTS[k]);
+    for (k in malls) if (malls[k].name === '페칭') malls[k].alts = [0.79];
+    return { costRate: COST_RATE, tol: TOLERANCE, malls: malls, ranges: { 'BUYMA': { lo: 0.93, hi: 1.10, jpy: true } } };
+  }
+  // 설정(cfg) → check()에 넘길 값들
+  function fromConfig(cfg) {
+    var mults = {}, alts = {}, ceil = {};
+    (cfg.malls || []).forEach(function (m) {
+      if (!m.name) return;
+      mults[m.name] = (m.mult === '' || m.mult == null) ? null : Number(m.mult);
+      alts[m.name] = (m.alts || []).filter(function (x) { return x > 0; });
+      ceil[m.name] = m.round === 'c100';
+    });
+    return { mults: mults, tol: cfg.tol, opts: { costRate: cfg.costRate, alts: alts, ceil: ceil, ranges: cfg.ranges } };
   }
 
   // 상태: ok 정상 · bad 가격 다름 · unmapped 미매핑(기준가 없음) · hold 보류(배수 비움/환율 없음)
@@ -120,15 +153,17 @@
   function check(rows, mults, tol, opts) {
     tol = tol == null ? TOLERANCE : tol;
     opts = opts || {};
+    var costRate = opts.costRate > 0 ? opts.costRate : COST_RATE;
+    var ALTS = opts.alts || ALT_MULTS;
     return rows.map(function (r) {
       var o = {}, k;
       for (k in r) o[k] = r[k];
       var unmapped = r.code === UNMAPPED_CODE || !r.cost;
-      o.base = r.cost ? r.cost / COST_RATE : 0;
+      o.base = r.cost ? r.cost / costRate : 0;
       o.payRate = r.price ? r.pay / r.price : 0;
       if (unmapped) { o.status = 'unmapped'; return o; }
 
-      var rg = rangeOf(r.mall);
+      var rg = rangeOf(r.mall, opts.ranges);
       if (rg) {
         o.mult = null; o.range = [rg.lo, rg.hi];
         if (!opts.jpyKrw) { o.status = 'hold'; o.note = '엔 환율이 없어 검증 못 함'; return o; }
@@ -150,7 +185,8 @@
       if (o.mult == null) { o.status = 'hold'; return o; }
       function expectFor(mult) {
         var raw = o.base * mult;
-        return isCeil100(r.mall) ? Math.ceil(raw / 100 - 1e-9) * 100 : Math.round(raw / 10) * 10;
+        var useCeil = (mk != null && opts.ceil) ? !!opts.ceil[mk] : isCeil100(r.mall);
+        return useCeil ? Math.ceil(raw / 100 - 1e-9) * 100 : Math.round(raw / 10) * 10;
       }
       o.expect = expectFor(o.mult);
       o.diff = r.price - o.expect;
@@ -159,7 +195,7 @@
       else if (q2 > 1 && Math.abs(r.price - o.expect * q2) <= tol * q2) { o.status = 'ok'; o.note = '수량 ' + q2 + '개 합계가'; }
       else {
         o.status = 'bad';
-        var alts = (mk != null && ALT_MULTS[mk]) || [], a;
+        var alts = (mk != null && ALTS[mk]) || [], a;
         for (a = 0; a < alts.length; a++) {
           var ex = expectFor(alts[a]);
           if (Math.abs(r.price - ex) <= tol) { o.status = 'ok'; o.note = '행사가 ×' + alts[a]; o.diff = r.price - ex; break; }
@@ -179,6 +215,6 @@
     return s;
   }
 
-  return { COST_RATE: COST_RATE, TOLERANCE: TOLERANCE, UNMAPPED_CODE: UNMAPPED_CODE, DEFAULT_MULTS: DEFAULT_MULTS, mallNote: mallNote, resolveMall: resolveMall, RANGES: RANGES, ALT_MULTS: ALT_MULTS, rangeOf: rangeOf,
+  return { COST_RATE: COST_RATE, TOLERANCE: TOLERANCE, UNMAPPED_CODE: UNMAPPED_CODE, DEFAULT_MULTS: DEFAULT_MULTS, mallNote: mallNote, defaultConfig: defaultConfig, fromConfig: fromConfig, resolveMall: resolveMall, RANGES: RANGES, ALT_MULTS: ALT_MULTS, rangeOf: rangeOf,
            parseOrders: parseOrders, check: check, summarize: summarize };
 });
