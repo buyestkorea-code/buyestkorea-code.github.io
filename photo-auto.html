@@ -248,7 +248,7 @@
   <button class="btn btn-out" id="dl" disabled title="상세페이지 이미지(_00)만 저장">JPG 저장</button>
   <button class="btn btn-out" id="dla" disabled title="상세페이지(_00) + 다른 팀에 넘기는 3컷(_0012 · _01_ · _02_)을 ZIP 하나로 한 번에 저장">JPG 전체 저장</button>
   <button class="btn btn-out" id="dlp" disabled title="글자는 글자 레이어, 사진·박스는 각각 레이어로 저장">PSD 저장</button>
-  <button class="btn btn-pri" id="dlz" disabled title="완성된 JPG + PSD + 엑셀(사이트 등록 칸 · 정보 · 실측표까지 전부)을 ZIP 하나로 저장합니다. 엑셀은 다음에 ② 파일 칸에 올리면 값이 그대로 다시 채워져요">JPEG+PSD+엑셀 저장</button>
+  <button class="btn btn-pri" id="dlz" disabled title="완성된 JPG + 잘라낸 사진 3컷(_0012 · _01_ · _02_) + PSD + 엑셀(사이트 등록 칸 · 정보 · 실측표까지 전부)을 ZIP 하나로 저장합니다. 엑셀은 다음에 ② 파일 칸에 올리면 값이 그대로 다시 채워져요">JPEG+PSD+엑셀 저장</button>
   <label class="hint" style="margin-left:6px"><input type="checkbox" id="guides" checked> 가이드선 (사진 칸·중앙선)</label>
   <span id="status" class="hint"></span>
 </div>
@@ -1444,14 +1444,17 @@ $('dlp').addEventListener('click',function(){
 $('dlz').addEventListener('click',function(){
   if(!state.last||!state.canvas) return; applyPending();
   if(!window.JSZip||!window.PhotoRegister){ $('status').textContent='ZIP 도구를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.'; return; }
-  var b=$('dlz'), old=$('status').textContent, code=codeOf(), zip=new JSZip(); b.disabled=true; $('status').textContent='JPEG · PSD · 엑셀 만드는 중…';
+  var b=$('dlz'), old=$('status').textContent, code=codeOf(), zip=new JSZip(); b.disabled=true; $('status').textContent='JPEG · 잘라낸 사진 · PSD · 엑셀 만드는 중…';
+  var p1=state.photos[0], p2=state.photos[1]||state.photos[0], cuts=[[960,1280,'_0012.jpg',p1],[1000,1000,'_01_.jpg',p1],[1000,1000,'_02_.jpg',p2]], ci=0;
+  function nextCut(){ if(ci>=cuts.length) return Promise.resolve(); var c=cuts[ci++]; $('status').textContent='잘라낸 사진 만드는 중… ('+ci+'/'+cuts.length+')'; return cutCanvas(c[3],c[0],c[1]).then(encodeJpeg).then(function(j){ zip.file(code+c[2],j); }).then(nextCut); }
   encodeJpeg(state.canvas).then(function(j){ zip.file(code+'_00.jpg',j); })
+  .then(nextCut)
   .then(function(){ return loadScript('assets/libs/ag-psd-28.2.2.bundle.js'); })
   .then(function(){ return new Promise(function(r){setTimeout(r,30);}); })
   .then(function(){ zip.file(code+'.psd',buildPsd()); })
   .then(function(){ return PhotoRegister.xlsxBlob(); })
   .then(function(x){ zip.file('상품정보_'+code+'.xlsx',x); $('status').textContent='ZIP 묶는 중…'; return zip.generateAsync({type:'blob',compression:'STORE'}); })
-  .then(function(z){ saveBlob(z,code+'_완성.zip'); $('status').textContent='저장했어요: '+code+'_완성.zip (JPG · PSD · 엑셀)'; })
+  .then(function(z){ saveBlob(z,code+'_완성.zip'); $('status').textContent='저장했어요: '+code+'_완성.zip (JPG · 잘라낸 사진 3장 · PSD · 엑셀)'; })
   .catch(function(e){ $('status').textContent='저장 실패: '+e.message; console.error(e); })
   .then(function(){ b.disabled=false; });
 });
