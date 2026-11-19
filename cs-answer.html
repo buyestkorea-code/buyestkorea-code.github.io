@@ -323,8 +323,15 @@ function ttMakeX(key, d){
   const tail = ttTail(d.messages), q = tail.filter(m => m.kind === 'text').map(m => m.text).join('\n');
   const r = { no: 'tt' + (tail.length ? tail[tail.length - 1].id : 0), idx: 0, shop: '네이버톡톡', prod: (d.product && d.product.name) || '', q, title: '', a: '', ans: '', date: '' };
   let c;
-  try{ c = CSAnswer.classify(r, { stock: STOCKFN, meas: measOf }); }
-  catch(_){ c = { kind: 'manual', intent: 'etc', label: '기타', slot: null, buttons: [], stock: null, note: '', build: function(){ return ''; } }; }
+  const plain = label => ({ kind: 'manual', intent: 'etc', label, slot: null, buttons: [], stock: null, note: '', build: function(){ return ''; } });
+  // 고객의 새 질문이 없는 대화(우리가 마지막으로 답한 상태)는 "내용 없는 플랫폼 알림"이 아니다 → 입력창·보류·완료·이미지 버튼이 그대로 있어야 한다
+  if(!q){ c = plain('새 고객 질문 없음'); }
+  else{
+    try{ c = CSAnswer.classify(r, { stock: STOCKFN, meas: measOf }); }
+    catch(_){ c = plain('기타'); }
+    // 톡톡 채팅에는 "플랫폼 공지" 분류가 없다. 엉뚱하게 분류돼도 답할 수 있게 일반 문의로 돌린다
+    if(c.kind === 'platform') c = plain(c.label || '기타');
+  }
   const slotVal = c.slot ? (c.slot.value || '') : '';
   const t0 = q && c.kind !== 'platform' ? CSAnswer.applySlot(c, slotVal) : '';
   return { r, c, key, slotVal, text: t0, machine: t0, aiUsed: false, edited: false, tailLen: tail.length, hasQ: !!q };
