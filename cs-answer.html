@@ -320,6 +320,12 @@ const TT_NICK = {};   // 고객 식별값 → 닉네임(고객이 동의한 경�
 const ttName = k => TT_NICK[k] || ttWho(k);
 const ttLabel = t => t.nick ? t.nick + (t.product ? ' · ' + t.product : '') : (t.product || ttWho(t.user_key));
 const TT_STATE = { wait: '답변 필요', hold: '보류', replied: '답변함', done: '완료' };
+const REQ_PHRASES = [
+  { label: '주문번호·성함 요청', text: '정확한 확인을 위해 주문번호 또는 주문자 성함을 알려 주시면 바로 확인해 드리겠습니다.' },
+  { label: '연락처 요청', text: '확인 후 안내드릴 수 있도록 연락 가능한 연락처를 남겨 주시면 감사하겠습니다.' },
+  { label: '사진 요청', text: '상품 상태 확인을 위해 사진을 보내 주시면 확인 후 안내드리겠습니다.' },
+  { label: '상품 확인 요청', text: '문의하시는 상품의 상품명이나 상품 페이지 링크를 알려 주시면 정확히 확인해 드리겠습니다.' }
+];
 const FAQ_TYPES = [['', '전체 유형'], ['auth', '정품 문의'], ['restock', '재입고'], ['pack', '선물포장·쇼핑백'], ['as', 'A/S·수선'], ['price', '가격·할인'], ['ret', '반품·교환·취소'], ['stock', '재고 확인'], ['sameday', '당일 발송'], ['ship', '배송·출고'], ['meas', '실측 치수'], ['sizerec', '사이즈 추천'], ['mat', '소재·디테일']];
 function ttTail(msgs){ const ins = []; for(let i = msgs.length - 1; i >= 0; i--){ if(msgs[i].dir === 'in') ins.unshift(msgs[i]); else break; } return ins; }
 function ttMakeX(key, d){
@@ -538,6 +544,7 @@ function renderCenter(){
       ${c.note && (x.hasQ !== false) ? `<p class="note">${esc(c.note)}</p>` : ''}<p class="note ainote${x.aiWarn ? ' warn' : ''}" id="ainote">${esc(x.aiNote || '')}</p>
       ${slot}<textarea id="draft" placeholder="${tt && x.hasQ === false ? '답할 새 질문이 없어요. 이어서 말할 내용을 쓰세요' : '직접 쓰거나 ✨ AI 초안을 눌러 보세요'}">${esc(x.text)}</textarea>
       ${snips ? `<div class="snip">${snips}</div>` : ''}
+      ${tt ? `<div class="snip"><span class="hint" style="align-self:center">고객에게 요청</span>${REQ_PHRASES.map((p, i) => `<button class="btn btn-out sm" type="button" data-act="reqphrase" data-i="${i}">+ ${esc(p.label)}</button>`).join('')}</div>` : ''}
       ${tt ? '<div class="imgpanel" id="imgPanel" hidden></div>' : ''}
       <div class="actr"><button class="btn btn-ai" type="button" data-act="ai" id="aiBtn">✨ AI 초안</button><button class="btn btn-out" type="button" data-act="redo">↺ 초안 다시</button>${tt ? '<button class="btn btn-out" type="button" data-act="imgpanel">🖼 이미지</button>' : ''}<span class="hint" id="st"></span>
         <span class="sp"><span class="cnt" id="cnt"></span>${tt ? '<button class="btn btn-out" type="button" data-act="hold">보류</button><button class="btn btn-out" type="button" data-act="done">상담 완료</button>' : ''}${primary}</span></div>
@@ -610,8 +617,8 @@ function renderInfo(){
   const tt = MODE === 'tt', d = TT.data, p = tt && d && d.product, mk = x.c.measKey || CSAnswer.measKey(x.r.prod), ms = mk ? measOf(mk) : '';
   const past = (tt && d.past) || [];
   const cust = tt ? `<details class="sec" open><summary>고객 정보</summary><div class="body">
-      <div class="kv"><span>이름</span><span>${TT_NICK[x.key] ? esc(TT_NICK[x.key]) : (d.nick_state === 'asked' ? '고객 동의를 기다리는 중' : '아직 몰라요')}</span></div>
-      ${TT_NICK[x.key] ? '' : (d.nick_state === 'asked' ? '' : `<div class="actr" style="margin:2px 0 4px"><button class="btn btn-out sm" type="button" data-act="profileask">이름 불러오기</button><span class="hint">고객 화면에 동의 확인창이 떠요</span></div>`)}
+      <div class="kv"><span>닉네임</span><span>${TT_NICK[x.key] ? esc(TT_NICK[x.key]) : (d.nick_state === 'asked' ? '고객 동의를 기다리는 중' : '아직 몰라요')}</span></div>
+      ${TT_NICK[x.key] ? '' : (d.nick_state === 'asked' ? '' : `<div class="actr" style="margin:2px 0 4px"><button class="btn btn-out sm" type="button" data-act="profileask">닉네임 불러오기</button><span class="hint">고객 화면에 동의 확인창이 떠요</span></div>`)}
       <div class="kv"><span>고객 번호</span><span>${esc(ttWho(x.key).replace('고객 ', ''))}</span></div>
       <div class="kv"><span>첫 문의</span><span>${esc(tm(d.first_at))}</span></div>
       <div class="kv"><span>고객 메시지</span><span>${d.n_all}개</span></div>
@@ -796,8 +803,9 @@ document.addEventListener('click', async e => {
   if(act === 'copy') return doCopy(x);
   if(act === 'send') return doSend(x);
   if(act === 'ok'){ setDone(x, !DONE[x.key]); renderCenter(); renderList(); return; }
+  if(act === 'reqphrase'){ const p = REQ_PHRASES[+t.dataset.i]; if(p && $('draft')) setDraft(x, appendBody($('draft').value, p.text), true); return; }
   if(act === 'profileask'){
-    if(!confirm('고객 화면에 "개인정보 제공 동의" 확인창이 떠요. 이름을 불러올까요?')) return;
+    if(!confirm('고객 화면에 "개인정보 제공 동의" 확인창이 떠요. 닉네임을 불러올까요?')) return;
     try{ await tapi('profile_ask', { user_key: x.key }); st('요청했어요. 고객이 동의하면 이름이 나와요', false); if(TT.data) TT.data.nick_state = 'asked'; renderInfo(); }
     catch(err){ st(err.message, true); }
     return;
