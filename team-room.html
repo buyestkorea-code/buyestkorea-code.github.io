@@ -296,7 +296,7 @@
           <div class="composer-foot"><span class="sp"></span><button class="btn pri" id="aiSend">AI 직원에게 보내기</button></div>
         </div>
         <div class="card" id="aiNoCreate" hidden><div class="empty">아직 AI 직원에게 시킬 수 있는 계정이 아니에요.<br>시험이 끝나면 열어드릴게요.</div></div>
-        <div class="card sec"><div class="ch"><h2>요청 목록</h2></div><div id="aiList"></div></div>
+        <div class="card sec"><div class="ch"><h2>요청 목록</h2><span class="sp"></span><button class="btn" id="aiClear" type="button">끝난 요청 모두 지우기</button></div><div id="aiList"></div></div>
       </div>
       <div class="card" id="aiDetail"><div class="empty">왼쪽 목록에서 요청을 고르면<br>진행 상황이 여기에 보여요.</div></div>
     </div>
@@ -711,6 +711,7 @@
       if(j.body) html += '<label class="f">요청 내용</label><div class="box">' + h(j.body) + '</div>';
       if(j.result && j.status !== 'needs_manual') html += '<label class="f">결과</label><div class="box">' + h(j.result) + '</div>';
       if(j.status === 'queued') html += '<div class="row" style="margin-bottom:18px;"><button class="btn bad" id="aiCancel">요청 취소</button></div>';
+      if(/^(done|failed|rejected|cancelled)$/.test(j.status)) html += '<div class="row" style="margin-bottom:18px;"><button class="btn bad" id="aiDel">이 요청 지우기</button></div>';
       html += '<label class="f">진행 기록</label><ul class="tl">' + r.events.map(function(e){ return '<li class="e-' + h(e.level) + '"><time>' + h(e.at.slice(5, 16)) + '</time>' + h(e.msg) + '</li>'; }).join('') + '</ul></div>';
       d.innerHTML = html;
       // 버튼은 "지금 화면에 그려진 작업"(jid)에 묶는다. 목록에서 다른 작업을 눌러도 엉뚱한 작업이 승인되지 않게.
@@ -718,9 +719,23 @@
       var bind = function(id, fn){ var el = $(id); if(el) el.addEventListener('click', fn); };
       bind('aiOk', function(){ aiDecide(jid, 'approve'); }); bind('aiNo', function(){ aiDecide(jid, 'reject'); });
       bind('aiResume', function(){ aiApi('aj_resume', {id:jid}).then(function(r){ if(r && r.ok){ toast('알겠어요. AI 직원이 처음부터 다시 확인하고 이어서 진행해요'); aiRefresh(); } else toast((r && r.error) || '이어가지 못했어요', true); }); });
+      bind('aiDel', function(){
+        if(!confirm('이 요청과 진행 기록을 지울까요? 되돌릴 수 없어요.')) return;
+        aiApi('aj_delete', {id:jid}).then(function(r){
+          if(r && r.ok){ toast('지웠어요'); if(aiSel === jid){ aiSel = 0; $('aiDetail').innerHTML = '<div class="empty">왼쪽 목록에서 요청을 고르면<br>진행 상황이 여기에 보여요.</div>'; } aiRefresh(); }
+          else toast((r && r.error) || '지우지 못했어요', true);
+        });
+      });
       bind('aiCancel', function(){ aiApi('aj_cancel', {id:jid}).then(function(r){ if(r && r.ok){ toast('취소했어요'); aiRefresh(); } else toast((r && r.error) || '취소하지 못했어요', true); }); });
     });
   }
+  $('aiClear').addEventListener('click', function(){
+    if(!confirm('내가 요청한 것 중 끝난 요청(완료·실패·거절·취소)을 모두 지울까요?\n진행 중이거나 승인을 기다리는 요청은 지우지 않아요. 되돌릴 수 없어요.')) return;
+    aiApi('aj_clear', {}).then(function(r){
+      if(r && r.ok){ toast(r.deleted ? (r.deleted + '건 지웠어요') : '지울 요청이 없어요'); aiSel = 0; $('aiDetail').innerHTML = '<div class="empty">왼쪽 목록에서 요청을 고르면<br>진행 상황이 여기에 보여요.</div>'; aiRefresh(); }
+      else toast((r && r.error) || '지우지 못했어요', true);
+    });
+  });
   function aiDecide(id, dec){
     aiApi('aj_decide', {id:id, decision:dec}).then(function(r){
       if(r && r.ok){ toast(dec === 'approve' ? '승인했어요. AI 직원이 이어서 진행해요' : '거절했어요'); aiRefresh(); }
