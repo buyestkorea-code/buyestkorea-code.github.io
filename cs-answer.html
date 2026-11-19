@@ -136,7 +136,7 @@
       <button class="mode" type="button" id="modeBtnTt" role="tab" data-mode="tt">네이버 톡톡 실시간 <span class="pill" id="ttPill"></span></button>
       <button class="mode" type="button" id="modeBtnXls" role="tab" data-mode="xls">사방넷 문의 엑셀 <span class="pill" id="xlsPill"></span></button>
     </div>
-    <div class="status"><span id="connMsg"></span><span class="asof" id="stockMsg"></span><span class="learn" id="learnMsg"></span></div>
+    <div class="status"><button class="btn btn-out sm" id="notiBtn" type="button" hidden title="새 문의가 오면 소리와 알림을 보내요">🔔 알림 켜기</button><span id="connMsg"></span><span class="asof" id="stockMsg"></span><span class="learn" id="learnMsg"></span></div>
   </header>
   <div class="strip" id="strip" hidden></div>
   <div class="cols" id="cols" data-view="list">
@@ -345,7 +345,8 @@ async function ttRefresh(){
       const d = await tapi('threads', { state: TT.state, limit: 60 });
       TT.threads = d.items; TT.ready = true;
       TT.strip = TT.state === 'wait' ? d.items : (await tapi('threads', { state: 'wait', limit: 20 })).items;
-      $('connMsg').className = 'okc'; $('connMsg').textContent = '톡톡 연결됨 · 마지막 수신 ' + (st.last_event ? tm(st.last_event) : '아직 없음') + (st.handover ? '' : ' · 파트너센터 대기목록 연동 꺼짐');
+      ttNotifyCheck(TT.strip, st.counts.wait);
+      $('connMsg').className = 'okc'; $('connMsg').textContent = '톡톡 연결됨 · 마지막 수신 ' + (st.last_event ? tm(st.last_event) : '아직 없음');
     } else { TT.ready = false; $('connMsg').className = 'warn'; $('connMsg').textContent = '톡톡 연결 전'; }
   }catch(e){ TT.err = e.message; $('connMsg').className = 'warn'; $('connMsg').textContent = '톡톡 문의를 불러오지 못했어요: ' + e.message; }
   if(MODE !== 'tt') return;
@@ -379,6 +380,37 @@ function ttApplyLock(){
   if(sh) sh.disabled = !!TT.lock || TT.sending;
   const ip = $('imgPanel'); if(ip && !ip.hidden && TT.tpls) tplRender();
 }
+/* ----- 새 문의 알림 (소리 · 브라우저 알림 · 창 제목 숫자) ----- */
+function ttBeep(){
+  try{
+    const c = TT.ac || (TT.ac = new (window.AudioContext || window.webkitAudioContext)()); if(c.state === 'suspended') c.resume();
+    [0, .22].forEach(dt => { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = dt ? 1175 : 880; o.connect(g); g.connect(c.destination);
+      const t = c.currentTime + dt; g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.22, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + .3); o.start(t); o.stop(t + .32); });
+  }catch(_){}
+}
+let TT_BASE_TITLE = null;
+function ttTitle(n){
+  try{
+    const d = window.top.document; if(TT_BASE_TITLE === null) TT_BASE_TITLE = d.title.replace(/^\(\d+\)\s*/, '');
+    d.title = (n ? '(' + n + ') ' : '') + TT_BASE_TITLE;
+  }catch(_){}
+}
+function notiBtnUpdate(){ const b = $('notiBtn'); if(b) b.hidden = !('Notification' in window) || Notification.permission !== 'default'; }
+async function notiEnable(){
+  try{ if(TT.ac && TT.ac.state === 'suspended') TT.ac.resume(); ttBeep(); if('Notification' in window) await Notification.requestPermission(); }catch(_){}
+  notiBtnUpdate();
+}
+function ttNotifyCheck(list, waitCount){
+  const keys = new Set(list.map(t => t.user_key + '|' + t.last_in));
+  if(TT.seen){
+    const fresh = list.filter(t => !TT.seen.has(t.user_key + '|' + t.last_in));
+    if(fresh.length){
+      ttBeep();
+      try{ if('Notification' in window && Notification.permission === 'granted'){ const n = new Notification('새 톡톡 문의 ' + fresh.length + '건', { body: fresh[0].last_q, tag: 'tt-new', renotify: true }); n.onclick = () => { try{ window.focus(); window.top.focus(); }catch(_){} n.close(); }; } }catch(_){}
+    }
+  }
+  TT.seen = keys; ttTitle(waitCount); notiBtnUpdate();
+}
 function renderStrip(){
   const el = $('strip');
   if(MODE !== 'tt' || !TT.ready || !TT.strip.length){ el.hidden = true; return; }
@@ -393,14 +425,12 @@ function setMode(m){
   $('modeBtnTt').setAttribute('aria-selected', String(m === 'tt')); $('modeBtnXls').setAttribute('aria-selected', String(m === 'xls'));
   $('xlsTools').hidden = m !== 'xls'; $('shopSel').hidden = m !== 'xls'; $('fileMsg').hidden = m !== 'xls';
   $('cols').dataset.view = 'list'; SHOWN_KEY = '';
-  if(TT.timer){ clearInterval(TT.timer); TT.timer = null; }
   if(m === 'tt'){
     (async () => {
       if(!STOCKFN) await loadStock();
       if(!LEARN_ON) await initLearn();
       await ttRefresh();
     })();
-    TT.timer = setInterval(() => { if(document.visibilityState === 'visible' && MODE === 'tt') ttRefresh(); }, 20000);
   }
   renderAll();
 }
@@ -732,6 +762,7 @@ document.addEventListener('click', async e => {
   const chipEl = e.target.closest('[data-chip]');
   if(chipEl){ const x = curX(); if(x){ x.slotVal = chipEl.dataset.chip; const s = $('slot'); if(s) s.value = x.slotVal; if(!x.edited){ x.text = CSAnswer.applySlot(x.c, x.slotVal); x.machine = x.text; setDraft(x, x.text, false); } } return; }
   const t = e.target.closest('button'); if(!t) return;
+  if(t.id === 'notiBtn') return notiEnable();
   if(t.dataset.mode) return setMode(t.dataset.mode);
   if(t.dataset.filter){ if(MODE === 'tt'){ TT.state = t.dataset.filter; SEL.tt = null; TT.data = null; await ttRefresh(); renderCenter(); renderInfo(); } else { FILTER = t.dataset.filter; SHOWN = 80; renderList(); } return; }
   if(t.dataset.open) return openItem(t.dataset.open);
@@ -785,6 +816,10 @@ document.addEventListener('keydown', e => {
   if(authInfo()){ initLearn(); }
   else learnMsg('학습 저장소 꺼짐 — 툴킷에 로그인하세요', true);
   setMode(MODE);
+  // 다른 메뉴나 탭에 있어도 새 문의를 놓치지 않게, 이 화면이 열려 있는 동안은 항상 20초마다 확인해 알린다
+  if(MODE !== 'tt' && authInfo()) ttRefresh();
+  TT.timer = setInterval(() => { if(authInfo() && !TT.sending) ttRefresh(); }, 20000);
+  notiBtnUpdate();
 })();
 </script>
 <script src="paste-upload.js"></script>
