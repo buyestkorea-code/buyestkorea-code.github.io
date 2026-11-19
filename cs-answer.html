@@ -360,7 +360,7 @@ async function ttOpen(key, quiet){
   if(SHOWN_KEY === 'tt:' + key && $('msgs')){
     const box = $('msgs'), atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
     box.innerHTML = msgsHtml(); if(atBottom) box.scrollTop = box.scrollHeight;
-    const ta = $('draft'); if(ta && !x.edited && !x.aiUsed && ta.value !== x.text){ ta.value = x.text; fit(ta); }
+    const ta = $('draft'); if(ta && !x.edited && !x.aiUsed && ta.value !== x.text){ ta.value = x.text; fit(ta); count(); }
     const nq = $('nq'); if(nq) nq.hidden = !x.newQ;
     ttApplyLock();
   } else { renderCenter(); renderInfo(); }
