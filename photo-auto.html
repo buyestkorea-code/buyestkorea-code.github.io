@@ -807,6 +807,7 @@ function fitPhoto(c,px,py,raw){
   var s=Math.min(PHOTO_MAX_W/cw, SLOT_H/ch);
   if(s>1.25){ s=1.25; warn='해상도 낮음('+cw+'px)'; }
   px=px||100; py=py||px; if(px!==100||py!==100) full=false;
+  if(state.season && !raw) full=false; /* 시즌변경으로 가져온 사진은 여백 없이 꽉 차 있어 '꽉 참' 으로 처리되던 것 → 일반 사진처럼 정사각 틀(653) 안에 가운데로 넣는다 */
   var tw=Math.max(1,Math.round(cw*s*px/100)), th=Math.max(1,Math.round(ch*s*py/100));
   return {c:resizeFrom(c,b[0],b[1],cw,ch,tw,th), w:tw, h:th, full:full, warn:warn};
 }

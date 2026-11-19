@@ -99,7 +99,8 @@ function hashCanvas(c){
   return h.toString(36)+'_'+c.width+'x'+c.height;
 }
 function isFixed(w,h){
-  if(w>=700 && h>=800) return true; /* 가로 꽉 찬 긴 안내(반품·각인 등). 가로 700 이상이어도 높이가 낮으면 사진일 수 있다 */
+  /* 가로 꽉 찬 '긴' 안내(반품·각인 등)만 고정. 세로 1000 미만은 세로로 큰 사진(예: 716×841 안쪽 컷)일 수 있어 사진으로 가져온다 — 사진 누락 방지 */
+  if(w>=690 && h>=1000) return true;
   return FIXED_SIZES.some(function(s){ return Math.abs(s[0]-w)<=3 && Math.abs(s[1]-h)<=3; });
 }
 
