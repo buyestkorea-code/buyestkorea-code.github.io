@@ -109,11 +109,31 @@ function build(ExcelJS,v){
   cell('F37','예) 핏 | 레귤러핏',"note"); cell('F38','예) 세탁방법 | 드라이클리닝','note');
 
   /* ===== 4. 실측표 (템플릿에 실측표가 있을 때만) — 읽기는 register.js parseSheet1Detail 의 '사이즈 ↓' 규칙 ===== */
-  if(v.sizeCols&&v.sizeCols.length){
+  if(v.sizeTable&&v.sizeTable.length>1){
+    /* 완성 엑셀: 화면에 입력한 실측표를 값까지 그대로 (6열 넘는 표는 아래 '상세' 시트에만 — 이 칸 폭이 6열까지) */
+    var stb=v.sizeTable, scols=Math.max.apply(null,stb.map(function(r){return r.length;}))-1;
+    if(scols>=1&&scols<=6){
+      cell('C44','실측표 (cm)','title'); cell('D44','▼ 화면 ③에 입력한 실측표 — 다시 ②에 올리면 그대로 채워져요','note');
+      cell('C45','사이즈 ↓','label');
+      for(var hi=0;hi<scols;hi++) cell(COLS[hi]+'45',str(stb[0][hi+1]),'label');
+      stb.slice(1).forEach(function(row,j){ var r=46+j; cell('C'+r,str(row[0]),'label'); for(var ci=0;ci<scols;ci++) cell(COLS[ci]+r,str(row[ci+1]),'input'); });
+    }
+  } else if(v.sizeCols&&v.sizeCols.length){
     cell('C44','실측표 (cm)','title'); cell('D44','▼ 사이즈별 실측값을 적으세요. 비워 둔 칸은 화면 ③에서 직접 입력해도 돼요','note');
     cell('C45','사이즈 ↓ '+(v.sizeCorner||''),'label');
     v.sizeCols.slice(0,6).forEach(function(h,i){ cell(COLS[i]+'45',h,'label'); });
     (v.sizeRows||[]).slice(0,10).forEach(function(sz,j){ var r=46+j; cell('C'+r,sz,'label'); v.sizeCols.slice(0,6).forEach(function(h,i){ cell(COLS[i]+r,'','input'); }); });
+  }
+
+  /* ===== 완성 엑셀: '상세' 시트(전체 값·실측표 그대로) — 읽기는 register.js parseInfoWorkbook 의 '상세' 시트 규칙 ===== */
+  if(v.completed){
+    var wd=wb.addWorksheet('상세'), rows=[['항목','값']];
+    [['상품명(입력)',v.pname],['브랜드한글',v.brandKo],['카테고리',v.categoryWord],['수입여부',v.imported],['제조년월',v.mfg],['색상',v.color],['구성품',v.parts],['수납공간',v.storage]].forEach(function(r){ if(r[1]) rows.push([r[0],r[1]]); });
+    Object.keys(v.extras||{}).forEach(function(k){ if(v.extras[k]) rows.push([k,v.extras[k]]); });
+    rows.push([]); rows.push(['실측표']);
+    (v.sizeTable||[]).forEach(function(r){ rows.push(r); });
+    rows.forEach(function(r,ri){ r.forEach(function(c,ci){ if(c!==''&&c!=null){ var x=wd.getCell(ri+1,ci+1); x.value=String(c); x.font={name:'맑은 고딕',size:10,bold:ri===0||(ci===0&&ri>0&&!(v.sizeTable||[]).length)}; } }); });
+    wd.getColumn(1).width=28; wd.getColumn(2).width=40;
   }
 
   /* ===== 참고 메뉴 목록 (J~L열) — 복사해서 붙여넣기용 ===== */
@@ -129,13 +149,16 @@ function build(ExcelJS,v){
 function loadScript(src){
   return new Promise(function(res,rej){ var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=function(){ rej(new Error('엑셀 도구를 불러오지 못했어요')); }; document.head.appendChild(s); });
 }
-function download(v,filename){
+function buffer(v){
   var p=root.ExcelJS?Promise.resolve():loadScript('assets/libs/exceljs-4.4.0.min.js');
-  return p.then(function(){ return build(root.ExcelJS,v).xlsx.writeBuffer(); }).then(function(buf){
+  return p.then(function(){ return build(root.ExcelJS,v).xlsx.writeBuffer(); });
+}
+function download(v,filename){
+  return buffer(v).then(function(buf){
     var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
     a.download=filename||'상품정보_기본양식.xlsx'; document.body.appendChild(a); a.click(); a.remove();
   });
 }
 root.PhotoSizeSort=sortSizes;
-root.PhotoTemplate={build:build,download:download,REF:REF,DETAIL_ROWS:DETAIL_ROWS,KEY_OF:KEY_OF};
+root.PhotoTemplate={build:build,buffer:buffer,download:download,REF:REF,DETAIL_ROWS:DETAIL_ROWS,KEY_OF:KEY_OF};
 })(typeof window!=='undefined'?window:globalThis);

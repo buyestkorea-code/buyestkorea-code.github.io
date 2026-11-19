@@ -248,6 +248,7 @@
   <button class="btn btn-out" id="dl" disabled title="상세페이지 이미지(_00)만 저장">JPG 저장</button>
   <button class="btn btn-out" id="dla" disabled title="상세페이지(_00) + 다른 팀에 넘기는 3컷(_0012 · _01_ · _02_)을 ZIP 하나로 한 번에 저장">JPG 전체 저장</button>
   <button class="btn btn-out" id="dlp" disabled title="글자는 글자 레이어, 사진·박스는 각각 레이어로 저장">PSD 저장</button>
+  <button class="btn btn-pri" id="dlz" disabled title="완성된 JPG + PSD + 엑셀(사이트 등록 칸 · 정보 · 실측표까지 전부)을 ZIP 하나로 저장합니다. 엑셀은 다음에 ② 파일 칸에 올리면 값이 그대로 다시 채워져요">JPEG+PSD+엑셀 저장</button>
   <label class="hint" style="margin-left:6px"><input type="checkbox" id="guides" checked> 가이드선 (사진 칸·중앙선)</label>
   <span id="status" class="hint"></span>
 </div>
@@ -1352,7 +1353,7 @@ $('go').addEventListener('click',function(){
   if(state.chartMode!=='full'){}
   else if(!chart.given) warns.push('★ 실측 입력 필요 — 실측 칸을 채우고 다시 만드세요');
   else if(sizeHasEmpty(chart)) warns.push('★ 실측 표에 비어 있는 칸이 있습니다 — 채우고 다시 만드세요');
-  btn.disabled=true; $('dl').disabled=true; $('dla').disabled=true; $('dlp').disabled=true; $('applyBtn').disabled=true; state.ov=(state.pending&&state.pending.ov)||{}; $('status').textContent='만드는 중…';
+  btn.disabled=true; $('dl').disabled=true; $('dla').disabled=true; $('dlp').disabled=true; $('dlz').disabled=true; $('applyBtn').disabled=true; state.ov=(state.pending&&state.pending.ov)||{}; $('status').textContent='만드는 중…';
 
   Promise.all([loadFonts(),loadStatic()]).then(function(){
     var seq=[], i=0;
@@ -1379,7 +1380,7 @@ $('go').addEventListener('click',function(){
     showPreview(); $('editHint').style.display='block';
     $('status').textContent='완료: '+W+' × '+c.height+' px · 사진 '+state.photos.length+'장';
     state.genId=(state.genId||0)+1;
-    state.stale=false; $('dl').disabled=false; $('dla').disabled=false; $('dlp').disabled=false; setApplyBtn(); showWarns(warns); queueSave(300);
+    state.stale=false; $('dl').disabled=false; $('dla').disabled=false; $('dlp').disabled=false; $('dlz').disabled=false; setApplyBtn(); showWarns(warns); queueSave(300);
     if(window.PhotoRegister) PhotoRegister.onGenerated();
   }).catch(function(e){ $('status').textContent='실패: '+e.message; console.error(e); }).then(function(){ btn.disabled=false; });
 });
@@ -1438,6 +1439,21 @@ $('dlp').addEventListener('click',function(){
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},4000);
     $('status').textContent=old;
   }).catch(function(e){ $('status').textContent='PSD 저장 실패: '+e.message; console.error(e); }).then(function(){ b.disabled=false; });
+});
+
+$('dlz').addEventListener('click',function(){
+  if(!state.last||!state.canvas) return; applyPending();
+  if(!window.JSZip||!window.PhotoRegister){ $('status').textContent='ZIP 도구를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.'; return; }
+  var b=$('dlz'), old=$('status').textContent, code=codeOf(), zip=new JSZip(); b.disabled=true; $('status').textContent='JPEG · PSD · 엑셀 만드는 중…';
+  encodeJpeg(state.canvas).then(function(j){ zip.file(code+'_00.jpg',j); })
+  .then(function(){ return loadScript('assets/libs/ag-psd-28.2.2.bundle.js'); })
+  .then(function(){ return new Promise(function(r){setTimeout(r,30);}); })
+  .then(function(){ zip.file(code+'_00.psd',buildPsd()); })
+  .then(function(){ return PhotoRegister.xlsxBlob(); })
+  .then(function(x){ zip.file('상품정보_'+code+'.xlsx',x); $('status').textContent='ZIP 묶는 중…'; return zip.generateAsync({type:'blob',compression:'STORE'}); })
+  .then(function(z){ saveBlob(z,code+'_완성.zip'); $('status').textContent='저장했어요: '+code+'_완성.zip (JPG · PSD · 엑셀)'; })
+  .catch(function(e){ $('status').textContent='저장 실패: '+e.message; console.error(e); })
+  .then(function(){ b.disabled=false; });
 });
 
 /* ---------- 작업 내역 서버 보관(30일) ---------- */
@@ -1884,6 +1900,7 @@ window.PhotoAuto={
   infoRows:function(){ return state.infoRows; },
   setField:function(k,v){ if(fld(k)){ fld(k).value=v; state.dirty[k]=true; mark(); } },
   sizeText:function(){ return $('size').value.trim(); },
+  pname:function(){ return $('pname').value.trim(); },
   xlSummary:function(t){ $('xSum').textContent=t||''; },
   readF:readF, sizeTableRows:sizeTableRows, encodeJpeg:encodeJpeg,
   sizeIncomplete:function(){ if(state.chartMode!=='full') return false; var ch=buildSizeChart(); return !ch.given || sizeHasEmpty(ch); },
@@ -1910,8 +1927,11 @@ window.PhotoAuto={
   },
   /* 엑셀 '상세' 시트의 값으로 정보칸·실측표 채우기 */
   applyDetail:function(kv,table){
+    /* 완성 엑셀에 들어 있는 상품명(입력칸)은 칸이 비어 있을 때만 채운다 */
+    if(kv&&kv['상품명(입력)']&&!$('pname').value.trim()){ $('pname').value=kv['상품명(입력)']; $('pname').dispatchEvent(new Event('input',{bubbles:true})); }
     Object.keys(kv||{}).forEach(function(k){
       if(!kv[k]) return;
+      if(k==='상품명(입력)') return;
       if(k==='실측'){ if(!$('table').value.trim()){ $('size').value=kv[k]; gridSet(gridFromText()); } return; }
       if(!fld(k)){ ensureField(k); if(state.infoRows&&state.infoRows.indexOf(k)<0) setInfoRows(state.infoRows.concat([k])); }
       fld(k).value=kv[k]; state.dirty[k]=true;

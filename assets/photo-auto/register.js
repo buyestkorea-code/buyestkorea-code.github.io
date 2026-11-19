@@ -96,7 +96,7 @@ function parseSheet1Detail(XLSX,ws){
       if(n){
         table.push(hdr);
         for(var rr=r+1;rr<=last;rr++){   /* 사이즈 줄 수 제한 없음(예전엔 12줄까지만 읽어 11 사이즈가 잘렸음) */
-          var sz=cellStr(ws,'C'+rr); if(!sz||sz.length>20) continue;
+          var sz=cellStr(ws,'C'+rr); if(!sz||sz.length>40) continue;
           var row=[sz]; for(c=0;c<n;c++) row.push(cellStr(ws,COLS[c]+rr)); table.push(row);
         }
         any=true;
@@ -141,7 +141,8 @@ function collect(){
     extras:(function(){ var o={}, base=['상품명','브랜드한글','상단브랜드','브랜드','카테고리','수입여부','제조년월','색상','제조국','구성품','수납공간','소재']; Object.keys(f).forEach(function(k){ if(base.indexOf(k)<0) o[k]=f[k]; }); return o; })(),
     sizeText:PA.sizeText?PA.sizeText():'',
     brandKo:f['브랜드한글'],categoryWord:f['카테고리'],imported:f['수입여부'],mfg:f['제조년월'],color:f['색상'],parts:f['구성품'],storage:f['수납공간'],
-    sizeTable:PA.sizeTableRows()};
+    sizeTable:PA.sizeTableRows(),
+    completed:true,pname:PA.pname?PA.pname():'',infoRows:PA.infoRows?PA.infoRows():null};
 }
 function fill(v){
   if(v.brand!=null) $('rBrand').value=v.brand;
@@ -160,6 +161,10 @@ function keyOf(){
   return JSON.stringify([c.pname,c.genId,collect(),c.photos.slice(0,2).map(function(p){return p.file.name+p.file.size;})]);
 }
 
+/* 완성 엑셀(사이트 등록 칸 + 정보 + 실측표 + 상품명)의 파일 내용. JPEG+PSD+엑셀 ZIP 에서도 쓴다 */
+function xlsxBlob(){
+  return root.PhotoTemplate.buffer(collect()).then(function(buf){ return new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); });
+}
 function downloadXlsx(){
   var v=collect();
   root.PhotoTemplate.download(v,'상품정보_'+(PA.ctx()?PA.ctx().code:'양식')+'.xlsx').catch(function(e){ msg(e.message,'bad'); });
@@ -335,6 +340,7 @@ function init(){
 }
 root.PhotoRegister={
   init:init,
+  xlsxBlob:xlsxBlob,
   setTier:function(i,name,values,keepReal){ var n=$('rT'+i+'n'); if(!n) return; if(!n.value.trim()) n.value=name; $('rT'+i+'v').value=sortCsv(values).join(','); if(!keepReal) $('rT'+i+'s').value=csv($('rT'+i+'s').value).filter(function(x){ return values.indexOf(x)>=0; }).join(','); invalidate(); },   /* keepReal=true: '실제 입고된 값'은 건드리지 않는다 */
   onGenerated:function(){ invalidate(); $('rResult').style.display='none'; if(R.auth) msg('이미지가 준비됐어요. 아래 정보를 확인하고 [미리보기]를 누르세요.'); },
   onXlsx:function(file){
