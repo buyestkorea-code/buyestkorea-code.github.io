@@ -199,6 +199,8 @@
   .selbar{display:flex;align-items:center;gap:12px;padding:10px 14px;margin:0 0 12px;background:#f4f4f5;border-radius:10px;font-weight:600;} .selmsg{color:var(--amber);font-weight:500;}
   .stkt td.ck,.stkt th:first-child{text-align:center;padding-left:10px;padding-right:0;} .stkt td.ck input,.stkt th input{width:18px;height:18px;accent-color:#18181b;}
   .selbar[hidden],.fstat:empty{display:none;}
+  .polprev{margin:4px 0 12px;padding:12px 14px;background:#f4f4f5;border-radius:10px;line-height:1.6;} .polprev:empty{display:none;} .polprev .h{color:var(--faint);}
+  .lnk.sel-style{font-size:12px;font-weight:600;margin-left:8px;}
   .fall{margin-top:20px;padding-top:18px;border-top:1px solid #e4e4e7;} .fall .finfo{margin-bottom:12px;}
   .kin.pin{width:110px;height:34px;text-align:right;} .man{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:5px;} .man .lnk{font-size:12.5px;font-weight:600;} .pr2.oor{color:var(--red);font-weight:600;} .obtools{display:flex;gap:8px;}
   @media (max-width:900px){.kf-two{grid-template-columns:1fr;}}
@@ -327,7 +329,7 @@
       <div class="kact"><button class="kb" type="button" id="stkReset">초기화</button><button class="kb pri" type="submit" id="stkGo">검색</button></div>
     </form>
     <div class="kcard">
-      <div class="hd"><h2>재고 목록 <b class="g num" id="stkTotal"></b></h2><button class="kb sm" type="button" id="stkReload">새로고침</button></div>
+      <div class="hd"><h2>재고 목록 <b class="g num" id="stkTotal"></b></h2><span class="obtools"><button class="kb sm" type="button" id="stkAddAll" title="지금 조건에 나온 줄 중 새 입찰가가 정해진 줄을 모두 송신 대기함에 담아요">이 조건 전체 담기</button><button class="kb sm" type="button" id="stkReload">새로고침</button></span></div>
       <div class="chips" id="stkChips" role="tablist" aria-label="재고 상태"></div>
       <div class="selbar" id="stkAct" hidden><span id="stkSelTxt"></span><button class="kb pri sm" type="button" id="stkAdd">송신 대기함에 담기</button><span class="selmsg" id="stkAddMsg" role="status"></span></div>
       <table class="mpt stkt">
@@ -341,7 +343,7 @@
   <div id="stkOutView" hidden>
     <div class="kcard">
       <div class="hd"><h2>송신 대기함 <b class="g num" id="obTotal"></b></h2>
-        <span class="obtools"><button class="kb sm" type="button" id="obClear">전체 비우기</button><button class="kb sm" type="button" id="oxSend" disabled title="송신은 잠겨 있어요. 사장님이 열겠다고 하실 때까지 크림으로 아무것도 보내지 않습니다.">크림으로 송신 (잠김)</button></span></div>
+        <span class="obtools"><button class="kb sm" type="button" id="obCsv" title="엑셀에서 열 수 있는 CSV 파일로 저장해요">엑셀(CSV)로 내보내기</button><button class="kb sm" type="button" id="obClear">전체 비우기</button><button class="kb sm" type="button" id="oxSend" disabled title="송신은 잠겨 있어요. 사장님이 열겠다고 하실 때까지 크림으로 아무것도 보내지 않습니다.">크림으로 송신 (잠김)</button></span></div>
       <p class="finfo">여기에 담긴 가격은 <b>아직 크림에 올라가지 않았어요.</b> 송신은 잠겨 있고, 담은 목록만 보관됩니다.</p>
       <table class="mpt stkt">
         <colgroup><col><col style="width:150px"><col style="width:140px"><col style="width:140px"><col style="width:140px"><col style="width:110px"></colgroup>
@@ -364,6 +366,7 @@
       <label class="radio"><input type="radio" name="polBelow" value="floor"><div><b>허용선 가격으로 입찰</b><span>기준가 −N% 가격으로 입찰해요.</span></div></label>
       <label class="radio"><input type="radio" name="polBelow" value="base"><div><b>기준가로 입찰</b><span>사이트 판매가 그대로 입찰해요.</span></div></label>
     </div>
+    <div class="polprev" id="polPrev" aria-live="polite"></div>
     <div class="h" id="polErr" style="color:var(--red);font-weight:600" hidden></div>
   </div>
   <div class="df"><span class="sp"></span><button class="btn" data-close>취소</button><button class="btn pri" id="polOk">저장</button></div>
@@ -1032,7 +1035,7 @@
     if(!SK.rows.length){ $('stkBody').innerHTML='<tr><td colspan="9"><div class="empty">'+(SK.q||SK.brand||SK.dup?'검색 결과가 없습니다.<br>검색어를 바꾸거나 초기화를 눌러 보세요.':'이 조건의 줄이 없습니다.')+'</div></td></tr>'; }
     else { var prev=''; $('stkBody').innerHTML=SK.rows.map(function(r){
       var first=r.style_norm!==prev; prev=r.style_norm;
-      var prod=first?'<div class="brand">'+esc(r.brand||'')+'</div><span class="big" style="font-size:14.5px">'+esc(r.style_raw)+'</span>'+(r.name?'<div class="nm">'+esc(r.name)+'</div>':'')+(+r.kream_product_id?'<div style="margin-top:3px"><a class="kid" href="https://kream.co.kr/products/'+(+r.kream_product_id)+'" target="_blank" rel="noopener">크림 '+(+r.kream_product_id)+'</a></div>':''):'';
+      var prod=first?'<div class="brand">'+esc(r.brand||'')+'</div><span class="big" style="font-size:14.5px">'+esc(r.style_raw)+'</span>'+(r.name?'<div class="nm">'+esc(r.name)+'</div>':'')+(+r.kream_product_id?'<div style="margin-top:3px"><a class="kid" href="https://kream.co.kr/products/'+(+r.kream_product_id)+'" target="_blank" rel="noopener">크림 '+(+r.kream_product_id)+'</a> <button class="lnk sel-style" type="button" data-s="'+esc(r.style_norm)+'">이 상품 전체 선택</button></div>':''):'';
       var opt=r.option_name===''?'<div class="opt">'+esc(r.our_size)+'</div><div class="opt2">'+(r.state==='check'?'우리 사이즈 · 크림 표기와 달라요':'크림 입찰 없음')+'</div>':'<div class="opt">'+esc(r.option_name)+'</div><div class="opt2">'+(r.state==='keep'?'우리 사이즈 '+esc(r.our_size):(r.state==='new'?'우리 사이즈 '+esc(r.our_size)+' · 크림 입찰 없음':(r.state==='check'?'크림 표기 · 우리 사이즈와 달라요':'우리 재고 없음')))+'</div>';
       var n=+r.ask_count, pr=n>0?'<div class="pr">'+won(r.min_price)+(+r.max_price>+r.min_price?' ~ '+won(r.max_price):'')+(n>1?'<span class="dupt">중복</span>':'')+'</div><div class="pr2">입찰 '+n+'건</div>':'<span class="zero">-</span>';
       var q=+r.our_qty, qty=q>0?'<span class="num" style="font-weight:700">'+q.toLocaleString('ko-KR')+'</span>':'<span class="zero">0</span>';
@@ -1141,10 +1144,51 @@
       box.querySelector('.pin').focus(); return;
     }
     var a=e.target.closest('.man-add'); if(a){ manAdd(a); return; }
-    var c=e.target.closest('.man-cancel'); if(c){ skRows(); }
+    var c=e.target.closest('.man-cancel'); if(c){ skRows(); return; }
+    var ss=e.target.closest('.sel-style'); if(ss){
+      var boxes=[].slice.call(document.querySelectorAll('#stkBody .skchk')).filter(function(b){ return b.dataset.k.indexOf(ss.dataset.s+'|')===0; });
+      if(!boxes.length) return;
+      var all=boxes.every(function(b){ return b.checked; });
+      boxes.forEach(function(b){ b.checked=!all; SK.sel[b.dataset.k]=!all; });
+      $('stkAddMsg').textContent=''; skSelBar();
+    }
   });
   document.addEventListener('keydown',function(e){
     if(e.key==='Enter'&&e.target.classList&&e.target.classList.contains('pin')){ var b=e.target.closest('.man')&&e.target.closest('.man').querySelector('.man-add'); if(b){ e.preventDefault(); manAdd(b); } }
+  });
+  $('stkAddAll').addEventListener('click',function(){
+    if(!confirm('지금 조건에 나온 줄 중 새 입찰가가 정해진 줄을 모두 송신 대기함에 담을까요?\n확인 필요·시세 미확인·변경 없는 줄은 건너뛰고, 크림으로는 아무것도 보내지 않아요.')) return;
+    $('stkAddAll').disabled=true;
+    api({action:'outbox_add_filter',filter:SK.filter,q:SK.q,brand:SK.brand,dup:SK.dup}).then(function(j){
+      var k=j.skipped||{}, sk=[];
+      if(k.review) sk.push('확인 필요 '+nf(k.review)+'줄'); if(k.nomarket) sk.push('시세 미확인 '+nf(k.nomarket)+'줄'); if(k.nobase) sk.push('판매가 없음 '+nf(k.nobase)+'줄'); if(k.nochange) sk.push('변경 없음 '+nf(k.nochange)+'줄');
+      toast('송신 대기함에 '+nf(j.added)+'줄을 담았어요'+(sk.length?' (건너뜀: '+sk.join(', ')+')':'')+'. 크림으로는 아직 보내지 않았어요.');
+      return Promise.all([skSummary(),skList(false)]);
+    }).catch(function(e){ toast(e.message); }).then(function(){ $('stkAddAll').disabled=false; });
+  });
+  function csvCell(v){ v=v==null?'':String(v); return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+  function obCsvText(rows){
+    var T={match:'최저가에 맞춤',base:'상한가',floor:'하한가',manual:'직접 입력',keep:'유지'}, head=['구분','브랜드','품번','상품명','크림 상품번호','옵션','지금 입찰가','새 입찰가','변화율(%)','가격 근거','하한·상한 확인'];
+    var out=[head].concat(rows.map(function(r){
+      var o=r.old_price==null?'':+r.old_price, nw=+r.new_price, g=o?Math.round((nw/o-1)*1000)/10:'';
+      return [r.action==='create'?'신규 입찰':'가격 수정',r.brand||'',r.style_raw||r.style_norm,r.name||'',r.kream_product_id,r.option_name,o,nw,g,T[r.kind]||r.kind,r.range==='below'?'하한가 아래':(r.range==='above'?'상한가 위':'범위 안')];
+    }));
+    return out.map(function(l){ return l.map(csvCell).join(','); }).join('\r\n')+'\r\n';
+  }
+  $('obCsv').addEventListener('click',function(){
+    if(!SK.ob.total){ toast('송신 대기함이 비어 있어요.'); return; }
+    $('obCsv').disabled=true; var all=[], page=1;
+    (function next(){
+      return api({action:'outbox_list',page:page,per_page:100}).then(function(j){
+        all=all.concat(j.rows);
+        if(all.length<j.total&&j.rows.length){ page++; return next(); }
+      });
+    })().then(function(){
+      var blob=new Blob(['\ufeff'+obCsvText(all)],{type:'text/csv;charset=utf-8'}), a=document.createElement('a'), d=new Date(), p2=function(x){return (x<10?'0':'')+x;};
+      a.href=URL.createObjectURL(blob); a.download='크림_송신대기함_'+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+'_'+p2(d.getHours())+p2(d.getMinutes())+'.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('송신 대기함 '+nf(all.length)+'줄을 CSV로 저장했어요.');
+    }).catch(function(e){ toast(e.message); }).then(function(){ $('obCsv').disabled=false; });
   });
   $('obMore').addEventListener('click',function(){ SK.ob.page++; obLoad(true).catch(function(e){ SK.ob.page--; toast(e.message); }); });
   $('obClear').addEventListener('click',function(){
@@ -1154,10 +1198,25 @@
   });
 
   /* 가격 정책 */
+  /* 정책 미리보기: 저장하지 않고 "이 설정이면 자동 가격 몇 줄 / 확인 필요 몇 줄"을 보여 준다 */
+  var ppt=0;
+  function polDraft(){ var b=document.querySelector('input[name=polBelow]:checked'); return {action:'policy_preview',max_pct:$('polMax').value,under_won:$('polUnder').value,upper_pct:$('polUpper').value,below:b?b.value:''}; }
+  function polPreview(){
+    clearTimeout(ppt);
+    ppt=setTimeout(function(){
+      api(polDraft()).then(function(j){
+        var d=j.draft, c=j.current, df=function(a,b){ var x=a-b; return x===0?'':' ('+(x>0?'+':'−')+nf(Math.abs(x))+')'; };
+        $('polPrev').innerHTML='이 설정이면 <b>가격이 정해지는 줄 '+nf(d.priced)+'</b>'+df(d.priced,c.priced)+' · <b>확인 필요 '+nf(d.review)+'</b>'+df(d.review,c.review)+' · 시세 미확인 '+nf(d.nomarket)+'줄 <span class="h">(지금 저장된 설정: 가격 '+nf(c.priced)+'줄, 확인 필요 '+nf(c.review)+'줄)</span>';
+      }).catch(function(e){ $('polPrev').textContent=''; });
+    },300);
+  }
+  ['polMax','polUnder','polUpper'].forEach(function(id){ $(id).addEventListener('input',polPreview); });
+  document.querySelectorAll('input[name=polBelow]').forEach(function(r){ r.addEventListener('change',polPreview); });
   $('polEdit').addEventListener('click',function(){
     var p=SK.pol||{max_pct:5,under_won:0,below:'review'};
     $('polMax').value=p.max_pct; $('polUnder').value=p.under_won; $('polUpper').value=p.upper_pct||0; $('polErr').hidden=true;
     document.querySelectorAll('input[name=polBelow]').forEach(function(r){ r.checked=r.value===p.below; });
+    $('polPrev').textContent=''; polPreview();
     $('dlgPol').showModal();
   });
   $('polOk').addEventListener('click',function(){
