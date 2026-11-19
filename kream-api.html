@@ -200,7 +200,7 @@
   .stkt td.ck,.stkt th:first-child{text-align:center;padding-left:10px;padding-right:0;} .stkt td.ck input,.stkt th input{width:18px;height:18px;accent-color:#18181b;}
   .selbar[hidden],.fstat:empty{display:none;}
   .fall{margin-top:20px;padding-top:18px;border-top:1px solid #e4e4e7;} .fall .finfo{margin-bottom:12px;}
-  .kin.pin{width:130px;height:34px;text-align:right;} .obtools{display:flex;gap:8px;}
+  .kin.pin{width:110px;height:34px;text-align:right;} .man{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:5px;} .man .lnk{font-size:12.5px;font-weight:600;} .pr2.oor{color:var(--red);font-weight:600;} .obtools{display:flex;gap:8px;}
   @media (max-width:900px){.kf-two{grid-template-columns:1fr;}}
 
   #toast{position:fixed;left:24px;bottom:24px;z-index:60;display:flex;flex-direction:column;gap:8px;}
@@ -320,7 +320,7 @@
       <div class="kf-row"><label class="kl" for="stkQ">검색어</label>
         <input class="kin" type="search" id="stkQ" placeholder="품번 · 상품명 입력" aria-label="품번 또는 상품명 검색"></div>
       <div class="kf-two">
-        <div><label class="kl" for="stkBrand">브랜드</label><input class="kin" type="search" id="stkBrand" placeholder="브랜드 입력" aria-label="브랜드 검색"></div>
+        <div><label class="kl" for="stkBrand">브랜드</label><input class="kin" type="search" id="stkBrand" list="stkBrandList" placeholder="브랜드 입력하거나 목록에서 고르기" aria-label="브랜드 검색 또는 선택" autocomplete="off"><datalist id="stkBrandList"></datalist></div>
         <div><span class="kl">중복 입찰</span><div class="kradio" id="stkDup" role="radiogroup" aria-label="중복 입찰">
           <label><input type="radio" name="stkdup" value="" checked>전체</label><label><input type="radio" name="stkdup" value="yes">있음</label><label><input type="radio" name="stkdup" value="no">없음</label></div></div>
       </div>
@@ -1017,14 +1017,14 @@
     var k=skKey(r);
     switch(r.rec_kind){
       case 'none': return '<span class="zero">-</span>';
-      case 'nomarket': return '<span class="zero">시세를 읽어야 해요</span>';
-      case 'nobase': return '<span class="zero">사이트 판매가 없음</span>';
-      case 'review': return '<input class="kin pin" type="number" inputmode="numeric" data-k="'+esc(k)+'" placeholder="직접 입력" aria-label="직접 입력할 입찰가"><div class="why2">최저가가 하한가('+won(r.floor)+') 아래예요</div>';
+      case 'nomarket': return '<span class="zero">시세를 읽어야 해요</span><div class="man"><button class="lnk man-open" type="button" data-k="'+esc(k)+'">직접 입력</button></div>';
+      case 'nobase': return '<span class="zero">사이트 판매가 없음</span><div class="man"><button class="lnk man-open" type="button" data-k="'+esc(k)+'">직접 입력</button></div>';
+      case 'review': return '<div class="man"><input class="kin pin" type="number" inputmode="numeric" data-k="'+esc(k)+'" placeholder="직접 입력" aria-label="직접 입력할 입찰가"><button class="mini man-add" type="button" data-k="'+esc(k)+'">담기</button></div><div class="why2">최저가가 하한가('+won(r.floor)+') 아래예요</div>';
       default:
         var own=(+r.ask_count>0&&r.min_price!=null)?+r.min_price:null, d='';
         if(own&&r.rec_price!==own){ var g=Math.round((r.rec_price/own-1)*1000)/10; d=' · 지금보다 '+(g>0?'+':'−')+Math.abs(g).toFixed(1)+'%'; }
         else if(own) d=' · 지금과 같아요';
-        return '<div class="pr">'+won(r.rec_price)+'</div><div class="pr2">'+(r.state==='new'?'신규 입찰 · ':'')+(KT[r.rec_kind]||'')+d+'</div>';
+        return '<div class="pr">'+won(r.rec_price)+'</div><div class="pr2">'+(r.state==='new'?'신규 입찰 · ':'')+(KT[r.rec_kind]||'')+d+'</div><div class="man"><button class="lnk man-open" type="button" data-k="'+esc(k)+'">직접 입력</button></div>';
     }
   }
   function skRange(r){ return r.floor&&r.ceil ? '<div class="pr2" style="margin:0">'+won(r.floor)+' ~ '+won(r.ceil)+'</div>' : '<span class="zero">-</span>'; }
@@ -1053,8 +1053,15 @@
   function skSummary(){ return api({action:'stock_summary'}).then(function(j){
     SK.counts=j; SK.builtAt=j.built_at; SK.asksAt=j.asks_at; SK.marketAt=j.market_at||0; SK.staged=j.staged||0; SK.pol=j.policy||null;
     skChips(); skNote(); skPolicy(); skMarket(); $('obCnt').textContent=(SK.staged||0).toLocaleString('ko-KR'); }); }
+  /* 지금 조건(칩·검색어·중복)에 나온 줄의 브랜드 목록 — 입력칸에서 고르면 바로 걸러진다 */
+  function skBrands(){
+    return api({action:'stock_brands',filter:SK.filter,q:SK.q,dup:SK.dup}).then(function(j){
+      $('stkBrandList').innerHTML=(j.brands||[]).filter(function(b){return b.brand!=='';}).map(function(b){
+        return '<option value="'+esc(b.brand)+'" label="'+b.n.toLocaleString('ko-KR')+'줄"></option>'; }).join('');
+    }).catch(function(){});
+  }
   function skList(append){
-    return api({action:'stock_list',filter:SK.filter,q:SK.q,brand:SK.brand,dup:SK.dup,page:SK.page,per_page:PER}).then(function(j){ SK.rows=append?SK.rows.concat(j.rows):j.rows; SK.total=j.total; skRows(); });
+    return api({action:'stock_list',filter:SK.filter,q:SK.q,brand:SK.brand,dup:SK.dup,page:SK.page,per_page:PER}).then(function(j){ SK.rows=append?SK.rows.concat(j.rows):j.rows; SK.total=j.total; skRows(); if(!append) skBrands(); });
   }
   function skFail(e){ $('stkBody').innerHTML='<tr><td colspan="9"><div class="empty">재고별 목록을 불러오지 못했습니다.<br>'+esc(e.message)+'</div></td></tr>'; $('stkMore').hidden=true; }
   function skBoot(){ SK.loaded=true; skSummary().then(function(){ return skList(false); }).then(function(){ fdPoll(); }).catch(function(e){ SK.loaded=false; skFail(e); }); }
@@ -1068,7 +1075,7 @@
       var o=r.old_price==null?null:+r.old_price, nw=+r.new_price, g=o?Math.round((nw/o-1)*1000)/10:null;
       return '<tr><td class="pc"><div class="brand">'+esc(r.brand||'')+'</div><span class="big" style="font-size:14.5px">'+esc(r.style_raw||r.style_norm)+'</span>'+(r.name?'<div class="nm">'+esc(r.name)+'</div>':'')+'</td>'
         +'<td><div class="opt">'+esc(r.option_name)+'</div></td><td class="r">'+(o==null?'<span class="zero">-</span>':'<span class="pr">'+won(o)+'</span>')+'</td>'
-        +'<td class="r"><div class="pr">'+won(nw)+'</div>'+(g==null?'':'<div class="pr2">지금보다 '+(g>0?'+':'−')+Math.abs(g).toFixed(1)+'%</div>')+'</td>'
+        +'<td class="r"><div class="pr">'+won(nw)+'</div>'+(g==null?'':'<div class="pr2">지금보다 '+(g>0?'+':'−')+Math.abs(g).toFixed(1)+'%</div>')+(r.range==='below'?'<div class="pr2 oor">하한가 아래</div>':(r.range==='above'?'<div class="pr2 oor">상한가 위</div>':''))+'</td>'
         +'<td>'+(r.action==='create'?'신규 입찰':'가격 수정')+' · '+esc(T[r.kind]||r.kind)+'</td><td class="r"><button class="mini obrm" type="button" data-k="'+esc(r.style_norm+'|'+r.option_key)+'">빼기</button></td></tr>';
     }).join('');
     $('obTotal').textContent=SK.ob.total.toLocaleString('ko-KR')+'줄';
@@ -1113,6 +1120,31 @@
       toast('송신 대기함에 '+j.added+'줄 담았어요. 크림으로는 아직 보내지 않았어요.');
       return Promise.all([skSummary(),skList(false)]);
     }).catch(function(e){ toast(e.message); }).then(function(){ $('stkAdd').disabled=false; skSelBar(); });
+  });
+  /* 개별 수동 입찰가: 한 줄에 가격을 직접 입력해 송신 대기함에 담는다(송신은 잠김) */
+  function manAdd(btn){
+    var box=btn.closest('.man'), inp=box.querySelector('.pin'), k=btn.dataset.k, price=parseInt(inp.value,10);
+    if(!price||price<20000){ toast('가격은 20,000원 이상 숫자로 입력해 주세요.'); inp.focus(); return; }
+    var p=k.split('|'), row=SK.rows.filter(function(r){return skKey(r)===k;})[0], note='';
+    if(row&&row.floor&&price<row.floor) note=' (하한가 '+won(row.floor)+' 아래예요)'; else if(row&&row.ceil&&price>row.ceil) note=' (상한가 '+won(row.ceil)+' 위예요)';
+    btn.disabled=true;
+    api({action:'outbox_add',items:[{style_norm:p[0],option_key:p.slice(1).join('|'),price:price}]}).then(function(j){
+      if(j.skipped&&j.skipped.length){ toast(j.skipped[0].reason); btn.disabled=false; return; }
+      toast('송신 대기함에 '+won(price)+'으로 담았어요'+note+'. 크림으로는 아직 보내지 않았어요.');
+      return Promise.all([skSummary(),skList(false)]);
+    }).catch(function(e){ toast(e.message); btn.disabled=false; });
+  }
+  document.addEventListener('click',function(e){
+    var o=e.target.closest('.man-open'); if(o){
+      var box=o.closest('.man'), k=o.dataset.k;
+      box.innerHTML='<input class="kin pin" type="number" inputmode="numeric" data-k="'+esc(k)+'" placeholder="입찰가(원)" aria-label="직접 입력할 입찰가"><button class="mini man-add" type="button" data-k="'+esc(k)+'">담기</button><button class="mini man-cancel" type="button">취소</button>';
+      box.querySelector('.pin').focus(); return;
+    }
+    var a=e.target.closest('.man-add'); if(a){ manAdd(a); return; }
+    var c=e.target.closest('.man-cancel'); if(c){ skRows(); }
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&e.target.classList&&e.target.classList.contains('pin')){ var b=e.target.closest('.man')&&e.target.closest('.man').querySelector('.man-add'); if(b){ e.preventDefault(); manAdd(b); } }
   });
   $('obMore').addEventListener('click',function(){ SK.ob.page++; obLoad(true).catch(function(e){ SK.ob.page--; toast(e.message); }); });
   $('obClear').addEventListener('click',function(){
@@ -1163,6 +1195,8 @@
     return skList(false).catch(skFail);
   }
   $('stkFilter').addEventListener('submit',function(e){ e.preventDefault(); skSearch(); });
+  $('stkBrand').addEventListener('change',function(){ skSearch(); });          // 목록에서 고르면 바로 걸러진다
+  $('stkBrand').addEventListener('input',function(e){ if(e.inputType==='insertReplacementText'||(!e.inputType&&this.value)) skSearch(); });   // 일부 브라우저는 목록 선택을 input 으로만 알려 준다
   $('stkReset').addEventListener('click',function(){
     $('stkQ').value=''; $('stkBrand').value=''; document.querySelector('input[name=stkdup][value=""]').checked=true;
     SK.filter=''; skChips(); skSearch();
