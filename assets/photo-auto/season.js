@@ -312,6 +312,19 @@ function doApply(thenGo){
   }).catch(function(e){ st.textContent='적용 실패: '+e.message; console.error(e); });
 }
 
+/* ---------- 색상변경 탭: PSD 로 불러오기 ---------- */
+function onColorFile(files){
+  var f=files.filter(function(x){ return /\.psd$/i.test(x.name); })[0], st=$('colorLoad');
+  if(!f){ st.textContent='PSD 파일(.psd)을 올려 주세요.'; return; }
+  st.textContent='PSD 읽는 중… ('+Math.round(f.size/1048576*10)/10+'MB)';
+  f.arrayBuffer().then(parsePsd).then(function(p){
+    var rows=newRows(p), name=(rows.filter(function(r){ return r.k==='상품명'; })[0]||{}).nv||'';
+    if(!name){ st.textContent='PSD에서 상품명(모델명)을 찾지 못했어요. 다른 파일이거나 틀이 달라요.'; return; }
+    st.textContent='✔ '+f.name+(files.length>1?' (여러 개를 올리셨다면 첫 PSD만 읽어요)':'');
+    api.colorFromPsd({body:name,rows:rows,table:p.table,fileName:f.name});
+  }).catch(function(e){ st.textContent='PSD를 읽지 못했습니다: '+e.message; console.error(e); });
+}
+
 /* ---------- 파일 받기 ---------- */
 function onFile(files){
   var f=files.filter(function(x){ return /\.psd$/i.test(x.name); })[0];
@@ -337,6 +350,15 @@ function init(a){
   ['dragenter','dragover'].forEach(function(ev){ box.addEventListener(ev,function(e){ e.preventDefault(); box.classList.add('on'); }); });
   ['dragleave','drop'].forEach(function(ev){ box.addEventListener(ev,function(e){ e.preventDefault(); box.classList.remove('on'); }); });
   box.addEventListener('drop',function(e){ onFile([].slice.call(e.dataTransfer.files)); });
+  var cb=$('colorDrop'), ci=$('colorFile');
+  if(cb&&ci){
+    cb.addEventListener('click',function(){ ci.click(); });
+    cb.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); ci.click(); } });
+    ci.addEventListener('change',function(){ if(ci.files.length) onColorFile([].slice.call(ci.files)); ci.value=''; });
+    ['dragenter','dragover'].forEach(function(ev){ cb.addEventListener(ev,function(e){ e.preventDefault(); cb.classList.add('on'); }); });
+    ['dragleave','drop'].forEach(function(ev){ cb.addEventListener(ev,function(e){ e.preventDefault(); cb.classList.remove('on'); }); });
+    cb.addEventListener('drop',function(e){ onColorFile([].slice.call(e.dataTransfer.files)); });
+  }
   var t='new'; try{ t=sessionStorage.getItem('photoAutoTab'); t=(t==='season'||t==='color')?t:'new'; }catch(e){}
   setTab(t);
 }
