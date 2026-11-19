@@ -152,11 +152,13 @@ function newRows(p){
 
 /* ---------- 화면 ---------- */
 function setTab(which){
-  var s=which==='season';
-  $('tabNew').setAttribute('aria-selected',s?'false':'true'); $('tabSeason').setAttribute('aria-selected',s?'true':'false');
-  $('tabNew').classList.toggle('on',!s); $('tabSeason').classList.toggle('on',s);
+  var s=which==='season', c=which==='color';
+  [['tabNew',!s&&!c],['tabSeason',s],['tabColor',c]].forEach(function(t){ var b=$(t[0]); if(!b) return; b.setAttribute('aria-selected',t[1]?'true':'false'); b.classList.toggle('on',t[1]); });
   $('seasonBox').style.display=s?'block':'none';
-  $('leadNew').style.display=s?'none':''; $('leadSeason').style.display=s?'':'none';
+  if($('colorBox')) $('colorBox').style.display=c?'block':'none';
+  document.body.classList.toggle('tabcolor',c);
+  $('leadNew').style.display=(s||c)?'none':''; $('leadSeason').style.display=s?'':'none';
+  if($('leadColor')) $('leadColor').style.display=c?'':'none';
   try{ sessionStorage.setItem('photoAutoTab',which); }catch(e){}
 }
 
@@ -327,6 +329,7 @@ function init(a){
   api=a;
   $('tabNew').addEventListener('click',function(){ setTab('new'); });
   $('tabSeason').addEventListener('click',function(){ setTab('season'); });
+  if($('tabColor')) $('tabColor').addEventListener('click',function(){ setTab('color'); });
   var box=$('seasonDrop'), inp=$('seasonFile');
   box.addEventListener('click',function(){ inp.click(); });
   box.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); inp.click(); } });
@@ -334,7 +337,7 @@ function init(a){
   ['dragenter','dragover'].forEach(function(ev){ box.addEventListener(ev,function(e){ e.preventDefault(); box.classList.add('on'); }); });
   ['dragleave','drop'].forEach(function(ev){ box.addEventListener(ev,function(e){ e.preventDefault(); box.classList.remove('on'); }); });
   box.addEventListener('drop',function(e){ onFile([].slice.call(e.dataTransfer.files)); });
-  var t='new'; try{ t=sessionStorage.getItem('photoAutoTab')==='season'?'season':'new'; }catch(e){}
+  var t='new'; try{ t=sessionStorage.getItem('photoAutoTab'); t=(t==='season'||t==='color')?t:'new'; }catch(e){}
   setTab(t);
 }
 

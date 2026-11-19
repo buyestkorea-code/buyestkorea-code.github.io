@@ -113,7 +113,9 @@
   .tabs button:hover:not(.on){color:var(--ink);}
   .tabs button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px;border-radius:6px;}
   /* 시즌변경 */
-  #seasonBox{display:none;}
+  #seasonBox{display:none;} #colorBox{display:none;}
+  .hist .hrow [data-a=color]{display:none;} body.tabcolor .hist .hrow [data-a=color]{display:inline-block;}
+  .cv-ok{margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fafaf8;font-size:13.5px;line-height:1.7;} .cv-ok input{font:14px var(--font);padding:7px 10px;border:1px solid var(--line);border-radius:8px;width:160px;}
   .sv-meta{font-size:12.5px;color:var(--sub);margin:0 0 10px;}
   .sv-season{background:var(--bluebg);border-radius:10px;padding:10px 12px;margin:0 0 12px;}
   .sv-season label{display:block;margin-bottom:6px;font-size:13px;}
@@ -139,9 +141,18 @@
 <div class="tabs" role="tablist" aria-label="작업 방식">
   <button type="button" role="tab" id="tabNew" class="on" aria-selected="true">상세페이지 만들기</button>
   <button type="button" role="tab" id="tabSeason" aria-selected="false">시즌변경</button>
+  <button type="button" role="tab" id="tabColor" aria-selected="false">색상변경</button>
 </div>
 <p class="lead" id="leadNew">사진 + 기본틀 엑셀 + 상품명만 넣으면 상세페이지 이미지(폭 720px)를 자동으로 조립합니다. <b>실측</b>은 직접 입력하세요. 만드는 작업은 이 브라우저 안에서 처리되고, 결과와 사진은 <b>서버에 30일간 보관</b>돼 아래 '최근 작업'에서 다시 불러올 수 있습니다.</p>
 <p class="lead" id="leadSeason" style="display:none">예전 틀로 만든 상세페이지 PSD를 올리면 글자·실측표·사진을 읽어 <b>현재 템플릿</b>에 옮겨 줍니다. 시즌·원산지·소재처럼 바뀐 값은 고쳐 쓰고, 그 뒤는 상세페이지 만들기 · 수정 · 사이트 등록까지 똑같이 진행해요.</p>
+
+<p class="lead" id="leadColor" style="display:none">이미 만든 상세페이지를 그대로 불러와서 <b>사진과 색상(상품명)만</b> 바꾸는 탭이에요. 정보 · 실측표 · 템플릿은 그대로 유지됩니다. 아래 <b>최근 작업</b>에서 원하는 작업의 <b>색상변경</b> 버튼을 누르세요.</p>
+
+<div class="box" id="colorBox">
+  <h2>색상변경 — 만든 상세페이지에서 색상만 바꿔 새로 만들기</h2>
+  <div id="colorMsg" class="hint">아래 “최근 작업” 목록에서 <b>색상변경</b> 버튼을 눌러 불러오세요. (원래 작업은 그대로 남고, 새 작업으로 따로 저장돼요)</div>
+  <div id="colorOk" class="cv-ok" style="display:none"></div>
+</div>
 
 <div class="box" id="seasonBox">
   <h2>시즌변경 — 예전 PSD를 현재 템플릿으로</h2>
@@ -1505,7 +1516,7 @@ function loadHistList(){
     j.jobs.forEach(function(it){
       var d=document.createElement('div'); d.className='hrow';
       d.innerHTML='<img class="hth" alt=""><div class="hmeta"><b></b><span></span></div>'+
-        '<button class="btn btn-out btn-sm" data-a="load">불러오기</button><button class="btn btn-out btn-sm" data-a="jpg">JPG 받기</button><button class="btn btn-out btn-sm" data-a="del">삭제</button>';
+        '<button class="btn btn-out btn-sm" data-a="color">색상변경</button><button class="btn btn-out btn-sm" data-a="load">불러오기</button><button class="btn btn-out btn-sm" data-a="jpg">JPG 받기</button><button class="btn btn-out btn-sm" data-a="del">삭제</button>';
       d.querySelector('b').textContent=it.pname||'(이름 없음)';
       d.dataset.q=[it.pname,it.code,it.actor,fmtTime(it.updated),(it.season?'시즌변경':'')].join(' ').toLowerCase();
       if(it.season){ var sb=document.createElement('em'); sb.className='hseason'; sb.textContent='시즌변경'; d.querySelector('b').insertBefore(sb,d.querySelector('b').firstChild); }
@@ -1513,6 +1524,7 @@ function loadHistList(){
       if(it.has_thumb) phCall('file',{job:it.id,kind:'thumb'}).then(function(r){return r.blob();}).then(function(b){ d.querySelector('img').src=URL.createObjectURL(b); });
       d.addEventListener('click',function(e){ var a=e.target.dataset&&e.target.dataset.a; if(!a) return;
         if(a==='load') loadJob(it.id);
+        else if(a==='color') loadJobColor(it.id);
         else if(a==='del'){ if(confirm('이 작업을 서버에서 지울까요?\n'+(it.pname||''))) phJson('delete',{job:it.id}).then(function(){ if(state.job===it.id) state.job=''; loadHistList(); }).catch(function(er){ alert(er.message); }); }
         else if(a==='jpg') phCall('file',{job:it.id,kind:'jpg'}).then(function(r){return r.blob();}).then(function(b){
           var u=URL.createObjectURL(b), l=document.createElement('a'); l.href=u; l.download=(it.code||'detail')+'_00.jpg'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(function(){URL.revokeObjectURL(u);},3000); });
@@ -1546,6 +1558,49 @@ function loadJob(id){
       if(miss.length) setHist('일부 사진을 찾지 못했어요: '+miss.join(', '));
     });
   }).catch(function(e){ $('status').textContent='불러오기 실패: '+e.message; });
+}
+/* ---------- 색상변경: 만든 작업을 불러오되 사진은 비우고, 사진·색상(상품명)만 바꾸게 한다 ---------- */
+var colorSrc=null;
+function escH(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function loadJobColor(id){
+  $('status').textContent='색상변경용으로 불러오는 중…';
+  phJson('get',{job:id}).then(function(j){
+    var m=j.meta;
+    state.job=''; state.jobName=''; state.season=!!m.season; state.xl=m.xl||{}; state.dirty=Object.assign({},m.dirty||{}); Object.keys(m.fields||{}).forEach(function(k){ if(m.fields[k]) state.dirty[k]=true; }); /* 불러온 값은 상품명 입력 때 자동값으로 덮이지 않게 모두 고정 */
+    $('pname').value=m.pname||'';
+    Object.keys(m.fields||{}).forEach(function(k){ if(!fld(k)&&m.fields[k]) ensureField(k); });
+    setInfoRows(m.infoRows||null);
+    restoreTpl(m);
+    fieldKeys().forEach(function(k){ fld(k).value=(m.fields&&m.fields[k])||''; });
+    $('size').value=m.size||''; $('table').value=m.table||''; gridSet(gridFromText()); $('zoom').checked=!!m.zoom; $('bgwhite').checked=m.bgwhite!==false; $('aicut').checked=!!m.aicut;
+    $('xName').textContent=(state.xl.brand||state.xl.origin||state.xl.material)?'✔ (불러온 작업) 브랜드 '+(state.xl.brand||'?')+' · 제조국 '+(state.xl.origin||'?')+' · 소재 '+(state.xl.material||'?'):'';
+    state.photos=[]; state.sv={}; state.slots=null; state.last=null; state.canvas=null; state.pending=null; state.stale=false;
+    drawPhotos(); mark(); $('prev').style.display='none'; $('prev').innerHTML='';
+    colorSrc={name:m.pname||'',color:(m.fields&&m.fields['색상'])||'',fname:(m.fields&&m.fields['상품명'])||''};
+    var ok=$('colorOk'); ok.style.display='block';
+    ok.innerHTML='<div>불러온 작업: <b>'+escH(m.pname||'(이름 없음)')+'</b> <span class="hint">· 색상 “'+escH(colorSrc.color||'없음')+'”</span></div>'+
+      '<div style="margin-top:6px">새 색상 <input id="cvNew" type="text" placeholder="예: 블랙" autocomplete="off"> <span class="hint" id="cvNote">입력하면 상품명의 색상 글자와 ③ 색상 칸이 같이 바뀌어요</span></div>'+
+      '<ol style="margin:8px 0 0 18px;padding:0"><li>위 칸에 새 색상 입력 (상품명 · 색상 칸 자동 변경)</li><li>② 사진 칸에 <b>새 색상 사진</b> 올리기 (이전 사진은 비워 둠)</li><li>“상세페이지 만들기” → 필요하면 글자 눌러 고치고 ④ 사이트 등록</li></ol>';
+    $('cvNew').addEventListener('input',function(){ applyNewColor(this.value); });
+    $('status').textContent='불러왔어요 — 새 색상과 사진만 바꾸세요. 정보·실측표·템플릿은 그대로예요.';
+    $('colorBox').scrollIntoView({block:'start',behavior:'smooth'});
+  }).catch(function(e){ $('status').textContent='색상변경 불러오기 실패: '+e.message; });
+}
+function applyNewColor(v){
+  if(!colorSrc) return; v=String(v||'').trim();
+  var nm=colorSrc.name, oc=colorSrc.color, note=$('cvNote'), done=false;
+  if(v){
+    if(oc){ var i=nm.indexOf(oc); if(i>=0){ nm=nm.slice(0,i)+v+nm.slice(i+oc.length); done=true; } }
+    note.textContent=done?'상품명 · 색상 칸에 반영했어요':'상품명에서 이전 색상“'+oc+'”을 못 찾았어요 — 상품명을 직접 고쳐 주세요';
+    $('pname').value=nm; $('pname').dispatchEvent(new Event('input',{bubbles:true}));
+    fld('색상').value=v; state.dirty['색상']=true;
+    if(oc&&colorSrc.fname&&fld('상품명')) fld('상품명').value=colorSrc.fname.split(oc).join(v);
+    mark();
+  } else {
+    note.textContent='입력하면 상품명의 색상 글자와 ③ 색상 칸이 같이 바뀌어요';
+    $('pname').value=colorSrc.name; $('pname').dispatchEvent(new Event('input',{bubbles:true}));
+    fld('색상').value=colorSrc.color; if(fld('상품명')) fld('상품명').value=colorSrc.fname; mark();
+  }
 }
 $('histRefresh').addEventListener('click',loadHistList);
 loadHistList();
