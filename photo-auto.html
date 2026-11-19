@@ -1435,7 +1435,7 @@ $('dlp').addEventListener('click',function(){
     return new Promise(function(r){setTimeout(r,30);});
   }).then(function(){
     var buf=buildPsd(), blob=new Blob([buf],{type:'application/octet-stream'});
-    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=codeOf()+'_00.psd';
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=codeOf()+'.psd';
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},4000);
     $('status').textContent=old;
   }).catch(function(e){ $('status').textContent='PSD 저장 실패: '+e.message; console.error(e); }).then(function(){ b.disabled=false; });
@@ -1448,7 +1448,7 @@ $('dlz').addEventListener('click',function(){
   encodeJpeg(state.canvas).then(function(j){ zip.file(code+'_00.jpg',j); })
   .then(function(){ return loadScript('assets/libs/ag-psd-28.2.2.bundle.js'); })
   .then(function(){ return new Promise(function(r){setTimeout(r,30);}); })
-  .then(function(){ zip.file(code+'_00.psd',buildPsd()); })
+  .then(function(){ zip.file(code+'.psd',buildPsd()); })
   .then(function(){ return PhotoRegister.xlsxBlob(); })
   .then(function(x){ zip.file('상품정보_'+code+'.xlsx',x); $('status').textContent='ZIP 묶는 중…'; return zip.generateAsync({type:'blob',compression:'STORE'}); })
   .then(function(z){ saveBlob(z,code+'_완성.zip'); $('status').textContent='저장했어요: '+code+'_완성.zip (JPG · PSD · 엑셀)'; })
