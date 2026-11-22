@@ -42,14 +42,14 @@
     <div class="card"><h2>실입찰 전 단계</h2><p class="info">이 화면은 <b>POIZON으로 아무것도 보내지 않습니다.</b> 아래 단계가 모두 초록이 돼도 실제 송신은 잠겨 있고, 사장님이 열겠다고 하실 때까지 열리지 않아요.</p><div id="steps"></div></div>
     <div class="card"><h2>연결 현황</h2><div class="grid" id="stats"></div></div>
     <div class="card"><h2>가격 정책 <span class="g" id="polState"></span></h2>
-      <p class="info">입찰가 = (사이트 판매가 + 최소 마진) ÷ 환율을 <b>정수 달러로 올림</b>한 값입니다. POIZON은 기준가보다 너무 높으면 거부하므로(8월 시험에서 2배부터 거부) <b>상한은 원가환산가의 %</b>로 막습니다.</p>
-      <div class="row"><div><label class="l" for="pRate">환율 (원/달러)</label><input class="in num" id="pRate" type="number" step="0.01"></div><div><label class="l" for="pMargin">최소 마진 (원)</label><input class="in num" id="pMargin" type="number" step="1000"></div><div><label class="l" for="pCap">가격 상한 (%)</label><input class="in num" id="pCap" type="number" step="5"></div><button class="btn pri" id="pSave">정책 저장</button></div>
+      <p class="info">사이트 판매가를 <b>현재 환율로 달러로 바꾼 값이 기준가</b>입니다(정수 달러). 입찰가는 기준가에서 <b>하한(−%)~상한(+%)</b> 안에서만 정해집니다. POIZON은 기준가보다 너무 높으면 거부하므로(8월 시험에서 2배부터 거부) 상한은 +50%를 권해요.</p>
+      <div class="row"><div><label class="l" for="pRate">환율 (원/달러)</label><input class="in num" id="pRate" type="number" step="0.01"></div><div><label class="l" for="pLower">하한 (기준가보다 −%)</label><input class="in num" id="pLower" type="number" step="1" min="0" max="50"></div><div><label class="l" for="pUpper">상한 (기준가보다 +%)</label><input class="in num" id="pUpper" type="number" step="5" min="0" max="100"></div><button class="btn pri" id="pSave">정책 저장</button></div>
       <p class="info" id="pMsg" role="status" style="margin-top:8px"></p></div>
   </section>
   <section id="v-stock" hidden>
     <div class="card"><div class="row"><div><label class="l" for="sQ">검색</label><input class="in" style="width:260px" id="sQ" type="search" placeholder="품번 · 상품명 · SKU"></div><button class="btn" id="sGo">검색</button><span class="sp"></span><button class="btn pri" id="sAdd" disabled>선택한 줄 송신 대기함에 담기</button></div></div>
     <div class="card"><h2>재고·가격 <b class="g num" id="sTotal"></b></h2><div class="chips" id="sChips"></div>
-      <table><thead><tr><th><input type="checkbox" id="sAll" aria-label="이 페이지 전체 선택"></th><th>상품 / 옵션</th><th>상태</th><th class="r">지금 입찰</th><th class="r">최소가</th><th class="r">시장 최저</th><th class="r">새 입찰가</th><th></th></tr></thead><tbody id="sBody"></tbody></table>
+      <table><thead><tr><th><input type="checkbox" id="sAll" aria-label="이 페이지 전체 선택"></th><th>상품 / 옵션</th><th>상태</th><th class="r">이카운트 재고</th><th class="r">지금 입찰</th><th class="r">기준가 (하한~상한)</th><th class="r">시장 최저</th><th class="r">새 입찰가</th><th></th></tr></thead><tbody id="sBody"></tbody></table>
       <p style="text-align:center"><button class="btn" id="sMore" hidden>더 보기</button></p></div>
   </section>
   <section id="v-out" hidden>
@@ -86,7 +86,7 @@
     });
   }
   var S={tab:'home',state:'',q:'',page:1,rows:[],total:0,sel:{}};
-  var KIND={match:'시장 최저가',capped:'상한으로 제한',floor:'최소가(시장이 더 낮음)',base:'최소가(시세 없음)',manual:'직접 입력',blocked:'판매 불가',nomap:'연결 안 됨',noprice:'가격 없음'};
+  var KIND={match:'시장 최저가',capped:'상한으로 제한',floor:'하한으로 올림(시장이 더 낮음)',base:'기준가(시세 없음)',manual:'직접 입력',blocked:'판매 불가',nomap:'연결 안 됨',noprice:'가격 없음'};
   var STATE={new:'신규 후보',keep:'입찰 중',drop:'정리 후보',skip:'대상 아님',check:'확인 필요'};
   function tab(t){
     S.tab=t; document.querySelectorAll('#tabs button').forEach(function(b){ b.setAttribute('aria-selected',String(b.dataset.tab===t)); });
@@ -99,21 +99,21 @@
       var locked=j.mode!=='PRODUCTION'&&j.mode!=='LIVE_TEST'; $('lockTag').textContent=locked?'읽기 전용 · 송신 잠김 ('+j.mode+')':'⚠ 쓰기 모드 '+j.mode; $('lockTag').className='lock'+(locked?'':' warn');
       $('obCn').textContent=j.staged;
       var ready=j.status.READY||0, vm=j.verify.match||0, vbad=(j.verify.mismatch||0)+(j.verify.nores||0)+(j.verify.error||0);
-      $('stats').innerHTML=[['전체 연결',j.maps],['확정(READY)',ready],['확인 필요(REVIEW)',j.status.REVIEW||0],['SKU 없음',j.status.NO_SKU||0],['재확인 일치',vm],['재확인 불일치·실패',vbad],['시세 읽은 줄',j.market.ok],['걸린 입찰',j.active_bids]].map(function(x){ return '<div class="stat"><div class="k">'+x[0]+'</div><div class="v num">'+nf(x[1])+'</div></div>'; }).join('');
+      $('stats').innerHTML=[['전체 연결',j.maps],['확정(READY)',ready],['확인 필요(REVIEW)',j.status.REVIEW||0],['SKU 없음',j.status.NO_SKU||0],['재확인 일치',vm],['재확인 불일치·실패',vbad],['시세 읽은 줄',j.market.ok],['이카운트 재고 기준 시각',0],['걸린 입찰',j.active_bids]].map(function(x){ return '<div class="stat"><div class="k">'+x[0]+'</div><div class="v num"'+(x[0].indexOf('시각')>=0?' style="font-size:15px"':'')+'>'+(x[0].indexOf('시각')>=0?tm(j.stock_at):nf(x[1]))+'</div></div>'; }).join('');
       var steps=[
         [vm>0&&vbad===0,'연결 재확인','표본 '+nf(vm)+'줄을 POIZON에서 다시 조회해 SKU가 맞는지 확인했어요'+(vbad?' (불일치·실패 '+vbad+')':'')+'. 더 확인하려면 서버에서 poizon_read.php --verify=N'],
         [j.market.ok>0,'시세 읽기',j.market.ok>0?nf(j.market.ok)+'줄의 시장 최저가를 읽었어요('+tm(j.market.at)+')':'아직 시세를 읽지 않았어요(poizon_read.php --market=N)'],
-        [j.policy.confirmed,'가격 정책 확정',j.policy.confirmed?'환율 '+j.policy.usd_krw_rate+' · 마진 '+nf(j.policy.margin_krw)+'원 · 상한 '+j.policy.cap_pct+'%':'기본값 그대로예요. 환율·마진을 정하고 저장해 주세요'],
+        [j.policy.confirmed,'가격 정책 확정',j.policy.confirmed?'환율 '+j.policy.usd_krw_rate+' · 하한 −'+j.policy.lower_pct+'% · 상한 +'+j.policy.upper_pct+'%':'기본값 그대로예요. 환율과 하한·상한을 정하고 저장해 주세요'],
         [j.staged>0,'송신 대기함에 담기',nf(j.staged)+'줄 담김(점검표 통과분만)'],
         [false,'입찰 작업 준비·확정','작업 내역 탭에서 진행'],
         [false,'POIZON으로 송신','잠겨 있음 — 1건 등록→취소 시험과 사장님 승인 뒤에만 열어요']
       ];
       $('steps').innerHTML=steps.map(function(s,i){ return '<div class="step"><i class="'+(s[0]?'ok':(i===5?'':'no'))+'">'+(i+1)+'</i><div><b>'+s[1]+'</b><div class="info" style="margin:0">'+s[2]+'</div></div></div>'; }).join('');
-      var p=j.policy; $('pRate').value=p.usd_krw_rate; $('pMargin').value=p.margin_krw; $('pCap').value=p.cap_pct; $('polState').textContent=p.confirmed?'저장됨 '+tm(p.updated_at)+' · '+p.updated_by:'기본값(아직 저장 안 함)';
+      var p=j.policy; $('pRate').value=p.usd_krw_rate; $('pLower').value=p.lower_pct; $('pUpper').value=p.upper_pct; $('polState').textContent=p.confirmed?'저장됨 '+tm(p.updated_at)+' · '+p.updated_by:'기본값(아직 저장 안 함)';
     }).catch(function(e){ toast(e.message); });
   }
   $('pSave').addEventListener('click',function(){
-    $('pSave').disabled=true; api({action:'policy_set',usd_krw_rate:$('pRate').value,margin_krw:$('pMargin').value,cap_pct:$('pCap').value}).then(function(){ $('pMsg').textContent='저장했어요. 새 입찰가가 다시 계산됩니다.'; return loadHome(); }).catch(function(e){ $('pMsg').textContent=e.message; }).then(function(){ $('pSave').disabled=false; });
+    $('pSave').disabled=true; api({action:'policy_set',usd_krw_rate:$('pRate').value,lower_pct:$('pLower').value,upper_pct:$('pUpper').value}).then(function(){ $('pMsg').textContent='저장했어요. 새 입찰가가 다시 계산됩니다.'; return loadHome(); }).catch(function(e){ $('pMsg').textContent=e.message; }).then(function(){ $('pSave').disabled=false; });
   });
   /* 재고·가격 */
   var CH=[['','전체'],['new','신규 후보'],['keep','입찰 중'],['drop','정리 후보'],['skip','대상 아님'],['check','확인 필요']];
@@ -124,10 +124,10 @@
     }).catch(function(e){ toast(e.message); });
   }
   function drawStock(){
-    if(!S.rows.length){ $('sBody').innerHTML='<tr><td colspan="8"><div class="empty">조건에 맞는 줄이 없어요.</div></td></tr>'; return; }
+    if(!S.rows.length){ $('sBody').innerHTML='<tr><td colspan="9"><div class="empty">조건에 맞는 줄이 없어요.</div></td></tr>'; return; }
     $('sBody').innerHTML=S.rows.map(function(r){
       var cls=r.state==='new'||r.state==='keep'?'ok':(r.state==='drop'?'bad':'warn');
-      return '<tr><td><input type="checkbox" data-sel="'+r.map_id+'"'+(S.sel[r.map_id]?' checked':'')+(r.rec_cent==null?' disabled':'')+' aria-label="선택"></td><td><b>'+esc(r.name||'(사이트 상품 없음)')+'</b><div class="code">'+esc(r.article)+' · '+esc(r.size)+' · SKU '+esc(r.sku_id)+'</div>'+(r.site_block?'<div class="info" style="margin:0;color:var(--red)">'+esc(r.site_block)+'</div>':'')+'</td><td><span class="tag '+cls+'">'+STATE[r.state]+'</span>'+(r.verify==='match'?' <span class="tag ok" title="POIZON에서 다시 확인함">확인됨</span>':'')+'</td><td class="r num">'+usd(r.own_cent)+'</td><td class="r num">'+usd(r.min_cent||null)+'</td><td class="r num">'+usd(r.ref_cent||null)+'</td><td class="r num"><b>'+usd(r.rec_cent)+'</b><div class="code">'+esc(KIND[r.rec_kind]||r.rec_kind)+'</div></td><td><button class="btn sm" data-ck="'+r.map_id+'">점검</button></td></tr>';
+      return '<tr><td><input type="checkbox" data-sel="'+r.map_id+'"'+(S.sel[r.map_id]?' checked':'')+(r.rec_cent==null?' disabled':'')+' aria-label="선택"></td><td><b>'+esc(r.name||'(사이트 상품 없음)')+'</b><div class="code">'+esc(r.article)+' · '+esc(r.size)+' · SKU '+esc(r.sku_id)+'</div>'+(r.stock_block?'<div class="info" style="margin:0;color:var(--red)">'+esc(r.stock_block)+'</div>':'')+'</td><td><span class="tag '+cls+'">'+STATE[r.state]+'</span>'+(r.verify==='match'?' <span class="tag ok" title="POIZON에서 다시 확인함">확인됨</span>':'')+'</td><td class="r num">'+nf(r.our_qty)+'</td><td class="r num">'+usd(r.own_cent)+'</td><td class="r num">'+usd(r.base_cent||null)+'<div class="code">'+usd(r.floor_cent||null)+' ~ '+usd(r.cap_cent||null)+'</div></td><td class="r num">'+usd(r.ref_cent||null)+'</td><td class="r num"><b>'+usd(r.rec_cent)+'</b><div class="code">'+esc(KIND[r.rec_kind]||r.rec_kind)+'</div></td><td><button class="btn sm" data-ck="'+r.map_id+'">점검</button></td></tr>';
     }).join('');
     $('sAdd').disabled=!Object.keys(S.sel).length;
   }
@@ -149,8 +149,8 @@
     api({action:'check',map_id:+id}).then(function(j){
       var r=j.row, c=j.result; $('ckT').textContent=(r.article||'')+' · '+(r.size||'')+' — '+({create:'신규 등록',update:'가격 수정',cancel:'취소'}[j.act]);
       var h='<p class="info">보낼 가격 <b>'+usd(c.price_cent)+'</b> · '+(c.ready?'<span class="tag ok">필수 점검 모두 통과</span>':'<span class="tag bad">필수 점검 '+c.hard_fail+'건 실패</span>')+'</p>';
-      h+=c.checks.map(function(x){ return '<div class="step"><i class="'+(x.pass?'ok':(x.hard?'no':''))+'">'+(x.pass?'✓':(x.hard?'✕':'·'))+'</i><div><b>'+esc(x.label)+(x.hard?'':' <span class="tag">참고</span>')+'</b><div class="info" style="margin:0">'+esc(x.detail)+'</div></div></div>'; }).join('');
-      h+='<p class="info" style="margin-top:10px"><b>보낼 요청 본문(미리보기, 전송 안 함)</b></p><pre class="code" style="white-space:pre-wrap;background:#f6f6f2;padding:10px;border-radius:6px">'+esc(JSON.stringify(c.payload,null,2))+'</pre>';
+      h+=c.checks.map(function(x){ return '<div class="step"><i class="'+(x.pass?'ok':(x.hard?'no':''))+'">'+(x.pass?'✓':(x.hard?'✕':'·'))+'</i><div><b>'+esc(x.label)+''+'</b><div class="info" style="margin:0">'+esc(x.detail)+'</div></div></div>'; }).join('');
+      h+='<p class="info" style="margin-top:10px">실제 송신은 잠겨 있어요(현재 모드: '+esc(c.mode)+'). 이 화면은 어떤 경우에도 POIZON으로 보내지 않습니다.</p><p class="info"><b>보낼 요청 본문(미리보기, 전송 안 함)</b></p><pre class="code" style="white-space:pre-wrap;background:#f6f6f2;padding:10px;border-radius:6px">'+esc(JSON.stringify(c.payload,null,2))+'</pre>';
       $('ckBody').innerHTML=h; $('dlgCk').showModal();
     }).catch(function(e){ toast(e.message); });
   }
@@ -193,10 +193,11 @@
   /* 설명서 */
   var HELP=[
     ['이 화면은 POIZON으로 무언가를 보내나요?','아니요. 읽기와 계산만 합니다. 가격은 송신 대기함에 담아 두기만 하고 송신은 잠겨 있어요. 사장님이 열겠다고 하실 때까지 POIZON에는 아무것도 올라가지 않습니다.'],
-    ['새 입찰가는 어떻게 정해지나요?','(사이트 판매가 + 최소 마진) ÷ 환율을 정수 달러로 올린 값이 <b>최소가</b>입니다. POIZON 시장 최저가를 읽었고 최소가 이상이면 그 가격에 맞추고, 시장이 더 낮으면 최소가로 둡니다. 어느 경우든 <b>상한(원가환산가의 %)</b>을 넘지 않아요.'],
+    ['재고는 어디 기준인가요?','<b>이카운트 재고</b>입니다(크림 화면과 같은 출처). POIZON 품번을 이카운트 품번과 맞추고, 사이즈까지 맞는 재고가 1개 이상이면 입찰 가능으로 봅니다. 이카운트에 품번이나 사이즈가 없으면 "대상 아님"으로 빠지고 이유가 표시돼요.'],
+    ['새 입찰가는 어떻게 정해지나요?','사이트 판매가를 <b>현재 환율로 달러로 바꾼 값이 기준가</b>입니다. 하한 = 기준가 −하한%, 상한 = 기준가 +상한%예요. POIZON 시장 최저가가 그 범위 안이면 그 가격에 맞추고, 하한보다 낮으면 하한, 상한보다 높으면 상한으로 둡니다. 시세를 아직 못 읽었으면 기준가를 씁니다. 모두 정수 달러예요.'],
     ['왜 정수 달러, 왜 상한이 있나요?','8월 외주 시험에서 $462.50은 "정수여야 함"으로, 원가환산 2배 이상은 "가격이 너무 높음"으로 거부됐어요. 1.5배 이내의 정수 달러만 통과했습니다.'],
-    ['상태(신규 후보·입찰 중·정리 후보…)','<b>신규 후보</b> 연결이 확정됐고 사이트에서 판매 가능한데 걸린 입찰이 없음 · <b>입찰 중</b> 입찰이 있고 판매 가능 · <b>정리 후보</b> 입찰이 있는데 사이트에서 품절·숨김 · <b>대상 아님</b> 판매 불가 · <b>확인 필요</b> 연결이 확정되지 않음.'],
-    ['점검 버튼(실입찰 전 점검표)','연결, 재확인, 사이트 재고, 가격 규칙, 이중 등록, 다른 작업과 충돌, 요청 본문까지 13가지를 확인하고, 실제로 보낼 요청 본문을 미리 보여 줘요. 필수 항목이 실패한 줄은 송신 대기함에 담기지 않아요.'],
+    ['상태(신규 후보·입찰 중·정리 후보…)','<b>신규 후보</b> 연결이 확정됐고 이카운트 재고가 있는데 걸린 입찰이 없음 · <b>입찰 중</b> 입찰이 있고 재고도 있음 · <b>정리 후보</b> 입찰이 있는데 이카운트 재고가 없음 · <b>대상 아님</b> 재고 없음 · <b>확인 필요</b> 연결이 확정되지 않음.'],
+    ['점검 버튼(점검표 5항목)','<b>연결</b>(SKU 확정·재확인), <b>이카운트 재고</b>, <b>가격 범위</b>(정수 달러·하한~상한), <b>중복·충돌</b>(이미 걸린 입찰이나 다른 작업), <b>요청 형식</b>을 확인하고 실제로 보낼 요청 본문을 미리 보여 줘요. 하나라도 실패한 줄은 송신 대기함에 담기지 않아요.'],
     ['송신 대기함 → 작업 준비 → 확정','대기함의 줄을 한 묶음(작업)으로 만들고 30분 안에 확정합니다. 확정 때 가격이 바뀐 줄은 빠지고, 같은 줄은 두 작업에 동시에 못 들어가요. 확정까지만 가능합니다.'],
     ['시세와 재확인은 어디서 읽나요?','서버의 <span class="code">poizon_read.php --market=N / --verify=N</span> 으로 읽어요(읽기 전용). 정기 실행(크론)은 사장님 승인 뒤에 등록합니다.']
   ];

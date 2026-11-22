@@ -382,6 +382,12 @@
   <div class="df"><span class="sp"></span><button class="btn pri" data-close>닫기</button></div>
 </dialog>
 
+<dialog class="modal" id="dlgCk" aria-labelledby="dlgCkT">
+  <div class="dh"><h2 id="dlgCkT">입찰 전 점검</h2><button class="x" data-close aria-label="닫기">×</button></div>
+  <div class="db" id="ckBody"></div>
+  <div class="df"><span class="sp"></span><button class="btn pri" data-close>닫기</button></div>
+</dialog>
+
 <dialog class="modal" id="dlgPol" aria-labelledby="dlgPolT">
   <div class="dh"><h2 id="dlgPolT">가격 정책</h2><button class="x" data-close aria-label="닫기">×</button></div>
   <div class="db">
@@ -1067,7 +1073,7 @@
       var n=+r.ask_count, pr=n>0?'<div class="pr">'+won(r.min_price)+(+r.max_price>+r.min_price?' ~ '+won(r.max_price):'')+(n>1?'<span class="dupt">중복</span>':'')+'</div><div class="pr2">입찰 '+n+'건</div>':'<span class="zero">-</span>';
       var q=+r.our_qty, qty=q>0?'<span class="num" style="font-weight:700">'+q.toLocaleString('ko-KR')+'</span>':'<span class="zero">0</span>';
       var k=skKey(r), chk=(r.state==='keep'||(r.state==='new'&&r.option_name!==''))?'<input type="checkbox" class="skchk" data-k="'+esc(k)+'" aria-label="이 줄 선택"'+(SK.sel[k]?' checked':'')+'>':'';
-      return '<tr class="'+(first?'':'cont')+'"><td class="ck">'+chk+'</td><td class="pc">'+prod+'</td><td>'+opt+'</td><td class="r">'+pr+'</td><td class="r">'+qty+'</td><td class="r">'+skLow(r)+'</td><td class="r">'+skNew(r)+'</td><td class="r">'+skRange(r)+'</td><td>'+skState(r)+'</td></tr>';
+      return '<tr class="'+(first?'':'cont')+'"><td class="ck">'+chk+'</td><td class="pc">'+prod+'</td><td>'+opt+'</td><td class="r">'+pr+'</td><td class="r">'+qty+'</td><td class="r">'+skLow(r)+'</td><td class="r">'+skNew(r)+'</td><td class="r">'+skRange(r)+'</td><td>'+skState(r)+((r.state==='keep'||(r.state==='new'&&r.option_name!==''))?'<div style="margin-top:4px"><button class="kb sm" type="button" data-ckk="'+esc(k)+'">점검</button></div>':'')+'</td></tr>';
     }).join(''); }
     $('stkTotal').textContent=SK.total.toLocaleString('ko-KR')+'줄';
     $('stkMore').hidden=SK.rows.length>=SK.total;
@@ -1171,6 +1177,7 @@
   var HELP=[
     ['이 화면은 크림으로 무언가를 보내나요?','아니요. 지금은 <b>읽기만</b> 합니다. 크림에서 입찰과 시세를 읽어 와 계산하고, 가격은 송신 대기함에 담아 두기만 해요. 송신 버튼은 잠겨 있고, 사장님이 열겠다고 하실 때까지 크림에는 아무것도 올라가지 않아요.'],
     ['① 연결 정리 / ② 재고·가격 관리','① 은 우리 품번과 크림 상품을 짝짓는 곳, ② 는 짝지어진 상품의 사이즈별 재고·입찰·새 입찰가를 보는 곳이에요. ②를 쓰려면 먼저 ①에서 연결이 돼 있어야 해요.'],
+    ['점검 버튼(점검표 5항목)','연결, 이카운트 재고, 가격 범위(하한~상한), 중복·충돌, 요청 형식 5가지를 확인해요. 하나라도 실패하면 이유가 보입니다. 크림으로는 아무것도 보내지 않아요.'],
     ['새 입찰가는 어떻게 정해지나요?','크림 최저가에서 <b>가격 정책</b>의 내림 금액만큼 낮춘 값이에요. 사이트 판매가(기준가)에서 하한(−%)과 상한(+%)을 벗어나면 "확인 필요"로 빠지고 자동으로 정해지지 않아요. 정책은 오른쪽 위 <b>가격 정책</b>에서 바꿔요.'],
     ['상태 칩(유지·정리 후보·신규 후보·확인 필요)','<b>유지</b> 재고와 입찰이 모두 있음 · <b>정리 후보</b> 입찰은 있는데 재고가 없음 · <b>신규 후보</b> 재고는 있는데 입찰이 없음 · <b>확인 필요</b> 사이즈를 크림 옵션과 못 맞췄거나 가격이 허용선 밖.'],
     ['시세는 얼마나 자주 새로 읽나요?','같은 상품은 <b>24시간 안에는 다시 읽지 않아요</b>(크림 호출 한도를 아끼기 위해). 오래된 상품부터 읽습니다.'],
@@ -1181,6 +1188,18 @@
   $('btnHelp').addEventListener('click',function(){
     $('helpBody').innerHTML=HELP.map(function(h,i){ return '<details'+(i===0?' open':'')+' style="border-bottom:1px solid #eee;padding:8px 0"><summary style="cursor:pointer;font-weight:600">'+h[0]+'</summary><p style="margin:6px 0 2px;line-height:1.6;font-size:13px">'+h[1]+'</p></details>'; }).join('');
     $('dlgHelp').showModal();
+  });
+  /* 입찰 전 점검표(5항목): 한 줄을 대기함에 담기 전에 확인. 크림으로는 아무것도 보내지 않는다. */
+  document.addEventListener('click',function(e){
+    var b=e.target.closest('[data-ckk]'); if(!b) return;
+    var p=b.dataset.ckk.split('|'); b.disabled=true;
+    api({action:'check',style_norm:p[0],option_key:p.slice(1).join('|')}).then(function(j){
+      var r=j.row, c=j.result; $('dlgCkT').textContent=(r.style_raw||'')+' · '+(r.option_name||r.our_size||'')+' — '+(c.act==='create'?'신규 입찰':'가격 수정');
+      var h='<p style="margin:0 0 10px;color:var(--sub)">보낼 가격 <b>'+(c.price==null?'-':won(c.price))+'</b> · '+(c.ready?'<b style="color:var(--green)">점검 모두 통과</b>':'<b style="color:var(--red)">'+c.hard_fail+'건 실패</b>')+'</p>';
+      h+=c.checks.map(function(x){ return '<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #eeede8"><span style="flex:none;width:22px;height:22px;border-radius:50%;text-align:center;line-height:22px;font-size:12px;font-weight:800;color:#fff;background:'+(x.pass?'var(--green)':'var(--red)')+'">'+(x.pass?'✓':'✕')+'</span><div><b>'+esc(x.label)+'</b><div style="color:var(--sub)">'+esc(x.detail)+'</div></div></div>'; }).join('');
+      h+='<p style="margin:10px 0 0;color:var(--sub)">실제 송신은 잠겨 있어요('+esc(c.mode)+'). 이 점검은 크림으로 아무것도 보내지 않습니다.</p>';
+      $('ckBody').innerHTML=h; $('dlgCk').showModal();
+    }).catch(function(er){ toast(er.message); }).then(function(){ b.disabled=false; });
   });
   document.addEventListener('click',function(e){
     var c=e.target.closest('#stkChips [data-sf]'); if(c){ SK.filter=c.dataset.sf; SK.page=1; skChips(); skList(false).catch(skFail); return; }
