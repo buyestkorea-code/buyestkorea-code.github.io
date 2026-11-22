@@ -75,6 +75,54 @@
       return list.filter(function (x) { return x !== undefined; });
     }
 
+    // ---- 안드로이드(갤럭시 등) 초점 보강 (2026-11-23) ----
+    // 아이폰은 해상도·초점을 따로 요청하지 않아도 자동초점이 잘 되지만, 안드로이드 크롬은 기본값(640x480, 초점 모드 미지정)으로
+    // 열려서 갤럭시에서 흐릿하게 고정되는 경우가 있다(해상도가 낮으면 바코드를 채우려고 폰을 너무 가까이 대야 해서 최소 초점거리 안쪽이 된다).
+    // 그래서 안드로이드에서만 ① 1920x1080 요청(안 되면 기기가 가까운 해상도로 맞춤) ② 연속 자동초점 요청을 추가하고,
+    // 거절되면 예전 방식(기본값)으로 다시 열며 ③ 확대·손전등·초점 다시 맞추기를 쓸 수 있게 열어 둔다. 아이폰은 기존 동작 그대로.
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var track = null, caps = {}, torchOn = false, focusTimer = null;
+
+    function currentTrack() {
+      var v = document.querySelector('#' + o.elementId + ' video');
+      var s = v && v.srcObject;
+      return (s && s.getVideoTracks && s.getVideoTracks()[0]) || null;
+    }
+    async function tune() {
+      track = currentTrack(); torchOn = false;
+      if (!track) return;
+      try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch (e) { caps = {}; }
+      if (!isIOS && caps.focusMode && caps.focusMode.indexOf('continuous') > -1) {
+        try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
+      }
+    }
+    async function refocus() {
+      if (!track || !caps.focusMode) return false;
+      try {
+        if (caps.focusMode.indexOf('single-shot') > -1) await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+        if (caps.focusMode.indexOf('continuous') > -1) {
+          clearTimeout(focusTimer);
+          focusTimer = setTimeout(function () { try { track && track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {} }, 900);
+        }
+        return true;
+      } catch (e) { return false; }
+    }
+    async function setZoom(z) {
+      if (!track || !caps.zoom) return false;
+      var zz = Math.max(caps.zoom.min || 1, Math.min(caps.zoom.max || 1, z));
+      try { await track.applyConstraints({ advanced: [{ zoom: zz }] }); return zz; } catch (e) { return false; }
+    }
+    async function toggleTorch() {
+      if (!track || !caps.torch) return null;
+      try { await track.applyConstraints({ advanced: [{ torch: !torchOn }] }); torchOn = !torchOn; return torchOn; } catch (e) { return null; }
+    }
+    function info() {
+      if (!track) return null;
+      var st = {}; try { st = track.getSettings ? track.getSettings() : {}; } catch (e) {}
+      return { label: track.label || '', width: st.width || 0, height: st.height || 0, focusMode: st.focusMode || '',
+               focusModes: caps.focusMode || [], zoom: caps.zoom || null, torch: !!caps.torch, ios: isIOS };
+    }
+
     async function start() {
       if (running || starting) return;
       if (typeof global.Html5Qrcode === 'undefined') throw new Error('카메라 스캔 라이브러리를 불러오지 못했어요');
@@ -84,25 +132,37 @@
         var cfg = { verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } };
         var fm = formatList(); if (fm && fm.length) cfg.formatsToSupport = fm;
         mountViewport();
-        qr = new global.Html5Qrcode(o.elementId, cfg);
-        await qr.start(
-          // (해상도 videoConstraints는 일부러 안 넣는다 — 1280x720을 요청하면 폰 세로 화면에서 영상 박스가 아주 길게
-          //  잡히고 조준 박스가 영상 밖으로 밀리는 레이아웃 문제가 있었음. 라이브러리 기본 설정이 검증된 동작.)
-          { facingMode: 'environment' },
-          {
+        function scanConfig(withAndroidTuning) {
+          var c = {
             fps: o.fps || 10,
             // 가운데 가로로 긴 박스만 읽음 — 1차원 바코드에 맞는 모양이고, 배경 오인식을 줄인다.
             // 높이는 화면에 보이는 띠(viewportH) 안에 들어오게 제한
             qrbox: function (vw, vh) {
               return { width: Math.floor(Math.min(vw * 0.9, 420)), height: Math.floor(Math.min(vh * 0.38, 150, viewportH - 24)) };
             }
-          },
-          function (text) { feed(text); },
-          function () { /* 프레임에서 못 읽음 — 정상, 무시 */ }
-        );
+          };
+          // 아이폰: 해상도 videoConstraints를 넣지 않는다(예전에 영상 박스가 길어지는 문제가 있었고, 아이폰은 기본값이 검증된 동작).
+          // 안드로이드: 1280x720 + 연속 자동초점 요청. (영상은 고정 높이 띠로 잘라 보여주므로 레이아웃 문제 없음)
+          if (withAndroidTuning) c.videoConstraints = { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] };
+          return c;
+        }
+        var okCb = function (text) { feed(text); };
+        var errCb = function () { /* 프레임에서 못 읽음 — 정상, 무시 */ };
+        qr = new global.Html5Qrcode(o.elementId, cfg);
+        try {
+          await qr.start({ facingMode: 'environment' }, scanConfig(!isIOS), okCb, errCb);
+        } catch (e1) {
+          if (isIOS) throw e1;
+          // 안드로이드에서 해상도/초점 요청이 거절되면 예전 방식(기본값)으로 한 번 더 시도
+          try { await qr.stop(); } catch (e) {}
+          try { qr.clear(); } catch (e) {}
+          qr = new global.Html5Qrcode(o.elementId, cfg);
+          await qr.start({ facingMode: 'environment' }, scanConfig(false), okCb, errCb);
+        }
         running = true;
         var video = document.querySelector('#' + o.elementId + ' video');
         if (video) { video.setAttribute('playsinline', 'true'); video.muted = true; }
+        await tune();
         status('바코드를 박스 안에 가만히 비춰주세요', 'info');
       } finally { starting = false; }
     }
@@ -113,6 +173,7 @@
         try { qr.clear(); } catch (e) {}
       }
       qr = null; running = false; hist = [];
+      clearTimeout(focusTimer); track = null; caps = {}; torchOn = false;
       unmountViewport();
     }
 
@@ -139,7 +200,8 @@
       if (viewportEl) viewportEl.style.display = 'none';
     }
 
-    return { start: start, stop: stop, isRunning: function () { return running; }, _feed: feed };
+    return { start: start, stop: stop, isRunning: function () { return running; }, _feed: feed,
+             info: info, refocus: refocus, setZoom: setZoom, toggleTorch: toggleTorch };
   }
 
   global.RobustCameraScan = { create: create };
