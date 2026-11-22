@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POIZON API</title>
+<style>
+  :root{--bg:#f6f6f2;--paper:#fff;--ink:#1b1d21;--sub:#5d6068;--faint:#666972;--line:#e2e1db;--accent:#1b1d21;--blue:#2457c5;--green:#1f8a54;--red:#c0392b;--amber:#b36b00;--font:"Pretendard","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;}
+  *{box-sizing:border-box;} body{margin:0;font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;}
+  button,input,select{font:inherit;color:inherit;} .num{font-variant-numeric:tabular-nums;} :focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .top{position:sticky;top:0;z-index:20;background:var(--bg);padding:16px 24px 0;border-bottom:1px solid var(--line);}
+  .tb{display:flex;align-items:center;gap:14px;margin-bottom:6px;flex-wrap:wrap;} h1{font-size:20px;margin:0;font-weight:800;letter-spacing:-.02em;}
+  .lock{font-size:12.5px;font-weight:700;color:var(--green);background:#e6f4ec;border-radius:999px;padding:3px 11px;} .lock.warn{color:var(--red);background:#fbe9e6;}
+  .sp{flex:1;} .btn{height:34px;padding:0 14px;font-weight:600;border:1px solid #cfcec8;border-radius:7px;background:#fff;cursor:pointer;white-space:nowrap;} .btn:hover{background:#f1f1ed;}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);} .btn.sm{height:28px;padding:0 10px;font-size:13px;} .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .tabs{display:flex;gap:22px;overflow-x:auto;} .tabs button{border:0;background:none;padding:10px 0 11px;cursor:pointer;color:var(--sub);font-weight:600;border-bottom:2px solid transparent;font-size:14.5px;white-space:nowrap;}
+  .tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--ink);} .tabs button span{margin-left:6px;color:var(--faint);font-weight:500;}
+  .wrap{padding:16px 24px 80px;} .card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px;}
+  .card h2{font-size:15.5px;margin:0 0 10px;display:flex;align-items:center;gap:10px;} .card h2 .g{color:var(--faint);font-weight:500;}
+  .info{color:var(--sub);margin:0 0 10px;line-height:1.6;} .info b{color:var(--ink);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;} .stat{border:1px solid var(--line);border-radius:8px;padding:10px 12px;} .stat .k{color:var(--sub);font-size:12.5px;} .stat .v{font-size:22px;font-weight:800;}
+  .row{display:flex;gap:10px;align-items:end;flex-wrap:wrap;} label.l{display:block;font-size:12.5px;color:var(--sub);margin-bottom:3px;} input.in,select.in{height:34px;padding:0 10px;border:1px solid #cfcec8;border-radius:7px;background:#fff;} input.in{width:150px;}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px;} th{background:#efefea;text-align:left;font-size:12.5px;font-weight:600;color:var(--sub);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;} td{padding:8px 10px;border-bottom:1px solid #eeede8;vertical-align:top;} th.r,td.r{text-align:right;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px;} .chips button{border:1px solid #cfcec8;background:#fff;border-radius:999px;padding:4px 12px;cursor:pointer;font-size:13px;} .chips button[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .empty{padding:26px;text-align:center;color:var(--sub);} .tag{display:inline-block;border-radius:4px;padding:1px 7px;font-size:12px;font-weight:600;background:#eee;} .tag.ok{background:#e6f4ec;color:var(--green);} .tag.bad{background:#fbe9e6;color:var(--red);} .tag.warn{background:#fff3dd;color:var(--amber);}
+  .code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:var(--sub);} .step{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #eeede8;} .step:last-child{border:0;} .step i{font-style:normal;width:22px;height:22px;border-radius:50%;text-align:center;line-height:22px;font-size:12px;font-weight:800;background:#eee;flex:none;} .step i.ok{background:var(--green);color:#fff;} .step i.no{background:#fbe9e6;color:var(--red);}
+  dialog{border:0;border-radius:10px;padding:0;width:min(640px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(0,0,0,.3);} dialog::backdrop{background:rgba(0,0,0,.35);} .dh{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);} .dh h2{margin:0;font-size:16px;flex:1;} .db{padding:14px 18px;max-height:65vh;overflow:auto;} .df{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;} .x{border:0;background:none;font-size:22px;cursor:pointer;}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99;} #toast .t{background:#1b1d21;color:#fff;border-radius:8px;padding:10px 16px;margin-top:6px;max-width:80vw;}
+  @media (max-width:760px){.wrap{padding:12px} .top{padding:12px 12px 0} table{display:block;overflow-x:auto}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="tb"><h1>POIZON 운영</h1><span class="lock" id="lockTag">읽기 전용</span><span class="sp"></span>
+    <button class="btn" id="btnHelp" type="button">? 설명서</button></div>
+  <div class="tabs" id="tabs" role="tablist" aria-label="화면 선택">
+    <button type="button" role="tab" data-tab="home" aria-selected="true">현황·정책</button><button type="button" role="tab" data-tab="stock" aria-selected="false">재고·가격</button><button type="button" role="tab" data-tab="out" aria-selected="false">송신 대기함<span id="obCn">0</span></button><button type="button" role="tab" data-tab="ops" aria-selected="false">작업 내역</button>
+  </div>
+</header>
+<main class="wrap">
+  <section id="v-home">
+    <div class="card"><h2>실입찰 전 단계</h2><p class="info">이 화면은 <b>POIZON으로 아무것도 보내지 않습니다.</b> 아래 단계가 모두 초록이 돼도 실제 송신은 잠겨 있고, 사장님이 열겠다고 하실 때까지 열리지 않아요.</p><div id="steps"></div></div>
+    <div class="card"><h2>연결 현황</h2><div class="grid" id="stats"></div></div>
+    <div class="card"><h2>가격 정책 <span class="g" id="polState"></span></h2>
+      <p class="info">입찰가 = (사이트 판매가 + 최소 마진) ÷ 환율을 <b>정수 달러로 올림</b>한 값입니다. POIZON은 기준가보다 너무 높으면 거부하므로(8월 시험에서 2배부터 거부) <b>상한은 원가환산가의 %</b>로 막습니다.</p>
+      <div class="row"><div><label class="l" for="pRate">환율 (원/달러)</label><input class="in num" id="pRate" type="number" step="0.01"></div><div><label class="l" for="pMargin">최소 마진 (원)</label><input class="in num" id="pMargin" type="number" step="1000"></div><div><label class="l" for="pCap">가격 상한 (%)</label><input class="in num" id="pCap" type="number" step="5"></div><button class="btn pri" id="pSave">정책 저장</button></div>
+      <p class="info" id="pMsg" role="status" style="margin-top:8px"></p></div>
+  </section>
+  <section id="v-stock" hidden>
+    <div class="card"><div class="row"><div><label class="l" for="sQ">검색</label><input class="in" style="width:260px" id="sQ" type="search" placeholder="품번 · 상품명 · SKU"></div><button class="btn" id="sGo">검색</button><span class="sp"></span><button class="btn pri" id="sAdd" disabled>선택한 줄 송신 대기함에 담기</button></div></div>
+    <div class="card"><h2>재고·가격 <b class="g num" id="sTotal"></b></h2><div class="chips" id="sChips"></div>
+      <table><thead><tr><th><input type="checkbox" id="sAll" aria-label="이 페이지 전체 선택"></th><th>상품 / 옵션</th><th>상태</th><th class="r">지금 입찰</th><th class="r">최소가</th><th class="r">시장 최저</th><th class="r">새 입찰가</th><th></th></tr></thead><tbody id="sBody"></tbody></table>
+      <p style="text-align:center"><button class="btn" id="sMore" hidden>더 보기</button></p></div>
+  </section>
+  <section id="v-out" hidden>
+    <div class="card"><h2>송신 대기함 <b class="g num" id="oTotal"></b><span class="sp"></span><button class="btn sm pri" id="oPrep">작업으로 준비</button><button class="btn sm" id="oClear">전체 비우기</button></h2>
+      <p class="info">여기 담긴 가격은 <b>아직 POIZON에 올라가지 않았어요.</b> 담을 때 점검표를 통과한 줄만 들어옵니다.</p>
+      <table><thead><tr><th>상품 / 옵션</th><th>종류</th><th class="r">지금 입찰</th><th class="r">새 입찰가</th><th>담은 사람</th><th></th></tr></thead><tbody id="oBody"></tbody></table></div>
+  </section>
+  <section id="v-ops" hidden>
+    <div class="card"><h2>입찰 작업 <span class="sp"></span><button class="btn sm" id="opReload">새로고침</button></h2>
+      <p class="info">대기함의 줄을 하나의 <b>작업</b>으로 묶어 준비 → 확정까지만 기록합니다. 실행(송신)은 잠겨 있고, 준비한 작업은 30분 안에 확정하지 않으면 만료돼요.</p>
+      <table><thead><tr><th>번호</th><th>상태</th><th class="r">줄 수</th><th>준비한 시각</th><th>비고</th><th></th></tr></thead><tbody id="opBody"></tbody></table></div>
+    <div class="card"><h2>POIZON 호출 기록 <span class="sp"></span><select class="in" id="lgH"><option value="24">최근 24시간</option><option value="168">최근 7일</option><option value="720">최근 30일</option></select><label><input type="checkbox" id="lgBad"> 실패만</label></h2>
+      <p class="info" id="lgSum"></p><table><thead><tr><th>시각</th><th>작업</th><th class="r">API</th><th class="r">결과</th><th>오류</th></tr></thead><tbody id="lgBody"></tbody></table></div>
+  </section>
+</main>
+<dialog id="dlgCk"><div class="dh"><h2 id="ckT">실입찰 전 점검</h2><button class="x" data-close aria-label="닫기">×</button></div><div class="db" id="ckBody"></div><div class="df"><button class="btn" data-close>닫기</button></div></dialog>
+<dialog id="dlgHelp"><div class="dh"><h2>POIZON 운영 사용 설명서</h2><button class="x" data-close aria-label="닫기">×</button></div><div class="db" id="helpBody"></div><div class="df"><button class="btn pri" data-close>닫기</button></div></dialog>
+<div id="toast" aria-live="polite"></div>
+<script>
+(function(){
+  var API='https://buyest.co.kr/poizon_api.php', PER=50;
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function nf(n){ return (+n||0).toLocaleString('ko-KR'); }
+  function usd(c){ return c==null?'-':'$'+(c/100).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2}); }
+  function tm(ts){ ts=+ts||0; if(!ts) return '-'; var d=new Date(ts*1000),z=function(n){return (n<10?'0':'')+n;}; return z(d.getMonth()+1)+'/'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes()); }
+  function toast(m){ var d=document.createElement('div'); d.className='t'; d.textContent=m; $('toast').appendChild(d); setTimeout(function(){ d.remove(); },4200); }
+  function getAuth(){ try{ var a=JSON.parse(localStorage.getItem('buyest.dash.auth')); return (a&&a.id)?a:null; }catch(e){ return null; } }
+  function api(body){
+    var a=getAuth(); if(!a) return Promise.reject(new Error('툴킷에 로그인한 뒤 새로고침해 주세요.'));
+    var b={user:a.id,pass:a.pass}; for(var k in body) b[k]=body[k];
+    return fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){
+      return r.json().then(function(j){ if(!j.ok) throw new Error(j.need_login?'툴킷에 다시 로그인해 주세요.':(j.error||('서버 오류 '+r.status))); return j; });
+    });
+  }
+  var S={tab:'home',state:'',q:'',page:1,rows:[],total:0,sel:{}};
+  var KIND={match:'시장 최저가',capped:'상한으로 제한',floor:'최소가(시장이 더 낮음)',base:'최소가(시세 없음)',manual:'직접 입력',blocked:'판매 불가',nomap:'연결 안 됨',noprice:'가격 없음'};
+  var STATE={new:'신규 후보',keep:'입찰 중',drop:'정리 후보',skip:'대상 아님',check:'확인 필요'};
+  function tab(t){
+    S.tab=t; document.querySelectorAll('#tabs button').forEach(function(b){ b.setAttribute('aria-selected',String(b.dataset.tab===t)); });
+    ['home','stock','out','ops'].forEach(function(v){ $('v-'+v).hidden=v!==t; });
+    if(t==='home') loadHome(); if(t==='stock') loadStock(false); if(t==='out') loadOut(); if(t==='ops'){ loadOps(); loadLog(); }
+  }
+  /* 현황 */
+  function loadHome(){
+    return api({action:'summary'}).then(function(j){
+      var locked=j.mode!=='PRODUCTION'&&j.mode!=='LIVE_TEST'; $('lockTag').textContent=locked?'읽기 전용 · 송신 잠김 ('+j.mode+')':'⚠ 쓰기 모드 '+j.mode; $('lockTag').className='lock'+(locked?'':' warn');
+      $('obCn').textContent=j.staged;
+      var ready=j.status.READY||0, vm=j.verify.match||0, vbad=(j.verify.mismatch||0)+(j.verify.nores||0)+(j.verify.error||0);
+      $('stats').innerHTML=[['전체 연결',j.maps],['확정(READY)',ready],['확인 필요(REVIEW)',j.status.REVIEW||0],['SKU 없음',j.status.NO_SKU||0],['재확인 일치',vm],['재확인 불일치·실패',vbad],['시세 읽은 줄',j.market.ok],['걸린 입찰',j.active_bids]].map(function(x){ return '<div class="stat"><div class="k">'+x[0]+'</div><div class="v num">'+nf(x[1])+'</div></div>'; }).join('');
+      var steps=[
+        [vm>0&&vbad===0,'연결 재확인','표본 '+nf(vm)+'줄을 POIZON에서 다시 조회해 SKU가 맞는지 확인했어요'+(vbad?' (불일치·실패 '+vbad+')':'')+'. 더 확인하려면 서버에서 poizon_read.php --verify=N'],
+        [j.market.ok>0,'시세 읽기',j.market.ok>0?nf(j.market.ok)+'줄의 시장 최저가를 읽었어요('+tm(j.market.at)+')':'아직 시세를 읽지 않았어요(poizon_read.php --market=N)'],
+        [j.policy.confirmed,'가격 정책 확정',j.policy.confirmed?'환율 '+j.policy.usd_krw_rate+' · 마진 '+nf(j.policy.margin_krw)+'원 · 상한 '+j.policy.cap_pct+'%':'기본값 그대로예요. 환율·마진을 정하고 저장해 주세요'],
+        [j.staged>0,'송신 대기함에 담기',nf(j.staged)+'줄 담김(점검표 통과분만)'],
+        [false,'입찰 작업 준비·확정','작업 내역 탭에서 진행'],
+        [false,'POIZON으로 송신','잠겨 있음 — 1건 등록→취소 시험과 사장님 승인 뒤에만 열어요']
+      ];
+      $('steps').innerHTML=steps.map(function(s,i){ return '<div class="step"><i class="'+(s[0]?'ok':(i===5?'':'no'))+'">'+(i+1)+'</i><div><b>'+s[1]+'</b><div class="info" style="margin:0">'+s[2]+'</div></div></div>'; }).join('');
+      var p=j.policy; $('pRate').value=p.usd_krw_rate; $('pMargin').value=p.margin_krw; $('pCap').value=p.cap_pct; $('polState').textContent=p.confirmed?'저장됨 '+tm(p.updated_at)+' · '+p.updated_by:'기본값(아직 저장 안 함)';
+    }).catch(function(e){ toast(e.message); });
+  }
+  $('pSave').addEventListener('click',function(){
+    $('pSave').disabled=true; api({action:'policy_set',usd_krw_rate:$('pRate').value,margin_krw:$('pMargin').value,cap_pct:$('pCap').value}).then(function(){ $('pMsg').textContent='저장했어요. 새 입찰가가 다시 계산됩니다.'; return loadHome(); }).catch(function(e){ $('pMsg').textContent=e.message; }).then(function(){ $('pSave').disabled=false; });
+  });
+  /* 재고·가격 */
+  var CH=[['','전체'],['new','신규 후보'],['keep','입찰 중'],['drop','정리 후보'],['skip','대상 아님'],['check','확인 필요']];
+  function chips(c){ $('sChips').innerHTML=CH.map(function(x){ var n=x[0]===''?c.all:c[x[0]]; return '<button type="button" data-st="'+x[0]+'" aria-pressed="'+(S.state===x[0])+'">'+x[1]+' <span class="num">'+nf(n)+'</span></button>'; }).join(''); }
+  function loadStock(append){
+    return api({action:'list',state:S.state,q:S.q,page:S.page,per_page:PER}).then(function(j){
+      S.rows=append?S.rows.concat(j.rows):j.rows; S.total=j.total; $('sTotal').textContent=nf(j.total)+'줄'; chips(j.counts); $('sMore').hidden=S.rows.length>=j.total; drawStock();
+    }).catch(function(e){ toast(e.message); });
+  }
+  function drawStock(){
+    if(!S.rows.length){ $('sBody').innerHTML='<tr><td colspan="8"><div class="empty">조건에 맞는 줄이 없어요.</div></td></tr>'; return; }
+    $('sBody').innerHTML=S.rows.map(function(r){
+      var cls=r.state==='new'||r.state==='keep'?'ok':(r.state==='drop'?'bad':'warn');
+      return '<tr><td><input type="checkbox" data-sel="'+r.map_id+'"'+(S.sel[r.map_id]?' checked':'')+(r.rec_cent==null?' disabled':'')+' aria-label="선택"></td><td><b>'+esc(r.name||'(사이트 상품 없음)')+'</b><div class="code">'+esc(r.article)+' · '+esc(r.size)+' · SKU '+esc(r.sku_id)+'</div>'+(r.site_block?'<div class="info" style="margin:0;color:var(--red)">'+esc(r.site_block)+'</div>':'')+'</td><td><span class="tag '+cls+'">'+STATE[r.state]+'</span>'+(r.verify==='match'?' <span class="tag ok" title="POIZON에서 다시 확인함">확인됨</span>':'')+'</td><td class="r num">'+usd(r.own_cent)+'</td><td class="r num">'+usd(r.min_cent||null)+'</td><td class="r num">'+usd(r.ref_cent||null)+'</td><td class="r num"><b>'+usd(r.rec_cent)+'</b><div class="code">'+esc(KIND[r.rec_kind]||r.rec_kind)+'</div></td><td><button class="btn sm" data-ck="'+r.map_id+'">점검</button></td></tr>';
+    }).join('');
+    $('sAdd').disabled=!Object.keys(S.sel).length;
+  }
+  $('sChips').addEventListener('click',function(e){ var b=e.target.closest('[data-st]'); if(!b) return; S.state=b.dataset.st; S.page=1; loadStock(false); });
+  $('sGo').addEventListener('click',function(){ S.q=$('sQ').value.trim(); S.page=1; loadStock(false); });
+  $('sQ').addEventListener('keydown',function(e){ if(e.key==='Enter') $('sGo').click(); });
+  $('sMore').addEventListener('click',function(){ S.page++; loadStock(true); });
+  $('sAll').addEventListener('change',function(){ S.rows.forEach(function(r){ if(r.rec_cent!=null){ if($('sAll').checked) S.sel[r.map_id]=1; else delete S.sel[r.map_id]; } }); drawStock(); });
+  $('sBody').addEventListener('change',function(e){ var c=e.target.closest('[data-sel]'); if(!c) return; if(c.checked) S.sel[c.dataset.sel]=1; else delete S.sel[c.dataset.sel]; $('sAdd').disabled=!Object.keys(S.sel).length; });
+  $('sBody').addEventListener('click',function(e){ var b=e.target.closest('[data-ck]'); if(b) openCheck(b.dataset.ck); });
+  $('sAdd').addEventListener('click',function(){
+    var ids=Object.keys(S.sel); if(!ids.length) return; $('sAdd').disabled=true;
+    api({action:'outbox_add',items:ids.map(function(i){ return {map_id:+i}; })}).then(function(j){
+      S.sel={}; toast(nf(j.added)+'줄을 송신 대기함에 담았어요. POIZON으로는 보내지 않았어요.'+(j.skipped.length?' 점검 실패로 제외 '+j.skipped.length+'줄: '+j.skipped[0].reason:''));
+      return loadStock(false).then(function(){ return loadHome(); });
+    }).catch(function(e){ toast(e.message); drawStock(); });
+  });
+  function openCheck(id){
+    api({action:'check',map_id:+id}).then(function(j){
+      var r=j.row, c=j.result; $('ckT').textContent=(r.article||'')+' · '+(r.size||'')+' — '+({create:'신규 등록',update:'가격 수정',cancel:'취소'}[j.act]);
+      var h='<p class="info">보낼 가격 <b>'+usd(c.price_cent)+'</b> · '+(c.ready?'<span class="tag ok">필수 점검 모두 통과</span>':'<span class="tag bad">필수 점검 '+c.hard_fail+'건 실패</span>')+'</p>';
+      h+=c.checks.map(function(x){ return '<div class="step"><i class="'+(x.pass?'ok':(x.hard?'no':''))+'">'+(x.pass?'✓':(x.hard?'✕':'·'))+'</i><div><b>'+esc(x.label)+(x.hard?'':' <span class="tag">참고</span>')+'</b><div class="info" style="margin:0">'+esc(x.detail)+'</div></div></div>'; }).join('');
+      h+='<p class="info" style="margin-top:10px"><b>보낼 요청 본문(미리보기, 전송 안 함)</b></p><pre class="code" style="white-space:pre-wrap;background:#f6f6f2;padding:10px;border-radius:6px">'+esc(JSON.stringify(c.payload,null,2))+'</pre>';
+      $('ckBody').innerHTML=h; $('dlgCk').showModal();
+    }).catch(function(e){ toast(e.message); });
+  }
+  /* 송신 대기함 */
+  function loadOut(){
+    return api({action:'outbox_list',page:1,per_page:100}).then(function(j){
+      $('oTotal').textContent=nf(j.total)+'줄'; $('obCn').textContent=j.total;
+      $('oBody').innerHTML=j.rows.length?j.rows.map(function(r){ return '<tr><td><b>'+esc(r.name||'')+'</b><div class="code">'+esc(r.article_number)+' · '+esc(r.size_text)+' · SKU '+esc(r.sku_id)+'</div></td><td>'+({create:'신규 등록',update:'가격 수정'}[r.action]||r.action)+'<div class="code">'+esc(KIND[r.kind]||r.kind)+'</div></td><td class="r num">'+usd(r.old_price==null?null:+r.old_price)+'</td><td class="r num"><b>'+usd(+r.new_price)+'</b></td><td>'+esc(r.created_by)+'<div class="code">'+tm(r.created_at)+'</div></td><td><button class="btn sm" data-rm="'+r.map_id+'">빼기</button></td></tr>'; }).join(''):'<tr><td colspan="6"><div class="empty">송신 대기함이 비어 있어요.<br>재고·가격 탭에서 줄을 골라 담아 보세요.</div></td></tr>';
+    }).catch(function(e){ toast(e.message); });
+  }
+  $('oBody').addEventListener('click',function(e){ var b=e.target.closest('[data-rm]'); if(!b) return; api({action:'outbox_remove',items:[{map_id:+b.dataset.rm}]}).then(loadOut).catch(function(er){ toast(er.message); }); });
+  $('oClear').addEventListener('click',function(){ if(confirm('송신 대기함을 모두 비울까요? POIZON에는 영향이 없어요.')) api({action:'outbox_remove',all:true}).then(loadOut).catch(function(e){ toast(e.message); }); });
+  $('oPrep').addEventListener('click',function(){
+    if(!confirm('송신 대기함의 줄을 하나의 입찰 작업으로 준비할까요?\nPOIZON으로는 아무것도 보내지 않아요. 30분 안에 확정하지 않으면 만료돼요.')) return;
+    api({action:'ops_prepare'}).then(function(j){ toast('작업 #'+j.op_id+' 준비('+nf(j.items)+'줄'+(j.skipped.length?', 건너뜀 '+j.skipped.length:'')+')'); tab('ops'); }).catch(function(e){ toast(e.message); });
+  });
+  /* 작업 내역 */
+  var OPST={prepared:'준비됨',confirmed:'확정됨',executing:'실행 중',done:'완료',partial:'일부 실패',paused:'한도로 멈춤',cancelled:'취소',expired:'만료',interrupted:'끊김'};
+  function loadOps(){
+    return api({action:'ops_list'}).then(function(j){
+      $('opBody').innerHTML=j.rows.length?j.rows.map(function(o){
+        var act=o.status==='prepared'?'<button class="btn sm pri" data-opc="'+o.id+'">확정</button> <button class="btn sm" data-opx="'+o.id+'">취소</button>':(o.status==='confirmed'||o.status==='paused')?'<button class="btn sm" data-opx="'+o.id+'">취소</button>':'';
+        return '<tr><td class="num">#'+o.id+'</td><td>'+esc(OPST[o.status]||o.status)+'</td><td class="r num">'+nf(o.item_count)+'</td><td class="num">'+tm(o.created_at)+' · '+esc(o.created_by)+'</td><td>'+esc(o.error||'')+(+o.bad_n?' 확인 필요 '+o.bad_n+'줄':'')+'</td><td>'+act+'</td></tr>';
+      }).join(''):'<tr><td colspan="6"><div class="empty">아직 만든 작업이 없어요.</div></td></tr>';
+    }).catch(function(e){ toast(e.message); });
+  }
+  $('opBody').addEventListener('click',function(e){
+    var c=e.target.closest('[data-opc]'), x=e.target.closest('[data-opx]');
+    if(c){ if(!confirm('작업 #'+c.dataset.opc+'을 확정할까요? 그 사이 가격이 바뀐 줄은 빠져요. 확정해도 POIZON으로는 보내지 않아요.')) return; api({action:'ops_confirm',op_id:c.dataset.opc}).then(function(j){ toast('확정('+nf(j.items)+'줄'+(j.changed.length?', 바뀌어서 뺀 줄 '+j.changed.length:'')+')'); }).catch(function(er){ toast(er.message); }).then(loadOps); }
+    else if(x){ if(!confirm('작업 #'+x.dataset.opx+'을 취소할까요?')) return; api({action:'ops_cancel',op_id:x.dataset.opx}).then(function(){ toast('취소했어요.'); }).catch(function(er){ toast(er.message); }).then(loadOps); }
+  });
+  $('opReload').addEventListener('click',loadOps);
+  function loadLog(){
+    return api({action:'log_summary',hours:+$('lgH').value,only_bad:$('lgBad').checked?1:0}).then(function(j){
+      var s=j.summary; $('lgSum').innerHTML='호출 <b class="num">'+nf(s.total)+'</b>건 · 실패 <b class="num">'+nf(s.failed)+'</b>건 · 쓰기 <b class="num">'+nf(s.writes)+'</b>건'+(s.last_at?' · 마지막 '+tm(s.last_at):'');
+      $('lgBody').innerHTML=j.rows.length?j.rows.map(function(r){ return '<tr><td class="num">'+tm(r.at)+'</td><td>'+esc(r.action)+(r.dry_run==='Y'?' <span class="tag">시험</span>':'')+'</td><td class="r num">'+esc(r.api_id)+'</td><td class="r num">'+(r.success==='Y'?'성공':'<span style="color:var(--red)">실패</span>')+' '+esc(r.http_status)+'</td><td>'+esc(r.error)+'</td></tr>'; }).join(''):'<tr><td colspan="5"><div class="empty">이 기간에 기록이 없어요.</div></td></tr>';
+    }).catch(function(e){ toast(e.message); });
+  }
+  $('lgH').addEventListener('change',loadLog); $('lgBad').addEventListener('change',loadLog);
+  /* 설명서 */
+  var HELP=[
+    ['이 화면은 POIZON으로 무언가를 보내나요?','아니요. 읽기와 계산만 합니다. 가격은 송신 대기함에 담아 두기만 하고 송신은 잠겨 있어요. 사장님이 열겠다고 하실 때까지 POIZON에는 아무것도 올라가지 않습니다.'],
+    ['새 입찰가는 어떻게 정해지나요?','(사이트 판매가 + 최소 마진) ÷ 환율을 정수 달러로 올린 값이 <b>최소가</b>입니다. POIZON 시장 최저가를 읽었고 최소가 이상이면 그 가격에 맞추고, 시장이 더 낮으면 최소가로 둡니다. 어느 경우든 <b>상한(원가환산가의 %)</b>을 넘지 않아요.'],
+    ['왜 정수 달러, 왜 상한이 있나요?','8월 외주 시험에서 $462.50은 "정수여야 함"으로, 원가환산 2배 이상은 "가격이 너무 높음"으로 거부됐어요. 1.5배 이내의 정수 달러만 통과했습니다.'],
+    ['상태(신규 후보·입찰 중·정리 후보…)','<b>신규 후보</b> 연결이 확정됐고 사이트에서 판매 가능한데 걸린 입찰이 없음 · <b>입찰 중</b> 입찰이 있고 판매 가능 · <b>정리 후보</b> 입찰이 있는데 사이트에서 품절·숨김 · <b>대상 아님</b> 판매 불가 · <b>확인 필요</b> 연결이 확정되지 않음.'],
+    ['점검 버튼(실입찰 전 점검표)','연결, 재확인, 사이트 재고, 가격 규칙, 이중 등록, 다른 작업과 충돌, 요청 본문까지 13가지를 확인하고, 실제로 보낼 요청 본문을 미리 보여 줘요. 필수 항목이 실패한 줄은 송신 대기함에 담기지 않아요.'],
+    ['송신 대기함 → 작업 준비 → 확정','대기함의 줄을 한 묶음(작업)으로 만들고 30분 안에 확정합니다. 확정 때 가격이 바뀐 줄은 빠지고, 같은 줄은 두 작업에 동시에 못 들어가요. 확정까지만 가능합니다.'],
+    ['시세와 재확인은 어디서 읽나요?','서버의 <span class="code">poizon_read.php --market=N / --verify=N</span> 으로 읽어요(읽기 전용). 정기 실행(크론)은 사장님 승인 뒤에 등록합니다.']
+  ];
+  $('btnHelp').addEventListener('click',function(){ $('helpBody').innerHTML=HELP.map(function(h,i){ return '<details'+(i===0?' open':'')+' style="border-bottom:1px solid #eee;padding:8px 0"><summary style="cursor:pointer;font-weight:600">'+h[0]+'</summary><p class="info" style="margin:6px 0 2px;font-size:13px">'+h[1]+'</p></details>'; }).join(''); $('dlgHelp').showModal(); });
+  document.addEventListener('click',function(e){ var c=e.target.closest('[data-close]'); if(c) c.closest('dialog').close(); });
+  $('tabs').addEventListener('click',function(e){ var b=e.target.closest('[data-tab]'); if(b) tab(b.dataset.tab); });
+  tab('home');
+})();
+</script>
+</body>
+</html>
