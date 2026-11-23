@@ -236,7 +236,7 @@
     <input type="checkbox" id="zoom" hidden>
     <label class="hint"><input type="checkbox" id="bgwhite" checked> 연한 회색 배경 사진은 흰 배경으로 자동 정리</label>
     <label class="hint" style="margin-left:14px" title="브라우저 안에서 AI가 제품만 남기고 배경을 흰색으로 바꿉니다. 사진은 밖으로 나가지 않아요. 처음 한 번 모델(약 179MB)을 내려받고(이후엔 저장됨), 사진 한 장에 약 10초 걸립니다."><input type="checkbox" id="aicut"> AI 누끼 (어떤 배경이든 제품만 남기고 흰색 · 얇은 체인도 잡는 고성능 AI · 사진 한 장에 약 10초)</label>
-    <label class="hint" style="margin-left:14px" title="JPG 전체 저장으로 나오는 3컷(1000×1000 두 장 · 960×1280 한 장)에서 상품이 차지하는 크기. 긴 쪽이 캔버스의 이 %까지 커집니다. 1000×1000에서 정한 상품 크기를 960×1280에도 똑같이 씁니다(비율이 바뀌어 길어 보이지 않게).">컷 사진 상품 크기 <input type="number" id="cutW" value="90" min="50" max="100" step="1" style="width:60px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> %</label>
+    <span class="hint" style="margin-left:14px" title="JPG 전체 저장으로 나오는 컷에서 상품이 차지하는 크기. 긴 쪽이 캔버스의 이 %까지 커집니다. 01 사진과 02 사진을 따로 정할 수 있어요. 960×1280(_0012)은 01 사진 설정을 따라갑니다.">컷 사진 상품 크기 <label>01 <input type="number" id="cutW" value="90" min="50" max="100" step="1" style="width:60px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> %</label> <label style="margin-left:8px">02 <input type="number" id="cutW2" value="90" min="50" max="100" step="1" style="width:60px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> %</label></span>
     <label class="hint" style="margin-left:14px" title="Product Detail 아래 상세 사진들 사이의 세로 간격(px). 전체에 한 번에 적용됩니다">사진 사이 여백 <input type="number" id="photoGap" value="37" min="0" max="400" step="1" style="width:68px;font:13px var(--font);padding:4px 6px;border:1px solid var(--line);border-radius:6px"> px
       <button class="btn btn-out btn-sm" type="button" data-gap="0">0</button><button class="btn btn-out btn-sm" type="button" data-gap="37">기본</button><button class="btn btn-out btn-sm" type="button" data-gap="80">80</button><button class="btn btn-out btn-sm" type="button" data-gap="150">150</button></label>
   </div>
@@ -1393,10 +1393,10 @@ $('dl').addEventListener('click',function(){
 });
 /* 다른 팀에 넘기는 컷: 첫 사진 → _0012(960×1280)·_01_(1000×1000), 둘째 사진(없으면 첫 사진) → _02_(1000×1000)
    상품 가장자리를 잘라낸 뒤, 1000×1000 캔버스에서 긴 쪽이 cutW % 가 되는 배율을 정하고 그 배율을 960×1280 에도 똑같이 쓴다(캔버스를 넘으면 그때만 줄임). 흰 캔버스 가운데에 놓는다 */
-function cutCanvas(p,cw,ch){
+function cutCanvas(p,cw,ch,pid){
   return loadImg(p.url).then(function(im){
     return cleanBg(adjustCanvas(toWhiteCanvas(im),p.adj),p).then(function(rr){ var c=rr.c;
-    var b=trimBox(c), bw=b[2]-b[0], bh=b[3]-b[1], pc=Math.max(50,Math.min(100,parseInt($('cutW').value,10)||90))/100;
+    var b=trimBox(c), bw=b[2]-b[0], bh=b[3]-b[1], pc=Math.max(50,Math.min(100,parseInt($(pid||'cutW').value,10)||90))/100;
     var kBase=Math.min(1000*pc/bw,1000*pc/bh);                       /* 기준: 1000×1000 */
     var k=Math.min(kBase,cw*pc/bw,ch*pc/bh), w=Math.max(1,Math.round(bw*k)), h=Math.max(1,Math.round(bh*k));
     var r=resizeFrom(c,b[0],b[1],bw,bh,w,h), o=document.createElement('canvas'); o.width=cw; o.height=ch;
@@ -1412,7 +1412,7 @@ $('dla').addEventListener('click',function(){
   var jobs=[[function(){ return Promise.resolve(state.canvas); },code+'_00.jpg'],
             [function(){ return cutCanvas(p1,960,1280); },code+'_0012.jpg'],
             [function(){ return cutCanvas(p1,1000,1000); },code+'_01_.jpg'],
-            [function(){ return cutCanvas(p2,1000,1000); },code+'_02_.jpg']], i=0;
+            [function(){ return cutCanvas(p2,1000,1000,'cutW2'); },code+'_02_.jpg']], i=0;
   var zip=window.JSZip?new JSZip():null;
   function next(){
     if(i>=jobs.length) return Promise.resolve();
@@ -1445,8 +1445,8 @@ $('dlz').addEventListener('click',function(){
   if(!state.last||!state.canvas) return; applyPending();
   if(!window.JSZip||!window.PhotoRegister){ $('status').textContent='ZIP 도구를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.'; return; }
   var b=$('dlz'), old=$('status').textContent, code=codeOf(), zip=new JSZip(); b.disabled=true; $('status').textContent='JPEG · 잘라낸 사진 · PSD · 엑셀 만드는 중…';
-  var p1=state.photos[0], p2=state.photos[1]||state.photos[0], cuts=[[960,1280,'_0012.jpg',p1],[1000,1000,'_01_.jpg',p1],[1000,1000,'_02_.jpg',p2]], ci=0;
-  function nextCut(){ if(ci>=cuts.length) return Promise.resolve(); var c=cuts[ci++]; $('status').textContent='잘라낸 사진 만드는 중… ('+ci+'/'+cuts.length+')'; return cutCanvas(c[3],c[0],c[1]).then(encodeJpeg).then(function(j){ zip.file(code+c[2],j); }).then(nextCut); }
+  var p1=state.photos[0], p2=state.photos[1]||state.photos[0], cuts=[[960,1280,'_0012.jpg',p1,'cutW'],[1000,1000,'_01_.jpg',p1,'cutW'],[1000,1000,'_02_.jpg',p2,'cutW2']], ci=0;
+  function nextCut(){ if(ci>=cuts.length) return Promise.resolve(); var c=cuts[ci++]; $('status').textContent='잘라낸 사진 만드는 중… ('+ci+'/'+cuts.length+')'; return cutCanvas(c[3],c[0],c[1],c[4]).then(encodeJpeg).then(function(j){ zip.file(code+c[2],j); }).then(nextCut); }
   encodeJpeg(state.canvas).then(function(j){ zip.file(code+'_00.jpg',j); })
   .then(nextCut)
   .then(function(){ return loadScript('assets/libs/ag-psd-28.2.2.bundle.js'); })
@@ -1913,7 +1913,7 @@ window.PhotoAuto={
   },
   /* 목록(_01)/오버(_02) 이미지용: 상품 가장자리를 잘라 1000×1000 흰 캔버스 가운데에 놓는다(JPG 전체 저장의 _01_/_02_ 와 같은 방식, 크기는 '컷 사진 상품 크기 %' 설정). 마우스를 올리면 다른 사진으로 바뀌는 목록용 */
   photoJpeg:function(p){
-    return cutCanvas(p,1000,1000).then(encodeJpeg);
+    return cutCanvas(p,1000,1000,(state.photos.length>1&&p===state.photos[1])?'cutW2':'cutW').then(encodeJpeg);
   },
   /* 템플릿: 실측 항목(머리글)만 채움. 값은 사람이 입력 */
   applyTemplate:function(b){
