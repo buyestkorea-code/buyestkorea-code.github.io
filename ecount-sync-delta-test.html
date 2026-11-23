@@ -112,6 +112,7 @@
   </div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
+<script src="assets/tk-who.js"></script>
 <script>
 const REPORT_URL = 'https://buyest.co.kr/ecount_sync_report_test_api.php';   // TEST: 후보 목록(candidates) 포함
 const EXEC_URL = 'https://buyest.co.kr/ecount_sync_execute_api.php';
@@ -215,7 +216,7 @@ async function loadFromExcel(file) {
     const res = await fetch(REPORT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows })
+      body: JSON.stringify(tkWho({ rows }))
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
@@ -397,7 +398,7 @@ async function refreshMapping() {
     const res = await fetch(REFRESH_MAP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: failedRows })
+      body: JSON.stringify(tkWho({ items: failedRows }))
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
@@ -431,7 +432,7 @@ async function saveMappings() {
     const res = await fetch(SAVE_MAP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: currentItems })
+      body: JSON.stringify(tkWho({ items: currentItems }))
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
@@ -484,7 +485,7 @@ async function execute() {
     const res = await fetch(EXEC_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: runItems })
+      body: JSON.stringify(tkWho({ items: runItems }))
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
@@ -557,7 +558,7 @@ async function mpLoad(page) {
   try {
     const res = await fetch(LOOKUP_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: mp.q, filter: mp.filter, page: mp.page, per: mp.per })
+      body: JSON.stringify(tkWho({ q: mp.q, filter: mp.filter, page: mp.page, per: mp.per }))
     });
     const d = await res.json();
     if (mine !== mp.seq) return;
@@ -639,7 +640,7 @@ async function mpSave(i) {
   try {
     const res = await fetch(SAVE_MAP_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: [{ ec_code: r.ec_code, size: r.size || '', qty: r.ec_qty ?? 0, buyest_product_code: code }] })
+      body: JSON.stringify(tkWho({ items: [{ ec_code: r.ec_code, size: r.size || '', qty: r.ec_qty ?? 0, buyest_product_code: code }] }))
     });
     const d = await res.json();
     if (!d.ok) throw new Error(d.error || '알 수 없는 오류');
