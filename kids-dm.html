@@ -168,7 +168,14 @@ const apiMsg = m => m.replace(/\{링크\}/g, '{link}');
 
 /* ---------- 데이터 로드 ---------- */
 async function loadHome() { S.loading = true; S.err = ''; render(); try { S.ov = await api('overview'); } catch (e) { S.err = e.message; } S.loading = false; render(); }
-async function loadMedia() { if (S.media) return; try { S.media = (await api('media')).media; } catch (e) { S.err = e.message; } render(); }
+async function loadMedia() { if (S.media) return; try { const j = await api('media'); S.media = j.media; S.mediaNext = j.next || ''; } catch (e) { S.err = e.message; } render(); }
+async function loadMoreMedia() {
+  if (!S.mediaNext || S.mediaMore) return;
+  S.mediaMore = true; render();
+  try { const j = await api('media', { after: S.mediaNext }); const have = new Set(S.media.map(m => m.id)); S.media = S.media.concat(j.media.filter(m => !have.has(m.id))); S.mediaNext = j.next || ''; }
+  catch (e) { toast(e.message); }
+  S.mediaMore = false; render();
+}
 async function loadTpls() { try { S.tpls = (await api('tpl_list')).templates; } catch (e) { S.err = e.message; } render(); }
 async function loadLog() { try { S.log = (await api('log')).items; } catch (e) { S.err = e.message; } render(); }
 
@@ -277,7 +284,7 @@ function viewNew(v) {
     <div class="card" id="stepbox"></div></div>${previewHTML()}</div>`);
   const box = $('#stepbox');
   if (S.step === 1) {
-    box.innerHTML = `<h2>어느 게시물에 자동화를 걸까요?</h2><p class="lead">이 게시물에 댓글을 달면 DM이 가요. 최근 게시물 24개가 보여요.</p><div class="grid" id="grid">${S.media ? '' : '<p class="muted">게시물을 불러오는 중이에요…</p>'}</div><div class="nav"><span></span><button class="btn" id="next" ${d.media_id ? '' : 'disabled'}>다음</button></div>`;
+    box.innerHTML = `<h2>어느 게시물에 자동화를 걸까요?</h2><p class="lead">이 게시물에 댓글을 달면 DM이 가요. 최근 게시물부터 24개씩 보여요. 예전 게시물은 아래 '이전 게시물 더 보기'를 눌러 주세요.</p><div class="grid" id="grid">${S.media ? '' : '<p class="muted">게시물을 불러오는 중이에요…</p>'}</div>${S.media && S.mediaNext ? `<div style="text-align:center;margin-top:12px"><button class="btn ghost" id="moreMedia" ${S.mediaMore ? 'disabled' : ''}>${S.mediaMore ? '불러오는 중…' : '이전 게시물 더 보기'}</button></div>` : S.media && S.media.length ? '<p class="muted" style="text-align:center;margin-top:12px">모든 게시물을 불러왔어요.</p>' : ''}<div class="nav"><span></span><button class="btn" id="next" ${d.media_id ? '' : 'disabled'}>다음</button></div>`;
     if (S.media) {
       $('#grid').innerHTML = S.media.map(m => `<button class="pick ${d.media_id === m.id ? 'sel' : ''}" data-m="${m.id}" aria-label="${esc(m.caption || '게시물')} 선택" aria-pressed="${d.media_id === m.id}"><img src="${esc(m.thumb)}" alt="" referrerpolicy="no-referrer" loading="lazy"><span class="ty">${m.type === 'VIDEO' ? '릴스' : m.type === 'CAROUSEL_ALBUM' ? '여러 장' : '사진'}</span>${m.rules ? `<span class="tag">자동화 ${m.rules}</span>` : ''}</button>`).join('') || '<p class="muted">게시물이 없어요.</p>';
       $('#grid').querySelectorAll('.pick').forEach(b => b.onclick = () => {
@@ -287,6 +294,7 @@ function viewNew(v) {
         render();
       });
     }
+    if ($('#moreMedia')) $('#moreMedia').onclick = loadMoreMedia;
     $('#next').onclick = () => { S.step = 2; render(); };
   } else if (S.step === 2) {
     const tplOpts = (S.tpls || []).map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
