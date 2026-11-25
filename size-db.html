@@ -303,7 +303,8 @@
     var ks = Object.keys(b.meas).sort(function(a,c){var i=ORDER.indexOf(a),j=ORDER.indexOf(c);return (i<0?99:i)-(j<0?99:j);});
     var line = ks.map(function(k){return k+' '+fmt(b.meas[k]);}).join('  ·  ');
     var txt = size+' 사이즈 '+ks.map(function(k){return k+' '+fmt(b.meas[k]);}).join(' / ');
-    if (b.kind==='est') txt += ' (참고용 추정값)'; else if (b.label!=='같은 품번') txt += ' (비슷한 상품 기준 참고용)';
+    var basis = b.label==='같은 품번' ? '' : '비슷한 상품 기준 ';
+    if (b.kind==='est') txt += ' ('+basis+'참고용 추정값)'; else if (basis) txt += ' ('+basis+'참고용)';
     var tag = b.kind==='act' ? (b.label==='같은 품번' ? '실측 · 같은 품번' : '실측 · '+b.label) : (b.est.kind==='보간' ? '추정값 · '+fmt(b.est.from[0])+'와 '+fmt(b.est.from[1])+' 사이 계산' : '추정값 · 끝 사이즈 연장 (정확도 낮음)');
     return '<div class="answer'+(b.kind==='est'?' est':'')+'"><button class="copy" data-copy="'+esc(txt)+'">답변 문구 복사</button>'+
       '<div class="tag">'+esc(tag)+'</div><div class="line">'+esc(size)+'&nbsp;&nbsp;'+esc(line)+'</div>'+
