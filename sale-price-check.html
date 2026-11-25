@@ -68,6 +68,9 @@
   table.cfg td{padding:6px 8px;}
   table.cfg input[type=text],table.cfg input[type=number],table.cfg select{width:100%;padding:6px 8px;font-size:13px;}
   table.cfg input.n{width:96px;text-align:right;font-variant-numeric:tabular-nums;}
+  table.cfg input.mn{min-width:150px;}
+  table.cfg input.id{min-width:118px;font-variant-numeric:tabular-nums;}
+  table.cfg input.lb{min-width:112px;}
   table.cfg td.x{width:1%;}
   table.cfg tr.flash td{background:var(--warnbg);}
   .addrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
@@ -79,12 +82,14 @@
 <body>
 <h1>판매가 검증 <span class="badge">TEST</span></h1>
 <p class="lead">사방넷 주문서(주문서확인처리) 엑셀을 올리면, 몰별 기준 가격과 실제 판매가를 비교해 다른 건만 골라 줍니다.<br>
-기준은 <b>필웨이 가격 = 현재 사방넷 가격</b>(주문서 원가 ÷ 0.87)이고, 몰마다 얼마를 곱한 값이 정상인지는 아래 <b>몰별 기준 설정</b>에서 직접 정합니다. 결제금액은 쿠폰·할인이 반영돼 있어 판정하지 않고 참고로만 보여 줍니다.</p>
+기준은 <b>필웨이 가격 = 현재 사방넷 가격</b>(주문서 원가 ÷ 0.87)이고, 몰마다 얼마를 곱한 값이 정상인지는 아래 <b>몰별 기준 설정</b>에서 직접 정합니다. 결제금액은 쿠폰·할인이 반영돼 있어 판정하지 않고 참고로만 보여 줍니다.<br>
+<b>SSG.COM은 계정이 두 개</b>라 주문서의 쇼핑몰ID로 나눠 <b>BUYEST11 (SSG바이스트)</b>와 <b>0024852987 (SSG신세계V)</b>를 따로 검증합니다.</p>
 
 <details class="box" id="cfgBox" open>
   <summary><b>몰별 기준 설정</b> <span class="hint" id="cfgSum"></span></summary>
   <p class="hint" style="margin:8px 0 0;">몰마다 <b>필웨이 가격에 곱할 배수</b>를 정합니다. 고치면 바로 저장되고 아래 검증에도 곧바로 반영됩니다. 이 브라우저에 저장되므로, 다른 PC·직원과 맞추려면 "설정 내보내기"로 파일을 만들어 "설정 가져오기"로 불러오세요.<br>
-  몰 이름은 앞부분이 같으면 같은 몰로 봅니다 (예: "쿠팡"은 "쿠팡 (로켓)"도 포함). 목록에 없는 몰은 ×1.0으로 봅니다.</p>
+  몰 이름은 앞부분이 같으면 같은 몰로 봅니다 (예: "쿠팡"은 "쿠팡 (로켓)"도 포함). 목록에 없는 몰은 ×1.0으로 봅니다.<br>
+  <b>쇼핑몰ID</b>를 적은 줄은 그 계정 주문에만 적용되고, 비우면 몰 전체에 적용됩니다. 계정별로 나눈 몰에서 목록에 없는 ID가 나오면 "미검증"으로 표시합니다.</p>
   <div class="row cfg-top">
     <label>사방넷 기준가 = 주문서 원가 ÷ <input type="number" step="0.01" min="0.01" id="cfgCost" aria-label="원가율"></label>
     <label>허용 오차 ± <input type="number" step="10" min="0" id="cfgTol" aria-label="허용 오차 원"> 원</label>
@@ -103,7 +108,7 @@
 <div class="box">
   <div class="drop" id="drop">
     <b>주문서 엑셀을 여기에 놓거나 아래 버튼으로 선택하세요</b>
-    <span class="hint">사방넷 &gt; 주문관리 &gt; 주문서확인처리에서 내려받은 파일 (원가·수량·판매가·결제금액 열이 있는 출력양식)</span>
+    <span class="hint">사방넷 &gt; 주문관리 &gt; 주문서확인처리에서 내려받은 파일 (원가·수량·판매가·결제금액·쇼핑몰ID 열이 있는 출력양식)</span>
     <div style="margin-top:12px;"><span class="filebtn"><button class="btn btn-pri" type="button">주문서 엑셀 선택</button><input id="file" type="file" accept=".xls,.xlsx" aria-label="주문서 엑셀 선택"></span></div>
   </div>
   <div class="hint" id="fileInfo" style="margin-top:8px;" hidden></div>
@@ -138,7 +143,7 @@
 </div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
-<script src="sale-price-core.js"></script>
+<script src="sale-price-core.js?v=20261125"></script>
 <script>
 (function(){
   var C = window.SalePriceCore;
@@ -154,14 +159,14 @@
   function sgn(n){ var v = Math.round(n); return v === 0 ? '0' : (v > 0 ? '+' : '-') + Math.abs(v).toLocaleString('ko-KR'); }
   function normCfg(o){
     var d = C.defaultConfig();
-    var c = { costRate: o.costRate > 0 ? +o.costRate : d.costRate, tol: (o.tol !== '' && o.tol != null && o.tol >= 0) ? +o.tol : d.tol, malls: [], ranges: d.ranges };
+    var c = { ver: +o.ver || 1, costRate: o.costRate > 0 ? +o.costRate : d.costRate, tol: (o.tol !== '' && o.tol != null && o.tol >= 0) ? +o.tol : d.tol, malls: [], ranges: d.ranges };
     if (o.ranges && o.ranges.BUYMA && o.ranges.BUYMA.lo > 0 && o.ranges.BUYMA.hi > 0) c.ranges = { BUYMA: { lo: +o.ranges.BUYMA.lo, hi: +o.ranges.BUYMA.hi, jpy: true } };
     (o.malls || []).forEach(function(m){
       if (!m || !String(m.name || '').trim()) return;
-      c.malls.push({ name: String(m.name).trim(), mult: (m.mult === '' || m.mult == null) ? '' : +m.mult,
+      c.malls.push({ name: String(m.name).trim(), id: String(m.id || '').trim(), label: String(m.label || '').trim(), mult: (m.mult === '' || m.mult == null) ? '' : +m.mult,
         alts: (m.alts || []).map(Number).filter(function(x){ return x > 0; }), round: m.round === 'c100' ? 'c100' : 'r10', note: String(m.note || '') });
     });
-    return c;
+    return C.upgradeConfig(c);
   }
   function loadCfg(){
     try { var o = JSON.parse(localStorage.getItem(CFG_LS) || 'null'); if (o && Array.isArray(o.malls)) return normCfg(o); } catch(e){}
@@ -169,11 +174,20 @@
     try {   // 예전 화면에서 고쳐 둔 배수가 있으면 이어받는다
       var old = JSON.parse(localStorage.getItem(OLD_LS) || 'null');
       if (old) Object.keys(old).forEach(function(k){
+        if (k === 'SSG.COM' || k === 'SSG 사이먼') return;   // 계정별 기준으로 바뀜
         var hit = c.malls.filter(function(m){ return m.name === k; })[0];
-        if (hit) hit.mult = old[k] == null ? '' : old[k]; else c.malls.push({ name: k, mult: old[k] == null ? '' : old[k], alts: [], round: 'r10', note: '' });
+        if (hit) hit.mult = old[k] == null ? '' : old[k]; else c.malls.push({ name: k, id: '', label: '', mult: old[k] == null ? '' : old[k], alts: [], round: 'r10', note: '' });
       });
     } catch(e){}
     return c;
+  }
+  // 설정에서 몰 이름 + 쇼핑몰ID가 같은 줄 번호 (ID가 비면 몰 전체 줄)
+  function cfgIndex(name, id){
+    for (var i = 0; i < CFG.malls.length; i++) {
+      var m = CFG.malls[i];
+      if (m.name === name && C.normId(m.id) === C.normId(id)) return i;
+    }
+    return -1;
   }
   function saveCfg(){ try { localStorage.setItem(CFG_LS, JSON.stringify(CFG)); } catch(e){} F = C.fromConfig(CFG); }
   function showErr(msg){ var e = $('err'); e.textContent = msg || ''; e.hidden = !msg; }
@@ -195,6 +209,8 @@
         $('fileInfo').textContent = f.name + ' · 주문 ' + ROWS.length + '건';
         FILTER = 'bad'; MALL = '';
         run();
+        // 계정별로 나눠 검증하는 몰이 있으면 요약을 펼쳐 두 계정 결과가 바로 보이게 한다
+        $('multBox').open = RES.some(function(r){ return r.ruleId || r.noAcct; });
       } catch(e){ $('result').hidden = true; showErr(e.message || String(e)); }
     };
     rd.readAsArrayBuffer(f);
@@ -242,37 +258,53 @@
       '<div class="stat ' + (s.unmapped ? 'warn' : '') + '"><div class="lab">미매핑 (기준가 없음)</div><div class="n">' + s.unmapped + '<small>건</small></div></div>' +
       '<div class="stat ' + ((s.nomult + s.hold) ? 'warn' : '') + '"><div class="lab">검증 못 함</div><div class="n">' + (s.nomult + s.hold) + '<small>건</small></div></div>';
 
-    // 몰별 배수 표
-    var malls = Object.keys(s.malls).sort(function(a, b){ return s.malls[b].total - s.malls[a].total; });
-    var h = '<tr><th>몰</th><th class="r">건수</th><th class="r">기준 배수</th><th>계산</th><th class="r">정상</th><th class="r">이상</th><th class="r">미매핑</th></tr>';
-    malls.forEach(function(m){
-      var c = s.malls[m], rg = C.rangeOf(m, CFG.ranges), key = C.resolveMall(m, F.mults), cm = key ? CFG.malls.filter(function(x){ return x.name === key; })[0] : null;
+    // 몰별(계정별) 배수 표 — 같은 몰의 계정들은 붙여서 보여 준다
+    var byMall = {};
+    Object.keys(s.malls).forEach(function(g){ var n = s.malls[g].row.mall; byMall[n] = (byMall[n] || 0) + s.malls[g].total; });
+    var malls = Object.keys(s.malls).sort(function(a, b){
+      var x = s.malls[a].row.mall, y = s.malls[b].row.mall;
+      return (byMall[y] - byMall[x]) || x.localeCompare(y) || (rank(a) - rank(b)) || a.localeCompare(b);
+    });
+    // 같은 몰의 계정은 설정 표에 적힌 순서(바이스트 → 신세계V), 기준이 없는 ID는 맨 뒤
+    function rank(g){ var r = s.malls[g].row, i = r.ruleId ? cfgIndex(r.ruleKey, r.ruleId) : -1; return i < 0 ? 9999 : i; }
+    var h = '<tr><th>몰 / 계정</th><th class="r">건수</th><th class="r">기준 배수</th><th>계산</th><th class="r">정상</th><th class="r">이상</th><th class="r">미매핑</th></tr>';
+    malls.forEach(function(g){
+      var c = s.malls[g], row = c.row, m = row.mall, rg = C.rangeOf(m, CFG.ranges);
+      var ci = row.ruleKey ? cfgIndex(row.ruleKey, row.ruleId) : -1, cm = ci > -1 ? CFG.malls[ci] : null;
+      var setAttr = ' data-set="' + esc(row.ruleId ? row.ruleKey : m) + '" data-id="'+ esc(row.ruleId || (row.noAcct ? row.shopId : '')) + '"';
       var cell, note = '';
       if (rg) { cell = '<b>' + rg.lo + ' ~ ' + rg.hi.toFixed(2) + '</b>'; note = '엔화 판매가를 환율로 환산해 범위 안이면 정상'; }
       else if (cm && cm.mult !== '') {
         cell = '<b>' + cm.mult + '</b>' + (cm.alts.length ? '<div class="hint">+ ' + cm.alts.join(', ') + '</div>' : '');
         note = (cm.round === 'c100' ? '100원 단위 올림 · ' : '') + (cm.note || '');
       }
-      else if (cm) { cell = '<button class="btn btn-out btn-sm" type="button" data-set="' + esc(m) + '">배수 입력</button>'; note = '배수가 비어 있어 검증 못 함'; }
-      else { cell = '<button class="btn btn-out btn-sm" type="button" data-set="' + esc(m) + '">설정에 추가</button>'; note = '목록 외 몰 ×1.0으로 검증 중'; }
-      h += '<tr><td class="nm"><div>' + esc(m) + '</div></td><td class="r">' + c.total + '</td>' +
+      else if (cm) { cell = '<button class="btn btn-out btn-sm" type="button"' + setAttr + '>배수 입력</button>'; note = '배수가 비어 있어 검증 못 함'; }
+      else if (row.noAcct) { cell = '<button class="btn btn-out btn-sm" type="button"' + setAttr + '>계정 추가</button>'; note = '기준이 없는 쇼핑몰ID라 검증 못 함'; }
+      else { cell = '<button class="btn btn-out btn-sm" type="button"' + setAttr + '>설정에 추가</button>'; note = '목록 외 몰 ×1.0으로 검증 중'; }
+      h += '<tr><td class="nm">' + who(row) + '</td><td class="r">' + c.total + '</td>' +
         '<td class="r">' + cell + '</td>' +
         '<td class="hint">' + esc(note) + '</td>' +
         '<td class="r">' + c.ok + '</td><td class="r ' + (c.bad ? 'diffneg' : 'dim') + '">' + c.bad + '</td><td class="r dim">' + c.unmapped + '</td></tr>';
     });
     $('mallTbl').innerHTML = h;
-    $('multSum').textContent = malls.length + '개 몰 · 눌러서 펼치기';
+    $('multSum').textContent = Object.keys(byMall).length + '개 몰 · 눌러서 펼치기';
 
     // 필터
     var segs = [['bad','가격 이상',s.bad],['unmapped','미매핑',s.unmapped],['nomult','검증 못 함',s.nomult + s.hold],['ok','정상',s.ok],['all','전체',s.total]];
     $('seg').innerHTML = segs.map(function(x){ return '<button type="button" data-f="' + x[0] + '" class="' + (FILTER === x[0] ? 'on' : '') + '">' + x[1] + '<b>' + x[2] + '</b></button>'; }).join('');
-    var opts = '<option value="">모든 몰</option>' + malls.map(function(m){ return '<option value="' + esc(m) + '"' + (m === MALL ? ' selected' : '') + '>' + esc(m) + ' (' + s.malls[m].total + ')</option>'; }).join('');
+    if (MALL && !s.malls[MALL]) MALL = '';   // 설정을 고쳐 묶음 이름이 바뀌면 전체로
+    var opts = '<option value="">모든 몰</option>' + malls.map(function(g){ return '<option value="' + esc(g) + '"' + (g === MALL ? ' selected' : '') + '>' + esc(g) + ' (' + s.malls[g].total + ')</option>'; }).join('');
     $('mallSel').innerHTML = opts;
     renderList();
   }
 
+  // 몰 칸: 계정별로 나눈 건은 계정 표기를 크게, 몰 이름을 작게
+  function who(r){
+    return '<div>' + esc(r.group) + '</div>' + (r.group !== r.mall && r.ruleId ? '<div class="hint">' + esc(r.mall) + '</div>' : '');
+  }
+
   function pass(r){
-    if (MALL && r.mall !== MALL) return false;
+    if (MALL && r.group !== MALL) return false;
     if (FILTER === 'all') return true;
     if (FILTER === 'nomult') return r.status === 'nomult' || r.status === 'hold';
     return r.status === FILTER;
@@ -289,7 +321,7 @@
       var d = r.diff, dc = !r.expect ? 'dim' : (d === 0 || Math.abs(d) <= CFG.tol ? 'diff0' : (d < 0 ? 'diffneg' : 'diffpos'));
       h += '<tr class="' + (r.status === 'bad' ? 'bad' : '') + '">' +
         '<td>' + chip(r.status) + (r.note ? '<div class="hint">' + esc(r.note) + '</div>' : '') + '</td>' +
-        '<td>' + esc(r.mall) + '</td><td>' + esc(r.mallOrd) + '</td><td>' + esc(r.code) + '</td>' +
+        '<td>' + who(r) + '</td><td>' + esc(r.mallOrd) + '</td><td>' + esc(r.code) + '</td>' +
         '<td class="nm"><div title="' + esc(r.name) + '">' + esc(r.name) + '</div><small>' + esc(r.opt) + (r.qty > 1 ? ' · 수량 ' + r.qty : '') + '</small></td>' +
         '<td class="r' + (r.base ? '' : ' dim') + '">' + won(r.base) + '</td>' +
         '<td class="r' + (r.mult == null && !r.range ? ' dim' : '') + '">' + (r.range ? r.range[0] + '~' + r.range[1].toFixed(2) : (r.mult == null ? '-' : r.mult)) + '</td>' +
@@ -305,13 +337,13 @@
     var list = RES.filter(function(r){ return r.status !== 'ok'; });
     if (!list.length) { showErr('확인할 건이 없습니다.'); return; }
     showErr('');
-    var head = ['상태','쇼핑몰','쇼핑몰 주문번호','상품코드','상품명','옵션','수량','사방넷 기준가','기준 배수','기대 판매가','실제 판매가','차이','결제금액'];
+    var head = ['상태','쇼핑몰','쇼핑몰ID','검증 구분','쇼핑몰 주문번호','상품코드','상품명','옵션','수량','사방넷 기준가','기준 배수','기대 판매가','실제 판매가','차이','결제금액'];
     var aoa = [head];
     list.forEach(function(r){
-      aoa.push([STAT_LABEL[r.status], r.mall, r.mallOrd, r.code, r.name, r.opt, r.qty, Math.round(r.base) || '', r.range ? (r.range[0] + '~' + r.range[1].toFixed(2)) : (r.mult == null ? '' : r.mult), r.range && r.expect ? (r.expect + ' ~ ' + r.expectHi) : (r.expect || ''), r.price + (r.range ? '엔' : ''), r.expect ? r.diff : '', r.pay]);
+      aoa.push([STAT_LABEL[r.status], r.mall, r.shopId, r.group, r.mallOrd, r.code, r.name, r.opt, r.qty, Math.round(r.base) || '', r.range ? (r.range[0] + '~' + r.range[1].toFixed(2)) : (r.mult == null ? '' : r.mult), r.range && r.expect ? (r.expect + ' ~ ' + r.expectHi) : (r.expect || ''), r.price + (r.range ? '엔' : ''), r.expect ? r.diff : '', r.pay]);
     });
     var ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [10,18,22,14,46,14,6,12,8,12,12,10,12].map(function(w){ return { wch:w }; });
+    ws['!cols'] = [10,18,16,26,22,14,46,14,6,12,8,12,12,10,12].map(function(w){ return { wch:w }; });
     var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '확인할 건');
     var d = new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
     XLSX.writeFile(wb, '판매가검증_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '.xlsx');
@@ -328,10 +360,12 @@
   // ---- 몰별 기준 설정 ----
   function fnum(v){ return v === '' || v == null ? '' : v; }
   function renderCfg(flashIdx){
-    var h = '<tr><th>쇼핑몰명</th><th class="r">필웨이 대비 배수</th><th>이 배수도 정상 (예: 행사가)</th><th>금액 처리</th><th>메모</th><th></th></tr>';
+    var h = '<tr><th>쇼핑몰명</th><th>쇼핑몰ID</th><th>계정 표시 이름</th><th class="r">필웨이 대비 배수</th><th>이 배수도 정상 (예: 행사가)</th><th>금액 처리</th><th>메모</th><th></th></tr>';
     CFG.malls.forEach(function(m, i){
       h += '<tr data-i="' + i + '"' + (i === flashIdx ? ' class="flash"' : '') + '>' +
-        '<td><input type="text" data-k="name" value="' + esc(m.name) + '" aria-label="쇼핑몰명"></td>' +
+        '<td><input type="text" class="mn" data-k="name" value="' + esc(m.name) + '" aria-label="쇼핑몰명"></td>' +
+        '<td><input type="text" class="id" data-k="id" value="' + esc(m.id) + '" placeholder="비움=전체" aria-label="' + esc(m.name) + ' 쇼핑몰ID"></td>' +
+        '<td><input type="text" class="lb" data-k="label" value="' + esc(m.label) + '" aria-label="' + esc(m.name) + ' 계정 표시 이름"></td>' +
         '<td class="r"><input type="number" class="n" step="0.01" min="0" data-k="mult" value="' + esc(fnum(m.mult)) + '" placeholder="비움=검증 안 함" aria-label="' + esc(m.name) + ' 배수"></td>' +
         '<td><input type="text" data-k="alts" value="' + esc(m.alts.join(', ')) + '" placeholder="예: 0.96, 0.9" aria-label="' + esc(m.name) + ' 추가 정상 배수"></td>' +
         '<td><select data-k="round" aria-label="' + esc(m.name) + ' 금액 처리"><option value="r10"' + (m.round === 'r10' ? ' selected' : '') + '>10원 단위 반올림</option><option value="c100"' + (m.round === 'c100' ? ' selected' : '') + '>100원 단위 올림</option></select></td>' +
@@ -339,15 +373,20 @@
         '<td class="x"><button class="btn btn-out btn-sm" type="button" data-del="' + i + '" aria-label="' + esc(m.name) + ' 삭제">삭제</button></td></tr>';
     });
     $('cfgTbl').innerHTML = h;
-    $('cfgSum').textContent = CFG.malls.length + '개 몰 · 필웨이 가격 기준';
+    $('cfgSum').textContent = CFG.malls.length + '줄 · 필웨이 가격 기준';
     $('cfgCost').value = CFG.costRate; $('cfgTol').value = CFG.tol;
     $('cfgLo').value = CFG.ranges.BUYMA.lo; $('cfgHi').value = CFG.ranges.BUYMA.hi;
   }
   function cfgChanged(){ saveCfg(); if (ROWS.length) run(); }
-  function addMall(name, mult){
+  function addMall(name, id){
     name = String(name || '').trim(); if (!name) return -1;
-    var ex = -1; CFG.malls.forEach(function(m, i){ if (m.name === name) ex = i; });
-    if (ex < 0) { CFG.malls.push({ name: name, mult: mult == null ? 1 : mult, alts: [], round: 'r10', note: '' }); ex = CFG.malls.length - 1; saveCfg(); }
+    id = String(id || '').trim();
+    var ex = cfgIndex(name, id);
+    if (ex < 0) {
+      // 계정별로 나눈 몰에 새 줄을 넣으면 배수를 비워 둔다 (모르는 계정이 ×1.0으로 통과하지 않게)
+      var split = !!id || CFG.malls.some(function(m){ return m.name === name && m.id; });
+      CFG.malls.push({ name: name, id: id, label: '', mult: split ? '' : 1, alts: [], round: 'r10', note: '' }); ex = CFG.malls.length - 1; saveCfg(); renderCfg();
+    }
     return ex;
   }
   function focusCfg(i){
@@ -363,12 +402,16 @@
     else if (k === 'alts') m.alts = v.split(/[,\s]+/).map(parseFloat).filter(function(x){ return x > 0; });
     else if (k === 'round') m.round = v === 'c100' ? 'c100' : 'r10';
     else if (k === 'note') m.note = v;
+    else if (k === 'id') m.id = v.trim();
+    else if (k === 'label') m.label = v.trim();
     cfgChanged();
   });
   $('cfgTbl').addEventListener('click', function(e){
     var b = e.target.closest('button[data-del]'); if (!b) return;
     var m = CFG.malls[+b.dataset.del];
-    if (!confirm('"' + m.name + '" 설정을 지울까요? (목록에서 빠지면 ×1.0으로 검증합니다)')) return;
+    var others = CFG.malls.some(function(x){ return x !== m && x.name === m.name; });
+    var after = m.id && others ? '이 계정 주문은 검증 못 함으로 표시됩니다' : '목록에서 빠지면 ×1.0으로 검증합니다';
+    if (!confirm('"' + m.name + (m.id ? ' / ' + m.id : '') + '" 설정을 지울까요? (' + after + ')')) return;
     CFG.malls.splice(+b.dataset.del, 1); renderCfg(); cfgChanged();
   });
   $('cfgAdd').addEventListener('click', function(){
@@ -382,8 +425,9 @@
   });
   $('mallTbl').addEventListener('click', function(e){
     var b = e.target.closest('button[data-set]'); if (!b) return;
-    var name = b.dataset.set, key = C.resolveMall(name, F.mults), i = -1;
-    if (key) CFG.malls.forEach(function(m, j){ if (m.name === key) i = j; }); else i = addMall(name);
+    var name = b.dataset.set, id = b.dataset.id || '';
+    var key = id ? name : (C.resolveMall(name, F.mults) || name), i = cfgIndex(key, id);
+    if (i < 0) i = addMall(key, id);
     focusCfg(i); if (ROWS.length) run();
   });
   $('btnReset').addEventListener('click', function(){

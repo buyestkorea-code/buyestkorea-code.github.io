@@ -7,6 +7,7 @@
  *  - 실제 판매가   = 주문서 '판매가' 열 (수집 금액, 사방넷에서 수정 불가)
  *  - 허용 오차     = ±100원
  *  - '결제금액'은 쿠폰·할인 반영액이라 판정하지 않고 참고로만 보여 준다.
+ *  - 계정(쇼핑몰ID)마다 기준이 다른 몰(SSG.COM)은 주문서 '쇼핑몰ID' 열로 나눠 따로 검증한다.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -31,7 +32,6 @@
     '쿠팡': 0.92,
     '트렌비': 0.94,
     '롯데온': 1.09,
-    'SSG.COM': 1.00,
     '카카오스타일 (지그재그, 포스티)': 1.00,
     '머스트잇': 1.00,
     'LFmall': 1.00,
@@ -45,6 +45,19 @@
     '에이블리': 1.00,
     '롯데홈쇼핑(신)': 1.00
   };
+
+  // 한 몰에 계정(쇼핑몰ID)이 여러 개이고 계정마다 기준이 다른 경우 — 사장님 확정(2026-11-25)
+  // 여기에 있는 몰은 목록에 없는 ID를 ×1.0으로 넘기지 않고 '검증 못 함'으로 둔다.
+  var DEFAULT_ACCOUNTS = [
+    { name: 'SSG.COM', id: 'BUYEST11', label: 'SSG바이스트', mult: 1.00, note: '바이스트 계정: 필웨이가' },
+    { name: 'SSG.COM', id: '0024852987', label: 'SSG신세계V', mult: 0.92, note: '사이먼 계정: 필웨이*0.92' }
+  ];
+  // ID 비교용: 대소문자 무시, 숫자 ID는 앞의 0 무시(엑셀이 숫자로 바꾸면 0이 빠진다)
+  function normId(v) {
+    var s = str(v).toLowerCase();
+    return /^\d+$/.test(s) ? s.replace(/^0+(?=\d)/, '') : s;
+  }
+  function accountName(a) { return a.label ? a.id + ' (' + a.label + ')' : a.id; }
 
   // 기대가를 100원 단위로 올림하는 몰 (웰스토리몰, 삼성카드). 나머지는 10원 단위 반올림.
   function isCeil100(mall) { return /삼성카드|웰스토리/.test(mall || ''); }
@@ -82,17 +95,19 @@
     var c = {
       cost: col('원가'), mall: col('쇼핑몰명'), ordAt: col('주문일시'), code: col('상품코드'),
       ordNo: col('주문번호'), name: col('상품명'), mallOrd: col('주문번호(쇼핑몰)'), opt: col('옵션'),
-      qty: col('수량'), ea: col('EA'), price: col('판매가'), brand: col('브랜드명'), supply: col('공급단가'), pay: col('결제금액')
+      qty: col('수량'), ea: col('EA'), price: col('판매가'), brand: col('브랜드명'), supply: col('공급단가'), pay: col('결제금액'),
+      shopId: col('쇼핑몰ID')
     };
+    var NEED = { cost: '원가', mall: '쇼핑몰명', code: '상품코드', price: '판매가', qty: '수량', shopId: '쇼핑몰ID' };
     var miss = [];
-    ['cost', 'mall', 'code', 'price', 'qty'].forEach(function (k) { if (c[k] < 0) miss.push(k); });
-    if (miss.length) throw new Error('필요한 열이 없습니다: ' + miss.join(', ') + ' (주문서 출력양식에 원가·수량 열이 있어야 합니다)');
+    Object.keys(NEED).forEach(function (k) { if (c[k] < 0) miss.push(NEED[k]); });
+    if (miss.length) throw new Error('필요한 열이 없습니다: ' + miss.join(', ') + ' (주문서확인처리 출력양식에 이 열을 넣어 다시 받아 주세요)');
     var rows = [];
     for (i = hi + 1; i < aoa.length; i++) {
       var r = aoa[i]; if (!r) continue;
       var mall = str(r[c.mall]); if (!mall) continue;
       rows.push({
-        line: i + 1, mall: mall,
+        line: i + 1, mall: mall, shopId: str(r[c.shopId]),
         ordAt: c.ordAt > -1 ? str(r[c.ordAt]) : '',
         code: str(r[c.code]), ordNo: c.ordNo > -1 ? str(r[c.ordNo]) : '', name: c.name > -1 ? str(r[c.name]) : '',
         mallOrd: c.mallOrd > -1 ? str(r[c.mallOrd]) : '', opt: c.opt > -1 ? str(r[c.opt]) : '',
@@ -121,30 +136,54 @@
     '쿠팡': '협의표: 필웨이*0.92', '트렌비': '협의표: 필웨이*0.94', '롯데온': '협의표: 필웨이*1.09',
     '삼성카드쇼핑': '협의표: 필웨이*0.88, 100원 단위 올림', '웰스토리몰2.0(메인몰)': '협의표: 필웨이*0.88, 100원 단위 올림',
     '카카오톡쇼핑': '협의표: 필웨이*0.87', '한스타일': '협의표: 필웨이*0.97', '발란': '협의표: 필웨이*1.2',
-    '머스트잇아울렛': '협의표: 필웨이*0.85', 'SSG 사이먼': '협의표: 필웨이*0.92', '페칭': '협의표: 상시 ×0.82 / 행사 ×0.79'
+    '머스트잇아울렛': '협의표: 필웨이*0.85', '페칭': '협의표: 상시 ×0.82 / 행사 ×0.79'
   };
-  var EXTRA_DEFAULTS = { '카카오톡쇼핑': 0.87, '한스타일': 0.97, '발란': 1.2, '머스트잇아울렛': 0.85, 'SSG 사이먼': 0.92, '페칭': 0.82 };
+  var EXTRA_DEFAULTS = { '카카오톡쇼핑': 0.87, '한스타일': 0.97, '발란': 1.2, '머스트잇아울렛': 0.85, '페칭': 0.82 };
+  var CFG_VER = 2;   // 2: 쇼핑몰ID(계정)별 기준 추가
+  function accountEntry(a) {
+    return { name: a.name, id: a.id, label: a.label, mult: a.mult, alts: [], round: 'r10', note: a.note };
+  }
   function defaultConfig() {
     var malls = [], k, seen = {};
     function add(name, mult) {
       if (seen[name]) return; seen[name] = 1;
-      malls.push({ name: name, mult: mult, alts: (ALT_MULTS[name] || []).slice(), round: isCeil100(name) ? 'c100' : 'r10', note: DEFAULT_NOTES[name] || '' });
+      malls.push({ name: name, id: '', label: '', mult: mult, alts: (ALT_MULTS[name] || []).slice(), round: isCeil100(name) ? 'c100' : 'r10', note: DEFAULT_NOTES[name] || '' });
     }
-    for (k in DEFAULT_MULTS) add(k, DEFAULT_MULTS[k]);
+    for (k in DEFAULT_MULTS) {
+      add(k, DEFAULT_MULTS[k]);
+      if (k === '롯데온') DEFAULT_ACCOUNTS.forEach(function (a) { malls.push(accountEntry(a)); });
+    }
     for (k in EXTRA_DEFAULTS) add(k, EXTRA_DEFAULTS[k]);
     for (k in malls) if (malls[k].name === '페칭') malls[k].alts = [0.79];
-    return { costRate: COST_RATE, tol: TOLERANCE, malls: malls, ranges: { 'BUYMA': { lo: 0.93, hi: 1.10, jpy: true } } };
+    return { ver: CFG_VER, costRate: COST_RATE, tol: TOLERANCE, malls: malls, ranges: { 'BUYMA': { lo: 0.93, hi: 1.10, jpy: true } } };
   }
-  // 설정(cfg) → check()에 넘길 값들
+  // 예전에 브라우저에 저장했거나 내보낸 설정에 계정별 기준을 한 번만 넣는다.
+  // ID 없는 'SSG.COM'·'SSG 사이먼' 줄은 두 계정 줄로 대체한다.
+  function upgradeConfig(cfg) {
+    if (cfg.ver >= CFG_VER) return cfg;
+    var malls = (cfg.malls || []).filter(function (m) { return str(m.id) || (m.name !== 'SSG.COM' && m.name !== 'SSG 사이먼'); });
+    var at = malls.map(function (m) { return m.name; }).indexOf('롯데온') + 1 || malls.length;
+    DEFAULT_ACCOUNTS.forEach(function (a) {
+      var has = malls.some(function (m) { return m.name === a.name && normId(m.id) === normId(a.id); });
+      if (!has) malls.splice(at++, 0, accountEntry(a));
+    });
+    cfg.malls = malls; cfg.ver = CFG_VER;
+    return cfg;
+  }
+  // 설정(cfg) → check()에 넘길 값들. 쇼핑몰ID가 적힌 줄은 그 계정에만, 빈 줄은 몰 전체에 적용.
   function fromConfig(cfg) {
-    var mults = {}, alts = {}, ceil = {};
+    var mults = {}, alts = {}, ceil = {}, accounts = {};
     (cfg.malls || []).forEach(function (m) {
       if (!m.name) return;
-      mults[m.name] = (m.mult === '' || m.mult == null) ? null : Number(m.mult);
-      alts[m.name] = (m.alts || []).filter(function (x) { return x > 0; });
-      ceil[m.name] = m.round === 'c100';
+      var mult = (m.mult === '' || m.mult == null) ? null : Number(m.mult);
+      var al = (m.alts || []).filter(function (x) { return x > 0; });
+      if (str(m.id)) {
+        (accounts[m.name] || (accounts[m.name] = [])).push({ id: str(m.id), label: str(m.label), mult: mult, alts: al, ceil: m.round === 'c100' });
+        return;
+      }
+      mults[m.name] = mult; alts[m.name] = al; ceil[m.name] = m.round === 'c100';
     });
-    return { mults: mults, tol: cfg.tol, opts: { costRate: cfg.costRate, alts: alts, ceil: ceil, ranges: cfg.ranges } };
+    return { mults: mults, tol: cfg.tol, opts: { costRate: cfg.costRate, alts: alts, ceil: ceil, ranges: cfg.ranges, accounts: accounts } };
   }
 
   // 상태: ok 정상 · bad 가격 다름 · unmapped 미매핑(기준가 없음) · hold 보류(배수 비움/환율 없음)
@@ -155,12 +194,22 @@
     opts = opts || {};
     var costRate = opts.costRate > 0 ? opts.costRate : COST_RATE;
     var ALTS = opts.alts || ALT_MULTS;
+    var ACC = opts.accounts || fromConfig({ malls: DEFAULT_ACCOUNTS }).opts.accounts;
     return rows.map(function (r) {
       var o = {}, k;
       for (k in r) o[k] = r[k];
       var unmapped = r.code === UNMAPPED_CODE || !r.cost;
       o.base = r.cost ? r.cost / costRate : 0;
       o.payRate = r.price ? r.pay / r.price : 0;
+
+      // 어느 기준 줄을 쓰는지 먼저 정한다. group = 요약·필터에서 묶는 이름, ruleKey/ruleId = 설정 줄
+      var ak = resolveMall(r.mall, ACC), acct = null, mk = resolveMall(r.mall, mults), noAcct = false;
+      if (ak != null) {
+        acct = ACC[ak].filter(function (a) { return normId(a.id) === normId(r.shopId); })[0] || null;
+        noAcct = !acct && mk == null;
+      }
+      o.group = acct ? accountName(acct) : (noAcct ? r.mall + ' · ' + (r.shopId || 'ID 없음') : r.mall);
+      o.ruleKey = acct ? ak : mk; o.ruleId = acct ? acct.id : ''; o.noAcct = noAcct;
       if (unmapped) { o.status = 'unmapped'; return o; }
 
       var rg = rangeOf(r.mall, opts.ranges);
@@ -178,14 +227,14 @@
         return o;
       }
 
-      var mk = resolveMall(r.mall, mults);
-      var m = mk == null ? 1.0 : mults[mk];                 // 목록 외 몰 → ×1.0
-      if (mk == null) o.note = '목록 외 몰 ×1.0';
+      if (noAcct) { o.mult = null; o.status = 'hold'; o.note = '기준이 없는 쇼핑몰ID'; return o; }
+      var m = acct ? acct.mult : (mk == null ? 1.0 : mults[mk]);   // 목록 외 몰 → ×1.0
+      if (!acct && mk == null) o.note = '목록 외 몰 ×1.0';
       o.mult = (m == null || m === '') ? null : Number(m);
       if (o.mult == null) { o.status = 'hold'; return o; }
       function expectFor(mult) {
         var raw = o.base * mult;
-        var useCeil = (mk != null && opts.ceil) ? !!opts.ceil[mk] : isCeil100(r.mall);
+        var useCeil = acct ? acct.ceil : ((mk != null && opts.ceil) ? !!opts.ceil[mk] : isCeil100(r.mall));
         return useCeil ? Math.ceil(raw / 100 - 1e-9) * 100 : Math.round(raw / 10) * 10;
       }
       o.expect = expectFor(o.mult);
@@ -195,7 +244,7 @@
       else if (q2 > 1 && Math.abs(r.price - o.expect * q2) <= tol * q2) { o.status = 'ok'; o.note = '수량 ' + q2 + '개 합계가'; }
       else {
         o.status = 'bad';
-        var alts = (mk != null && ALTS[mk]) || [], a;
+        var alts = acct ? acct.alts : ((mk != null && ALTS[mk]) || []), a;
         for (a = 0; a < alts.length; a++) {
           var ex = expectFor(alts[a]);
           if (Math.abs(r.price - ex) <= tol) { o.status = 'ok'; o.note = '행사가 ×' + alts[a]; o.diff = r.price - ex; break; }
@@ -209,12 +258,13 @@
     var s = { total: res.length, ok: 0, bad: 0, unmapped: 0, nomult: 0, hold: 0, malls: {} };
     res.forEach(function (r) {
       s[r.status]++;
-      var m = s.malls[r.mall] || (s.malls[r.mall] = { total: 0, ok: 0, bad: 0, unmapped: 0, nomult: 0, hold: 0 });
+      var g = r.group || r.mall;
+      var m = s.malls[g] || (s.malls[g] = { total: 0, ok: 0, bad: 0, unmapped: 0, nomult: 0, hold: 0, row: r });
       m.total++; m[r.status]++;
     });
     return s;
   }
 
-  return { COST_RATE: COST_RATE, TOLERANCE: TOLERANCE, UNMAPPED_CODE: UNMAPPED_CODE, DEFAULT_MULTS: DEFAULT_MULTS, mallNote: mallNote, defaultConfig: defaultConfig, fromConfig: fromConfig, resolveMall: resolveMall, RANGES: RANGES, ALT_MULTS: ALT_MULTS, rangeOf: rangeOf,
+  return { COST_RATE: COST_RATE, TOLERANCE: TOLERANCE, UNMAPPED_CODE: UNMAPPED_CODE, DEFAULT_MULTS: DEFAULT_MULTS, mallNote: mallNote, defaultConfig: defaultConfig, fromConfig: fromConfig, resolveMall: resolveMall, RANGES: RANGES, ALT_MULTS: ALT_MULTS, rangeOf: rangeOf, DEFAULT_ACCOUNTS: DEFAULT_ACCOUNTS, normId: normId, accountName: accountName, upgradeConfig: upgradeConfig,
            parseOrders: parseOrders, check: check, summarize: summarize };
 });
