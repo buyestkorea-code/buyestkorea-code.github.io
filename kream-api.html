@@ -195,6 +195,14 @@
   .cx-search{display:flex;gap:10px;margin:0 0 14px;} .cx-search .kin{max-width:360px;}
   .cx-sub{margin:-4px 0 14px;display:flex;gap:10px;align-items:center;} .cx-sub select{height:36px;border:1px solid #e4e4e7;border-radius:10px;padding:0 10px;background:#fff;font:inherit;font-size:14px;}
   .cx-sub[hidden]{display:none;}
+  .kflow{margin:14px 24px 16px;background:#fff;border:2px solid #18181b;border-radius:12px;padding:0 20px;} body:not(.alt) .kflow{display:none;}
+  .kflow summary{cursor:pointer;padding:14px 0;display:flex;gap:12px;align-items:baseline;} .kflow summary b{font-size:16px;} .kflow summary span{color:#52525b;font-size:13px;}
+  .kflow summary::before{content:'▸';font-size:13px;} .kflow[open] summary::before{content:'▾';} .kflow summary::-webkit-details-marker{display:none;}
+  .kflow ol{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:0;padding:0;list-style:none;}
+  .kflow li{background:#f4f4f5;border-radius:10px;padding:12px;line-height:1.6;} .kflow li p{margin:6px 0 0;color:#3f3f46;font-size:13px;} .kflow li em{font-style:normal;font-weight:700;color:var(--ink);}
+  .kflow .kh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;} .kflow .kh i{font-style:normal;font-size:12px;font-weight:700;border-radius:10px;padding:1px 8px;white-space:nowrap;}
+  .kflow i.ok{background:#dff3e6;color:#12652f;} .kflow i.hand{background:#fdf3e7;color:#8a4b08;} .kflow i.wait{background:#e4e4e7;color:#3f3f46;}
+  .kflow-foot{margin:12px 0 14px;color:#3f3f46;}
   .cx-guide h2 .g{color:#c2261a;} .cx-guide h2 .b{color:#17803f;}
   .cx-key{margin:0 0 14px;padding:12px 16px;border:1px solid #f0c9a0;background:#fdf3e7;border-radius:10px;line-height:1.7;} .cx-key ul{margin:4px 0 0;padding-left:20px;} .cx-key em{font-style:normal;font-weight:700;}
   ul.cx-steps{margin-bottom:0;}
@@ -325,6 +333,20 @@
   </div>
   <div class="df"><span class="sp"></span><button class="btn" data-close>취소</button><button class="btn pri" id="mapOk">연결</button></div>
 </dialog>
+
+<!-- 업무 순서 요약(직원 숙지용). 필요 없어지면 여기부터 '업무 순서 요약 끝'까지와 CSS(.kflow), 스크립트(kflow)를 지우면 된다. -->
+<details class="kflow" id="kflow" open>
+  <summary><b>크림 업무 순서</b><span>처음이면 먼저 읽어 주세요 · 눌러서 접고 펼 수 있어요</span></summary>
+  <ol>
+    <li><div class="kh"><b>1. 품번 연결</b><i class="ok">사용 가능</i></div><p><em>③</em> 목록의 <em>우리 품번 연결</em><br>또는 <em>①</em> 자동 찾기 후 <em>확정</em></p></li>
+    <li><div class="kh"><b>2. 재고 반영</b><i class="ok">자동</i></div><p>판매는 <em>이카운트에 입력</em>해야 재고에서 빠져요. 서버가 10~19시 매시, 새벽 3시에 받아요.</p></li>
+    <li><div class="kh"><b>3. 취소할 입찰 찾기</b><i class="ok">사용 가능</i></div><p><em>③</em>에서 <em>입찰 다시 확인</em>을 누르고 <em>취소할 입찰</em>을 봐요.</p></li>
+    <li><div class="kh"><b>4. 입찰 취소</b><i class="hand">직접</i></div><p><em>크림 판매자센터</em>에서 직접 취소해요. 취소 전에 상품·사이즈를 한 번 더 확인해요.</p></li>
+    <li><div class="kh"><b>5. 가격·새 입찰</b><i class="wait">준비 중</i></div><p><em>②</em>에서 시세 읽기와 가격 계산까지만 돼요. 크림에 올리는 기능은 아직 없어요.</p></li>
+  </ol>
+  <p class="kflow-foot">이 화면은 크림의 입찰을 <b>올리거나 바꾸거나 취소하지 않아요.</b> 연결하지 않은 상품은 재고와 비교되지 않아요.</p>
+</details>
+<!-- 업무 순서 요약 끝 -->
 
 <section class="mp" id="stkPanel" aria-label="크림 재고·가격 관리">
   <div class="kcard cx-guide">
@@ -488,7 +510,7 @@
     <ul class="cx-steps">
       <li><b>새로 연결하기</b><span><em>③ 취소할 입찰 찾기</em> 목록의 <em>우리 품번 연결</em>에서 해요. 크림에 걸린 상품을 보면서 고를 수 있어요.</span></li>
       <li><b>확정하기</b><span>아래 <em>연결됨</em>에서 상품이 맞으면 <em>확정</em>을 눌러요. <b>확정한 상품만</b> ③에서 재고와 비교해요. 틀렸으면 <em>연결 해제</em>.</span></li>
-      <li><b>자동 찾기 주의</b><span>지금은 직접 확인해서 연결하기로 했어요. <b>자동 찾기는 사장님 확인 없이 누르지 마세요.</b></span></li>
+      <li><b>자동 찾기</b><span>아래 버튼을 누르면 우리 품번을 크림에서 찾아 자동으로 연결해요. 자동 연결도 <em>확정</em>해야 ③에서 비교돼요.</span></li>
     </ul>
   </div>
   <div class="note" id="mpNote"></div>
@@ -1644,6 +1666,12 @@
     else if(b.dataset.cxu!==undefined){ var pid=CX.link.pid; if(confirm('이 품번의 크림 연결을 해제할까요?')) cxdChange({action:'unmap',style_norm:b.dataset.cxu,expect_pid:pid},'연결을 해제했어요.'); }
     else if(b.dataset.cxr!==undefined){ cxdChange({action:'requeue',style_norm:b.dataset.cxr,expect_pid:CX.link.pid},'이 상품과의 후보 연결을 지웠어요.'); }
   });
+  /* kflow: 업무 순서 요약을 접었는지 이 브라우저에만 기억한다(저장이 안 돼도 화면은 그대로). */
+  (function(){
+    var f=$('kflow'); if(!f) return;
+    try{ if(localStorage.getItem('buyest.kream.flowClosed')==='1') f.open=false; }catch(e){}
+    f.addEventListener('toggle',function(){ try{ localStorage.setItem('buyest.kream.flowClosed',f.open?'0':'1'); }catch(e){} setTimeout(function(){ document.documentElement.style.setProperty('--topH',$('top').offsetHeight+'px'); },0); });
+  })();
   var h0=location.hash.replace('#','')||new URLSearchParams(location.search).get('mode')||'stock';
   setMode(h0==='map'?'map':(h0==='cancel'?'cancel':'stock'));
 })();
