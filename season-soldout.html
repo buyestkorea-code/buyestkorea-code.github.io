@@ -94,7 +94,9 @@ function renderTable() {
     r.matches.forEach(m => {
       const actionHtml = m.action === 'will_hide'
         ? '<span class="tag-hide">노출 → 미노출</span>'
-        : '<span class="tag-keep">이미 미노출 (변경없음)</span>';
+        : m.action === 'excluded_defect'
+          ? '<span class="tag-keep">하자·스크래치 제외 (변경없음)</span>'
+          : '<span class="tag-keep">이미 미노출 (변경없음)</span>';
       rows.push(`<tr>
         <td>${escapeHtml(r.code)}</td>
         <td>${escapeHtml(m.product_code)}</td>
