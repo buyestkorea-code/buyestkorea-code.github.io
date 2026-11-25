@@ -8,6 +8,8 @@
  *  - 허용 오차     = ±100원
  *  - '결제금액'은 쿠폰·할인 반영액이라 판정하지 않고 참고로만 보여 준다.
  *  - 계정(쇼핑몰ID)마다 기준이 다른 몰(SSG.COM)은 주문서 '쇼핑몰ID' 열로 나눠 따로 검증한다.
+ *  - 상품코드가 없는 스마트스토어 주문은 '스마트스토어 미매칭'으로 따로 묶는다. 원가가 없어 자동 판정하지 않고,
+ *    판매가 ÷ 스마트스토어 배수(1.17) = 필웨이 환산가를 보여 주면 사람이 사방넷 가격과 비교한다(2026-11-25).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -18,6 +20,7 @@
   var COST_RATE = 0.87;      // 원가 = 판매가 × 0.87
   var TOLERANCE = 100;       // 원
   var UNMAPPED_CODE = '000000-0000';
+  var SMART = '스마트스토어', SMART_NOCODE = '스마트스토어 미매칭';
 
   // 기본 세팅 — 사장님 지정(2026-11-16): 전체 필웨이 가격(= 사방넷 기준가) 기준
   //   11번가 ×1.05 · 웰스토리몰/삼성카드 ×0.88(100원 단위 올림) · 스마트스토어/크림 ×1.17 · 쿠팡 ×0.92 · 트렌비 ×0.94 · 롯데온 ×1.09 · 바이마 ×0.93
@@ -186,7 +189,7 @@
     return { mults: mults, tol: cfg.tol, opts: { costRate: cfg.costRate, alts: alts, ceil: ceil, ranges: cfg.ranges, accounts: accounts } };
   }
 
-  // 상태: ok 정상 · bad 가격 다름 · unmapped 미매핑(기준가 없음) · hold 보류(배수 비움/환율 없음)
+  // 상태: ok 정상 · bad 가격 다름 · unmapped 미매핑(기준가 없음) · hold 보류(배수 비움/환율 없음) · manual 스마트스토어 미매칭(직접 확인)
   // 목록에 없는 몰은 필웨이 가격 그대로(×1.0)로 본다.
   // opts.jpyKrw: 엔→원 환율 (BUYMA 환산용)
   function check(rows, mults, tol, opts) {
@@ -210,6 +213,14 @@
       }
       o.group = acct ? accountName(acct) : (noAcct ? r.mall + ' · ' + (r.shopId || 'ID 없음') : r.mall);
       o.ruleKey = acct ? ak : mk; o.ruleId = acct ? acct.id : ''; o.noAcct = noAcct;
+      if (r.mall.indexOf(SMART) === 0 && (!r.code || r.code === UNMAPPED_CODE)) {
+        var sm = acct ? acct.mult : (mk != null ? mults[mk] : null);
+        o.manual = true; o.group = SMART_NOCODE; o.base = 0;
+        o.mult = sm > 0 ? Number(sm) : DEFAULT_MULTS[SMART];
+        o.conv = r.price ? Math.round(r.price / o.mult) : 0;   // 필웨이 환산가 (판매가는 1개 값)
+        o.status = 'manual';
+        return o;
+      }
       if (unmapped) { o.status = 'unmapped'; return o; }
 
       var rg = rangeOf(r.mall, opts.ranges);
@@ -255,11 +266,11 @@
   }
 
   function summarize(res) {
-    var s = { total: res.length, ok: 0, bad: 0, unmapped: 0, nomult: 0, hold: 0, malls: {} };
+    var s = { total: res.length, ok: 0, bad: 0, unmapped: 0, nomult: 0, hold: 0, manual: 0, malls: {} };
     res.forEach(function (r) {
       s[r.status]++;
       var g = r.group || r.mall;
-      var m = s.malls[g] || (s.malls[g] = { total: 0, ok: 0, bad: 0, unmapped: 0, nomult: 0, hold: 0, row: r });
+      var m = s.malls[g] || (s.malls[g] = { total: 0, ok: 0, bad: 0, unmapped: 0, nomult: 0, hold: 0, manual: 0, row: r });
       m.total++; m[r.status]++;
     });
     return s;
