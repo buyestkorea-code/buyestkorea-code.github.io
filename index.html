@@ -997,6 +997,10 @@
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12.500h5"/></svg></span>
         TEST 문의 답변 도우미<span class="navst navst-test" title="시험판"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></span>
       </button>
+      <button class="nav-item" data-nav="sizeDb">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg></span>
+        실측데이터<span class="navst navst-ok" title="사용가능"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+      </button>
       <button class="nav-item" data-nav="manualHub">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5v-15Z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5v-15Z"/></svg></span>
         사용 설명서
@@ -1437,6 +1441,11 @@
         </div>
         <div class="card-group-label">재고 · 발주</div>
         <div class="card-grid">
+          <button class="tool-card" data-nav="sizeDb">
+            <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
+            <h3>실측데이터</h3>
+            <p>품번을 넣으면 같은 품번·색상만 다른 품번·비슷한 품번의 키즈 실측을 찾아줍니다. 없는 사이즈는 앞뒤 사이즈로 추정값을 계산합니다.</p>
+          </button>
           <button class="tool-card" data-nav="inventory">
             <div class="tool-card-top"><div class="ic">&#8942;</div><span class="chip chip-ready">사용가능</span></div>
             <h3>재고 세로변환</h3>
@@ -1856,6 +1865,11 @@
         <iframe data-src="ecount-stock-lookup.html" title="이카운트재고조회" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
       </section>
 
+      <!-- ============ SIZE DB (실측데이터) ============ -->
+      <section data-view="sizeDb">
+        <iframe data-src="size-db.html" title="실측데이터" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
+      </section>
+
       <!-- ============ BARCODE STOCK LOOKUP ============ -->
       <section data-view="barcodeStock">
         <iframe data-src="barcode-stock.html" title="바코드 재고조회" style="width:100%;height:calc(100vh - 140px);border:0;border-radius:4px;"></iframe>
@@ -2208,7 +2222,7 @@ window.__loadLib = (function(){
   var TITLES = {
     dashboard:'대시보드', inventory:'재고 세로변환', stockAddConvert:'재고추가변환', productCard:'상품 카드 이미지', videoStudio:'인스타카드뉴스 자동화', reelsAuto:'인스타 릴스 제작 (시험판)', reelsStudio:'AI 릴스 스튜디오 (시험판)', videoStudio2:'영상 스튜디오 V2', sabangEcount:'사방넷-이카운트 매칭', sabangBaseregi:'사방넷 기초등록',
     stockMove:'MD 품절', buyestSoldOut:'바이스트사이트 품절', buyestSoldOutTest:'최종 바이스트사이트 품절', ecountChangeTest:'TEST 오늘 변동 자동확인', seasonSoldOut:'바이스트사이트 시즌품절', stockMismatch:'이카운트-사이트 재고 불일치 확인', icm:'이카운트 -송장 재고매칭 (CS)', icmTest:'이카운트-송장 재고매칭', sabangMatchTest:'TEST 사방넷-이카운트 매칭 관리', stocktake:'재고조사 (바코드 실사)',
-    listCheck:'품번 리스트 재고확인', costCheck:'상품가격체크', seasonCheck:'물류팀 시즌체크', barcodeStock:'바코드 재고조회', ecountQty:'이카운트재고조회', kreamSoldOut:'크림 품절 정리',
+    listCheck:'품번 리스트 재고확인', costCheck:'상품가격체크', seasonCheck:'물류팀 시즌체크', sizeDb:'실측데이터', barcodeStock:'바코드 재고조회', ecountQty:'이카운트재고조회', kreamSoldOut:'크림 품절 정리',
     orderStock:'주문서 창고위치찾기', eventPos:'행사 POS', hrAdmin:'직원관리', teamRoom:'바이스트팀룸', barcodeListTest:'TEST 바코드→리스트화', tagPrintTest:'TEST 택 출력', priceCheckTest:'TEST 최저가 조회', settlementTest:'TEST 정산 검증', salePriceTest:'TEST 판매가 검증', kreamApi:'크림 API', poizonApi:'POIZON API', promoPickTest:'TEST 기획전 상품 뽑기', invoiceKhTest:'TEST 인보이스 재고추가(경호)', csAnswerTest:'TEST 문의 답변 도우미', photoFinderTest:'TEST 사진 자동 찾기', photoAutoTest:'TEST 사진자동화', nameGenTest:'TEST AI 상품명 생성', kidsDm:'키즈 인스타 DM 자동화', miniChat:'개발중메뉴', teamDashboard:'팀 대시보드', invoice:'인보이스 자동인식', galianoProforma:'갈리아노양식 변경', roadmap:'개발 예정 도구', manualHub:'사용 설명서'
   };
 
