@@ -45,6 +45,9 @@
   var DATELINE = /^[-=─\s\[<]*(\d{4})\s*(?:년|\.|-|\/)\s*(\d{1,2})\s*(?:월|\.|-|\/)\s*(\d{1,2})\s*(?:일|\.)?\s*(?:\(?[월화수목금토일](?:요일)?\)?)?[-=─\s\]>]*$/;
   // 각 형식: 머리줄 정규식 → {date?, time, who, text}
   var FORMATS = [
+    // 네이트온 '대화내용 저장': 「이름 님의 말(2026/11/25 (수) 오후 03:36:37) : 」 다음 줄부터 「 - 본문」
+    {name:'네이트온', dash:true, re:/^(.{1,60}?) 님의 말\s*\((\d{4})\/(\d{1,2})\/(\d{1,2})\s*(?:\([^)]*\))?\s*(오전|오후)\s*(\d{1,2}):(\d{2})(?::\d{2})?\)\s*[:：]\s*$/,
+      get:function(m){ return {date:ymd(m[2],m[3],m[4]), time:hm(m[5],m[6],m[7]), who:m[1], text:''}; }},
     {name:'카카오톡 (PC)', re:/^\[(.+?)\] \[(오전|오후) (\d+):(\d+)\] ?(.*)$/,
       get:function(m){ return {who:m[1], time:hm(m[2],m[3],m[4]), text:m[5]}; }},
     {name:'카카오톡 (휴대폰)', re:/^(\d{4})년 (\d{1,2})월 (\d{1,2})일 (오전|오후) (\d{1,2}):(\d{2}), (.+?) : (.*)$/,
@@ -75,7 +78,7 @@
   }
 
   function parseChat(text){
-    text = String(text||'').replace(/^﻿/,'');
+    text = String(text||'').replace(/﻿/g,'');   // 네이트온은 파일 중간 줄 앞에도 BOM이 붙는다
     if (/^"?Date"?,"?User"?,"?Message"?/.test(text)){
       var list = csvRows(text).slice(1).map(function(r){
         var m = String(r[0]||'').match(/^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)/);
@@ -89,7 +92,7 @@
     if (counts[best] < 3) return {format:null, messages:[]};
     var F = FORMATS[best], msgs = [], cur = null, date = null, time = '00:00';
     lines.forEach(function(l){
-      var d = l.match(DATELINE);
+      var d = !F.dash && l.match(DATELINE);   // 머리줄마다 날짜가 있는 형식은 날짜만 적힌 본문 줄을 그대로 둔다
       if (d){ date = ymd(d[1],d[2],d[3]); cur = null; return; }
       var m = l.match(F.re);
       if (m){
@@ -99,6 +102,7 @@
         cur = {date:date, time:time, who:x.who, text:x.text}; msgs.push(cur);
       } else if (cur) { cur.text += (cur.text ? '\n' : '') + l; }
     });
+    if (F.dash) msgs.forEach(function(x){ x.text = x.text.replace(/^\s*- ?/,'').replace(/\s+$/,''); });
     return {format:F.name, messages:msgs.filter(function(x){ return x.date; })};
   }
 
@@ -106,7 +110,8 @@
   var SZ = '(?:\\d{1,3}\\s*[AaYy세]?(?:\\s*[-~]\\s*\\d{1,3}\\s*[AaYy세]?)?|XXS|XS|S|M|L|XL|XXL|TU|FREE|FR)';
   var SZRE = new RegExp('^\\s*'+SZ+'\\s*$','i');
   var REQW = /(실측\s*사이즈|상세\s*사이즈|실측|사이즈|상세|확인|부탁\s*(?:드립니다|드려요|드립니당|해요|해|행|합니다|드려용)?|해주세요|해줘|가능할까|가능하신가요|있으면|있는거|매장|본사)[!.^~ㅠㅜ?\s]*/gi;
-  var KEYNOTE = /기모|로고|안감|모자|탈부착|밴딩|스판|A라인|나그랑|재봉|인밴드|탈착|후드|케어라벨/;
+  var SIZEWORD = /^[\[\(]?(?:\d{1,2}[AY세]|XXS|XS|S|M|L|XL|XXL|TU|FREE|FR)[\]\)]?$/i;
+  var KEYNOTE =/기모|로고|안감|모자|탈부착|밴딩|스판|A라인|나그랑|재봉|인밴드|탈착|후드|케어라벨/;
   var SIZE_PREFIX = new RegExp('^[\\[\\(]?\\s*('+SZ+')\\s*[\\]\\)]?\\s*(?:사이즈)?\\s*[:：\\-]?\\s*(?=(?:'+LABRE+'))','i');
   var CODE_SIZE = new RegExp('^(.*\\d.*?)_('+SZ+')$','i');
 
@@ -133,6 +138,9 @@
     var mu = s.match(CODE_SIZE);
     if (mu && normCode(mu[1]).length>=5){ s = mu[1]; sizes.push(mu[2].toUpperCase()); }
     if (/[가-힣]/.test(s)) return null;
+    // "10A 12A", "12Y, 14Y" 처럼 사이즈만 나열한 줄은 품번이 아니다
+    var words = s.split(/[\s,，\/~\-]+/).filter(Boolean);
+    if (words.length && words.every(function(w){ return SIZEWORD.test(w); })) return null;
     var c = normCode(s);
     if (c.length<5 || (c.match(/\d/g)||[]).length<3) return null;
     return {code:s.toUpperCase().replace(/\s+/g,' '), sizes:sizes};
@@ -216,7 +224,7 @@
       // 요청만 있는 메시지: 사이즈만 적힌 줄은 마지막 품번 요청에 붙인다
       if (newreqs.length && !hasmeas){
         lines.forEach(function(l){
-          var ls = l.trim().replace(/(실측|상세|사이즈|부탁|드립니다|확인|해|!|\.)/g,'');
+          var ls = l.trim().replace(REQW,' ').replace(/(실측|상세|사이즈|부탁|드립니다|확인|해|!|\.)/g,'').trim();
           if (ls && !parseCodeLine(l) && /^[\p{L}\p{N}_,\s\[\]\(\)\-~]+$/u.test(ls)){
             var toks = sizesFrom(ls);
             if (toks.length && toks.length >= ls.split(/[,\s]+/).filter(Boolean).length){
