@@ -99,8 +99,9 @@ function hashCanvas(c){
   return h.toString(36)+'_'+c.width+'x'+c.height;
 }
 function isFixed(w,h){
-  /* 가로 꽉 찬 '긴' 안내(반품·각인 등)만 고정. 세로 1000 미만은 세로로 큰 사진(예: 716×841 안쪽 컷)일 수 있어 사진으로 가져온다 — 사진 누락 방지 */
-  if(w>=690 && h>=1000) return true;
+  /* 가로가 넓고 '아주 긴' 안내(반품·구매전 주의사항 등)만 고정. 상품 사진은 720×1000·720×1017까지 있으므로 세로 1200 미만은 사진으로 가져온다 — 사진 누락 방지.
+     그보다 짧은 안내 이미지는 FIXED_SIZES 에 크기를 등록한다 */
+  if(w>=650 && h>=1200) return true;
   return FIXED_SIZES.some(function(s){ return Math.abs(s[0]-w)<=3 && Math.abs(s[1]-h)<=3; });
 }
 
