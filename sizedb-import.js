@@ -1,4 +1,4 @@
-/* 실측데이터: 카카오톡·네이트온 대화 내보내기 파일에서 실측 기록을 뽑는다.
+/* 실측데이터: 카카오톡·네이트온 대화 내보내기 파일과 실측 엑셀에서 실측 기록을 뽑는다.
    브라우저에서만 읽고, 서버에는 뽑은 실측 줄만 보낸다(대화 원문은 보내지 않는다). */
 (function(root){
   'use strict';
@@ -255,8 +255,10 @@
 
   function recKey(r){
     var meas = r[3];
-    return normCode(r[1])+'|'+String(r[2]||'').toUpperCase().replace(/[AY세]$/,'')+'|'+
-      Object.keys(meas).sort().map(function(k){ return k+'='+Number(meas[k]); }).join(',');
+    var m = Object.keys(meas).sort().map(function(k){ return k+'='+Number(meas[k]); }).join(',');
+    // 숫자를 못 읽는 줄(신발 mm 등)은 원문으로 구분한다. 서버(sd_key)·build_db.py 와 같은 규칙.
+    if (!m) m = '원문:'+String(r[4]||'').replace(/[\s<>\x00-\x1F]/g,'').slice(0,200);
+    return normCode(r[1])+'|'+String(r[2]||'').toUpperCase().replace(/[AY세]$/,'')+'|'+m;
   }
   // existing: [[brand,code,size,meas,...]] → {fresh:[], found:n, dup:n}
   function toRecords(extracted, existing){
@@ -265,10 +267,13 @@
     var fresh = [], found = 0, dup = 0;
     extracted.forEach(function(c){
       var keys = Object.keys(c.meas);
-      if (BAD.test(c.raw)) return;
-      if (keys.length<2 && !keys.some(function(k){return SHAPE.indexOf(k)>=0;})) return;
+      // 대화에서 뽑은 줄만 거른다. 엑셀은 직원이 직접 정리한 표라 그대로 받는다.
+      if (c.src!=='엑셀'){
+        if (BAD.test(c.raw)) return;
+        if (keys.length<2 && !keys.some(function(k){return SHAPE.indexOf(k)>=0;})) return;
+      }
       found++;
-      var r = [brand[splitBase(c.code)]||'', c.code, c.size.toUpperCase(), c.meas,
+      var r = [c.brand || brand[splitBase(c.code)] || '', c.code, c.size.toUpperCase(), c.meas,
         c.raw.replace(PHONE,'').slice(0,300), c.note.replace(PHONE,'').slice(0,200), c.src, c.date, c.conf];
       var k = recKey(r);
       if (seen[k]){ dup++; return; }
@@ -277,7 +282,52 @@
     return {fresh:fresh, found:found, dup:dup};
   }
 
-  var api = {decode:decode, parseChat:parseChat, extract:extract, toRecords:toRecords, recKey:recKey};
+  /* ---------- 실측 엑셀 읽기 ---------- */
+  function cell(v){ return v==null ? '' : String(v).replace(/\s+/g,' ').trim(); }
+  // 제목 줄(품번 + 실측)을 첫 10줄에서 찾아 칸 위치를 정한다
+  function headerOf(rows){
+    for (var i=0; i<Math.min(rows.length,10); i++){
+      var h = Array.from(rows[i]||[], function(v){ return cell(v).replace(/ /g,''); });
+      var find = function(test){ for (var j=0;j<h.length;j++) if (h[j] && test(h[j])) return j; return -1; };
+      var code = find(function(x){ return /품번|스타일/.test(x); });
+      var meas = find(function(x){ return /실측/.test(x); });
+      if (code<0 || meas<0 || code===meas) continue;
+      var brand = find(function(x){ return /브랜드/.test(x); });
+      if (brand<0 && code>0 && !h[code-1]) brand = code-1;   // 브랜드 칸에 제목이 없는 양식
+      return {row:i, brand:brand, code:code, meas:meas,
+        size:find(function(x){ return /사이즈/.test(x) && !/실측/.test(x); }),
+        note:find(function(x){ return /기타|비고|메모/.test(x); })};
+    }
+    return null;
+  }
+  // sheets: [{name, rows:[[칸,...]]}] → {recs, sheets:[읽은 시트], unread:[제목 줄이 없는 시트], noCode:뺀 줄 수}
+  function parseSheets(sheets){
+    var recs = [], read = [], unread = [], noCode = 0;
+    sheets.forEach(function(sh){
+      var H = headerOf(sh.rows);
+      if (!H){
+        if (sh.rows.some(function(r){ return (r||[]).some(function(v){ return cell(v); }); })) unread.push(sh.name);
+        return;
+      }
+      read.push(sh.name);
+      var brand = '', code = '', last = null;   // 브랜드·품번은 비어 있으면 윗줄 것을 이어 쓴다
+      sh.rows.slice(H.row+1).forEach(function(r){
+        function at(i){ return i<0 ? '' : cell((r||[])[i]); }
+        var a = at(H.brand), b = at(H.code).toUpperCase(), size = at(H.size).toUpperCase(), txt = at(H.meas), note = at(H.note);
+        if (a) brand = a;
+        if (b && !normCode(b)){ note = (b+' '+note).trim(); b = ''; }   // "(바닥실측)" 같은 설명은 품번이 아니다
+        if (b){ code = b; last = null; }
+        if (size.slice(-2)==='.0') size = size.slice(0,-2);
+        if (!txt){ if (note && last) last.note = (last.note+' '+note).trim(); return; }
+        if (!code || normCode(code).length<5){ noCode++; return; }
+        last = {brand:brand, code:code, size:size, meas:parseMeas(txt), raw:txt, note:note, src:'엑셀', date:'', conf:'high'};
+        recs.push(last);
+      });
+    });
+    return {recs:recs, sheets:read, unread:unread, noCode:noCode};
+  }
+
+  var api = {decode:decode, parseChat:parseChat, extract:extract, toRecords:toRecords, recKey:recKey, parseSheets:parseSheets};
   if (typeof module!=='undefined' && module.exports) module.exports = api;
   else root.SizeImport = api;
 })(this);
