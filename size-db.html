@@ -43,6 +43,9 @@
   .answer .copy { float:right; font-size:12.5px; font-weight:700; padding:6px 12px; border:1px solid var(--line); border-radius:7px; background:#fff; cursor:pointer; color:var(--ink); }
   .answer .copy:hover { border-color:var(--accent); color:var(--accent); }
 
+  .answer .warn { margin-top:9px; padding:8px 12px; border-radius:8px; font-size:12.5px; line-height:1.65; color:#8a1c1c; background:#fdf0ef; border:1px solid #efc2bd; }
+  .answer .warn ul { margin:3px 0 0; padding-left:18px; }
+
   .tier { font-size:12.5px; font-weight:800; color:var(--muted); margin:14px 2px 6px; display:flex; gap:8px; align-items:center; }
   .tier i { font-style:normal; font-weight:600; color:var(--muted); font-size:12px; }
   .prod { background:#fff; border:1px solid var(--line); border-radius:10px; margin-bottom:9px; overflow:hidden; }
@@ -213,7 +216,7 @@
   function search(code, brand){
     var qn = norm(code), sp = split(code);
     var exact=[], same=[], near=[];
-    if (qn.length < 4) return {exact:exact, same:same, near:near};
+    if (qn.length < 4) return {exact:exact, same:same, near:near, base:sp.base};
     plist.forEach(function(p){
       if (brand && p.brand!==brand) return;
       if (p.key===qn) { exact.push(p); return; }
@@ -228,7 +231,39 @@
     var ref = exact.concat(same).map(ptype).filter(function(t){return t!=='other';})[0];
     if (ref) near = near.filter(function(x){ var t=ptype(x.p); return t==='other' || t===ref; });
     near.sort(function(a,b){return b.sim-a.sim;});
-    return {exact:exact, same:same, near:near};
+    return {exact:exact, same:same, near:near, base:sp.base};
+  }
+
+  /* ---------- 치수 어긋남 경고 ---------- */
+  // 추천값이 나온 상품이 아니라 검색한 상품의 실측을 기준으로 삼는다. 품번이 없으면 같은 모델(다른 색상).
+  function refOf(res, label){
+    if (label==='같은 품번') return null;
+    var list = res.exact, who = '검색한 품번';
+    if (!list.length && label==='비슷한 품번'){
+      list = res.same.filter(function(p){ return p.base===res.base; }); who = '같은 모델(다른 색상)';
+    }
+    return list.length ? {who:who, rows:[].concat.apply([], list.map(function(p){return p.rows;}))} : null;
+  }
+  // 작은 사이즈가 큰 사이즈보다(또는 그 반대로) 2cm 넘게 벗어난 항목
+  function conflicts(meas, size, rows){
+    var tn = snum(size), found = {};
+    if (tn==null) return [];
+    ladder(rows).forEach(function(x){
+      if (x.n===tn || scale(x.n)!==scale(tn)) return;
+      for (var k in meas){
+        if (!(k in x.meas)) continue;
+        var over = x.n>tn ? meas[k]-x.meas[k] : x.meas[k]-meas[k];
+        if (over>2 && (!found[k] || over>found[k].over)) found[k] = {key:k, over:over, val:meas[k], n:x.n, ref:x.meas[k]};
+      }
+    });
+    return Object.keys(found).map(function(k){return found[k];});
+  }
+  function warnHtml(b, size, ref){
+    var list = ref ? conflicts(b.meas, size, ref.rows) : [];
+    if (!list.length) return '';
+    return '<div class="warn"><b>주의 · 이 상품과 치수가 다를 수 있습니다.</b><ul>'+list.map(function(c){
+      return '<li>'+esc(size)+' 사이즈 '+esc(c.key)+' '+fmt(c.val)+' — '+ref.who+' '+fmt(c.n)+' 사이즈의 '+fmt(c.ref)+'보다 '+(c.val>c.ref?'큽니다':'작습니다')+'</li>';
+    }).join('')+'</ul></div>';
   }
 
   function sortRows(rows){
@@ -299,7 +334,7 @@
     for (i=2;i<tiers.length;i++){ t=tiers[i]; e = estimate(t.rows,size); if (e) return {kind:'est', meas:e.meas, est:e, label:t.label, who:t.who}; }
     return null;
   }
-  function answerHtml(b, code, size, id){
+  function answerHtml(b, size, ref){
     var ks = Object.keys(b.meas).sort(function(a,c){var i=ORDER.indexOf(a),j=ORDER.indexOf(c);return (i<0?99:i)-(j<0?99:j);});
     var line = ks.map(function(k){return k+' '+fmt(b.meas[k]);}).join('  ·  ');
     var txt = size+' 사이즈 '+ks.map(function(k){return k+' '+fmt(b.meas[k]);}).join(' / ');
@@ -308,7 +343,7 @@
     var tag = b.kind==='act' ? (b.label==='같은 품번' ? '실측 · 같은 품번' : '실측 · '+b.label) : (b.est.kind==='보간' ? '추정값 · '+fmt(b.est.from[0])+'와 '+fmt(b.est.from[1])+' 사이 계산' : '추정값 · 끝 사이즈 연장 (정확도 낮음)');
     return '<div class="answer'+(b.kind==='est'?' est':'')+'"><button class="copy" data-copy="'+esc(txt)+'">답변 문구 복사</button>'+
       '<div class="tag">'+esc(tag)+'</div><div class="line">'+esc(size)+'&nbsp;&nbsp;'+esc(line)+'</div>'+
-      '<div class="src">근거: '+esc(b.who)+(b.label?' ('+esc(b.label)+')':'')+(b.kind==='est'?' — 정확한 실측이 아닌 참고값입니다.':'')+'</div></div>';
+      '<div class="src">근거: '+esc(b.who)+(b.label?' ('+esc(b.label)+')':'')+(b.kind==='est'?' — 정확한 실측이 아닌 참고값입니다.':'')+'</div>'+warnHtml(b, size, ref)+'</div>';
   }
 
   function render(){
@@ -326,7 +361,7 @@
       }
       if (q.size){
         var b = bestAnswer(res, q.size);
-        html += b ? answerHtml(b, q.code, q.size, idx) : '<div class="empty" style="margin-bottom:12px">'+esc(q.size)+' 사이즈는 DB에 없고, 앞뒤 사이즈도 없어 추정할 수 없습니다. 아래 비슷한 상품의 다른 사이즈를 참고하세요.</div>';
+        html += b ? answerHtml(b, q.size, refOf(res, b.label)) :'<div class="empty" style="margin-bottom:12px">'+esc(q.size)+' 사이즈는 DB에 없고, 앞뒤 사이즈도 없어 추정할 수 없습니다. 아래 비슷한 상품의 다른 사이즈를 참고하세요.</div>';
       }
       if (res.exact.length){
         html += '<div class="tier">같은 품번 <i>'+res.exact.length+'개</i></div>';
