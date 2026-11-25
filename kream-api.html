@@ -143,6 +143,7 @@
   body:not(.mapmode) #mapPanel{display:none;}
   body:not(.stkmode) #stkPanel{display:none;}
   body:not(.cxmode) #cxPanel{display:none;}
+  body.cxmode #demoTag{display:none;}   /* 취소 대상은 실제 크림·재고 자료라 '시험 데이터' 표시를 감춘다 */
   .mp{padding:0 24px 80px;}
   .mp-bar{display:flex;gap:10px;align-items:center;padding:14px 0;flex-wrap:wrap;}
   .mp-bar input[type=search]{height:36px;width:280px;padding:0 12px;border:1px solid #cfcec8;border-radius:7px;background:#fff;}
