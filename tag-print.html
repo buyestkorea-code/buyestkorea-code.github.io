@@ -31,6 +31,17 @@
   .scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;}
   .x{border:0;background:none;color:var(--bad);cursor:pointer;font-size:16px;}
 
+  /* 이카운트 품목 정보 갱신 시각 */
+  .sync{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;border-left:4px solid var(--line);}
+  .sync[data-s="ok"]{border-left-color:var(--ok);} .sync[data-s="warn"]{border-left-color:var(--warn);}
+  .sync .k{font-size:12px;font-weight:700;color:var(--sub);}
+  .sync .t{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+  .sync .a{font-size:13px;color:var(--sub);}
+  .sync[data-s="warn"] .a{color:var(--warn);font-weight:700;}
+  .sync .h{flex-basis:100%;font-size:12.5px;color:var(--sub);line-height:1.55;}
+  .when{display:block;margin-top:2px;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums;}
+  .when.old{color:var(--warn);font-weight:700;}
+
   /* 위치 편집 */
   .edit{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;}
   #canvasWrap{flex:none;}
@@ -64,6 +75,13 @@
 <div class="noprint">
   <h1>택 출력 <span style="font-size:12px;color:var(--warn);font-weight:700;">시험판</span></h1>
   <p class="lead">상품명과 사이즈 두 열이 있는 엑셀을 올리면, 이카운트 품목 정보(품목코드·출고단가·바코드)와 사이트 상품 정보(브랜드·원산지)를 찾아 택에 들어갈 <b>값만</b> 인쇄합니다. 로고와 항목 이름(브랜드, 모델명…)은 택 용지에 이미 인쇄되어 있으니 나오지 않습니다.</p>
+
+  <div class="card sync" id="sync" role="status">
+    <span class="k">이카운트 품목 정보 마지막 갱신</span>
+    <span class="t" id="syncTime">—</span>
+    <span class="a" id="syncAge">불러오는 중이에요</span>
+    <span class="h">서버가 정해진 시간에 이카운트에서 받아 둔 값이에요. 낮(10~19시)에는 매시 28분·47분쯤, 밤에는 20분 간격(새벽 3시대 제외)으로 일부씩 돌아가며 받아서 품목마다 시각이 달라요. 품목별 시각은 엑셀을 올리면 상품명 아래에 나와요.</span>
+  </div>
 
   <div class="card">
     <h2>1. 엑셀 올리기</h2>
@@ -178,6 +196,40 @@ function readSheet(file) {
 }
 function msg(t, cls) { $('fileMsg').className = 'msg ' + (cls || ''); $('fileMsg').textContent = t; }
 
+/* ── 이카운트 품목 정보 갱신 시각 (한국시간) ── */
+const OLD_SEC = 48 * 3600;                 // 재고 있는 품목은 보통 하루 안팎이면 다시 받는다 → 이틀 넘으면 '오래됨'
+let skew = 0;                              // 서버 시각 - 이 컴퓨터 시각(초)
+const nowSec = () => Math.floor(Date.now() / 1000) + skew;
+const kstFmt = new Intl.DateTimeFormat('en-GB', { timeZone:'Asia/Seoul', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hourCycle:'h23' });
+function kst(ts) { const p = {}; kstFmt.formatToParts(new Date(ts * 1000)).forEach(x => p[x.type] = x.value); return +p.month + '/' + +p.day + ' ' + p.hour + ':' + p.minute; }
+function ago(ts) {
+  const m = Math.max(0, Math.floor((nowSec() - ts) / 60));
+  return m < 1 ? '방금' : m < 60 ? m + '분 전' : m < 1440 ? Math.floor(m / 60) + '시간 전' : Math.floor(m / 1440) + '일 전';
+}
+const isOld = ts => nowSec() - ts > OLD_SEC;
+function whenLine(it) {
+  if (!it.synced) return '';
+  const old = isOld(it.synced);
+  return '<span class="when' + (old ? ' old' : '') + '">정보 받은 시각 ' + kst(it.synced) + ' · ' + ago(it.synced) + (old ? ' · 판매가 확인' : '') + '</span>';
+}
+async function loadSync() {
+  try {
+    const d = await (await fetch(API, { cache:'no-store' })).json();
+    if (!d.ok || !d.master_ts) throw new Error('no time');
+    skew = d.now - Math.floor(Date.now() / 1000);
+    const late = d.now - d.master_ts > 3 * 3600, failed = !!d.master_status && d.master_status !== 'ok';
+    $('sync').dataset.s = late || failed ? 'warn' : 'ok';
+    $('syncTime').textContent = kst(d.master_ts);
+    $('syncAge').textContent = ago(d.master_ts) + (failed ? ' · 마지막 받기가 실패했어요. 관리자에게 알려 주세요' : late ? ' · 갱신이 늦어지고 있어요. 관리자에게 알려 주세요' : '');
+  } catch (e) {
+    $('sync').dataset.s = 'warn';
+    $('syncTime').textContent = '—';
+    $('syncAge').textContent = '갱신 시각을 불러오지 못했어요';
+  }
+}
+loadSync(); setInterval(loadSync, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) loadSync(); });
+
 $('file').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
   const a = auth();
@@ -192,10 +244,13 @@ $('file').addEventListener('change', async e => {
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user: a.id, pass: a.pass, rows: rows }) });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || '조회에 실패했어요.');
+    if (d.now) skew = d.now - Math.floor(Date.now() / 1000);
     items = d.rows.map(x => Object.assign({ src: rows[x.i], qty: 1 }, x));
     const c = k => items.filter(x => x.status === k).length;
     const miss = c('nosize') + c('nostyle');
-    msg(items.length + '줄 중 ' + c('ok') + '줄을 찾았어요.' + (c('multi') ? ' 후보가 여러 개인 ' + c('multi') + '줄은 직접 골라주세요.' : '') + (miss ? ' 못 찾은 ' + miss + '줄은 칸을 직접 채우거나 ×로 빼세요.' : ''), c('ok') === items.length ? 'ok' : '');
+    const old = items.filter(x => x.synced && isOld(x.synced)).length;
+    msg(items.length + '줄 중 ' + c('ok') + '줄을 찾았어요.' + (c('multi') ? ' 후보가 여러 개인 ' + c('multi') + '줄은 직접 골라주세요.' : '') + (miss ? ' 못 찾은 ' + miss + '줄은 칸을 직접 채우거나 ×로 빼세요.' : '') + (old ? ' 정보를 받은 지 이틀이 넘은 ' + old + '줄은 인쇄 전에 판매가를 확인하세요.' : ''), c('ok') === items.length && !old ? 'ok' : '');
+    loadSync();
     drawList();
   } catch (err) { msg(err.message, 'bad'); }
 });
@@ -209,7 +264,7 @@ function drawList() {
     const cand = it.status === 'multi' ? '<select data-c="' + i + '"><option value="">후보 고르기</option>' + it.cands.map((c, k) => '<option value="' + k + '">' + esc(c.ec_name) + ' / ' + esc(c.size) + ' / ' + esc(c.code) + '</option>').join('') + '</select>' : '';
     const inp = k => '<td><input type="text" data-i="' + i + '" data-k="' + k + '" value="' + esc(it[k]) + '" style="width:' + (k === 'style' ? 150 : k === 'barcode' ? 100 : 90) + 'px"></td>';
     return '<tr><td style="color:' + st[1] + ';font-weight:700;white-space:nowrap;">' + st[0] + '</td>' +
-      '<td style="min-width:220px;">' + esc(it.src.name) + '<br><span style="color:var(--sub)">' + esc(it.src.size) + (it.code ? ' → ' + esc(it.size) : '') + '</span>' + cand + '</td>' +
+      '<td style="min-width:220px;">' + esc(it.src.name) + '<br><span style="color:var(--sub)">' + esc(it.src.size) + (it.code ? ' → ' + esc(it.size) : '') + '</span>' + whenLine(it) + cand + '</td>' +
       ['brand', 'style', 'origin', 'price', 'barcode'].map(inp).join('') +
       '<td><input type="number" min="0" max="999" value="' + it.qty + '" data-q="' + i + '"></td><td><button class="x" data-d="' + i + '" title="빼기" aria-label="빼기">×</button></td></tr>';
   }).join('');
@@ -218,7 +273,7 @@ function drawList() {
   $('tbody').querySelectorAll('select[data-c]').forEach(s => s.addEventListener('change', () => {
     if (s.value === '') return;
     const it = items[+s.dataset.c], c = it.cands[+s.value];
-    Object.assign(it, { status:'ok', code:c.code, ec_name:c.ec_name, size:c.size, price:c.price, barcode:c.barcode });
+    Object.assign(it, { status:'ok', code:c.code, ec_name:c.ec_name, size:c.size, price:c.price, barcode:c.barcode, synced:c.synced });
     drawList();
   }));
   $('tbody').querySelectorAll('.x').forEach(b => b.addEventListener('click', () => { items.splice(+b.dataset.d, 1); drawList(); }));
