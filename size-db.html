@@ -73,7 +73,8 @@
   .upd.drag { border-color:var(--accent); background:var(--accent-soft); }
   .upd-row { display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
   .upd-text { flex:1 1 320px; }
-  .upd-text b { display:block; font-size:14px; margin-bottom:3px; }
+  .upd-text > b { display:block; font-size:14px; margin-bottom:3px; }
+  .upd-text span b.col { color:var(--ink); }
   .upd-text span { font-size:12.5px; color:var(--muted); line-height:1.55; }
   .upd-text strong { color:var(--accent); }
   .btn { font:inherit; font-size:13px; font-weight:700; padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:#fff; color:var(--accent); cursor:pointer; }
@@ -124,11 +125,11 @@
   <div class="upd" id="upd">
     <div class="upd-row">
       <div class="upd-text">
-        <b>네이트온이나 카카오톡 대화방을 그대로 올리면 DB가 업데이트 됩니다.</b>
-        <span>현재 DB는 <strong id="baseDate">2026년 11월 24일</strong> 기준입니다. 대화 내보내기 파일(.txt, .csv)을 고르거나 여기에 끌어다 놓으세요.</span>
+        <b>네이트온·카카오톡 대화방이나 실측 엑셀을 그대로 올리면 DB가 업데이트 됩니다.</b>
+        <span>현재 DB는 <strong id="baseDate">2026년 11월 25일</strong> 기준입니다. 대화 내보내기 파일(.txt, .csv)이나 엑셀(.xlsx, .xls)을 고르거나 여기에 끌어다 놓으세요. 엑셀은 제목 줄에 <b class="col">품번</b>·<b class="col">사이즈</b>·<b class="col">실측사이즈</b> 칸이 있어야 합니다.</span>
       </div>
-      <button type="button" class="btn fill" id="pick">대화 파일 올리기</button>
-      <input type="file" id="file" accept=".txt,.csv" multiple hidden>
+      <button type="button" class="btn fill" id="pick">파일 올리기</button>
+      <input type="file" id="file" accept=".txt,.csv,.xlsx,.xls" multiple hidden>
     </div>
     <div id="updMsg" aria-live="polite"></div>
     <details class="hist" id="hist" hidden><summary id="histSum"></summary><ul id="histList"></ul></details>
@@ -139,7 +140,7 @@
   <div id="out"></div>
 </div>
 <script src="sizedb.js"></script>
-<script src="sizedb-import.js"></script>
+<script src="sizedb-import.js?v=20261125xl"></script>
 <script>
 (function(){
   var BASE = (window.SIZEDB && window.SIZEDB.recs) || [];
@@ -320,7 +321,8 @@
   }
   function rawHtml(r){
     var nums = (String(r.raw).match(/[0-9]+(?:[.][0-9]+)?/g)||[]).length;
-    return nums===Object.keys(r.meas).length ? '' : '<span class="raw">원문: '+esc(r.raw)+'</span>';
+    var n = Object.keys(r.meas).length;
+    return n && nums===n ? '' : '<span class="raw">원문: '+esc(r.raw)+'</span>';
   }
   function ptype(p){
     var top=false, bot=false;
@@ -422,7 +424,7 @@
     out.innerHTML = html;
   }
 
-  /* ---------- 대화 파일로 DB 업데이트 ---------- */
+  /* ---------- 대화 파일·엑셀로 DB 업데이트 ---------- */
   var API = 'https://buyest.co.kr/size_db_api.php';
   var batches = [], pendingUp = null, busy = false;
   function auth(){
@@ -461,42 +463,88 @@
     var list = Array.from(files);
     if (busy || !list.length) return;
     if (!auth()){ say('툴킷에 로그인한 뒤 사용할 수 있습니다.', true); return; }
-    if (list.some(function(f){ return !/[.](txt|csv)$/i.test(f.name); })){ say('.txt 또는 .csv 파일만 올릴 수 있습니다. 압축(zip) 파일은 풀어서 올려 주세요.', true); return; }
+    if (list.some(function(f){ return !/[.](txt|csv|xlsx|xls)$/i.test(f.name); })){ say('.txt · .csv · .xlsx · .xls 파일만 올릴 수 있습니다. 압축(zip) 파일은 풀어서 올려 주세요.', true); return; }
     busy = true; pendingUp = null; say('파일을 읽는 중입니다…');
+    var hasXl = list.some(isExcel);
     // 이미 서버에 있는 기록과 비교하려고 먼저 최신 목록을 받는다
     call('list').then(function(j){
       applyServer(j);
-      return Promise.all(list.map(function(f){ return f.arrayBuffer().then(function(buf){ return {name:f.name, chat:SizeImport.parseChat(SizeImport.decode(buf))}; }); }));
+      return hasXl ? loadXlsx() : null;
+    }).then(function(){
+      return Promise.all(list.map(function(f){ return f.arrayBuffer().then(function(buf){
+        if (isExcel(f)) return {name:f.name, xl:SizeImport.parseSheets(sheetsOf(buf, f.name))};
+        return {name:f.name, chat:SizeImport.parseChat(SizeImport.decode(buf))};
+      }); }));
     }).then(function(read){
-      var bad = read.filter(function(x){ return !x.chat.format || !x.chat.messages.length; });
-      if (bad.length) throw new Error('대화 형식을 알아보지 못했습니다: '+bad.map(function(x){return x.name;}).join(', ')+'. 이 파일을 개발 담당에게 보내 주세요.');
+      var chats = read.filter(function(x){ return x.chat; }), xls = read.filter(function(x){ return x.xl; });
+      var bad = chats.filter(function(x){ return !x.chat.format || !x.chat.messages.length; });
+      if (bad.length) throw new Error('대화 형식을 알아보지 못했습니다: '+names(bad)+'. 이 파일을 개발 담당에게 보내 주세요.');
+      var noHead = xls.filter(function(x){ return !x.xl.sheets.length; });
+      if (noHead.length) throw new Error('엑셀에서 제목 줄을 찾지 못했습니다: '+names(noHead)+'. 첫 줄에 품번, 사이즈, 실측사이즈 칸 제목을 넣어 다시 올려 주세요.');
       var all = [], msgs = 0, from = '9999', to = '', formats = {};
-      read.forEach(function(x){
+      chats.forEach(function(x){
         var src = x.chat.format.indexOf('네이트온')===0 ? '네이트온' : '카톡';
         formats[x.chat.format] = 1; msgs += x.chat.messages.length;
         x.chat.messages.forEach(function(m){ if (m.date<from) from=m.date; if (m.date>to) to=m.date; });
         all = all.concat(SizeImport.extract(x.chat.messages, src));
       });
+      var lines = [], xlRows = 0, noCode = 0, unread = [];
+      if (chats.length) lines.push('<b>'+esc(Object.keys(formats).join(', '))+'</b> · 메시지 '+msgs.toLocaleString()+'개 · '+esc(from)+' ~ '+esc(to));
+      xls.forEach(function(x){
+        formats['엑셀'] = 1; all = all.concat(x.xl.recs);
+        xlRows += x.xl.recs.length; noCode += x.xl.noCode; unread = unread.concat(x.xl.unread);
+      });
+      if (xls.length){
+        lines.push('<b>엑셀</b> · 실측 '+xlRows.toLocaleString()+'줄을 읽었습니다.'+
+          (noCode ? ' 품번이 없거나 5글자보다 짧은 '+noCode.toLocaleString()+'줄은 뺐습니다.' : '')+
+          (unread.length ? ' 제목 줄이 없어 읽지 않은 시트: '+esc(unread.join(', ')) : ''));
+        to = today();
+      }
       var res = SizeImport.toRecords(all, DB);
-      var head = '<b>'+esc(Object.keys(formats).join(', '))+'</b> · 메시지 '+msgs.toLocaleString()+'개 · '+esc(from)+' ~ '+esc(to)+'<br>'+
+      var head = lines.join('<br>')+'<br>'+
         '실측 '+res.found.toLocaleString()+'건을 찾았고, 이미 있는 것을 빼면 <b>새 기록 '+res.fresh.length.toLocaleString()+'건</b>입니다.';
       if (!res.fresh.length){ say(head+'<br>DB에 추가할 것이 없습니다.'); return; }
-      pendingUp = {recs:res.fresh, file:read.map(function(x){return x.name;}).join(', '), source:Object.keys(formats).join(', '), data_until:to};
-      var rows = res.fresh.slice().sort(function(a,b){ return a[7]<b[7]?1:-1; }).slice(0,30).map(function(r){
-        return '<tr><td><b>'+esc(r[1])+'</b> '+esc(r[2])+'</td><td>'+chips(r[3])+'<span class="raw">원문: '+esc(r[4])+'</span></td><td class="t">'+esc(r[7])+(r[8]==='mid'?'<span class="pill mid">추정연결</span>':'')+'</td></tr>';
+      pendingUp = {recs:res.fresh, file:names(read), source:Object.keys(formats).join(', '), data_until:to};
+      // 대화 기록은 최근 것부터, 날짜가 없는 엑셀 줄은 파일에 적힌 순서대로
+      var rows = res.fresh.slice().sort(function(a,b){ return a[7]===b[7] ? 0 : (a[7]<b[7]?1:-1); }).slice(0,30).map(function(r){
+        // 저장되면 모든 직원에게 보이므로 브랜드·비고까지 미리 보여준다
+        return '<tr><td><b>'+esc(r[1])+'</b> '+esc(r[2])+(r[0]?'<span class="raw">'+esc(r[0])+'</span>':'')+'</td><td>'+chips(r[3])+(r[5]?'<span class="pill">'+esc(r[5])+'</span>':'')+'<span class="raw">원문: '+esc(r[4])+'</span></td><td class="t">'+esc(r[7]||r[6])+(r[8]==='mid'?'<span class="pill mid">추정연결</span>':'')+'</td></tr>';
       }).join('');
       say(head+'<div class="prod"><table>'+rows+'</table></div>'+
-        (res.fresh.length>30 ? '<div>최근 30건만 보여줍니다.</div>' : '')+
+        (res.fresh.length>30 ? '<div>30건만 미리 보여줍니다.</div>' : '')+
         '<button type="button" class="btn fill" data-act="save">새 기록 '+res.fresh.length.toLocaleString()+'건 DB에 반영</button><button type="button" class="btn" data-act="cancel">취소</button>');
     }).catch(function(e){ say(esc(e.message||'파일을 읽지 못했습니다.'), true); })
       .then(function(){ busy = false; $('file').value=''; });
+  }
+  function isExcel(f){ return /[.]xlsx?$/i.test(f.name); }
+  function names(list){ return list.map(function(x){return x.name;}).join(', '); }
+  function today(){
+    var d = new Date(), p = function(n){ return (n<10?'0':'')+n; };
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  }
+  // 엑셀 읽기 도구는 크기가 커서 엑셀을 올릴 때만 불러온다
+  function loadXlsx(){
+    if (window.XLSX) return Promise.resolve();
+    return new Promise(function(ok, no){
+      var s = document.createElement('script'); s.src = 'assets/libs/xlsx.full-0.20.2.min.js';
+      s.onload = ok;
+      s.onerror = function(){ s.remove(); no(new Error('엑셀 읽기 도구를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.')); };
+      document.head.appendChild(s);
+    });
+  }
+  function sheetsOf(buf, name){
+    var wb;
+    try { wb = XLSX.read(new Uint8Array(buf), {type:'array'}); }
+    catch(e){ throw new Error('엑셀 파일을 열지 못했습니다: '+name+'. 암호가 걸려 있으면 풀고, 다시 저장해서 올려 주세요.'); }
+    return wb.SheetNames.map(function(n){ return {name:n, rows:XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, raw:true, defval:null})}; });
   }
   function save(){
     if (busy || !pendingUp) return;
     busy = true; say('DB에 반영하는 중입니다…');
     call('add', pendingUp).then(function(j){
       pendingUp = null; applyServer(j);
-      say('새 기록 '+Number(j.added).toLocaleString()+'건을 DB에 반영했습니다. 모든 직원 화면에 적용됩니다.');
+      say('새 기록 '+Number(j.added).toLocaleString()+'건을 DB에 반영했습니다. 모든 직원 화면에 적용됩니다.'+
+        (j.skipped ? ' (서버에서 '+Number(j.skipped).toLocaleString()+'건은 이미 있거나 형식이 맞지 않아 뺐습니다.)' : ''));
     }).catch(function(e){
       say(esc(e.message)+'<br><button type="button" class="btn fill" data-act="save">다시 반영</button><button type="button" class="btn" data-act="cancel">취소</button>', true);
     }).then(function(){ busy = false; });
@@ -532,7 +580,7 @@
   });
   var p = new URLSearchParams(location.search);
   if (p.get('q')) { $('q').value = p.get('q'); if (p.get('s')) $('sz').value = p.get('s'); render(); }
-  if (auth()) call('list').then(applyServer).catch(function(e){ say('올린 대화의 추가 기록을 불러오지 못해 기본 DB만 보여줍니다. '+esc(e.message), true); });
+  if (auth()) call('list').then(applyServer).catch(function(e){ say('올린 파일의 추가 기록을 불러오지 못해 기본 DB만 보여줍니다. '+esc(e.message), true); });
 })();
 </script>
 </body>
