@@ -778,6 +778,8 @@ function subjectBox(c){
   function isFg(r,g,b){ return (299*Math.abs(r-rr)+587*Math.abs(g-rg)+114*Math.abs(b-rb))/1000>T; }
   var n=sw*sh, m=new Uint8Array(n), fg=0;
   for(i=0;i<n;i++){ if(isFg(d[i*4],d[i*4+1],d[i*4+2])){ m[i]=1; fg++; } }
+  /* 테두리가 균일하게 어두우면 원단이 화면을 꽉 채운 확대컷이다 — 원단을 배경으로 보고 로고 주변만 남기며 잘라내지 않도록 원본 전체를 쓴다 */
+  if(uniform&&(299*mr+587*mg+114*mb)/1000<190) return [0,0,w,h];
   if(!fg||fg>n*0.9) return null;
   var lab=new Int32Array(n), sizes=[0], stack=new Int32Array(n), cnt=0, bx0=[],by0=[],bx1=[],by1=[];
   for(i=0;i<n;i++){ if(m[i]&&!lab[i]){ cnt++; var sp=0, sz=0, ax0=sw, ay0=sh, ax1=-1, ay1=-1; stack[sp++]=i; lab[i]=cnt;
@@ -1140,6 +1142,13 @@ function setApplyBtn(){
   b.disabled=!state.last;
   if(state.stale){ b.textContent='● 현재 변경사항 저장'; b.style.borderColor='#c2410c'; b.style.color='#c2410c'; b.style.fontWeight='700'; }
   else { b.textContent='현재 변경사항 저장'; b.style.borderColor=''; b.style.color=''; b.style.fontWeight=''; }
+}
+/* 다른 상품을 불러오면 앞 상품의 결과물을 버리고 저장 버튼을 끈다 — 남겨 두면 이전 이미지가 새 품번 파일명으로 저장된다 */
+function dropResult(){
+  state.slots=null; state.last=null; state.canvas=null; state.stale=false; state.sel=''; state.wrapEl=null; state.hl=null;
+  ['dl','dla','dlp','dlz'].forEach(function(i){ $(i).disabled=true; }); setApplyBtn();
+  $('prev').style.display='none'; $('prev').innerHTML=''; $('editHint').style.display='none'; $('warns').innerHTML='';
+  if(window.PhotoRegister) PhotoRegister.invalidate();
 }
 /* 열려 있는 글자 편집을 확정하고, 입력칸에서 고친 값까지 미리보기(=저장될 이미지)에 반영 */
 function applyPending(){
@@ -1686,6 +1695,7 @@ function loadJob(id){
   $('status').textContent='보관된 작업 불러오는 중…';
   phJson('get',{job:id}).then(function(j){
     var m=j.meta, miss=[];
+    dropResult();
     state.job=id; state.season=!!m.season; state.fromColor=!!m.color; state.jobName=m.pname; $('pname').value=m.pname||''; state.xl=m.xl||{}; state.dirty=m.dirty||{};
     Object.keys(m.fields||{}).forEach(function(k){ if(!fld(k)&&m.fields[k]) ensureField(k); });
     setInfoRows(m.infoRows||null);
@@ -1711,8 +1721,8 @@ function loadJob(id){
 var colorSrc=null;
 function escH(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 function clearForColor(){
-  state.job=''; state.jobName=''; state.slots=null; state.last=null; state.canvas=null; state.pending=null; state.stale=false; state.sv={};
-  state.photos=[]; drawPhotos(); $('prev').style.display='none'; $('prev').innerHTML='';
+  state.job=''; state.jobName=''; state.pending=null; state.sv={};
+  state.photos=[]; drawPhotos(); dropResult();
 }
 function showColorPanel(label,withKo){
   var ok=$('colorOk'); ok.style.display='block';
@@ -2076,7 +2086,7 @@ if(window.PhotoSeason) PhotoSeason.init({
   hasPhotos:function(){ return state.photos.length; },
   setPhotos:function(files){
     state.photos=files.map(function(f){ return {file:f,url:URL.createObjectURL(f),key:keyOf(f)}; });
-    state.last=null; drawPhotos();
+    dropResult(); drawPhotos();
   },
   setPname:function(v){ state.season=true; state.fromColor=false; $('pname').value=v; $('pname').dispatchEvent(new Event('input',{bubbles:true})); },
   setField:function(k,v){ if(!fld(k)){ ensureField(k); if(state.infoRows&&state.infoRows.indexOf(k)<0) setInfoRows(state.infoRows.concat([k])); } fld(k).value=v; fld(k).dispatchEvent(new Event('input',{bubbles:true})); },
