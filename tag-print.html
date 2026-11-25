@@ -89,10 +89,10 @@
   <p class="lead">단품을 검색해 담거나, 상품명과 사이즈 두 열이 있는 엑셀을 올리면 이카운트 품목 정보(품목코드·출고단가·바코드)와 사이트 상품 정보(브랜드·원산지)를 찾아 택에 들어갈 <b>값만</b> 인쇄합니다. 로고와 항목 이름(브랜드, 모델명…)은 택 용지에 이미 인쇄되어 있으니 나오지 않습니다.</p>
 
   <div class="card sync" id="sync" role="status">
-    <span class="k">이카운트 품목 정보 마지막 갱신</span>
+    <span class="k">이카운트에서 마지막으로 받은 시각 (일부 품목)</span>
     <span class="t" id="syncTime">—</span>
     <span class="a" id="syncAge">불러오는 중이에요</span>
-    <span class="h">서버가 정해진 시간에 이카운트에서 받아 둔 값이에요. 낮(10~19시)에는 매시 28분·47분쯤, 밤에는 20분 간격(새벽 3시대 제외)으로 일부씩 돌아가며 받아서 품목마다 시각이 달라요. 품목별 시각은 상품명 아래에 나와요.</span>
+    <span class="h"><b>위 시각에 모든 품목을 받은 것이 아니에요.</b> 전체 약 8만 개를 한 번에 1,800개씩 돌아가며 받아서 품목마다 시각이 달라요. 가격은 <b>상품명 아래의 "정보 받은 시각"</b>으로 확인하세요. 재고 있는 상품은 보통 올해 시즌 4시간, 작년 시즌 8시간, 그 밖 14시간 안에 다시 받아요.</span>
   </div>
 
   <div class="card">
@@ -223,7 +223,7 @@ function readSheet(file) {
 function msg(t, cls) { $('fileMsg').className = 'msg ' + (cls || ''); $('fileMsg').textContent = t; }
 
 /* ── 이카운트 품목 정보 갱신 시각 (한국시간) ── */
-const OLD_SEC = 48 * 3600;                 // 재고 있는 품목은 보통 하루 안팎이면 다시 받는다 → 이틀 넘으면 '오래됨'
+/* '오래됨' 기준: 서버 갱신 순서(올해·다음 해 시즌 4시간 안팎, 그 밖 길면 14시간)보다 넉넉히 지난 것 */
 let skew = 0;                              // 서버 시각 - 이 컴퓨터 시각(초)
 const nowSec = () => Math.floor(Date.now() / 1000) + skew;
 const kstFmt = new Intl.DateTimeFormat('en-GB', { timeZone:'Asia/Seoul', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hourCycle:'h23' });
@@ -232,10 +232,14 @@ function ago(ts) {
   const m = Math.max(0, Math.floor((nowSec() - ts) / 60));
   return m < 1 ? '방금' : m < 60 ? m + '분 전' : m < 1440 ? Math.floor(m / 60) + '시간 전' : Math.floor(m / 1440) + '일 전';
 }
-const isOld = ts => nowSec() - ts > OLD_SEC;
+function oldLimit(name) {
+  const m = /^(\d{2})(?:SS|FW) /i.exec(String(name || '')), yy = new Date().getFullYear() % 100;
+  return (m && (+m[1] === yy || +m[1] === yy + 1) ? 6 : 16) * 3600;
+}
+const isOld = (ts, name) => nowSec() - ts > oldLimit(name);
 function whenLine(it) {
   if (!it.synced) return '';
-  const old = isOld(it.synced);
+  const old = isOld(it.synced, it.ec_name);
   return '<span class="when' + (old ? ' old' : '') + '">정보 받은 시각 ' + kst(it.synced) + ' · ' + ago(it.synced) + (old ? ' · 판매가 확인' : '') + '</span>';
 }
 async function loadSync() {
@@ -276,8 +280,8 @@ $('file').addEventListener('change', async e => {
     items = kept.concat(added);
     const c = k => added.filter(x => x.status === k).length;
     const miss = c('nosize') + c('nostyle');
-    const old = added.filter(x => x.synced && isOld(x.synced)).length;
-    msg(added.length + '줄 중 ' + c('ok') + '줄을 찾았어요.' + (c('multi') ? ' 후보가 여러 개인 ' + c('multi') + '줄은 직접 골라주세요.' : '') + (miss ? ' 못 찾은 ' + miss + '줄은 칸을 직접 채우거나 ×로 빼세요.' : '') + (old ? ' 정보를 받은 지 이틀이 넘은 ' + old + '줄은 인쇄 전에 판매가를 확인하세요.' : '') + (kept.length ? ' 검색으로 담은 ' + kept.length + '개는 그대로 있어요.' : ''), c('ok') === added.length && !old ? 'ok' : '');
+    const old = added.filter(x => x.synced && isOld(x.synced, x.ec_name)).length;
+    msg(added.length + '줄 중 ' + c('ok') + '줄을 찾았어요.' + (c('multi') ? ' 후보가 여러 개인 ' + c('multi') + '줄은 직접 골라주세요.' : '') + (miss ? ' 못 찾은 ' + miss + '줄은 칸을 직접 채우거나 ×로 빼세요.' : '') + (old ? ' 정보를 받은 지 오래된 ' + old + '줄(주황색)은 인쇄 전에 판매가를 확인하세요.' : '') + (kept.length ? ' 검색으로 담은 ' + kept.length + '개는 그대로 있어요.' : ''), c('ok') === added.length && !old ? 'ok' : '');
     loadSync();
     drawList();
   } catch (err) { msg(err.message, 'bad'); }
