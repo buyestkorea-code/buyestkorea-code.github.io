@@ -46,30 +46,81 @@ function leaves(list,out){
 }
 function textOf(l){ return l.text && typeof l.text.text==='string' ? l.text.text : ''; }
 
-/* 라벨(모델명 등) 글자 레이어와 같은 줄에서 오른쪽으로 가장 가까운 글자 레이어 = 값 */
+/* 값 글자 묶기: 툴킷이 저장한 PSD는 긴 값이 줄마다 다른 레이어다 — 왼쪽이 같고 위아래로 맞닿은 레이어를 한 덩어리로 본다
+   (표의 서로 다른 줄은 간격이 떨어져 있어 묶이지 않는다) */
+function textBlocks(texts, isLab){
+  var blocks=[];
+  texts.map(function(t,i){ return i; }).filter(function(i){ return !isLab[i] && squash(textOf(texts[i])); })
+    .sort(function(a,b){ return texts[a].top-texts[b].top || a-b; })
+    .forEach(function(i){
+      var t=texts[i], b=null;
+      blocks.forEach(function(x){ if(!b && Math.abs(t.left-x.left)<=4 && t.top>x.lastTop+8 && t.top-x.bottom<=2) b=x; });
+      if(b){ b.idx.push(i); b.lastTop=t.top; b.bottom=Math.max(b.bottom,t.bottom); }
+      else blocks.push({idx:[i],left:t.left,top:t.top,lastTop:t.top,bottom:t.bottom});
+    });
+  return blocks;
+}
+
+/* 라벨(모델명 등) 글자 레이어의 오른쪽에서, 같은 줄에 있는 가장 가까운 글자 덩어리 = 값.
+   같은 줄 = 첫 줄 높이가 라벨과 같거나(예전 틀), 덩어리의 세로 가운데가 라벨 가운데와 같음(여러 줄 값) */
 function readFields(texts){
-  var lab = [], i;
+  var lab = [];
   texts.forEach(function(t){ var k=LABELS[squash(textOf(t))]; if(k) lab.push({k:k,l:t}); });
   var isLab = {}; lab.forEach(function(x){ isLab[texts.indexOf(x.l)] = 1; });
-  var out = {}, used = {};
+  var blocks = textBlocks(texts, isLab), out = {}, used = {};
   lab.forEach(function(x){
-    var best=null, bd=1e9;
-    texts.forEach(function(v,vi){
-      if(isLab[vi] || used[vi] || !squash(textOf(v))) return;
-      if(Math.abs(v.top - x.l.top) > 10) return;
-      var d = v.left - x.l.right; if(d < 0) return;
-      if(d < bd){ bd=d; best=vi; }
+    var best=null, bd=1e9, mid=(x.l.top+x.l.bottom)/2;
+    blocks.forEach(function(b){
+      if(b.used) return;
+      if(Math.abs(b.top - x.l.top) > 10 && Math.abs((b.top+b.bottom)/2 - mid) > 12) return;
+      var d = b.left - x.l.right; if(d < 0) return;
+      if(d < bd){ bd=d; best=b; }
     });
-    if(best!=null && !out[x.k]){ used[best]=1; out[x.k]=String(textOf(texts[best])).replace(/\r\n?|\n/g,'\n').replace(/[ \t]+/g,' ').trim(); }
+    if(best && !out[x.k]){
+      best.used=true; best.idx.forEach(function(i){ used[i]=1; });
+      var v=best.idx.map(function(i){ return String(textOf(texts[i])).replace(/\r\n?|\n/g,'\n').trim(); }).join(x.k==='소재'?'\n':' ');
+      if(x.k==='상품명') v=v.replace(/\s*\n\s*/g,' ');
+      out[x.k]=v.replace(/[ \t]+/g,' ').trim();
+    }
   });
   return {fields:out, usedIdx:used, labelIdx:isLab};
 }
 
-/* 실측표: '사이즈' 로 시작하는 글자 레이어 = 머리글, 그 아래 같은 가로 범위의 글자 레이어 = 줄 */
+/* 실측표(칸마다 글자 레이어): 포토샵 틀 = 열마다 여러 줄 레이어, 툴킷이 저장한 PSD = 칸마다 한 레이어.
+   머리글과 같은 높이의 레이어가 열, 그 아래 레이어를 가장 가까운 열에 넣고 윗변 높이로 줄을 맞춘다 */
+function readGridTable(texts, skip, hd){
+  var stop=Infinity;   /* 안내 문구·다음 구역이 시작되는 높이에서 표가 끝난다 */
+  texts.forEach(function(t){ var s=squash(textOf(t)); if(t.top>hd.top+5 && (/^[•·※]/.test(s)||/ProductDetail|실측은/i.test(s))) stop=Math.min(stop,t.top); });
+  var cand=texts.filter(function(t,i){ var s=squash(textOf(t)); return !skip[i] && s && !/^(단위|SizeChart)/i.test(s) && t.top>=hd.top-10 && t.top<stop-2; });
+  function cx(t){ return (t.left+t.right)/2; }
+  var head=cand.filter(function(t){ return Math.abs(t.top-hd.top)<=10; }).sort(function(a,b){ return a.left-b.left; });
+  if(head.length<2) return null;
+  var gap=Infinity; for(var i=1;i<head.length;i++) gap=Math.min(gap,cx(head[i])-cx(head[i-1]));
+  var rows=[head.map(function(t){ return String(textOf(t)).replace(/\s+/g,' ').trim(); })], rowTop=null, r=0, lastEnd=hd.bottom;
+  cand.filter(function(t){ return t.top>=hd.bottom-2; }).sort(function(a,b){ return a.top-b.top; }).forEach(function(t){
+    if(t.top>lastEnd+90) return;   /* 표에서 멀리 떨어진 글자는 표가 아니다 */
+    var c=-1, bd=gap*0.6; head.forEach(function(h,j){ var d=Math.abs(cx(t)-cx(h)); if(d<bd){ bd=d; c=j; } });
+    if(c<0) return;
+    if(rowTop===null || t.top-rowTop>12){ r=rows.length; rowTop=t.top; }
+    lastEnd=Math.max(lastEnd,t.bottom);
+    var lines=String(textOf(t)).replace(/\r\n?/g,'\n').replace(/\s+$/,'').split('\n');
+    lines.forEach(function(v,k){
+      while(rows.length<=r+k) rows.push(head.map(function(){ return ''; }));
+      rows[r+k][c]=v.trim();
+    });
+  });
+  rows=rows.filter(function(x){ return x.some(function(v){ return v; }); });
+  return rows.length>=2 ? rows : null;
+}
+
+/* 실측표: '사이즈' 로 시작하는 글자 레이어 = 머리글. 머리글 한 레이어에 열 이름이 다 있으면 예전 틀(그 아래 같은 가로 범위의 레이어 = 줄),
+   '사이즈' 만 있으면 칸마다 레이어인 표 */
 function readSizeTable(texts, skip){
-  var hd=null;
-  texts.forEach(function(t,i){ if(skip[i]) return; if(/^사이즈/.test(squash(textOf(t))) && !hd) hd=t; });
-  if(!hd) return null;
+  var heads=texts.filter(function(t,i){ return !skip[i] && /^사이즈/.test(squash(textOf(t))); });
+  for(var i=0;i<heads.length;i++){ var res=readTableAt(texts,skip,heads[i]); if(res) return res; }
+  return null;
+}
+function readTableAt(texts, skip, hd){
   function cells(t){
     var raw=String(textOf(t)).replace(/\r\n?|\n/g,'\n').split('\n'), out=[];
     raw.forEach(function(line){
@@ -82,6 +133,7 @@ function readSizeTable(texts, skip){
   var rows=cells(hd);
   if(!rows.length) return null;
   var width=rows[0].length;
+  if(width<2) return readGridTable(texts,skip,hd);
   var below=texts.filter(function(t,i){
     if(skip[i]||t===hd) return false;
     return t.top>hd.bottom-2 && t.top<hd.bottom+260 && t.left>=hd.left-60 && t.right<=hd.right+120 && !/^SIZE/i.test(squash(textOf(t))) && squash(textOf(t));
