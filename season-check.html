@@ -80,7 +80,7 @@
     <div class="stats" id="stats"></div>
     <div style="margin:8px 0;"><button class="btn btn-sub" id="dlBtn">원본 양식 + 시즌체크 엑셀로 받기</button></div>
     <div class="tablewrap"><table><thead><tr><th>시트 행</th><th>품번 (MODEL)</th><th>시즌</th><th>판매중상품명</th><th>이카운트 재고</th><th>최근들어온내역</th><th>옵션값 (머리글에 넣는 사이즈 이름)</th><th>작업여부</th></tr></thead><tbody id="tbody"></tbody></table></div>
-    <div class="note">시즌 칸 읽는 법 — <b>26FW판매중</b>: 사이트에서 노출 중이고 살 수 있는 상품(시즌은 상품명 맨 앞에서 읽고, 상품명에 시즌이 없으면 사이트 등록일로 추정해 이름 칸에 표시) · <b>전품</b>: 노출 중인데 옵션이 모두 품절 · <b>미노출</b>: 사이트에서 숨김 · <b>다른색상판매</b>: 같은 모델의 다른 컬러만 있음 · <b>과거판매</b>: 사이트엔 없지만 이카운트 판매이력이 있음 · <b>신상</b>: 사이트에 없는 품번(이카운트에만 있어도 신상) · <b>확인필요</b>: 품번이 4자 미만이라 검색 불가. 작업여부는 비워 두니 확인하며 직접 적어 주세요.</div>
+    <div class="note">시즌 칸 읽는 법 — <b>26FW판매중</b>: 사이트에서 노출 중이고 살 수 있는 상품(시즌은 상품명 맨 앞에서 읽고, 상품명에 시즌이 없으면 사이트 등록일로 추정해 이름 칸에 표시) · <b>전품</b>: 노출 중인데 옵션이 모두 품절 · <b>미노출</b>: 사이트에서 숨김 · <b>다른색상판매</b>: 품번 맨 끝 컬러코드만 다르고 그 앞부분이 모두 같은 상품만 있음 · <b>과거판매</b>: 사이트엔 없지만 이카운트 판매이력이 있음 · <b>신상</b>: 사이트에 없는 품번(이카운트에만 있어도 신상) · <b>확인필요</b>: 품번이 4자 미만이라 검색 불가. 작업여부는 비워 두니 확인하며 직접 적어 주세요.</div>
   </div>
 </div>
 
@@ -187,6 +187,15 @@ const exactKey = hits => { const e = (hits || []).find(h => h.type === 'exact');
 const seasonFromDate = ts => { if (!ts) return ''; const d = new Date(ts * 1000); return String(d.getFullYear()).slice(2) + (d.getMonth() < 6 ? 'SS' : 'FW'); };
 const seasonOf = name => { const m = String(name || '').match(/^\s*(\d{2})\s?(FW|SS|AW|SP)\b/i); return m ? m[1] + m[2].toUpperCase() : ''; };
 
+// 다른 컬러 판정: 품번의 맨 끝 한 덩어리만 컬러코드이고, 그 앞(모델·원단)은 모두 같아야 한다.
+// 예) "1A001 18 597YW 999" 는 "1A001 18 597YW" 까지 같아야 함 → "1A001 18 54A91 74S" 는 다른 상품.
+function sameStyle(q, key){
+  const t = String(q).toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+  if (t.length < 2) return true;   // 한 덩어리 품번은 컬러 위치를 알 수 없어 서버의 앞부분 일치를 그대로 따른다
+  const style = t.slice(0, -1).join(''), at = String(key).indexOf(style);
+  return at === 0 || (style.length >= 10 && at >= 3 && at <= 6);   // 3~6자 = 우리 품번 앞에만 붙은 시즌코드(L2S15 …)
+}
+
 // 품번 하나의 최종 상태 (상품가격체크와 같은 규칙: 판매중 / 품절 / 미노출 / 미등록)
 function decide(main, alt, A, B){
   const sources = [{ q: main, R: A, via: '' }];
@@ -196,7 +205,7 @@ function decide(main, alt, A, B){
     if (k) return { key: k, exact: true, it: s.R.items[k], via: s.via, q: s.q };
   }
   for (const s of sources) {   // 정확 일치가 없으면 앞부분 일치(같은 모델 다른 컬러)
-    const h = s.R && (s.R.hits[s.q] || [])[0];
+    const h = s.R && (s.R.hits[s.q] || []).find(x => sameStyle(s.q, x.key));
     if (h) return { key: h.key, exact: false, it: s.R.items[h.key], via: s.via, q: s.q };
   }
   return { key: null, exact: false, it: null, via: '', q: main };
