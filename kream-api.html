@@ -189,7 +189,7 @@
   body.stkmode .chips button,body.mapmode .chips button,body.cxmode .chips button{height:36px;padding:0 16px;border:1px solid #e4e4e7;border-radius:20px;font-weight:500;color:#27272a;}
   body.stkmode .chips button[aria-selected=true],body.mapmode .chips button[aria-selected=true],body.cxmode .chips button[aria-selected=true]{background:#f1faf4;border-color:#5bc77f;color:#17803f;font-weight:600;} body.stkmode .chips button[aria-selected=true] span,body.mapmode .chips button[aria-selected=true] span,body.cxmode .chips button[aria-selected=true] span{color:#17803f;}
   body.stkmode .chips button span,body.mapmode .chips button span,body.cxmode .chips button span{color:#17803f;font-weight:600;}
-  /* ③ 취소 대상: 확인 전용 목록. 판정과 그 이유를 한 칸에서 읽는다 */
+  /* ③ 취소할 입찰: 판정과 그 이유, 취소 버튼과 진행 상태를 한 칸에서 읽는다 */
   .cx-scan{display:flex;gap:14px;align-items:center;flex-wrap:wrap;} .cx-scan .h{color:#52525b;}
   .cx-warn{margin:10px 0 0;padding:10px 14px;border-radius:10px;background:#fdf3e7;color:#8a4b08;line-height:1.55;}
   .cx-search{display:flex;gap:10px;margin:0 0 14px;} .cx-search .kin{max-width:360px;}
@@ -212,7 +212,19 @@
   .cx-steps li>b{display:block;margin-bottom:2px;} .cx-steps span{color:#3f3f46;} .cx-steps em{font-style:normal;font-weight:700;color:var(--ink);}
   @media (max-width:1100px){.cx-steps{grid-template-columns:1fr;}}
   .cx-legend{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0;line-height:1.55;} .cx-legend dd{margin:0;color:#3f3f46;}
-  .cx-act{margin-top:6px;}
+  .cx-act{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;}
+  /* 되돌릴 수 없는 일: 목록에서는 빨간 글씨, 확인창의 마지막 버튼만 빨간 면 */
+  .mini.del{border-color:#e7b4af;color:var(--red);} .mini.del:hover:not(:disabled){background:#fdeceb;color:var(--red);}
+  .btn.danger{background:var(--red);border-color:var(--red);color:#fff;} .btn.danger:hover{background:var(--red);filter:brightness(.9);}
+  .cx-delst{margin-top:6px;font-size:12.5px;font-weight:700;line-height:1.45;} .cx-delst span{display:block;font-weight:500;color:var(--faint);}
+  .cx-delst.run{color:var(--amber);} .cx-delst.bad{color:var(--red);} .cx-delst.done{color:var(--green);}
+  .mpt th.ck,.mpt td.ck{text-align:center;padding-left:8px;padding-right:0;} .mpt .ck input{width:18px;height:18px;margin:0;accent-color:#18181b;}
+  #cxDelStat{margin:0 0 12px;}
+  dialog#cxdelDlg{width:min(640px,calc(100vw - 32px));max-height:86vh;}
+  .cxdel-list{max-height:42vh;overflow:auto;margin:0;padding:0;list-style:none;border:1px solid #e4e4e7;border-radius:10px;}
+  .cxdel-list li{display:flex;justify-content:space-between;gap:12px;padding:9px 12px;border-top:1px solid #e4e4e7;line-height:1.45;} .cxdel-list li:first-child{border-top:0;}
+  .cxdel-list .nm{color:#52525b;font-size:13px;} .cxdel-list .pr{white-space:nowrap;font-weight:700;font-variant-numeric:tabular-nums;}
+  #cxdelDlg .cx-warn{margin:0 0 12px;}
   dialog#cxDlg{width:min(760px,calc(100vw - 32px));max-height:86vh;}
   .cxd-prod{margin:0 0 14px;line-height:1.6;} .cxd-prod .opts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;} .cxd-prod .opts span{background:#f4f4f5;border-radius:8px;padding:2px 9px;font-size:13px;}
   .cxd-h{margin:16px 0 8px;font-size:14px;font-weight:700;}
@@ -341,10 +353,10 @@
     <li><div class="kh"><b>1. 품번 연결</b><i class="ok">사용 가능</i></div><p><em>③</em> 목록의 <em>우리 품번 연결</em><br>또는 <em>①</em> 자동 찾기 후 <em>확정</em></p></li>
     <li><div class="kh"><b>2. 재고 반영</b><i class="ok">자동</i></div><p>판매는 <em>이카운트에 입력</em>해야 재고에서 빠져요. 서버가 10~19시 매시, 새벽 3시에 받아요.</p></li>
     <li><div class="kh"><b>3. 취소할 입찰 찾기</b><i class="ok">사용 가능</i></div><p><em>③</em>에서 <em>입찰 다시 확인</em>을 누르고 <em>취소할 입찰</em>을 봐요.</p></li>
-    <li><div class="kh"><b>4. 입찰 취소</b><i class="hand">직접</i></div><p><em>크림 판매자센터</em>에서 직접 취소해요. 취소 전에 상품·사이즈를 한 번 더 확인해요.</p></li>
+    <li><div class="kh"><b>4. 입찰 취소</b><i class="ok">사용 가능</i></div><p><em>③</em> 목록의 <em>입찰 취소</em>를 눌러요. 확인창에서 상품·사이즈를 한 번 더 보고 취소해요.</p></li>
     <li><div class="kh"><b>5. 가격·새 입찰</b><i class="wait">준비 중</i></div><p><em>②</em>에서 시세 읽기와 가격 계산까지만 돼요. 크림에 올리는 기능은 아직 없어요.</p></li>
   </ol>
-  <p class="kflow-foot">이 화면은 크림의 입찰을 <b>올리거나 바꾸거나 취소하지 않아요.</b> 연결하지 않은 상품은 재고와 비교되지 않아요.</p>
+  <p class="kflow-foot">이 화면은 크림에 입찰을 <b>올리거나 가격을 바꾸지 않아요.</b> 직접 눌러 확인한 입찰만 취소해요. 연결하지 않은 상품은 재고와 비교되지 않아요.</p>
 </details>
 <!-- 업무 순서 요약 끝 -->
 
@@ -463,22 +475,22 @@
 
 <section class="mp" id="cxPanel" aria-label="크림 입찰 취소 대상">
   <div class="kcard cx-guide">
-    <h2><span>이 화면은 <span class="g">취소해야 할 크림 입찰</span>을 찾아 줍니다</span></h2>
+    <h2><span>이 화면은 <span class="g">취소해야 할 크림 입찰</span>을 찾고, 골라서 취소합니다</span></h2>
     <p class="finfo">크림에 걸린 입찰을 <b>이카운트 재고</b>와 비교해, 재고가 없거나 재고보다 많이 걸린 입찰을 골라냅니다.</p>
     <div class="cx-key"><b>꼭 기억할 3가지</b><ul>
-      <li><b>찾아 주기만 합니다.</b> 크림 입찰을 직접 취소하지 않아요.</li>
+      <li><b>누르면 크림의 실제 입찰이 취소됩니다.</b> <em>되살릴 수 없어요.</em> 자동으로 취소하지는 않아요.</li>
       <li><b>자동이 아닙니다.</b> <em>입찰 다시 확인</em>을 눌러야 새로 비교해요.</li>
       <li><b>품번을 연결한 상품만 판정합니다.</b> 목록에 함께 보이는 나머지는 아직 비교하지 못한 입찰이에요. <b>재고가 없다는 뜻이 아니에요.</b></li>
     </ul></div>
     <ol class="cx-steps">
       <li><b>1. 우리 품번 연결</b><span>목록의 <em>우리 품번 연결</em>을 누르고, 크림 상품과 <b>색상·모델번호가 같은</b> 우리 품번을 골라 연결해요. 연결하면 바로 판정이 나와요.</span></li>
       <li><b>2. 입찰 다시 확인</b><span>크림 입찰을 새로 읽어 비교해요. 4~5분 걸리고, 그동안 다른 화면을 봐도 계속 진행돼요.</span></li>
-      <li><b>3. 취소할 입찰 처리</b><span><em>취소할 입찰</em> 칸에 나온 것을 확인한 뒤, 크림 판매자센터에서 직접 취소해 주세요.</span></li>
+      <li><b>3. 입찰 취소</b><span>입찰의 <em>입찰 취소</em>를 눌러요. 여러 건은 왼쪽 칸을 체크하고 <em>선택한 입찰 취소</em>를 눌러요. 보통 몇 초 안에 처리돼요.</span></li>
     </ol>
     <dl class="cx-legend">
       <dt><span class="st bad">취소 필요</span></dt><dd>재고가 0이거나, 재고 1개에 입찰 3건처럼 재고보다 많이 걸린 것</dd>
       <dt><span class="st ok">유지</span></dt><dd>재고가 있어서 그대로 두면 되는 것</dd>
-      <dt><span class="st warn">아직 비교 못 함</span></dt><dd>품번 연결 전이거나 사이즈를 못 맞춘 것. <b>재고가 없다는 뜻이 아니니 취소하지 마세요.</b></dd>
+      <dt><span class="st warn">아직 비교 못 함</span></dt><dd>품번 연결 전이거나 사이즈를 못 맞춘 것. <b>재고가 없다는 뜻이 아니에요.</b> 취소하려면 재고를 먼저 확인하세요.</dd>
       <dt><span class="st gray">보관판매</span></dt><dd>물건이 크림 창고에 있어 대상이 아닌 것</dd>
     </dl>
   </div>
@@ -495,9 +507,11 @@
     <div class="cx-sub" id="cxSub" hidden><label for="cxReason">비교 못 한 이유</label>
       <select id="cxReason"><option value="">전체</option></select></div>
     <form class="cx-search" id="cxFilter"><input class="kin" type="search" id="cxQ" placeholder="품번 · 상품명 입력" aria-label="품번 또는 상품명 검색"><button class="kb pri" type="submit">검색</button></form>
+    <p class="fstat" id="cxDelStat" role="status" aria-live="polite"></p>
+    <div class="selbar" id="cxSelbar" hidden><span id="cxSelN"></span><button class="mini del" type="button" id="cxSelGo">선택한 입찰 취소</button><button class="mini" type="button" id="cxSelClr">선택 해제</button></div>
     <div class="cx-wrap"><table class="mpt">
-      <colgroup><col><col style="width:130px"><col style="width:120px"><col style="width:110px"><col style="width:90px"><col style="width:90px"><col style="width:230px"></colgroup>
-      <thead><tr><th>상품</th><th>크림 옵션</th><th class="r">입찰가</th><th>우리 사이즈</th><th class="r">우리 재고</th><th class="r">같은 사이즈 입찰</th><th>판정</th></tr></thead>
+      <colgroup><col style="width:44px"><col><col style="width:130px"><col style="width:120px"><col style="width:110px"><col style="width:90px"><col style="width:90px"><col style="width:230px"></colgroup>
+      <thead><tr><th class="ck"><input type="checkbox" id="cxAll" aria-label="보이는 입찰 모두 선택"></th><th>상품</th><th>크림 옵션</th><th class="r">입찰가</th><th>우리 사이즈</th><th class="r">우리 재고</th><th class="r">같은 사이즈 입찰</th><th>판정</th></tr></thead>
       <tbody id="cxBody"></tbody>
     </table></div>
     <button class="btn more" type="button" id="cxMore" hidden></button>
@@ -556,6 +570,16 @@
     <div class="h" id="mpErr" style="color:var(--red);font-weight:600" hidden></div>
   </div>
   <div class="df"><span class="sp"></span><button class="btn" data-close>취소</button><button class="btn pri" id="mpOk">연결</button></div>
+</dialog>
+
+<dialog class="modal" id="cxdelDlg" aria-labelledby="cxdelT">
+  <div class="dh"><h2 id="cxdelT">입찰 취소</h2><button class="x" data-close aria-label="닫기">×</button></div>
+  <div class="db">
+    <p class="finfo">크림에 걸린 <b>실제 입찰</b>을 취소해요. 취소한 입찰은 되살릴 수 없고, 다시 팔려면 새로 입찰해야 해요.</p>
+    <div id="cxdelWarn"></div>
+    <ul class="cxdel-list" id="cxdelList"></ul>
+  </div>
+  <div class="df"><span class="sp"></span><button class="btn" data-close>닫기</button><button class="btn danger" type="button" id="cxdelOk">입찰 취소</button></div>
 </dialog>
 
 <dialog class="modal" id="cxDlg" aria-labelledby="cxDlgT">
@@ -1151,7 +1175,7 @@
     var c=(SK.counts&&SK.counts.counts)||{}, h='';
     if(!SK.builtAt){ h='지금은 비어 있어요. <b>③ 취소할 입찰 찾기</b>나 <b>① 연결 정리</b>에서 품번을 연결하면 그 상품의 사이즈별 재고가 여기에 나타납니다.'; }
     else {
-      h='<b>이 화면은 크림으로 아무것도 보내지 않습니다.</b> 가격은 계산해서 송신 대기함에 담기만 하고, 송신은 잠겨 있어요. 크림에 걸린 입찰은 <b>'+when(SK.asksAt)+'</b> 기준으로 읽어 온 값입니다.';
+      h='<b>② 재고·가격 관리는 크림으로 아무것도 보내지 않습니다.</b> 가격은 계산해서 송신 대기함에 담기만 하고, 송신은 잠겨 있어요. 크림에 걸린 입찰은 <b>'+when(SK.asksAt)+'</b> 기준으로 읽어 온 값입니다.';
       if(c.adj||c.rv||c.drop||c.dup||c.check) h+=' 가격 조정 <b class="num">'+(c.adj||0).toLocaleString('ko-KR')+'</b>줄, 확인 필요 <b class="num">'+(c.rv||0).toLocaleString('ko-KR')+'</b>줄, 정리 후보 <b class="num">'+(c.drop||0).toLocaleString('ko-KR')+'</b>줄, 사이즈 확인 <b class="num">'+(c.check||0).toLocaleString('ko-KR')+'</b>줄, 중복 입찰 <b class="num">'+(c.dup||0).toLocaleString('ko-KR')+'</b>줄을 먼저 살펴보세요.';
     }
     $('stkNote').innerHTML='<span>'+h+'</span>';
@@ -1302,11 +1326,11 @@
 
   /* ---------- 화면 안 사용 설명서 ---------- */
   var HELP=[
-    ['이 화면은 크림으로 무언가를 보내나요?','아니요. 지금은 <b>읽기만</b> 합니다. 크림에서 입찰과 시세를 읽어 와 계산하고, 가격은 송신 대기함에 담아 두기만 해요. 송신 버튼은 잠겨 있고, 사장님이 열겠다고 하실 때까지 크림에는 아무것도 올라가지 않아요.'],
+    ['이 화면은 크림으로 무언가를 보내나요?','<b>③의 입찰 취소만</b> 보냅니다. 직접 누르고 확인한 입찰이 크림에서 취소돼요. 나머지는 <b>읽기만</b> 합니다. 크림에서 입찰과 시세를 읽어 와 계산하고, 가격은 송신 대기함에 담아 두기만 해요. 송신 버튼은 잠겨 있고, 사장님이 열겠다고 하실 때까지 크림에는 아무것도 올라가지 않아요.'],
     ['① 연결 정리 / ② 재고·가격 관리','① 은 우리 품번과 크림 상품을 짝짓는 곳, ② 는 짝지어진 상품의 사이즈별 재고·입찰·새 입찰가를 보는 곳이에요. ②를 쓰려면 먼저 ①에서 연결이 돼 있어야 해요.'],
-    ['③ 취소할 입찰 찾기는 무엇인가요?','크림에 걸린 입찰을 <b>이카운트 재고</b>와 비교해, 재고가 없거나 재고보다 많이 걸린 입찰을 찾아 주는 곳이에요. <b>찾아 주기만 하고 크림의 입찰을 취소하지는 않아요.</b> 취소는 크림 판매자센터에서 직접 해 주세요.'],
-    ['③은 어떤 순서로 쓰나요?','1) 목록의 <b>우리 품번 연결</b>을 눌러 크림 상품에 우리 품번을 연결해요(연결하면 바로 다시 판정해요). 2) <b>입찰 다시 확인</b>으로 크림 입찰을 새로 읽어요. 자동으로 돌지 않아요. 3) <b>취소할 입찰</b>에 나온 것을 처리해요.'],
-    ['③의 "아직 비교 못 함"은 재고가 없다는 뜻인가요?','<b>아니요.</b> 품번을 연결하기 전이거나, 사이즈 표기를 못 맞췄거나, 비슷한 표기에 재고가 있는 경우예요. 재고가 있을 수 있으니 이 목록만 보고 취소하지 마세요.'],
+    ['③ 취소할 입찰 찾기는 무엇인가요?','크림에 걸린 입찰을 <b>이카운트 재고</b>와 비교해, 재고가 없거나 재고보다 많이 걸린 입찰을 찾아 주는 곳이에요. <b>입찰 취소</b>를 누르면 크림의 실제 입찰이 취소되고 되살릴 수 없어요. 자동으로 취소하지는 않아요.'],
+    ['③은 어떤 순서로 쓰나요?','1) 목록의 <b>우리 품번 연결</b>을 눌러 크림 상품에 우리 품번을 연결해요(연결하면 바로 다시 판정해요). 2) <b>입찰 다시 확인</b>으로 크림 입찰을 새로 읽어요. 자동으로 돌지 않아요. 3) <b>취소할 입찰</b>에 나온 것을 확인하고 <b>입찰 취소</b>를 눌러요.'],
+    ['③의 "아직 비교 못 함"은 재고가 없다는 뜻인가요?','<b>아니요.</b> 품번을 연결하기 전이거나, 사이즈 표기를 못 맞췄거나, 비슷한 표기에 재고가 있는 경우예요. 재고가 있을 수 있으니 취소하기 전에 재고를 먼저 확인하세요.'],
     ['점검 버튼(점검표 5항목)','연결, 이카운트 재고, 가격 범위(하한~상한), 중복·충돌, 요청 형식 5가지를 확인해요. 하나라도 실패하면 이유가 보입니다. 크림으로는 아무것도 보내지 않아요.'],
     ['새 입찰가는 어떻게 정해지나요?','크림 최저가에서 <b>가격 정책</b>의 내림 금액만큼 낮춘 값이에요. 사이트 판매가(기준가)에서 하한(−%)과 상한(+%)을 벗어나면 "확인 필요"로 빠지고 자동으로 정해지지 않아요. 정책은 오른쪽 위 <b>가격 정책</b>에서 바꿔요.'],
     ['상태 칩(유지·정리 후보·신규 후보·확인 필요)','<b>유지</b> 재고와 입찰이 모두 있음 · <b>정리 후보</b> 입찰은 있는데 재고가 없음 · <b>신규 후보</b> 재고는 있는데 입찰이 없음 · <b>확인 필요</b> 사이즈를 크림 옵션과 못 맞췄거나 가격이 허용선 밖.'],
@@ -1497,9 +1521,12 @@
     $('stkQ').value=''; $('stkBrand').value=''; document.querySelector('input[name=stkdup][value=""]').checked=true;
     SK.filter=''; skChips(); skSearch();
   });
-  /* ③ 취소할 입찰 찾기: 확인 전용. [입찰 다시 확인]은 요청만 넣고, 서버가 크림을 조회(GET)해 목록을 만든다. 크림 입찰을 지우는 기능은 없다.
+  /* ③ 취소할 입찰 찾기. [입찰 다시 확인]은 요청만 넣고, 서버가 크림을 조회(GET)해 목록을 만든다.
+     [입찰 취소]도 요청만 넣고, 서버의 취소 워커가 크림에서 그 입찰을 지운다(되살릴 수 없음).
      [우리 품번 연결]은 우리 DB 의 연결만 바꾸고, 서버가 그 상품의 줄을 바로 다시 판정한다. */
-  var CX={verdict:null,reason:'',q:'',page:1,rows:[],total:0,sum:null,job:null,timer:null,seq:0,link:null,lseq:0};
+  var CX={verdict:null,reason:'',q:'',page:1,rows:[],total:0,sum:null,job:null,timer:null,seq:0,link:null,lseq:0,
+    sel:{},pick:[],watch:{},res:{done:0,failed:0,unknown:0},dtimer:null,dsince:0,dbusy:false};
+  var CXMAX=100;
   var CXV={zero:['취소 필요 · 재고 0','bad'],excess:['취소 필요 · 재고보다 많음','bad'],keep:['유지 · 재고 있음','ok'],review:['아직 비교 못 함','warn'],inventory:['보관판매 · 대상 아님','gray']};
   var CXR={unlinked:['품번 연결 전','우리 품번을 연결해 주세요'],unconfirmed:['연결 확정 전','연결을 확정해 주세요'],size_none:['사이즈 못 맞춤','우리 사이즈 중에 맞는 표기가 없어요'],size_many:['사이즈 여러 개','비슷한 사이즈 표기에 재고가 있어요. 어느 것인지 확인해 주세요'],no_stock_item:['이카운트 품목 없음','이 품번의 품목이 없거나 사용중단이에요'],blank_size:['사이즈 빈 재고','이카운트에 사이즈가 비어 있는 재고가 있어요'],other_style:['다른 품번에 재고','같은 크림 모델번호의 다른 품번에 재고가 있어요'],staged:['거래 진행 중','구매결정 대기 상태라 건드리지 않아요']};
   var CXC=[['target','취소할 입찰'],['zero','└ 재고 0'],['excess','└ 재고보다 많음'],['review','아직 비교 못 함'],['keep','유지'],['inventory','보관판매'],['all','전체']];
@@ -1530,11 +1557,28 @@
     $('cxSub').hidden=CX.verdict!=='review';
     $('cxReason').innerHTML='<option value="">전체</option>'+Object.keys(CXR).map(function(k){ return '<option value="'+k+'"'+(CX.reason===k?' selected':'')+'>'+CXR[k][0]+' ('+nf(r[k])+')</option>'; }).join('');
   }
+  function cxQuery(page){ return {action:'cancel_list',verdict:CX.verdict==='all'?'':CX.verdict,reason:CX.verdict==='review'?CX.reason:'',q:CX.q,page:page,per_page:PER}; }
+  /* 요약과 지금 펼쳐 둔 쪽까지를 다시 읽는다. 아직 취소할 수 있는 선택은 남긴다. */
+  function cxRefresh(){
+    return cxSummary().then(function(){
+      var seq=++CX.seq, pages=CX.page, all=[];
+      function get(p){
+        return api(cxQuery(p)).then(function(j){
+          if(seq!==CX.seq) return;
+          all=all.concat(j.rows);
+          if(p<pages&&all.length<j.total) return get(p+1);
+          var keep={}; all.forEach(function(r){ var id=+r.ask_id; if(CX.sel[id]&&cxPickable(r)) keep[id]=true; });
+          CX.page=p; CX.rows=all; CX.total=j.total; CX.sel=keep; cxRows();
+        });
+      }
+      return get(1);
+    }).catch(cxFail);
+  }
   function cxList(append){
     var seq=++CX.seq;
-    return api({action:'cancel_list',verdict:CX.verdict==='all'?'':CX.verdict,reason:CX.verdict==='review'?CX.reason:'',q:CX.q,page:CX.page,per_page:PER}).then(function(j){
+    return api(cxQuery(CX.page)).then(function(j){
       if(seq!==CX.seq) return;                        // 늦게 온 이전 조건의 답은 버린다
-      CX.rows=append?CX.rows.concat(j.rows):j.rows; CX.total=j.total; cxRows();
+      CX.rows=append?CX.rows.concat(j.rows):j.rows; CX.total=j.total; if(!append) CX.sel={}; cxRows();
     });
   }
   function cxWhy(r){
@@ -1544,13 +1588,23 @@
     if(r.verdict==='inventory') return '물건이 크림 창고에 있어요';
     return '';
   }
+  function cxCan(r){ return r.verdict!=='inventory'&&!+r.is_inventory&&r.status!=='staged'; }          // 보관판매·거래 진행 중은 취소 버튼이 없다
+  function cxBusy(r){ return r.del_status==='queued'||r.del_status==='running'; }
+  function cxPickable(r){ return cxCan(r)&&!cxBusy(r)&&r.del_status!=='done'; }
+  function cxDelState(r){
+    var m={queued:['run','취소 요청함 · 곧 처리해요'],running:['run','크림에 보내는 중이에요'],done:['done','취소됨'],failed:['bad','취소 실패'],unknown:['bad','취소 결과 확인 필요']}[r.del_status];
+    return m?'<div class="cx-delst '+m[0]+'">'+m[1]+(r.del_error&&m[0]==='bad'?'<span>'+esc(r.del_error)+'</span>':'')+'</div>':'';
+  }
   function cxRows(){
     if(!CX.rows.length){
       var msg=!CX.sum||!CX.sum.scanned_at?'아직 목록이 없어요.<br>위의 입찰 다시 확인을 눌러 주세요.':(CX.q?'검색 결과가 없어요.<br>품번이나 상품명을 다르게 입력해 보세요.':(CX.verdict==='target'||CX.verdict==='zero'||CX.verdict==='excess'?'지금 취소할 입찰이 없어요.<br>연결한 상품만 비교하니, <b>아직 비교 못 함</b>에서 우리 품번을 연결해 주세요.':'여기에 해당하는 입찰이 없어요.'));
-      $('cxBody').innerHTML='<tr><td colspan="7"><div class="empty">'+msg+'</div></td></tr>';
+      $('cxBody').innerHTML='<tr><td colspan="8"><div class="empty">'+msg+'</div></td></tr>';
     } else $('cxBody').innerHTML=CX.rows.map(function(r){
       var v=CXV[r.verdict]||[r.verdict,'gray'], pid=+r.kream_product_id, why=cxWhy(r);
-      return '<tr><td><span class="big" style="font-size:14px">'+esc(r.name_kr||r.style_code)+'</span><span class="code">'+esc(r.style_code)+'</span>'
+      var id=+r.ask_id;
+      var link=pid?'<button type="button" class="mini'+(r.reason==='unlinked'||r.reason==='unconfirmed'?' pri':'')+'" data-cxl="'+pid+'">'+(r.reason==='unlinked'?'우리 품번 연결':(r.reason==='unconfirmed'?'연결 확정하기':'연결 보기'))+'</button>':'';
+      var del=cxCan(r)&&r.del_status!=='done'?'<button type="button" class="mini del" data-cxd="'+id+'"'+(cxBusy(r)?' disabled':'')+'>'+(cxBusy(r)?'취소 중':(r.del_status?'다시 취소':'입찰 취소'))+'</button>':'';
+      return '<tr><td class="ck">'+(cxPickable(r)?'<input type="checkbox" data-cxck="'+id+'"'+(CX.sel[id]?' checked':'')+' aria-label="'+esc((r.name_kr||r.style_code)+' '+r.option_name+' 입찰 선택')+'">':'')+'</td><td><span class="big" style="font-size:14px">'+esc(r.name_kr||r.style_code)+'</span><span class="code">'+esc(r.style_code)+'</span>'
         +(r.style_raw&&r.style_raw!==r.style_code?'<div class="why2">우리 품번 '+esc(r.style_raw)+'</div>':'')
         +(pid?'<div class="why2"><a class="kid" href="https://kream.co.kr/products/'+pid+'" target="_blank" rel="noopener">크림 '+pid+'</a></div>':'')+'</td>'
         +'<td class="opt">'+esc(r.option_name)+'</td><td class="r"><span class="pr">'+(r.price===null?'-':nf(r.price)+'원')+'</span></td>'
@@ -1558,13 +1612,74 @@
         +'<td class="r num">'+(r.our_qty===null?'<span class="sub2">-</span>':nf(r.our_qty))+'</td>'
         +'<td class="r num">'+(r.slot_asks?nf(r.slot_asks):'<span class="sub2">-</span>')+'</td>'
         +'<td><span class="st '+v[1]+'">'+esc(v[0])+'</span>'+(why?'<div class="why2">'+esc(why)+'</div>':'')
-        +(pid?'<div class="cx-act"><button type="button" class="mini'+(r.reason==='unlinked'||r.reason==='unconfirmed'?' pri':'')+'" data-cxl="'+pid+'">'+(r.reason==='unlinked'?'우리 품번 연결':(r.reason==='unconfirmed'?'연결 확정하기':'연결 보기'))+'</button></div>':'')+'</td></tr>';
+        +cxDelState(r)+(link||del?'<div class="cx-act">'+link+del+'</div>':'')+'</td></tr>';
     }).join('');
     $('cxTotal').textContent=CX.sum&&CX.sum.scanned_at?nf(CX.total)+'건':'';
     $('cxMore').hidden=CX.rows.length>=CX.total;
     if(!$('cxMore').hidden) $('cxMore').textContent='더 보기 ('+nf(CX.total-CX.rows.length)+'건 남음)';
+    cxSelRender();
+    var waiting=false; CX.rows.forEach(function(r){ if(cxBusy(r)){ CX.watch[+r.ask_id]=true; waiting=true; } });
+    if(waiting) cxDelWatch();                      // 다른 사람이 요청했거나 새로 열었을 때도 진행을 따라간다
   }
-  function cxFail(e){ $('cxBody').innerHTML='<tr><td colspan="7"><div class="empty">목록을 불러오지 못했어요.<br>'+esc(e.message)+'</div></td></tr>'; $('cxMore').hidden=true; if($('cxInfo').textContent.indexOf('불러오는 중')===0) $('cxInfo').textContent=e.message; }
+  function cxSelRender(){
+    var n=Object.keys(CX.sel).length, can=CX.rows.filter(cxPickable), on=can.filter(function(r){ return CX.sel[+r.ask_id]; }).length;
+    $('cxSelbar').hidden=!n; $('cxSelN').textContent='선택 '+nf(n)+'건';
+    $('cxAll').disabled=!can.length; $('cxAll').checked=!!can.length&&on===can.length; $('cxAll').indeterminate=on>0&&on<can.length;
+  }
+  function cxdelOpen(rows){
+    if(!rows.length) return;
+    CX.pick=rows.map(function(r){ return +r.ask_id; });
+    var risky=rows.filter(function(r){ return r.verdict==='keep'||r.verdict==='review'; }).length;
+    $('cxdelWarn').innerHTML=risky?'<p class="cx-warn">재고가 있거나 아직 비교하지 못한 입찰이 <b>'+nf(risky)+'건</b> 들어 있어요. 상품과 사이즈를 확인해 주세요.</p>':'';
+    $('cxdelList').innerHTML=rows.map(function(r){
+      var v=CXV[r.verdict]||[r.verdict,'gray'];
+      return '<li><div><b>'+esc(r.name_kr||r.style_code)+'</b><div class="nm">'+esc(r.style_code||'-')+' · '+esc(r.option_name)+' · '+esc(v[0])+'</div></div><div class="pr">'+(r.price===null?'-':nf(r.price)+'원')+'</div></li>';
+    }).join('');
+    $('cxdelOk').disabled=false; $('cxdelOk').textContent='입찰 '+nf(rows.length)+'건 취소';
+    $('cxdelDlg').showModal();
+  }
+  function cxdelSend(){
+    var ids=CX.pick.slice(); $('cxdelOk').disabled=true;
+    api({action:'ask_delete',ask_ids:ids}).then(function(j){
+      $('cxdelDlg').close(); CX.sel={};
+      if(!Object.keys(CX.watch).length) CX.res={done:0,failed:0,unknown:0};
+      var sent={}; j.ask_ids.forEach(function(id){ sent[id]=true; CX.watch[id]=true; });
+      CX.rows.forEach(function(r){ if(sent[+r.ask_id]){ r.del_status='queued'; r.del_error=''; } });
+      var why={not_in_list:'목록에 없음',inventory:'보관판매',staged:'거래 진행 중',already:'이미 요청됨'}, sk={};
+      j.skipped.forEach(function(x){ var k=why[x.why]||x.why; sk[k]=(sk[k]||0)+1; });
+      var skt=Object.keys(sk).map(function(k){ return k+' '+sk[k]+'건'; }).join(', ');
+      toast((j.queued?nf(j.queued)+'건 취소를 요청했어요.':'새로 요청한 입찰이 없어요.')+(skt?' 건너뜀: '+skt:''));
+      CX.dsince=0; cxRows(); if(j.queued) cxDelWatch(); else cxRefresh();
+    }).catch(function(e){ $('cxdelOk').disabled=false; toast(e.message); cxRefresh(); });   // 접수됐는데 응답만 끊겼을 수 있어 목록을 새로 읽는다
+  }
+  function cxDelWatch(){
+    if(CX.dtimer||CX.dbusy||!Object.keys(CX.watch).length) return;
+    if(!CX.dsince) CX.dsince=Date.now();
+    cxDelText(); CX.dtimer=setTimeout(cxDelPoll,Date.now()-CX.dsince>120000?15000:3000);
+  }
+  function cxDelText(){
+    var n=Object.keys(CX.watch).length, slow=Date.now()-CX.dsince>90000;
+    $('cxDelStat').className='fstat';
+    $('cxDelStat').innerHTML='입찰 취소를 처리하는 중이에요… 남은 <b class="num">'+nf(n)+'</b>건'+(slow?'<br>크림 호출 제한으로 잠시 쉬는 중일 수 있어요. 30분 안에 못 보내면 실패로 표시돼요.':'');
+  }
+  function cxDelPoll(){
+    CX.dtimer=null; CX.dbusy=true;
+    var ids=Object.keys(CX.watch).slice(0,CXMAX).map(Number);
+    api({action:'ask_delete_status',ask_ids:ids}).then(function(j){
+      CX.dbusy=false;
+      var got={}; j.rows.forEach(function(x){ got[x.ask_id]=x; });
+      ids.forEach(function(id){
+        var x=got[id];
+        if(x) CX.rows.forEach(function(r){ if(+r.ask_id===id){ r.del_status=x.status; r.del_error=x.error; } });
+        if(!x||(x.status!=='queued'&&x.status!=='running')){ delete CX.watch[id]; if(x&&CX.res[x.status]!==undefined) CX.res[x.status]++; }
+      });
+      if(Object.keys(CX.watch).length){ cxRows(); cxDelWatch(); return; }          // 보이는 줄에 없어도 끝까지 확인한다(예약은 한 번만 걸린다)
+      var o=CX.res, t='취소 완료 '+nf(o.done)+'건'+(o.failed?' · 실패 '+nf(o.failed)+'건':'')+(o.unknown?' · 확인 필요 '+nf(o.unknown)+'건':'');
+      $('cxDelStat').className='fstat'+(o.failed||o.unknown?' err':''); $('cxDelStat').textContent=t+(o.failed||o.unknown?'. 해당 입찰의 이유를 확인해 주세요.':'.');
+      toast(t); CX.dsince=0; CX.res={done:0,failed:0,unknown:0}; cxRefresh();
+    }).catch(function(e){ CX.dbusy=false; $('cxDelStat').className='fstat err'; $('cxDelStat').textContent='진행 상태를 확인하지 못했어요('+e.message+'). 잠시 뒤 다시 확인해요.'; CX.dtimer=setTimeout(cxDelPoll,8000); });
+  }
+  function cxFail(e){ $('cxBody').innerHTML='<tr><td colspan="8"><div class="empty">목록을 불러오지 못했어요.<br>'+esc(e.message)+'</div></td></tr>'; $('cxMore').hidden=true; if($('cxInfo').textContent.indexOf('불러오는 중')===0) $('cxInfo').textContent=e.message; }
   function cxReload(){ CX.page=1; return cxSummary().then(function(){ return cxList(false); }).catch(cxFail); }
   function cxJobRender(j){
     var el=$('cxStat'); el.className='fstat'; $('cxGo').disabled=cxActive(j);
@@ -1659,7 +1774,24 @@
     return api(body).then(function(j){ toast(j.list_stale?CXSTALE:done); cxReload(); if(seq===CX.lseq) return cxdInfo(); }).catch(function(e){ if(seq===CX.lseq) cxdMsg(e.message,true); else toast(e.message); });
   }
   $('cxdForm').addEventListener('submit',function(e){ e.preventDefault(); cxdSearch(); });
-  $('cxBody').addEventListener('click',function(e){ var b=e.target.closest('[data-cxl]'); if(b) cxdOpen(+b.dataset.cxl); });
+  $('cxBody').addEventListener('click',function(e){
+    var b=e.target.closest('[data-cxl]'); if(b){ cxdOpen(+b.dataset.cxl); return; }
+    var d=e.target.closest('[data-cxd]'); if(d) cxdelOpen(CX.rows.filter(function(r){ return +r.ask_id===+d.dataset.cxd; }));
+  });
+  $('cxBody').addEventListener('change',function(e){
+    var c=e.target.closest('[data-cxck]'); if(!c) return; var id=+c.dataset.cxck;
+    if(c.checked&&Object.keys(CX.sel).length>=CXMAX){ c.checked=false; toast('한 번에 '+CXMAX+'건까지 고를 수 있어요.'); return; }
+    if(c.checked) CX.sel[id]=true; else delete CX.sel[id];
+    cxSelRender();
+  });
+  $('cxAll').addEventListener('change',function(){
+    CX.sel={};
+    if(this.checked){ var can=CX.rows.filter(cxPickable); can.slice(0,CXMAX).forEach(function(r){ CX.sel[+r.ask_id]=true; }); if(can.length>CXMAX) toast('한 번에 '+CXMAX+'건까지라 위에서 '+CXMAX+'건만 골랐어요.'); }
+    cxRows();
+  });
+  $('cxSelClr').addEventListener('click',function(){ CX.sel={}; cxRows(); });
+  $('cxSelGo').addEventListener('click',function(){ cxdelOpen(CX.rows.filter(function(r){ return CX.sel[+r.ask_id]&&cxPickable(r); })); });
+  $('cxdelOk').addEventListener('click',cxdelSend);
   $('cxDlg').addEventListener('click',function(e){
     var b=e.target.closest('button'); if(!b||!CX.link) return;
     if(b.dataset.cxs!==undefined){ b.disabled=true; cxdSave(b.dataset.cxs,false,CX.link.pid,CX.lseq).then(function(){ b.disabled=false; }); }   // 확정 버튼도 같은 길(모델번호·타 상품 검사를 거친다)
