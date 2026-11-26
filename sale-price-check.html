@@ -80,6 +80,35 @@
   table.cfg tr.flash td{background:var(--warnbg);}
   .addrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
   .addrow input[type=text]{flex:1;min-width:200px;}
+  /* 출고 전 확인: 재고·중복 알림 + 누르면 아래 표가 걸러지는 단추 */
+  .chk{border-color:#e7b451;background:var(--warnbg);}
+  .chk.clear{border-color:#a7d8cf;background:var(--okbg);}
+  .chk.wait{border-color:var(--line);background:var(--card);}
+  .chk h2{margin:0;}
+  .chk .picks{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .pick{display:flex;align-items:baseline;gap:6px;font:600 13px var(--font);padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);cursor:pointer;}
+  .pick b{font-size:20px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;}
+  .pick.bad b{color:var(--bad);} .pick.warn b{color:var(--warn);} .pick.gray b{color:#666;} .pick.dup b{color:var(--blue);}
+  .pick.on{border-color:var(--pri);box-shadow:inset 0 0 0 1px var(--pri);}
+  .pick:disabled{opacity:.45;cursor:default;}
+  .chk .hint{margin-top:8px;color:#4d5258;}
+  .seglab{font-size:12px;font-weight:700;color:var(--sub);}
+  table.l td.stk{min-width:150px;max-width:250px;}
+  table.l td.stk .q{font-size:20px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin-right:7px;vertical-align:-2px;}
+  table.l td.stk .q.none,table.l td.stk .q.short{color:var(--bad);}
+  table.l td.stk .dups{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
+  table.l td.stk .hint{margin-top:3px;word-break:keep-all;overflow-wrap:anywhere;}
+  .chip.dup{background:var(--bluebg);color:var(--blue);}
+  table.l tr.warnrow td{background:#fffaf0;}
+  /* 몰별 기준 설정: 공용 설정 상태 · 변경 기록 · 저장 전 안내 막대 */
+  .shared{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0 0;font-size:13px;line-height:1.6;background:#fafaf8;}
+  .shared.warn{border-color:#e7b451;background:var(--warnbg);}
+  .shared ul,.hist ul,.savebar ul{margin:4px 0 0;padding-left:18px;}
+  .hist{margin-top:8px;} .hist summary{font-size:13px;color:var(--sub);}
+  .hist .ent{border-top:1px solid var(--line);padding:7px 0;font-size:12.5px;line-height:1.55;}
+  .savebar{position:fixed;left:12px;right:12px;bottom:12px;z-index:20;max-width:980px;margin:0 auto;background:#fff;border:2px solid #d99a1e;border-radius:14px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.18);font-size:13px;line-height:1.55;}
+  .savebar .list{max-height:22vh;overflow:auto;}
+  body.dirty{padding-bottom:var(--barh,170px);}
   [hidden]{display:none !important;}
   @media(max-width:640px){body{padding:12px;}}
 </style>
@@ -89,7 +118,10 @@
 <p class="lead">사방넷 주문서(주문서확인처리) 엑셀을 올리면, 몰별 기준 가격과 실제 판매가를 비교해 다른 건만 골라 줍니다.<br>
 기준은 <b>필웨이 가격 = 현재 사방넷 가격</b>(주문서 원가 ÷ 0.87)이고, 몰마다 얼마를 곱한 값이 정상인지는 아래 <b>몰별 기준 설정</b>에서 직접 정합니다. 결제금액은 쿠폰·할인이 반영돼 있어 판정하지 않고 참고로만 보여 줍니다.<br>
 <b>SSG.COM은 계정이 두 개</b>라 주문서의 쇼핑몰ID로 나눠 <b>BUYEST11 (SSG바이스트)</b>와 <b>0024852987 (SSG신세계V)</b>를 따로 검증합니다.<br>
-상품코드가 없는 주문은 <b>스마트스토어 미매칭</b>으로 따로 모읍니다. <b>필웨이 환산가(판매가 ÷ 1.17)</b>를 사방넷 가격과 비교해 <b>맞음 / 틀림</b>을 직접 눌러 주세요.</p>
+상품코드가 없는 주문은 <b>스마트스토어 미매칭</b>으로 따로 모읍니다. <b>필웨이 환산가(판매가 ÷ 1.17)</b>를 사방넷 가격과 비교해 <b>맞음 / 틀림</b>을 직접 눌러 주세요.<br>
+가격과 함께 <b>이카운트 현재고</b>(출고 가능 여부)와 <b>중복주문</b>도 확인합니다. 이카운트에서 <b>재고를 차감(판매입력)하기 전에</b> 돌려야 맞습니다.</p>
+
+<div class="shared" id="ruleNews" style="margin:0 0 12px;" aria-live="polite" hidden></div>
 
 <div class="box">
   <div class="drop" id="drop">
@@ -103,6 +135,9 @@
 <div class="err" id="err" hidden></div>
 
 <div id="result" hidden>
+  <div class="box chk wait" id="chk" aria-live="polite"></div>
+  <div class="box chk" id="ruleWarn" hidden></div>
+
   <div class="box row" id="fxBox">
     <b>BUYMA 엔 환율</b>
     <input type="number" step="0.01" min="0" id="jpy" class="mult" style="width:96px;" aria-label="엔 환율 (1엔당 원)" placeholder="1엔당 원">
@@ -124,14 +159,17 @@
     <span class="grow"></span>
     <button class="btn btn-pri btn-sm" id="btnXlsx" type="button">확인할 건 엑셀로 받기</button>
   </div>
+  <div class="tools"><span class="seglab">출고 · 중복</span><div class="seg" id="seg2"></div></div>
   <div class="lst"><table class="l" id="tbl"></table></div>
-  <p class="hint">배수가 다른 예외 상품은 직접 확인해 주세요. "확인할 건 엑셀"에는 가격 이상 · 미매핑 · 검증 못 한 건과 스마트스토어 미매칭(확인 결과 포함)이 들어갑니다.<br>
+  <p class="hint">배수가 다른 예외 상품은 직접 확인해 주세요. "확인할 건 엑셀"에는 가격 이상 · 미매핑 · 검증 못 한 건과 스마트스토어 미매칭(확인 결과 포함)이 들어갑니다. 재고 · 중복 확인이 필요한 건도 함께 들어갑니다.<br>
 직접 누른 맞음 / 틀림은 저장되지 않으니, 새로고침하거나 파일을 새로 올리기 전에 엑셀로 받아 두세요.</p>
 </div>
 
 <details class="box" id="cfgBox" open>
   <summary><b>몰별 기준 설정</b> <span class="hint" id="cfgSum"></span></summary>
-  <p class="hint" style="margin:8px 0 0;">몰마다 <b>필웨이 가격에 곱할 배수</b>를 정합니다. 고치면 바로 저장되고 위 검증 결과에도 곧바로 반영됩니다. 이 브라우저에 저장되므로, 다른 PC·직원과 맞추려면 "설정 내보내기"로 파일을 만들어 "설정 가져오기"로 불러오세요.<br>
+  <div class="shared" id="shared" aria-live="polite">공용 설정을 불러오는 중…</div>
+  <details class="hist" id="histBox" hidden><summary>변경 기록 보기</summary><div id="hist"></div></details>
+  <p class="hint" style="margin:8px 0 0;">몰마다 <b>필웨이 가격에 곱할 배수</b>를 정합니다. 이 설정은 <b>전 직원이 함께 씁니다.</b> 고친 값은 먼저 이 화면의 검증에만 반영되고, <b>전체 직원에게 저장</b>을 눌러야 모두에게 적용됩니다.<br>
   몰 이름은 앞부분이 같으면 같은 몰로 봅니다 (예: "쿠팡"은 "쿠팡 (로켓)"도 포함). 목록에 없는 몰은 ×1.0으로 봅니다.<br>
   <b>쇼핑몰ID</b>를 적은 줄은 그 계정 주문에만 적용되고, 비우면 몰 전체에 적용됩니다. 계정별로 나눈 몰에서 목록에 없는 ID가 나오면 "미검증"으로 표시합니다.</p>
   <div class="row cfg-top">
@@ -145,21 +183,47 @@
     <button class="btn btn-pri btn-sm" id="cfgAdd" type="button">몰 추가</button>
     <button class="btn btn-out btn-sm" id="cfgExp" type="button">설정 내보내기</button>
     <span class="filebtn"><button class="btn btn-out btn-sm" type="button">설정 가져오기</button><input id="cfgImp" type="file" accept=".json,application/json" aria-label="설정 파일 가져오기"></span>
-    <button class="btn btn-out btn-sm" id="btnReset" type="button">기본값으로 되돌리기</button>
+    <button class="btn btn-out btn-sm" id="btnReset" type="button">기본 설정으로 되돌리기</button>
   </div>
 </details>
 
+<div class="savebar" id="savebar" role="status" hidden>
+  <b>몰별 기준을 바꿨습니다 · 아직 저장 전</b> — 지금은 이 화면의 검증에만 반영됩니다. 저장하면 <b>전 직원</b>에게 적용됩니다.
+  <div class="diffneg" id="sbNote"></div>
+  <div class="list" id="sbList"></div>
+  <div class="row" style="margin-top:8px;"><button type="button" class="btn btn-pri btn-sm" data-sh="save" id="sbSave">전체 직원에게 저장</button><button type="button" class="btn btn-out btn-sm" data-sh="revert" id="sbRevert">되돌리기</button><button type="button" class="btn btn-out btn-sm" data-sh="load" id="sbLoad" hidden>다시 불러오기</button></div>
+</div>
+
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
-<script src="sale-price-core.js?v=20261125b"></script>
+<script src="sale-price-core.js?v=20261126"></script>
+<script src="sale-stock-core.js?v=20261126"></script>
+<script src="sale-config-core.js?v=20261126"></script>
 <script>
 (function(){
-  var C = window.SalePriceCore;
+  var C = window.SalePriceCore, S = window.SaleStockCore, G = window.SaleConfigCore;
+  var STOCK_API = 'https://buyest.co.kr/sale_stock_check_api.php';
+  var CFG_API = 'https://buyest.co.kr/sale_price_config_api.php';
+  var SHARED_LS = 'buyest.salePrice.shared.v1';   // 마지막으로 받은 공용 설정(서버에 연결 못 할 때 사용)
+  var SEEN_LS = 'buyest.salePrice.seen.v1';       // 이 PC에서 확인한 공용 설정 번호 (그 뒤에 바뀌면 맨 위에 알림)
+  // 재고: state '' | loading | ok | login | error,  data = 서버 응답, req = 새 파일이 올라오면 옛 응답을 버리기 위한 번호
+  var STK = { state:'', data:null, msg:'', req:0 }, CHK = { rows:[], count:{}, canCust:true }, BYLINE = {};
   var CFG_LS = 'buyest.salePrice.cfg.v1', OLD_LS = 'buyest.salePrice.mults.v2';
   var LS = 'buyest.salePrice.mults.v2';   // 기본값과 다르게 고친 몰만 저장 (기본값이 바뀌면 자동으로 따라감)
   var $ = function(id){ return document.getElementById(id); };
-  var ROWS = [], RES = [], CFG = loadCfg(), F = C.fromConfig(CFG), FILTER = 'bad', MALL = '', FILENAME = '';
+  // SH: 공용 설정 상태. state loading | ok | empty(아직 저장 전) | login | error,  base = 서버의 최신 설정, rev = 그 번호,
+  //     editRev = 지금 고치는 값이 출발한 번호, hist = 변경 기록, msg = 안내
+  var SH = { state:'loading', first:null, base:null, rev:0, editRev:0, hist:[], msg:'', saving:false, req:0 };
+  var ROWS = [], RES = [], CFG = null, F = null, FILTER = 'bad', MALL = '', FILENAME = '';
   var MARKS = {};   // 스마트스토어 미매칭 직접 확인 결과: 엑셀 행 번호 → 'ok' | 'bad' (파일을 새로 올리면 비움)
   var FX_LS = 'buyest.salePrice.jpy.v1', JPY = 0, FX_MANUAL = false;
+  (function(){
+    var cache = null;
+    try { var c = JSON.parse(localStorage.getItem(SHARED_LS) || 'null'); if (c && c.config && Array.isArray(c.config.malls)) cache = c; } catch(e){}
+    if (cache) { SH.base = normCfg(cache.config); SH.rev = SH.editRev = cache.rev || 0; SH.hist = [cache]; CFG = copy(SH.base); }
+    else CFG = loadCfg();
+    F = C.fromConfig(CFG);
+  })();
+  function copy(o){ return JSON.parse(JSON.stringify(o)); }
   try { var fx0 = JSON.parse(localStorage.getItem(FX_LS) || 'null'); if (fx0 && fx0.manual && fx0.rate > 0) { JPY = fx0.rate; FX_MANUAL = true; } } catch(e){}
 
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
@@ -197,7 +261,11 @@
     }
     return -1;
   }
-  function saveCfg(){ try { localStorage.setItem(CFG_LS, JSON.stringify(CFG)); } catch(e){} F = C.fromConfig(CFG); }
+  // 고친 값은 이 화면에만 반영한다. 전 직원에게는 '전체 직원에게 저장'을 눌러야 간다
+  function applyCfg(){
+    F = C.fromConfig(CFG);
+    renderShared();
+  }
   function showErr(msg){ var e = $('err'); e.textContent = msg || ''; e.hidden = !msg; }
 
   function handleFile(f){
@@ -216,7 +284,10 @@
         $('fileInfo').hidden = false;
         $('fileInfo').textContent = f.name + ' · 주문 ' + ROWS.length + '건';
         FILTER = 'bad'; MALL = ''; MARKS = {};
+        STK.req++; STK.data = null; STK.state = '';
         run();
+        loadShared();
+        loadStock();
         // 계정·미매칭으로 나눠 검증하는 몰이 있으면 요약을 펼쳐 구분 결과가 바로 보이게 한다
         $('multBox').open = RES.some(function(r){ return r.ruleId || r.noAcct || r.manual; });
       } catch(e){ $('result').hidden = true; showErr(e.message || String(e)); }
@@ -244,7 +315,216 @@
       });
   }
 
+  // ---- 이카운트 현재고 ----
+  function auth(){ try { var a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); return (a && a.id && a.pass) ? a : null; } catch(e){ return null; } }
+  // 서버에는 로그인 정보와 필요한 값(품번 목록 / 몰별 설정)만 보낸다 (주문자 정보는 브라우저 밖으로 나가지 않는다)
+  function ask(url, a, extra, what){
+    var ctl = new AbortController(), t = setTimeout(function(){ ctl.abort(); }, 20000);
+    var body = { user:a.id, pass:a.pass }; Object.keys(extra).forEach(function(k){ body[k] = extra[k]; });
+    return fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, cache:'no-store', signal:ctl.signal, body:JSON.stringify(body) })
+      .then(function(r){ return r.json().catch(function(){ throw new Error(what + ' 서버 응답을 읽지 못했어요 (HTTP ' + r.status + ')'); }); })
+      .then(function(d){ clearTimeout(t); if (!d.ok) { var e = new Error(d.error || (what + '을(를) 처리하지 못했어요')); e.login = !!d.need_login; e.data = d; throw e; } return d; },
+            function(e){ clearTimeout(t); throw (e.name === 'AbortError' || e instanceof TypeError) ? new Error(what + ' 서버에 연결하지 못했어요') : e; });
+  }
+  function loadStock(){
+    if (!ROWS.length) return;
+    var a = auth(), my = ++STK.req;
+    if (!a) { STK.state = 'login'; STK.data = null; STK.msg = '툴킷에서 로그인한 뒤 "재고 다시 불러오기"를 눌러 주세요.'; run(); return; }
+    var styles = S.stylesFor(ROWS), parts = [];
+    for (var i = 0; i < styles.length; i += 800) parts.push(styles.slice(i, i + 800));
+    if (!parts.length) parts.push([]);
+    STK.state = 'loading'; STK.data = null; run();
+    Promise.all(parts.map(function(p){ return ask(STOCK_API, a, { styles:p }, '재고'); })).then(function(list){
+      if (my !== STK.req) return;
+      var data = { as_of:list[0].as_of, items:{} };
+      list.forEach(function(d){ Object.keys(d.items || {}).forEach(function(k){ data.items[k] = d.items[k]; }); });
+      STK.data = data; STK.state = 'ok'; run();
+    }).catch(function(e){
+      if (my !== STK.req) return;
+      STK.state = e.login ? 'login' : 'error'; STK.msg = e.message; run();
+    });
+  }
+  var STOCK_LABEL = { ok:'출고가능', none:'재고 없음', short:'재고 부족', unknown:'품목 확인' };
+  var STOCK_CLS = { ok:'ok', none:'bad', short:'warn', unknown:'gray' };
+  // 재고·중복 필터: [값, 이름, 건수 열쇠, 색]
+  var CHECKS = [['st:none','재고 없음','none','bad'],['st:short','재고 부족','short','warn'],['st:unknown','품목 확인','unknown','gray'],['st:cust','고객 중복','cust','dup'],['st:same','같은 상품','same','dup']];
+  function isStockFilter(v){ return v.indexOf('st:') === 0; }
+  function isDupFilter(v){ return v === 'st:cust' || v === 'st:same'; }
+  function when(ts){ var d = new Date(ts * 1000), p = function(n){ return (n < 10 ? '0' : '') + n; }; return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+
+  function renderChk(){
+    var c = CHK.count, ok = STK.state === 'ok';
+    var picks = CHECKS.map(function(x){
+      var known = ok || isDupFilter(x[0]), n = c[x[2]] || 0;
+      if (x[0] === 'st:cust' && !CHK.canCust) known = false;
+      return '<button type="button" class="pick ' + (known && n ? x[3] : '') + (FILTER === x[0] ? ' on' : '') + '" data-f="' + x[0] + '"' + (known && n ? '' : ' disabled') + ' aria-pressed="' + (FILTER === x[0]) + '">' + x[1] + '<b>' + (known ? n : '–') + '</b></button>';
+    }).join('');
+    var title, cls = '', note, retry = true;
+    if (ok) {
+      title = c.check ? '출고 전에 확인하세요 · ' + c.check + '건' : '재고 · 중복 확인할 건이 없습니다';
+      cls = c.check ? '' : 'clear';
+      note = '출고가능 ' + c.ok + '건 · 이카운트 재고 기준 <b>' + when(STK.data.as_of) + '</b> (서버가 10~19시 매시간 · 새벽 3시에 받아 둔 값). 재고를 차감(판매입력)한 뒤에 돌리면 재고 없음으로 나옵니다.';
+      if (Date.now() / 1000 - STK.data.as_of > 12 * 3600) { cls = ''; note += '<br><b>재고가 12시간 넘게 갱신되지 않았습니다. 이카운트에서 직접 확인해 주세요.</b>'; }
+    } else if (STK.state === 'login' || STK.state === 'error') {
+      title = '재고를 확인하지 못했습니다';
+      note = esc(STK.msg) + '<br>지금은 출고 가능 여부를 알 수 없습니다. 가격 검증과 중복 확인은 그대로 됩니다.';
+    } else { title = '이카운트 재고를 불러오는 중…'; cls = 'wait'; note = '중복주문 건수를 먼저 표시합니다.'; retry = false; }
+    if (!CHK.canCust) note += '<br>주문서에 수취인 열이 없어 고객 중복은 확인하지 못했습니다.';
+    $('chk').className = 'box chk ' + cls;
+    $('chk').innerHTML = '<div class="row"><h2 class="grow">' + title + '</h2>' + (retry ? '<button type="button" class="btn btn-out btn-sm" id="btnStock">재고 다시 불러오기</button>' : '') + '</div>' +
+      '<div class="picks">' + picks + '</div><div class="hint">' + note + '</div>';
+    $('seg2').innerHTML = [['st:check','확인할 건 전체','check']].concat(CHECKS).map(function(x){
+      var known = ok || isDupFilter(x[0]) || x[0] === 'st:check';
+      return '<button type="button" data-f="' + x[0] + '" class="' + (FILTER === x[0] ? 'on' : '') + '">' + x[1] + '<b>' + (known ? (c[x[2]] || 0) : '–') + '</b></button>';
+    }).join('');
+  }
+
+  // 표의 '이카운트 현재고' 칸: 수량 · 출고 판정 + 중복 표시
+  function stockCell(r){
+    var o = BYLINE[r.line], h = '';
+    if (o.stock) {
+      h += (o.qty == null ? '' : '<span class="q ' + o.stock + '">' + o.qty.toLocaleString('ko-KR') + '</span>') + '<span class="chip ' + STOCK_CLS[o.stock] + '">' + STOCK_LABEL[o.stock] + '</span>';
+      if (o.need > 1) h += '<div class="hint">이 파일 주문 합계 ' + o.need + '개</div>';
+      if (o.why) h += '<div class="hint">' + esc(o.why) + '</div>';
+      if (o.parts.length > 1) h += '<div class="hint">' + o.parts.map(function(p){ return esc(p.name) + ' <b>' + p.qty + '개</b>'; }).join('<br>') + '</div>';
+      else if (o.matched) h += '<div class="hint">이카운트: ' + esc(o.matched) + '</div>';
+      if (o.note) h += '<div class="hint">' + esc(o.note) + '</div>';
+    } else h += '<span class="hint">' + (STK.state === 'loading' ? '불러오는 중…' : '재고 미확인') + '</span>';
+    if (o.cust || o.same) {
+      h += '<div class="dups">' + (o.cust ? '<span class="chip dup">고객 중복 ' + o.cust + '</span>' : '') + (o.same ? '<span class="chip dup">같은 상품 ' + o.same + ' · ' + o.sameCount + '건</span>' : '') + '</div>';
+      if (o.cust) h += '<div class="hint">' + esc(r.rcv) + ' · 상대 주문 ' + esc(o.custOrders.join(', ')) + '</div>';
+    }
+    return '<td class="stk">' + h + '</td>';
+  }
+
+  // ---- 몰별 기준 설정 (전 직원 공용) ----
+  function changes(){ return SH.base ? G.diff(SH.base, CFG) : []; }
+  function isDirty(){ return changes().length > 0; }
+  function last(){ var h = SH.hist[0]; return h && h.saved_by ? h.saved_by + ' · ' + when(h.saved_at) : ''; }
+  function liHtml(list, max){
+    var more = list.length > max ? '<li>외 ' + (list.length - max) + '건</li>' : '';
+    return '<ul>' + list.slice(0, max).map(function(x){ return '<li>' + esc(x) + '</li>'; }).join('') + more + '</ul>';
+  }
+  // 서버 응답을 반영. 저장 전 값이 있으면 덮어쓰지 않는다
+  function takeShared(d, keepDraft){
+    SH.hist = d.history || []; SH.rev = d.rev || 0; SH.msg = '';
+    SH.first = d.first ? normCfg(d.first) : null;
+    if (!SH.rev) { SH.state = 'empty'; return; }
+    var latest = normCfg(SH.hist[0].config);
+    try { localStorage.setItem(SHARED_LS, JSON.stringify(SH.hist[0])); } catch(e){}
+    SH.state = 'ok';
+    if (keepDraft && isDirty() && G.diff(latest, CFG).length) { SH.base = latest; return; }
+    SH.base = latest; CFG = copy(latest); SH.editRev = SH.rev; F = C.fromConfig(CFG);
+  }
+  // 공용 설정을 고칠 수 있는 때: 서버에서 받아 왔고 저장 중이 아닐 때만 (그 밖에는 입력칸을 잠가 값이 사라지지 않게)
+  function locked(){ return SH.saving || SH.state !== 'ok'; }
+  function lockCfg(){
+    var on = locked();
+    Array.prototype.forEach.call($('cfgBox').querySelectorAll('input, select, button:not([data-sh]):not(#cfgExp)'), function(el){ el.disabled = on; });
+  }
+  // 입력 중인 칸이 있으면 화면을 다시 그리기 전에 먼저 그 값을 반영한다 (옛 줄 번호에 적용되는 일 방지)
+  function commitInput(){ var el = document.activeElement; if (el && el !== document.body && $('cfgBox').contains(el)) el.blur(); }
+  function loadShared(){
+    if (SH.saving) return;
+    var a = auth(), my = ++SH.req;
+    function fail(state, msg){ commitInput(); SH.state = state; SH.msg = msg; renderShared(); if (ROWS.length) run(); }
+    if (!a) { fail('login', '툴킷에서 로그인해야 공용 설정을 불러옵니다.'); return; }
+    ask(CFG_API, a, { action:'get' }, '설정').then(function(d){
+      if (my !== SH.req || SH.saving) return;
+      // 늦게 도착한 옛 응답은 버린다. 아직 서버 답을 못 받은 상태(받아 둔 값만 있음)라면 서버 값을 따른다
+      if (SH.state === 'ok' && d.rev < SH.rev) return;
+      commitInput();
+      var before = JSON.stringify(CFG);
+      takeShared(d, true);
+      if (JSON.stringify(CFG) !== before) renderCfg(); else renderShared();
+      if (ROWS.length) run();
+    }).catch(function(e){
+      if (my !== SH.req) return;
+      fail(e.login ? 'login' : 'error', e.message);
+    });
+  }
+  function saveShared(){
+    var a = auth(), list = changes();
+    if (locked() || !a || !list.length) return;
+    var msg = '전 직원의 판매가 검증에 바로 적용됩니다. 저장할까요?\n\n' + list.slice(0, 15).map(function(x){ return '· ' + x; }).join('\n') + (list.length > 15 ? '\n외 ' + (list.length - 15) + '건' : '');
+    if (!confirm(msg)) return;
+    SH.saving = true; SH.req++; renderShared();
+    var sent = copy(CFG);
+    ask(CFG_API, a, { action:'save', base_rev:SH.editRev, config:sent }, '설정').then(function(d){
+      SH.saving = false; if (seenRev() >= d.rev - 1) markSeen(d.rev); takeShared(d, false); SH.msg = '저장했습니다. 전 직원에게 적용됩니다.'; renderCfg(); if (ROWS.length) run();
+    }).catch(function(e){
+      SH.saving = false;
+      if (e.data && e.data.conflict) {
+        // 남의 저장을 덮어쓰지 않는다: 최신 값을 받고, 바꾸려던 내용을 알려 다시 고치게 한다
+        takeShared(e.data, false); renderCfg(); if (ROWS.length) run();
+        alert('저장하지 않았습니다. ' + last() + ' 에 먼저 저장했습니다.\n최신 설정을 불러왔으니 아래 내용을 다시 확인해 주세요.\n\n' + list.map(function(x){ return '· ' + x; }).join('\n'));
+        SH.msg = '다른 직원의 저장이 먼저라 반영하지 않았습니다. 바꾸려던 내용: ' + list.join(' / '); renderShared();
+        return;
+      }
+      SH.msg = '저장하지 못했습니다. ' + e.message; renderShared(); alert(SH.msg);
+    });
+  }
+  function revertShared(){
+    if (!SH.base || SH.saving) return;
+    CFG = copy(SH.base); SH.editRev = SH.rev; SH.msg = ''; F = C.fromConfig(CFG); renderCfg(); if (ROWS.length) run();
+  }
+  function renderShared(){
+    var list = changes(), dirty = list.length > 0, stale = SH.state === 'ok' && SH.editRev !== SH.rev, h = '', warn = false;
+    if (SH.state === 'ok') h = '<b>공용 설정</b> · 마지막 변경 <b>' + esc(last()) + '</b>';
+    else if (SH.state === 'empty') { warn = true; h = '<b>아직 저장된 공용 설정이 없습니다.</b> 지금은 이 PC에 있는 값으로 검증하며 고칠 수 없습니다. 관리자에게 알려 주세요. <button type="button" class="btn btn-out btn-sm" data-sh="load">다시 불러오기</button>'; }
+    else if (SH.state === 'loading') h = '공용 설정을 불러오는 중…' + (last() ? ' (지금은 마지막으로 받은 값: ' + esc(last()) + ')' : '');
+    else { warn = true; h = '<b>공용 설정을 불러오지 못했습니다.</b> ' + esc(SH.msg) + '<br>' + (SH.base ? '이 PC에 마지막으로 받아 둔 설정(' + esc(last()) + ')' : '이 PC에 있던 설정') + '으로 검증합니다. 설정은 불러온 뒤에 고칠 수 있습니다. <button type="button" class="btn btn-out btn-sm" data-sh="load">다시 불러오기</button>'; }
+    if (SH.msg && SH.state === 'ok') h += '<div>' + esc(SH.msg) + '</div>';
+    $('shared').className = 'shared' + (warn ? ' warn' : '');
+    if ($('shared').dataset.h !== h) { $('shared').dataset.h = h; $('shared').innerHTML = h; }
+    // 변경 기록: 바로 앞 저장분과 비교해 무엇이 바뀌었는지 보여 준다 (최근 10번)
+    var hs = SH.hist.slice(0, 10).map(function(e, i){
+      var prev = SH.hist[i + 1], d = prev ? G.diff(normCfg(prev.config), normCfg(e.config)) : null;
+      return '<div class="ent"><b>' + esc(e.saved_by) + '</b> · ' + when(e.saved_at) + (d ? (d.length ? liHtml(d, 20) : ' · 바뀐 값 없음') : (e.rev === 1 ? ' · 첫 공용 저장' : '')) + '</div>';
+    });
+    $('histBox').hidden = !(SH.state === 'ok' && hs.length); $('hist').innerHTML = hs.join('');
+    $('cfgSum').textContent = CFG.malls.length + '줄 · ' + (dirty ? '저장 전 변경 ' + list.length + '건' : (SH.state === 'ok' ? '마지막 변경 ' + last() : '필웨이 가격 기준'));
+    renderNews(); lockCfg();
+    // 저장 전 안내 막대
+    var bar = $('savebar'); bar.hidden = !dirty; document.body.classList.toggle('dirty', dirty);
+    if (dirty) {
+      $('sbNote').innerHTML = (stale ? '그 사이 ' + esc(last()) + ' 에 다른 저장이 있었습니다. 되돌리기를 누른 뒤 다시 고쳐 주세요.' : '') +
+        (SH.state !== 'ok' ? '공용 설정에 연결되지 않아 지금은 저장할 수 없습니다.' : '');
+      $('sbList').innerHTML = liHtml(list, 30);
+      $('sbSave').disabled = !(SH.state === 'ok' && !stale && !SH.saving);
+      $('sbSave').textContent = SH.saving ? '저장 중…' : '전체 직원에게 저장';
+      $('sbRevert').disabled = !SH.base || SH.saving;
+      $('sbLoad').hidden = SH.state === 'ok';
+      document.body.style.setProperty('--barh', (bar.offsetHeight + 28) + 'px');
+    }
+  }
+  // 맨 위 알림: 마지막 변경자를 늘 보여 주고, 이 PC에서 아직 확인하지 않은 변경이 있으면 바뀐 내용을 펼쳐 둔다
+  function seenRev(){ try { return +localStorage.getItem(SEEN_LS) || 1; } catch(e){ return 1; } }
+  function markSeen(rev){ try { localStorage.setItem(SEEN_LS, String(rev)); } catch(e){} }
+  function renderNews(){
+    var box = $('ruleNews');
+    if (SH.state !== 'ok' || !SH.hist.length) { box.hidden = true; return; }
+    var seen = seenRev(), top = SH.hist[0], fresh = SH.rev > seen;
+    var h = '몰별 기준 마지막 변경 <b>' + esc(last()) + '</b>';
+    if (fresh) {
+      var old = SH.hist.filter(function(e){ return e.rev === seen; })[0] || SH.hist[SH.hist.length - 1];
+      var d = G.diff(normCfg(old.config), normCfg(top.config));
+      var who = SH.hist.filter(function(e){ return e.rev > old.rev; }).map(function(e){ return e.saved_by; }).filter(function(n, i, l){ return l.indexOf(n) === i; });
+      h = '<b>몰별 기준 설정이 바뀌었습니다.</b> 바꾼 사람 <b>' + esc(who.join(', ')) + '</b> · 마지막 ' + esc(when(top.saved_at)) + (d.length ? liHtml(d, 20) : '<div>지금 값은 전에 확인한 값과 같습니다.</div>') +
+        '<div style="margin-top:8px;"><button type="button" class="btn btn-pri btn-sm" data-sh="seen">확인했어요</button></div>';
+    }
+    box.hidden = false; box.className = 'shared' + (fresh ? ' warn' : '');
+    if (box.dataset.h !== h) { box.dataset.h = h; box.innerHTML = h; }
+  }
+  function sharedClick(e){
+    var b = e.target.closest('button[data-sh]'); if (!b) return;
+    if (b.dataset.sh === 'seen') { markSeen(SH.rev); renderNews(); return; }
+    if (b.dataset.sh === 'save') saveShared(); else if (b.dataset.sh === 'revert') revertShared(); else { SH.state = 'loading'; renderShared(); loadShared(); }
+  }
+
   function run(){
+    CHK = S.analyze(ROWS, STK.state === 'ok' ? STK.data.items : null);
+    BYLINE = {}; CHK.rows.forEach(function(o){ BYLINE[o.line] = o; });
     F.opts.jpyKrw = JPY;
     RES = C.check(ROWS, F.mults, F.tol, F.opts);
     RES.forEach(function(r){ if (r.manual && MARKS[r.line]) r.status = MARKS[r.line]; });
@@ -276,7 +556,7 @@
       (smartCount() ? '<div class="stat ' + (s.manual ? 'warn' : 'ok') + '"><div class="lab">스마트스토어 미매칭 · 확인 필요</div><div class="n">' + s.manual + '<small>/ ' + smartCount() + '건</small></div></div>' : '');
 
     // 몰별(계정별) 배수 표 — 같은 몰의 계정들은 붙여서 보여 준다
-    var byMall = {};
+    var byMall = Object.create(null);
     Object.keys(s.malls).forEach(function(g){ var n = s.malls[g].row.mall; byMall[n] = (byMall[n] || 0) + s.malls[g].total; });
     var malls = Object.keys(s.malls).sort(function(a, b){
       var x = s.malls[a].row.mall, y = s.malls[b].row.mall;
@@ -311,6 +591,9 @@
     var segs = [['bad','가격 이상',s.bad],['smart','스마트스토어 미매칭',smartCount()],['unmapped','미매핑',s.unmapped],['nomult','검증 못 함',s.nomult + s.hold],['ok','정상',s.ok],['all','전체',s.total]];
     if (!smartCount()) segs.splice(1, 1);
     $('seg').innerHTML = segs.map(function(x){ return '<button type="button" data-f="' + x[0] + '" class="' + (FILTER === x[0] ? 'on' : '') + '">' + x[1] + '<b>' + x[2] + '</b></button>'; }).join('');
+    renderChk();
+    var rw = isDirty() ? '저장하지 않은 몰별 기준으로 검증 중입니다.' : (SH.state === 'error' || SH.state === 'login' ? '공용 몰별 기준을 불러오지 못해 이 PC에 있는 값으로 검증 중입니다. 가격 판정이 다른 직원과 다를 수 있습니다.' : (SH.state === 'empty' ? '아직 공용 몰별 기준이 없어 이 PC의 값으로 검증 중입니다.' : (SH.state === 'loading' ? '공용 몰별 기준을 불러오는 중입니다. 가격 판정이 곧 바뀔 수 있습니다.' : '')));
+    $('ruleWarn').hidden = !rw; $('ruleWarn').textContent = rw;
     if (MALL && !s.malls[MALL]) MALL = '';   // 설정을 고쳐 묶음 이름이 바뀌면 전체로
     var opts = '<option value="">모든 몰</option>' + malls.map(function(g){ return '<option value="' + esc(g) + '"' + (g === MALL ? ' selected' : '') + '>' + esc(g) + ' (' + s.malls[g].total + ')</option>'; }).join('');
     $('mallSel').innerHTML = opts;
@@ -327,6 +610,11 @@
   function pass(r){
     if (MALL && r.group !== MALL) return false;
     if (FILTER === 'all') return true;
+    if (isStockFilter(FILTER)) {
+      var o = BYLINE[r.line], k = FILTER.slice(3);
+      if (k === 'check') return S.needsCheck(o);
+      return isDupFilter(FILTER) ? !!o[k] : o.stock === k;
+    }
     if (FILTER === 'smart') return !!r.manual;   // 확인을 마친 건도 계속 보이게(누른 줄이 사라지지 않게)
     if (FILTER === 'nomult') return r.status === 'nomult' || r.status === 'hold';
     return r.status === FILTER;
@@ -334,17 +622,24 @@
 
   function renderList(){
     var list = RES.filter(pass);
+    // 중복을 볼 때는 같은 묶음끼리 붙여서 보여 준다 (A…Z, AA…)
+    if (isDupFilter(FILTER)) {
+      var k = FILTER.slice(3);
+      list.sort(function(a, b){ var x = BYLINE[a.line][k], y = BYLINE[b.line][k]; return (x.length - y.length) || x.localeCompare(y) || (a.line - b.line); });
+    }
     if (!list.length) {
-      $('tbl').innerHTML = '<tr><td class="empty">' + (FILTER === 'bad' ? '가격 이상 건이 없습니다.' : '해당하는 건이 없습니다.') + '</td></tr>';
+      var wait = isStockFilter(FILTER) && !isDupFilter(FILTER) && STK.state !== 'ok';
+      $('tbl').innerHTML = '<tr><td class="empty">' + (wait ? '재고를 불러오면 여기에 표시됩니다.' : (FILTER === 'bad' ? '가격 이상 건이 없습니다.' : '해당하는 건이 없습니다.')) + '</td></tr>';
       return;
     }
-    var h = '<tr><th>상태</th><th>몰</th><th>쇼핑몰 주문번호</th><th>상품코드</th><th>상품명</th><th class="r">사방넷 기준가</th><th class="r">배수</th><th class="r">기대 판매가</th><th class="r">실제 판매가</th><th class="r">차이</th><th class="r">결제금액</th></tr>';
+    var h = '<tr><th>상태</th><th>몰</th><th>쇼핑몰 주문번호</th><th>상품코드</th><th>상품명</th><th>이카운트 현재고</th><th class="r">사방넷 기준가</th><th class="r">배수</th><th class="r">기대 판매가</th><th class="r">실제 판매가</th><th class="r">차이</th><th class="r">결제금액</th></tr>';
     list.forEach(function(r){
       var d = r.diff, dc = !r.expect ? 'dim' : (d === 0 || Math.abs(d) <= CFG.tol ? 'diff0' : (d < 0 ? 'diffneg' : 'diffpos'));
-      h += '<tr class="' + (r.status === 'bad' ? 'bad' : '') + '">' +
+      var o = BYLINE[r.line], rowCls = r.status === 'bad' || o.stock === 'none' ? 'bad' : (o.stock === 'short' || o.cust ? 'warnrow' : '');
+      h += '<tr class="' + rowCls + '">' +
         '<td>' + chip(r.status) + (r.manual ? markBtns(r) : '') + (r.note ? '<div class="hint">' + esc(r.note) + '</div>' : '') + '</td>' +
         '<td>' + who(r) + '</td><td>' + esc(r.mallOrd) + '</td><td>' + esc(r.code) + '</td>' +
-        '<td class="nm"><div title="' + esc(r.name) + '">' + esc(r.name) + '</div><small>' + esc(r.opt) + (r.qty > 1 ? ' · 수량 ' + r.qty : '') + '</small></td>' +
+        '<td class="nm"><div title="' + esc(r.name) + '">' + esc(r.name) + '</div><small>' + esc(r.opt) + (r.qty > 1 ? ' · 수량 ' + r.qty : '') + '</small></td>' + stockCell(r) +
         (r.manual ? '<td class="r"><b class="conv">' + won(r.conv) + '</b><div class="hint">환산가 · 사방넷 확인</div></td>' : '<td class="r' + (r.base ? '' : ' dim') + '">' + won(r.base) + '</td>') +
         '<td class="r' + (r.mult == null && !r.range ? ' dim' : '') + '">' + (r.range ? r.range[0] + '~' + r.range[1].toFixed(2) : (r.mult == null ? '-' : r.mult)) + '</td>' +
         '<td class="r' + (r.expect ? '' : ' dim') + '">' + (r.range && r.expect ? won(r.expect) + ' ~ ' + won(r.expectHi) : won(r.expect)) + '</td>' +
@@ -357,17 +652,28 @@
 
   function exportXlsx(){
     // 스마트스토어 미매칭은 '맞음'으로 확인한 건도 기록으로 남긴다
-    var list = RES.filter(function(r){ return r.status !== 'ok' || r.manual; });
-    if (!list.length) { showErr('확인할 건이 없습니다.'); return; }
+    if (STK.state === 'loading') { showErr('재고를 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.'); return; }
+    var noStock = STK.state !== 'ok';
+    var list = RES.filter(function(r){ return r.status !== 'ok' || r.manual || S.needsCheck(BYLINE[r.line]); });
+    if (!list.length) { showErr(noStock ? '재고를 확인하지 못했습니다. 가격·중복에서 확인할 건은 없지만, 재고 없음 여부는 알 수 없습니다. "재고 다시 불러오기"를 눌러 주세요.' : '확인할 건이 없습니다.'); return; }
+    if (noStock && !confirm('이카운트 재고를 확인하지 못한 상태입니다.\n재고 없음·부족 건이 엑셀에서 빠집니다. 그래도 받을까요?')) return;
     showErr('');
-    var head = ['상태','쇼핑몰','쇼핑몰ID','검증 구분','쇼핑몰 주문번호','상품코드','상품명','옵션','수량','사방넷 기준가','필웨이 환산가','직접 확인','기준 배수','기대 판매가','실제 판매가','차이','결제금액'];
+    var ruleAt = isDirty() ? '저장 안 한 값' : (SH.state === 'ok' ? '공용 ' + last() : '공용 설정 미확인');
+    var stockAt = noStock ? '재고 미확인' : when(STK.data.as_of) + (Date.now() / 1000 - STK.data.as_of > 12 * 3600 ? ' (12시간 넘게 지남)' : '');
+    var head = ['상태','쇼핑몰','쇼핑몰ID','검증 구분','쇼핑몰 주문번호','상품코드','상품명','옵션','수량','이카운트 현재고','파일 주문 합계','출고 판정','품목 확인 사유','고객 중복','같은 상품','이카운트 품목(수량)','재고 기준','몰별 기준','사방넷 기준가','필웨이 환산가','직접 확인','기준 배수','기대 판매가','실제 판매가','차이','결제금액'];
     var aoa = [head];
     list.forEach(function(r){
       var mk = r.manual ? ({ ok:'맞음', bad:'틀림' }[MARKS[r.line]] || '미확인') : '';
-      aoa.push([STAT_LABEL[r.status], r.mall, r.shopId, r.group, r.mallOrd, r.code, r.name, r.opt, r.qty, Math.round(r.base) || '', r.conv || '', mk, r.range ? (r.range[0] + '~' + r.range[1].toFixed(2)) : (r.mult == null ? '' : r.mult), r.range && r.expect ? (r.expect + ' ~ ' + r.expectHi) : (r.expect || ''), r.price + (r.range ? '엔' : ''), r.expect ? r.diff : '', r.pay]);
+      var o = BYLINE[r.line];
+      var stk = [o.qty == null ? '' : o.qty, o.stock ? o.need : '', o.stock ? STOCK_LABEL[o.stock] : '재고 미확인', [o.why, o.note].filter(Boolean).join(' / '),
+        o.cust ? o.cust + ' (상대 주문 ' + o.custOrders.join(', ') + ')' : '', o.same ? o.same + ' (' + o.sameCount + '건)' : '',
+        o.parts.map(function(p){ return p.name + ' (' + p.qty + ')'; }).join(' / '), stockAt, ruleAt];
+      // 상품명·옵션은 주문서의 뒤쪽 열(K·L, 사방넷 확정 상품명·옵션)을 쓴다 (2026-11-26 사장님).
+      // 상품코드 없는 주문처럼 K·L이 빈 칸이면 앞쪽 열(H·J, 쇼핑몰 상품명·옵션)로 채운다
+      aoa.push([STAT_LABEL[r.status], r.mall, r.shopId, r.group, r.mallOrd, r.code, r.sName || r.name, r.sOpt || r.opt, r.qty].concat(stk, [Math.round(r.base) || '', r.conv || '', mk, r.range ? (r.range[0] + '~' + r.range[1].toFixed(2)) : (r.mult == null ? '' : r.mult), r.range && r.expect ? (r.expect + ' ~ ' + r.expectHi) : (r.expect || ''), r.price + (r.range ? '엔' : ''), r.expect ? r.diff : '', r.pay]));
     });
     var ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [10,18,16,26,22,14,46,14,6,12,13,10,8,12,12,10,12].map(function(w){ return { wch:w }; });
+    ws['!cols'] = [10,18,16,26,22,14,46,14,6,13,12,11,26,30,14,46,18,22,12,13,10,8,12,12,10,12].map(function(w){ return { wch:w }; });
     var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '확인할 건');
     var d = new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
     XLSX.writeFile(wb, '판매가검증_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '.xlsx');
@@ -379,7 +685,15 @@
   ['dragenter','dragover'].forEach(function(t){ drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.add('on'); }); });
   ['dragleave','drop'].forEach(function(t){ drop.addEventListener(t, function(e){ e.preventDefault(); drop.classList.remove('on'); }); });
   drop.addEventListener('drop', function(e){ handleFile(e.dataTransfer.files[0]); });
-  $('seg').addEventListener('click', function(e){ var b = e.target.closest('button[data-f]'); if (!b) return; FILTER = b.dataset.f; render(); });
+  function pickFilter(e){ var b = e.target.closest('button[data-f]'); if (!b) return ''; FILTER = b.dataset.f; render(); return b.dataset.f; }
+  $('seg').addEventListener('click', pickFilter);
+  $('seg2').addEventListener('click', pickFilter);
+  $('chk').addEventListener('click', function(e){
+    if (e.target.closest('#btnStock')) { loadStock(); return; }
+    var f = pickFilter(e); if (!f) return;
+    var again = $('chk').querySelector('button[data-f="' + f + '"]'); if (again) again.focus({ preventScroll:true });
+    $('seg2').scrollIntoView({ block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  });
   $('mallSel').addEventListener('change', function(e){ MALL = e.target.value; renderList(); });
   $('tbl').addEventListener('click', function(e){
     var b = e.target.closest('button[data-mark]'); if (!b) return;
@@ -405,11 +719,11 @@
         '<td class="x"><button class="btn btn-out btn-sm" type="button" data-del="' + i + '" aria-label="' + esc(m.name) + ' 삭제">삭제</button></td></tr>';
     });
     $('cfgTbl').innerHTML = h;
-    $('cfgSum').textContent = CFG.malls.length + '줄 · 필웨이 가격 기준';
+    renderShared();
     $('cfgCost').value = CFG.costRate; $('cfgTol').value = CFG.tol;
     $('cfgLo').value = CFG.ranges.BUYMA.lo; $('cfgHi').value = CFG.ranges.BUYMA.hi;
   }
-  function cfgChanged(){ saveCfg(); if (ROWS.length) run(); }
+  function cfgChanged(){ SH.msg = ''; applyCfg(); if (ROWS.length) run(); }
   function addMall(name, id){
     name = String(name || '').trim(); if (!name) return -1;
     id = String(id || '').trim();
@@ -417,7 +731,7 @@
     if (ex < 0) {
       // 계정별로 나눈 몰에 새 줄을 넣으면 배수를 비워 둔다 (모르는 계정이 ×1.0으로 통과하지 않게)
       var split = !!id || CFG.malls.some(function(m){ return m.name === name && m.id; });
-      CFG.malls.push({ name: name, id: id, label: '', mult: split ? '' : 1, alts: [], round: 'r10', note: '' }); ex = CFG.malls.length - 1; saveCfg(); renderCfg();
+      CFG.malls.push({ name: name, id: id, label: '', mult: split ? '' : 1, alts: [], round: 'r10', note: '' }); ex = CFG.malls.length - 1; applyCfg(); renderCfg();
     }
     return ex;
   }
@@ -443,7 +757,7 @@
     var m = CFG.malls[+b.dataset.del];
     var others = CFG.malls.some(function(x){ return x !== m && x.name === m.name; });
     var after = m.id && others ? '이 계정 주문은 검증 못 함으로 표시됩니다' : '목록에서 빠지면 ×1.0으로 검증합니다';
-    if (!confirm('"' + m.name + (m.id ? ' / ' + m.id : '') + '" 설정을 지울까요? (' + after + ')')) return;
+    if (!confirm('"' + m.name + (m.id ? ' / ' + m.id : '') + '" 설정을 지울까요? (' + after + ')\n전체 직원에게 저장을 눌러야 모두에게 적용됩니다.')) return;
     CFG.malls.splice(+b.dataset.del, 1); renderCfg(); cfgChanged();
   });
   $('cfgAdd').addEventListener('click', function(){
@@ -457,15 +771,18 @@
   });
   $('mallTbl').addEventListener('click', function(e){
     var b = e.target.closest('button[data-set]'); if (!b) return;
+    if (locked()) { alert('공용 설정에 연결된 뒤에 고칠 수 있습니다.'); return; }
     var name = b.dataset.set, id = b.dataset.id || '';
     var key = id ? name : (C.resolveMall(name, F.mults) || name), i = cfgIndex(key, id);
     if (i < 0) i = addMall(key, id);
     focusCfg(i); if (ROWS.length) run();
   });
   $('btnReset').addEventListener('click', function(){
-    if (!confirm('몰별 기준 설정을 처음 값(협의표 기준)으로 되돌릴까요? 직접 고친 내용은 사라집니다.')) return;
-    try { localStorage.removeItem(CFG_LS); localStorage.removeItem(OLD_LS); } catch(e){}
-    CFG = C.defaultConfig(); F = C.fromConfig(CFG); renderCfg(); if (ROWS.length) run();
+    // 기본 설정 = 처음 저장한 공용 설정(서버)
+    var base = SH.first;
+    if (!base) { alert('공용 설정에 연결된 뒤에 사용할 수 있습니다.'); return; }
+    if (!confirm('몰별 기준 설정을 기본 설정(처음 저장한 공용 설정)으로 바꿀까요? 전체 직원에게 저장을 눌러야 모두에게 적용됩니다.')) return;
+    CFG = copy(base); renderCfg(); cfgChanged();
   });
   $('cfgExp').addEventListener('click', function(){
     var blob = new Blob([JSON.stringify(CFG, null, 2)], { type:'application/json' }), a = document.createElement('a');
@@ -478,12 +795,17 @@
     rd.onload = function(){
       try {
         var o = JSON.parse(rd.result); if (!o || !Array.isArray(o.malls)) throw 0;
-        CFG = normCfg(o); saveCfg(); renderCfg(); showErr(''); if (ROWS.length) run();
+        CFG = normCfg(o); renderCfg(); showErr(''); cfgChanged();
       } catch(x){ showErr('설정 파일을 읽지 못했습니다. "설정 내보내기"로 만든 파일인지 확인해 주세요.'); }
     };
     rd.readAsText(f);
   });
   renderCfg();
+  loadShared();
+  $('shared').addEventListener('click', sharedClick);
+  $('savebar').addEventListener('click', sharedClick);
+  $('ruleNews').addEventListener('click', sharedClick);
+  window.addEventListener('beforeunload', function(e){ if (isDirty()) { e.preventDefault(); e.returnValue = ''; } });
   $('btnXlsx').addEventListener('click', exportXlsx);
   $('btnFx').addEventListener('click', fxFetch);
   $('jpy').addEventListener('change', function(e){

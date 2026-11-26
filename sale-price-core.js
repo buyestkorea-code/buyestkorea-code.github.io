@@ -99,8 +99,13 @@
       cost: col('원가'), mall: col('쇼핑몰명'), ordAt: col('주문일시'), code: col('상품코드'),
       ordNo: col('주문번호'), name: col('상품명'), mallOrd: col('주문번호(쇼핑몰)'), opt: col('옵션'),
       qty: col('수량'), ea: col('EA'), price: col('판매가'), brand: col('브랜드명'), supply: col('공급단가'), pay: col('결제금액'),
-      shopId: col('쇼핑몰ID')
+      shopId: col('쇼핑몰ID'),
+      // 재고·중복 확인용(없어도 가격 검증은 된다)
+      model: col('모델NO'), rcv: col('수취인명'), tel: col('수취인전화번호1'), tel2: col('수취인전화번호2'), addr: col('수취인주소')
     };
+    // '상품명'·'옵션'이 두 번 나오면 뒤쪽이 사방넷 확정 상품명·옵션
+    var sName = head.lastIndexOf('상품명'), sOpt = head.lastIndexOf('옵션');
+    function text(r, i) { return i > -1 ? str(r[i]) : ''; }
     var NEED = { cost: '원가', mall: '쇼핑몰명', code: '상품코드', price: '판매가', qty: '수량', shopId: '쇼핑몰ID' };
     var miss = [];
     Object.keys(NEED).forEach(function (k) { if (c[k] < 0) miss.push(NEED[k]); });
@@ -116,7 +121,9 @@
         mallOrd: c.mallOrd > -1 ? str(r[c.mallOrd]) : '', opt: c.opt > -1 ? str(r[c.opt]) : '',
         qty: num(r[c.qty]) || 1, ea: c.ea > -1 ? num(r[c.ea]) : 0,
         cost: num(r[c.cost]), price: num(r[c.price]), pay: c.pay > -1 ? num(r[c.pay]) : 0,
-        brand: c.brand > -1 ? str(r[c.brand]) : '', supply: c.supply > -1 ? num(r[c.supply]) : 0
+        brand: c.brand > -1 ? str(r[c.brand]) : '', supply: c.supply > -1 ? num(r[c.supply]) : 0,
+        sName: text(r, sName), sOpt: text(r, sOpt), model: text(r, c.model),
+        rcv: text(r, c.rcv), tel: text(r, c.tel), tel2: text(r, c.tel2), addr: text(r, c.addr)
       });
     }
     return rows;
@@ -175,7 +182,8 @@
   }
   // 설정(cfg) → check()에 넘길 값들. 쇼핑몰ID가 적힌 줄은 그 계정에만, 빈 줄은 몰 전체에 적용.
   function fromConfig(cfg) {
-    var mults = {}, alts = {}, ceil = {}, accounts = {};
+    // 쇼핑몰명이 'constructor' 같은 값이어도 깨지지 않게 빈 사전을 쓴다
+    var mults = Object.create(null), alts = Object.create(null), ceil = Object.create(null), accounts = Object.create(null);
     (cfg.malls || []).forEach(function (m) {
       if (!m.name) return;
       var mult = (m.mult === '' || m.mult == null) ? null : Number(m.mult);
@@ -266,7 +274,7 @@
   }
 
   function summarize(res) {
-    var s = { total: res.length, ok: 0, bad: 0, unmapped: 0, nomult: 0, hold: 0, manual: 0, malls: {} };
+    var s = { total: res.length, ok: 0, bad: 0, unmapped: 0, nomult: 0, hold: 0, manual: 0, malls: Object.create(null) };
     res.forEach(function (r) {
       s[r.status]++;
       var g = r.group || r.mall;
