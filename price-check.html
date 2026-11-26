@@ -390,7 +390,7 @@ async function processTask(t){
     } catch (e) {
       if (e.paused) { t.status = 'wait'; S.queue.unshift(t.key); S.cur = null; idbPut('tasks', t); return; }
       if (e.blocked) {
-        await sleepPausable((e.retry_after || 1800) + 5, s => `다나와가 접근을 막아서 쉬는 중이에요. ${fmtDur(s)} 뒤 자동으로 이어갑니다.`);
+        await sleepPausable((e.retry_after || 1800) + 5, s => `다나와가 점검 중이거나 접근을 막아서 쉬는 중이에요. ${fmtDur(s)} 뒤 자동으로 이어갑니다.`);
         if (S.paused) { t.status = 'wait'; S.queue.unshift(t.key); S.cur = null; idbPut('tasks', t); return; }
         continue;
       }
