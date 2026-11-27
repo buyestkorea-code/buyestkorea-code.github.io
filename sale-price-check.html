@@ -129,7 +129,7 @@
 <b>SSG.COM은 계정이 두 개</b>라 주문서의 쇼핑몰ID로 나눠 <b>BUYEST11 (SSG바이스트)</b>와 <b>0024852987 (SSG신세계V)</b>를 따로 검증합니다.<br>
 상품코드가 없는 주문은 <b>스마트스토어 미매칭</b>으로 따로 모읍니다. <b>필웨이 환산가(판매가 ÷ 1.17)</b>를 사방넷 가격과 비교해 <b>맞음 / 틀림</b>을 직접 눌러 주세요.<br>
 가격과 함께 <b>이카운트 현재고</b>(출고 가능 여부)와 <b>중복주문</b>도 확인합니다. 이카운트에서 <b>재고를 차감(판매입력)하기 전에</b> 돌려야 맞습니다.<br>
-하루에 여러 번 돌릴 때는 확인하고 이카운트 차감까지 마친 뒤 <b>N차 확인 완료</b>를 눌러 주세요. 다음에 올리는 누적 주문서에서 그 주문은 빠지고 새 주문만 검증합니다.</p>
+하루에 여러 번 돌릴 때는 확인을 마치고 <b>N차 확인 완료</b>를 눌러 주세요. 다음에 올리는 누적 주문서에서 그 주문은 빠지고 새 주문만 검증합니다.</p>
 
 <div class="shared" id="ruleNews" style="margin:0 0 12px;" aria-live="polite" hidden></div>
 
@@ -208,7 +208,7 @@
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
 <script src="sale-price-core.js?v=20261127"></script>
-<script src="sale-stock-core.js?v=20261127"></script>
+<script src="sale-stock-core.js?v=20261127b"></script>
 <script src="sale-round-core.js?v=20261127"></script>
 <script src="sale-config-core.js?v=20261126"></script>
 <script>
@@ -409,6 +409,7 @@
       h += (o.qty == null ? '' : '<span class="q ' + o.stock + '">' + o.qty.toLocaleString('ko-KR') + '</span>') + '<span class="chip ' + STOCK_CLS[o.stock] + '">' + STOCK_LABEL[o.stock] + '</span>';
       if (o.need > 1) h += '<div class="hint">' + (RND.split && RND.split.prev ? '이번 회차' : '이 파일') + ' 주문 합계 ' + o.need + '개</div>';
       if (o.why) h += '<div class="hint">' + esc(o.why) + '</div>';
+      if (o.warn) h += '<div class="hint diffneg">' + esc(o.warn) + '</div>';
       if (o.parts.length > 1) h += '<div class="hint">' + o.parts.map(function(p){ return esc(p.name) + ' <b>' + p.qty + '개</b>'; }).join('<br>') + '</div>';
       else if (o.matched) h += '<div class="hint">이카운트: ' + esc(o.matched) + '</div>';
       if (o.note) h += '<div class="hint">' + esc(o.note) + '</div>';
@@ -494,8 +495,7 @@
     var no = roundNo(), keys = RND.split.keys.slice(), left = todo().length;
     var s = C.summarize(freshRes()), blind = s.unmapped + s.nomult + s.hold;
     var msg = '새 주문 ' + keys.length + '건을 ' + no + '차 확인 완료로 기록할까요?\n\n' +
-      '· 다음에 올리는 주문서부터 이 주문은 빠집니다 (전 직원에게 적용)\n' +
-      '· 이카운트 차감(판매입력)까지 마친 뒤에 눌러야 다음 회차 재고가 맞습니다';
+      '· 다음에 올리는 주문서부터 이 주문은 빠집니다 (전 직원에게 적용)';
     if (left) msg += '\n· 확인할 건이 ' + left + '건 있습니다. 필요하면 취소하고 엑셀을 먼저 받으세요';
     if (blind) msg += '\n· 가격을 검증하지 못한 ' + blind + '건(미매핑·검증 못 함)도 기록돼 다음에 안 나옵니다';
     if (s.manual) msg += '\n· 맞음/틀림을 누르지 않은 스마트스토어 미매칭 ' + s.manual + '건도 기록됩니다';
@@ -534,7 +534,7 @@
       } else if (sp) {
         cls = ''; title = dayLabel() + ' ' + roundNo() + '차 확인 · 새 주문 ' + sp.fresh + '건';
         body = '<div class="hint">' + (sp.prev ? '앞 회차에서 확인한 <b>' + sp.prev + '건은 뺐습니다.</b> 재고는 새 주문을 계산하고, 중복은 앞 회차 주문과도 비교합니다.' : (RND.used.length ? '이 파일에는 앞 회차 주문이 없습니다.' : '오늘 확인 완료한 회차가 없어 파일 전체를 검증합니다.')) +
-          '<br>확인하고 <b>이카운트 차감(판매입력)까지 마친 뒤</b> <b>' + roundNo() + '차 확인 완료</b>를 눌러 주세요.</div>';
+          '<br>확인을 마치면 <b>' + roundNo() + '차 확인 완료</b>를 눌러 주세요. 이카운트 재고는 바뀌지 않습니다.</div>';
         if (sp.keys.length) btn = '<button type="button" class="btn btn-pri" data-rnd="done"' + (RND.busy ? ' disabled' : '') + '>' + (RND.busy ? '기록하는 중…' : roundNo() + '차 확인 완료 (' + sp.keys.length + '건)') + '</button>';
       }
       body = (list ? '<ul>' + list + '</ul>' : '') + body + ((btn || undo) ? '<div class="row" style="margin-top:10px;">' + undo + '<span class="grow"></span>' + btn + '</div>' : '');
@@ -853,7 +853,7 @@
     list.forEach(function(r){
       var mk = r.manual ? ({ ok:'맞음', bad:'틀림' }[MARKS[r.line]] || '미확인') : '';
       var o = BYLINE[r.line];
-      var stk = [o.qty == null ? '' : o.qty, o.stock ? o.need : '', o.stock ? STOCK_LABEL[o.stock] : '재고 미확인', [o.why, o.note].filter(Boolean).join(' / '),
+      var stk = [o.qty == null ? '' : o.qty, o.stock ? o.need : '', o.stock ? STOCK_LABEL[o.stock] : '재고 미확인', [o.why, o.warn, o.note].filter(Boolean).join(' / '),
         o.cust ? o.cust + ' (상대 주문 ' + o.custOrders.join(', ') + ')' : '', o.same ? o.same + ' (' + o.sameCount + '건)' : '',
         o.parts.map(function(p){ return p.name + ' (' + p.qty + ')'; }).join(' / '), stockAt, ruleAt];
       // 상품명·옵션은 주문서의 뒤쪽 열(K·L, 사방넷 확정 상품명·옵션)을 쓴다 (2026-11-26 사장님).

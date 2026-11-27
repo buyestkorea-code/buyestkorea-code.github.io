@@ -108,7 +108,7 @@
   // pending: 재고를 받은 시각이 그 회차 완료보다 앞서서 차감이 반영됐는지 알 수 없는 회차 번호들.
   //          그 수량까지 더해도 넉넉하면 출고가능, 새 주문만이면 되고 더하면 모자라면 '품목 확인'
   function analyze(rows, items, pending) {
-    var out = rows.map(function (r) { return { line: r.line, done: r.prev || 0, stock: '', qty: null, need: 0, parts: [], why: '', note: '', matched: '', cust: '', custOrders: [], same: '', sameCount: 0, samePrev: 0, units: (r.qty || 1) * (r.ea > 1 ? r.ea : 1) }; });
+    var out = rows.map(function (r) { return { line: r.line, done: r.prev || 0, stock: '', qty: null, need: 0, parts: [], why: '', note: '', matched: '', warn: '', cust: '', custOrders: [], same: '', sameCount: 0, samePrev: 0, units: (r.qty || 1) * (r.ea > 1 ? r.ea : 1) }; });
 
     // 재고
     if (items) {
@@ -125,7 +125,7 @@
         var head = find(o.parts[0].code);
         o.parts.forEach(function (p) { up[find(p.code)] = head; });
       });
-      var need = {}, wait = {};
+      var need = {}, wait = {}, earlier = {};
       out.forEach(function (o) { if (!o.parts.length) return; o.key = 'S:' + find(o.parts[0].code); need[o.key] = (need[o.key] || 0) + o.units; });
       // 앞 회차 줄도 같은 품목이면 새 주문과 같은 상품으로 묶이게 열쇠를 맞춘다
       rows.forEach(function (r, i) {
@@ -134,6 +134,7 @@
         if (!f.hit) return;
         var known = f.hit.filter(function (x) { return up[x[0]]; })[0];
         o.key = 'S:' + find((known || f.hit[0])[0]);
+        earlier[o.key] = (earlier[o.key] || 0) + o.units;
         if (pending && pending.indexOf(o.done) > -1) {
           var w = wait[o.key] || (wait[o.key] = { qty: 0, rounds: [] });
           w.qty += o.units; if (w.rounds.indexOf(o.done) < 0) w.rounds.push(o.done);
@@ -161,6 +162,10 @@
             o.why = w.rounds.sort().join('·') + '차 차감이 재고에 반영됐는지 확인 (앞 회차 ' + w.qty + '개 + 이번 ' + o.need + '개)';
           }
         }
+        // 이카운트 차감 여부는 알 수 없다: 판정은 지금 재고로 하되, 앞 회차 수량까지는 모자라면 한 줄 알려 준다
+        var e = earlier[o.key];
+        if (o.stock === 'ok' && e && (mixed ? !o.parts.every(function (p) { return p.qty >= o.need + e; }) : total < o.need + e))
+          o.warn = '앞 회차에도 같은 상품 ' + e + '개 · 이카운트 차감 전이면 재고가 모자랍니다';
       });
     }
 
