@@ -104,8 +104,11 @@
   function groupName(i) { var s = ''; do { s = String.fromCharCode(65 + i % 26) + s; i = Math.floor(i / 26) - 1; } while (i >= 0); return s; }
 
   // rows: parseOrders 결과, items: 서버 응답(아직 없으면 null)
-  function analyze(rows, items) {
-    var out = rows.map(function (r) { return { line: r.line, stock: '', qty: null, need: 0, parts: [], why: '', note: '', matched: '', cust: '', custOrders: [], same: '', sameCount: 0, units: (r.qty || 1) * (r.ea > 1 ? r.ea : 1) }; });
+  // r.prev > 0 인 줄은 앞 회차에서 확인을 마친 주문: 재고 판정은 하지 않고, 중복 비교 상대로 쓴다
+  // pending: 재고를 받은 시각이 그 회차 완료보다 앞서서 차감이 반영됐는지 알 수 없는 회차 번호들.
+  //          그 수량까지 더해도 넉넉하면 출고가능, 새 주문만이면 되고 더하면 모자라면 '품목 확인'
+  function analyze(rows, items, pending) {
+    var out = rows.map(function (r) { return { line: r.line, done: r.prev || 0, stock: '', qty: null, need: 0, parts: [], why: '', note: '', matched: '', cust: '', custOrders: [], same: '', sameCount: 0, samePrev: 0, units: (r.qty || 1) * (r.ea > 1 ? r.ea : 1) }; });
 
     // 재고
     if (items) {
@@ -113,6 +116,7 @@
       var up = {};
       var find = function (c) { while (up[c] && up[c] !== c) c = up[c]; return c; };
       rows.forEach(function (r, i) {
+        if (out[i].done) return;
         var f = findStock(r, items), o = out[i];
         o.note = f.rest.filter(function (x) { return Number(x[3]) > 0; }).map(brief).join(', ');
         if (o.note) o.note = '다른 품목에 재고: ' + o.note;
@@ -121,8 +125,20 @@
         var head = find(o.parts[0].code);
         o.parts.forEach(function (p) { up[find(p.code)] = head; });
       });
-      var need = {};
+      var need = {}, wait = {};
       out.forEach(function (o) { if (!o.parts.length) return; o.key = 'S:' + find(o.parts[0].code); need[o.key] = (need[o.key] || 0) + o.units; });
+      // 앞 회차 줄도 같은 품목이면 새 주문과 같은 상품으로 묶이게 열쇠를 맞춘다
+      rows.forEach(function (r, i) {
+        var o = out[i]; if (!o.done) return;
+        var f = findStock(r, items);
+        if (!f.hit) return;
+        var known = f.hit.filter(function (x) { return up[x[0]]; })[0];
+        o.key = 'S:' + find((known || f.hit[0])[0]);
+        if (pending && pending.indexOf(o.done) > -1) {
+          var w = wait[o.key] || (wait[o.key] = { qty: 0, rounds: [] });
+          w.qty += o.units; if (w.rounds.indexOf(o.done) < 0) w.rounds.push(o.done);
+        }
+      });
       out.forEach(function (o, i) {
         if (!o.parts.length) return;
         var name = rows[i].sName || rows[i].name;
@@ -137,6 +153,14 @@
           if (o.parts.every(function (p) { return p.qty >= o.need; })) { o.qty = total; o.stock = 'ok'; }
           else { o.stock = 'unknown'; o.why = '이름이 다른 품목이 여러 개 · 직접 확인'; }
         } else { o.qty = total; o.stock = total < o.need ? 'short' : 'ok'; }
+        var w = wait[o.key];
+        if (o.stock === 'ok' && w) {
+          var all = o.need + w.qty;
+          if (mixed ? !o.parts.every(function (p) { return p.qty >= all; }) : total < all) {
+            o.stock = 'unknown';
+            o.why = w.rounds.sort().join('·') + '차 차감이 재고에 반영됐는지 확인 (앞 회차 ' + w.qty + '개 + 이번 ' + o.need + '개)';
+          }
+        }
       });
     }
 
@@ -150,8 +174,10 @@
     var sameN = 0, custN = 0;
     order.forEach(function (k) {
       var g = byProduct[k]; if (g.length < 2) return;
-      var tag = groupName(sameN++);
-      g.forEach(function (i) { out[i].same = tag; out[i].sameCount = g.length; });
+      var fresh = function (i) { return !out[i].done; };
+      if (!g.some(fresh)) return;   // 앞 회차끼리의 중복은 그때 확인했다
+      var tag = groupName(sameN++), old = g.length - g.filter(fresh).length;
+      g.forEach(function (i) { out[i].same = tag; out[i].sameCount = g.length; out[i].samePrev = old; });
       // 같은 사람끼리 이어 붙인다 (A=B 전화, B=C 주소여도 한 묶음)
       var left = g.slice();
       while (left.length) {
@@ -159,17 +185,18 @@
         for (; j < who.length; j++) {
           left = left.filter(function (n) { if (samePerson(rows[who[j]], rows[n])) { who.push(n); return false; } return true; });
         }
-        if (who.length < 2) continue;
+        if (who.length < 2 || !who.some(fresh)) continue;
         var c = groupName(custN++);
         who.forEach(function (i) {
           out[i].cust = c;
-          out[i].custOrders = who.filter(function (n) { return n !== i; }).map(function (n) { return rows[n].mallOrd || ('엑셀 ' + rows[n].line + '행'); });
+          out[i].custOrders = who.filter(function (n) { return n !== i; }).map(function (n) { return (rows[n].mallOrd || ('엑셀 ' + rows[n].line + '행')) + (out[n].done ? ' (' + out[n].done + '차 확인)' : ''); });
         });
       }
     });
 
     var count = { ok: 0, none: 0, short: 0, unknown: 0, cust: 0, same: 0, check: 0 };
     out.forEach(function (o) {
+      if (o.done) return;   // 건수는 이번 회차 주문만
       if (o.stock) count[o.stock]++;
       if (o.cust) count.cust++;
       if (o.same) count.same++;
@@ -177,7 +204,7 @@
     });
     return { rows: out, count: count, canCust: rows.some(function (r) { return str(r.rcv); }) };
   }
-  function needsCheck(o) { return (!!o.stock && o.stock !== 'ok') || !!o.cust || !!o.same; }
+  function needsCheck(o) { return !o.done && ((!!o.stock && o.stock !== 'ok') || !!o.cust || !!o.same); }
 
   return { normStyle: normStyle, normSize: normSize, styleFromName: styleFromName, stylesFor: stylesFor, analyze: analyze, needsCheck: needsCheck };
 });

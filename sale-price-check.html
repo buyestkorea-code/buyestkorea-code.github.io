@@ -102,6 +102,12 @@
   table.l td.stk .dups{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
   table.l td.stk .hint{margin-top:3px;word-break:keep-all;overflow-wrap:anywhere;}
   .chip.dup{background:var(--bluebg);color:var(--blue);}
+  .chip.prev{background:#ececec;color:#555;margin-top:4px;}
+  /* 하루 1·2·3차: 이번에 확인하는 주문과 완료 기록 */
+  .rnd h2{margin:0;}
+  .rnd ul{margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.6;}
+  .rnd .hint{margin-top:8px;color:#4d5258;}
+  .rnd .btn-pri{font-size:15px;padding:10px 18px;}
   table.l tr.warnrow td{background:#fffaf0;}
   /* 몰별 기준 설정: 공용 설정 상태 · 변경 기록 · 저장 전 안내 막대 */
   .shared{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0 0;font-size:13px;line-height:1.6;background:#fafaf8;}
@@ -122,7 +128,8 @@
 기준은 <b>필웨이 가격 = 현재 사방넷 가격</b>(주문서 원가 ÷ 0.87)이고, 몰마다 얼마를 곱한 값이 정상인지는 아래 <b>몰별 기준 설정</b>에서 직접 정합니다. 결제금액은 쿠폰·할인이 반영돼 있어 판정하지 않고 참고로만 보여 줍니다.<br>
 <b>SSG.COM은 계정이 두 개</b>라 주문서의 쇼핑몰ID로 나눠 <b>BUYEST11 (SSG바이스트)</b>와 <b>0024852987 (SSG신세계V)</b>를 따로 검증합니다.<br>
 상품코드가 없는 주문은 <b>스마트스토어 미매칭</b>으로 따로 모읍니다. <b>필웨이 환산가(판매가 ÷ 1.17)</b>를 사방넷 가격과 비교해 <b>맞음 / 틀림</b>을 직접 눌러 주세요.<br>
-가격과 함께 <b>이카운트 현재고</b>(출고 가능 여부)와 <b>중복주문</b>도 확인합니다. 이카운트에서 <b>재고를 차감(판매입력)하기 전에</b> 돌려야 맞습니다.</p>
+가격과 함께 <b>이카운트 현재고</b>(출고 가능 여부)와 <b>중복주문</b>도 확인합니다. 이카운트에서 <b>재고를 차감(판매입력)하기 전에</b> 돌려야 맞습니다.<br>
+하루에 여러 번 돌릴 때는 확인하고 이카운트 차감까지 마친 뒤 <b>N차 확인 완료</b>를 눌러 주세요. 다음에 올리는 누적 주문서에서 그 주문은 빠지고 새 주문만 검증합니다.</p>
 
 <div class="shared" id="ruleNews" style="margin:0 0 12px;" aria-live="polite" hidden></div>
 
@@ -138,6 +145,7 @@
 <div class="err" id="err" hidden></div>
 
 <div id="result" hidden>
+  <div class="box chk rnd wait" id="rnd" aria-live="polite"></div>
   <div class="box chk wait" id="chk" aria-live="polite"></div>
   <div class="box chk" id="ruleWarn" hidden></div>
 
@@ -165,6 +173,7 @@
   <div class="tools"><span class="seglab">출고 · 중복</span><div class="seg" id="seg2"></div></div>
   <div class="lst"><table class="l" id="tbl"></table></div>
   <p class="hint">배수가 다른 예외 상품은 직접 확인해 주세요. "확인할 건 엑셀"에는 가격 이상 · 미매핑 · 검증 못 한 건과 스마트스토어 미매칭(확인 결과 포함)이 들어갑니다. 재고 · 중복 확인이 필요한 건도 함께 들어갑니다.<br>
+앞 회차에서 확인을 마친 주문은 건수와 엑셀에 넣지 않습니다. "앞 회차" 단추를 누르면 볼 수 있습니다.<br>
 직접 누른 맞음 / 틀림은 저장되지 않으니, 새로고침하거나 파일을 새로 올리기 전에 엑셀로 받아 두세요.</p>
 </div>
 
@@ -199,13 +208,18 @@
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
 <script src="sale-price-core.js?v=20261127"></script>
-<script src="sale-stock-core.js?v=20261126"></script>
+<script src="sale-stock-core.js?v=20261127"></script>
+<script src="sale-round-core.js?v=20261127"></script>
 <script src="sale-config-core.js?v=20261126"></script>
 <script>
 (function(){
-  var C = window.SalePriceCore, S = window.SaleStockCore, G = window.SaleConfigCore;
+  var C = window.SalePriceCore, S = window.SaleStockCore, G = window.SaleConfigCore, R = window.SaleRoundCore;
   var STOCK_API = 'https://buyest.co.kr/sale_stock_check_api.php';
   var CFG_API = 'https://buyest.co.kr/sale_price_config_api.php';
+  var ROUND_API = 'https://buyest.co.kr/sale_price_round_api.php';
+  // 회차: state '' | loading | ok | login | error | nokey,  day·rounds = 서버의 오늘 기록,  used = 이번 검증에서 빼는 회차,
+  //       done = 이 화면에서 방금 기록한 회차,  split = 이번 파일의 새 주문/앞 회차 건수
+  var RND = { state:'', day:'', rounds:[], used:[], done:null, msg:'', busy:false, req:0, split:null };
   var SHARED_LS = 'buyest.salePrice.shared.v1';   // 마지막으로 받은 공용 설정(서버에 연결 못 할 때 사용)
   var SEEN_LS = 'buyest.salePrice.seen.v1';       // 이 PC에서 확인한 공용 설정 번호 (그 뒤에 바뀌면 맨 위에 알림)
   // 재고: state '' | loading | ok | login | error,  data = 서버 응답, req = 새 파일이 올라오면 옛 응답을 버리기 위한 번호
@@ -288,8 +302,10 @@
         $('fileInfo').textContent = f.name + ' · 주문 ' + ROWS.length + '건';
         FILTER = 'bad'; MALL = ''; MARKS = {};
         STK.req++; STK.data = null; STK.state = '';
+        RND.req++; RND.state = ''; RND.used = []; RND.done = null; RND.busy = false;
         run();
         loadShared();
+        loadRounds();
         loadStock();
         // 계정·미매칭으로 나눠 검증하는 몰이 있으면 요약을 펼쳐 구분 결과가 바로 보이게 한다
         $('multBox').open = RES.some(function(r){ return r.ruleId || r.noAcct || r.manual; });
@@ -320,7 +336,7 @@
 
   // ---- 이카운트 현재고 ----
   function auth(){ try { var a = JSON.parse(localStorage.getItem('buyest.dash.auth') || 'null'); return (a && a.id && a.pass) ? a : null; } catch(e){ return null; } }
-  // 서버에는 로그인 정보와 필요한 값(품번 목록 / 몰별 설정)만 보낸다 (주문자 정보는 브라우저 밖으로 나가지 않는다)
+  // 서버에는 로그인 정보와 필요한 값(품번 목록 / 몰별 설정 / 사방넷 주문번호)만 보낸다 (주문자 정보는 브라우저 밖으로 나가지 않는다)
   function ask(url, a, extra, what){
     var ctl = new AbortController(), t = setTimeout(function(){ ctl.abort(); }, 20000);
     var body = { user:a.id, pass:a.pass }; Object.keys(extra).forEach(function(k){ body[k] = extra[k]; });
@@ -372,6 +388,8 @@
       title = '재고를 확인하지 못했습니다';
       note = esc(STK.msg) + '<br>지금은 출고 가능 여부를 알 수 없습니다. 가격 검증과 중복 확인은 그대로 됩니다.';
     } else { title = '이카운트 재고를 불러오는 중…'; cls = 'wait'; note = '중복주문 건수를 먼저 표시합니다.'; retry = false; }
+    var wait = pendingRounds();
+    if (ok && wait.length) note += '<br><b>이 재고는 ' + wait.join('·') + '차 완료보다 먼저 받은 값입니다.</b> 앞 회차 차감이 빠졌을 수 있어, 같은 상품 재고가 빠듯하면 "품목 확인"으로 표시합니다. 다음 동기화 뒤 "재고 다시 불러오기"를 누르면 다시 계산합니다.';
     if (!CHK.canCust) note += '<br>주문서에 수취인 열이 없어 고객 중복은 확인하지 못했습니다.';
     $('chk').className = 'box chk ' + cls;
     $('chk').innerHTML = '<div class="row"><h2 class="grow">' + title + '</h2>' + (retry ? '<button type="button" class="btn btn-out btn-sm" id="btnStock">재고 다시 불러오기</button>' : '') + '</div>' +
@@ -385,9 +403,11 @@
   // 표의 '이카운트 현재고' 칸: 수량 · 출고 판정 + 중복 표시
   function stockCell(r){
     var o = BYLINE[r.line], h = '';
-    if (o.stock) {
+    if (o.done) {
+      h += '<span class="hint">' + o.done + '차에서 확인 · 재고 계산 안 함</span>';
+    } else if (o.stock) {
       h += (o.qty == null ? '' : '<span class="q ' + o.stock + '">' + o.qty.toLocaleString('ko-KR') + '</span>') + '<span class="chip ' + STOCK_CLS[o.stock] + '">' + STOCK_LABEL[o.stock] + '</span>';
-      if (o.need > 1) h += '<div class="hint">이 파일 주문 합계 ' + o.need + '개</div>';
+      if (o.need > 1) h += '<div class="hint">' + (RND.split && RND.split.prev ? '이번 회차' : '이 파일') + ' 주문 합계 ' + o.need + '개</div>';
       if (o.why) h += '<div class="hint">' + esc(o.why) + '</div>';
       if (o.parts.length > 1) h += '<div class="hint">' + o.parts.map(function(p){ return esc(p.name) + ' <b>' + p.qty + '개</b>'; }).join('<br>') + '</div>';
       else if (o.matched) h += '<div class="hint">이카운트: ' + esc(o.matched) + '</div>';
@@ -395,9 +415,139 @@
     } else h += '<span class="hint">' + (STK.state === 'loading' ? '불러오는 중…' : '재고 미확인') + '</span>';
     if (o.cust || o.same) {
       h += '<div class="dups">' + (o.cust ? '<span class="chip dup">고객 중복 ' + o.cust + '</span>' : '') + (o.same ? '<span class="chip dup">같은 상품 ' + o.same + ' · ' + o.sameCount + '건</span>' : '') + '</div>';
+      if (o.samePrev && !o.done) h += '<div class="hint">같은 상품 중 ' + o.samePrev + '건은 앞 회차 주문</div>';
       if (o.cust) h += '<div class="hint">' + esc(r.rcv) + ' · 상대 주문 ' + esc(o.custOrders.join(', ')) + '</div>';
     }
     return '<td class="stk">' + h + '</td>';
+  }
+
+  // ---- 하루 1·2·3차 (전 직원 공용 기록) ----
+  function loadRounds(){
+    if (!ROWS.length) return;
+    var a = auth(), my = ++RND.req;
+    RND.used = []; RND.done = null; RND.busy = false;
+    if (!ROWS.some(function(r){ return R.keyOf(r); })) { RND.state = 'nokey'; run(); return; }
+    if (!a) { RND.state = 'login'; RND.msg = '툴킷에서 로그인한 뒤 "다시 불러오기"를 눌러 주세요.'; run(); return; }
+    RND.state = 'loading'; run();
+    ask(ROUND_API, a, { action:'get' }, '회차 기록').then(function(d){
+      if (my !== RND.req) return;
+      takeRounds(d); run();
+    }).catch(function(e){
+      if (my !== RND.req) return;
+      RND.state = e.login ? 'login' : 'error'; RND.msg = e.message; run();
+    });
+  }
+  // 서버 기록을 받아 이번 검증에서 뺄 회차로 삼는다
+  function takeRounds(d){
+    RND.state = 'ok'; RND.day = d.day; RND.rounds = d.rounds || []; RND.used = RND.rounds; RND.done = null; RND.msg = '';
+  }
+  function roundNo(){ return RND.used.length + 1; }
+  // 재고를 받은 시각보다 나중에(또는 그 직전에) 완료한 회차: 그 차감이 재고에 들어 있는지 알 수 없다.
+  // 서버의 재고 시각은 이카운트 응답을 받은 뒤에 찍히므로(보통 10초 안팎) 2분 여유를 둔다
+  var STOCK_MARGIN = 120;
+  function pendingRounds(){
+    if (RND.state !== 'ok' || STK.state !== 'ok') return [];
+    return RND.used.map(function(x, i){ return x.saved_at >= STK.data.as_of - STOCK_MARGIN ? i + 1 : 0; }).filter(Boolean);
+  }
+  function dayLabel(){ var m = /^\d{4}-(\d\d)-(\d\d)$/.exec(RND.day); return m ? (+m[1]) + '/' + (+m[2]) : ''; }
+  // 이번에 확인할 주문 중 아직 볼 것이 남은 줄 (엑셀에 들어가는 줄과 같다)
+  function todo(){ return RES.filter(function(r){ return !r.prev && (r.status !== 'ok' || r.manual || S.needsCheck(BYLINE[r.line])); }); }
+
+  function ids(list){ return list.map(function(x){ return x.id; }).join(','); }
+  function mineSaved(d, keys){
+    var list = d.rounds || [], x = list[RND.used.length], a = auth();
+    if (!keys || !a || d.day !== RND.day || list.length !== RND.used.length + 1 || ids(list.slice(0, -1)) !== ids(RND.used)) return false;
+    if (String(x.saved_by).toLowerCase() !== String(a.id).toLowerCase() || x.orders.length !== keys.length) return false;
+    var have = Object.create(null); x.orders.forEach(function(n){ have[n] = true; });
+    if (!keys.every(function(n){ return have[n]; })) return false;
+    RND.rounds = list; RND.done = { id:x.id, no:list.length, cnt:keys.length };
+    return true;
+  }
+  function sendRound(extra, after, keys){
+    var a = auth(), my = RND.req;
+    if (!a) { alert('툴킷에 로그인한 뒤 다시 눌러 주세요.'); return; }
+    RND.busy = true; renderRound();
+    ask(ROUND_API, a, extra, '회차 기록').then(function(d){
+      if (my !== RND.req) return;
+      RND.busy = false; after(d); run();
+    }).catch(function(e){
+      if (my !== RND.req) return;
+      var fail = function(){
+        RND.busy = false; renderRound();
+        alert(e.message + (keys ? '\n기록됐는지 알 수 없습니다. "다시 불러오기"로 확인해 주세요.\n이미 기록돼 있는데 엑셀이 필요하면 그 회차 완료를 취소한 뒤 받으세요.' : '\n취소됐는지 알 수 없습니다. "다시 불러오기"로 확인해 주세요.'));
+      };
+      if (e.data && e.data.conflict) {
+        RND.busy = false;
+        if (mineSaved(e.data, keys)) { run(); return; }
+        takeRounds(e.data); run();
+        alert(e.message + '\n최신 기록으로 다시 나눴습니다. 화면을 확인한 뒤 눌러 주세요.');
+      } else if (keys) {
+        ask(ROUND_API, a, { action:'get' }, '회차 기록').then(function(d){
+          if (my !== RND.req) return;
+          if (mineSaved(d, keys)) { RND.busy = false; run(); } else fail();
+        }, function(){ if (my === RND.req) fail(); });
+      } else fail();
+    });
+  }
+  function doneRound(){
+    if (RND.state !== 'ok' || RND.busy || RND.done || !RND.split || !RND.split.keys.length) return;
+    var no = roundNo(), keys = RND.split.keys.slice(), left = todo().length;
+    var s = C.summarize(freshRes()), blind = s.unmapped + s.nomult + s.hold;
+    var msg = '새 주문 ' + keys.length + '건을 ' + no + '차 확인 완료로 기록할까요?\n\n' +
+      '· 다음에 올리는 주문서부터 이 주문은 빠집니다 (전 직원에게 적용)\n' +
+      '· 이카운트 차감(판매입력)까지 마친 뒤에 눌러야 다음 회차 재고가 맞습니다';
+    if (left) msg += '\n· 확인할 건이 ' + left + '건 있습니다. 필요하면 취소하고 엑셀을 먼저 받으세요';
+    if (blind) msg += '\n· 가격을 검증하지 못한 ' + blind + '건(미매핑·검증 못 함)도 기록돼 다음에 안 나옵니다';
+    if (s.manual) msg += '\n· 맞음/틀림을 누르지 않은 스마트스토어 미매칭 ' + s.manual + '건도 기록됩니다';
+    if (STK.state !== 'ok') msg += '\n· 이카운트 재고를 확인하지 못한 상태입니다';
+    if (isDirty()) msg += '\n· 저장하지 않은 몰별 기준으로 검증한 상태입니다';
+    else if (SH.state !== 'ok') msg += '\n· 공용 몰별 기준을 확인하지 못한 상태입니다';
+    if (RND.split.noKey) msg += '\n· 주문번호가 없는 ' + RND.split.noKey + '건은 기록되지 않아 다음에 다시 나옵니다';
+    if (!confirm(msg)) return;
+    sendRound({ action:'done', day:RND.day, base:RND.used.length ? RND.used[RND.used.length - 1].id : 0, orders:keys }, function(d){
+      // 지금 화면은 그대로 둔다(엑셀을 더 받을 수 있게). 빼는 것은 다음에 올릴 때부터
+      RND.day = d.day; RND.rounds = d.rounds || []; RND.done = { id:d.saved_id, no:no, cnt:keys.length };
+    }, keys);
+  }
+  function undoRound(){
+    if (RND.state !== 'ok' || RND.busy || !RND.rounds.length) return;
+    var last = RND.rounds[RND.rounds.length - 1], no = RND.rounds.length;
+    if (!confirm(no + '차 완료를 취소할까요?\n(' + last.saved_by + ' · ' + when(last.saved_at) + ' · ' + last.orders.length + '건)\n\n그 주문은 다시 검증 대상이 됩니다. 전 직원에게 적용됩니다.')) return;
+    var mine = RND.done && RND.done.id === last.id;
+    sendRound({ action:'undo', day:RND.day, id:last.id }, function(d){
+      // 방금 내가 누른 완료를 되돌리면 화면은 그대로, 앞서 있던 회차를 취소하면 다시 나눈다
+      if (mine) { RND.day = d.day; RND.rounds = d.rounds || []; RND.done = null; } else takeRounds(d);
+    });
+  }
+  function renderRound(){
+    var box = $('rnd'), sp = RND.split, cls = 'wait', title, body = '', btn = '';
+    var again = '<button type="button" class="btn btn-out btn-sm" data-rnd="load"' + (RND.busy ? ' disabled' : '') + '>다시 불러오기</button>';
+    if (RND.state === 'ok') {
+      var list = RND.rounds.map(function(x, i){ return '<li><b>' + (i + 1) + '차 완료</b> ' + esc(when(x.saved_at)) + ' · ' + esc(x.saved_by) + ' · ' + x.orders.length + '건</li>'; }).join('');
+      var undo = RND.rounds.length ? '<button type="button" class="btn btn-out btn-sm" data-rnd="undo"' + (RND.busy ? ' disabled' : '') + '>' + (RND.busy ? '기록하는 중…' : RND.rounds.length + '차 완료 취소') + '</button>' : '';
+      if (RND.done) {
+        cls = 'clear'; title = RND.done.no + '차 확인 완료로 기록했습니다 · ' + RND.done.cnt + '건';
+        body = '<div class="hint">다음에 올리는 주문서부터 이 주문은 빠집니다. 지금 화면은 그대로라 엑셀을 더 받을 수 있습니다.</div>';
+      } else if (sp && !sp.fresh) {
+        cls = 'clear'; title = '새로 확인할 주문이 없습니다';
+        body = '<div class="hint">이 파일의 주문 ' + sp.prev + '건은 모두 앞 회차에서 확인했습니다.</div>';
+      } else if (sp) {
+        cls = ''; title = dayLabel() + ' ' + roundNo() + '차 확인 · 새 주문 ' + sp.fresh + '건';
+        body = '<div class="hint">' + (sp.prev ? '앞 회차에서 확인한 <b>' + sp.prev + '건은 뺐습니다.</b> 재고는 새 주문을 계산하고, 중복은 앞 회차 주문과도 비교합니다.' : (RND.used.length ? '이 파일에는 앞 회차 주문이 없습니다.' : '오늘 확인 완료한 회차가 없어 파일 전체를 검증합니다.')) +
+          '<br>확인하고 <b>이카운트 차감(판매입력)까지 마친 뒤</b> <b>' + roundNo() + '차 확인 완료</b>를 눌러 주세요.</div>';
+        if (sp.keys.length) btn = '<button type="button" class="btn btn-pri" data-rnd="done"' + (RND.busy ? ' disabled' : '') + '>' + (RND.busy ? '기록하는 중…' : roundNo() + '차 확인 완료 (' + sp.keys.length + '건)') + '</button>';
+      }
+      body = (list ? '<ul>' + list + '</ul>' : '') + body + ((btn || undo) ? '<div class="row" style="margin-top:10px;">' + undo + '<span class="grow"></span>' + btn + '</div>' : '');
+    } else if (RND.state === 'login' || RND.state === 'error') {
+      cls = ''; title = '앞 회차 기록을 확인하지 못했습니다';
+      body = '<div class="hint">' + esc(RND.msg) + '<br><b>지금은 파일 전체를 검증합니다.</b> 앞 회차에서 차감한 주문이 섞여 있을 수 있습니다.</div>';
+    } else if (RND.state === 'nokey') {
+      cls = ''; title = '회차를 나눌 수 없습니다';
+      body = '<div class="hint">주문서에 사방넷 "주문번호" 열이 없어 파일 전체를 검증합니다.</div>';
+      again = '';
+    } else { title = '앞 회차 기록을 불러오는 중…'; again = ''; }
+    box.className = 'box chk rnd ' + cls;
+    box.innerHTML = '<div class="row"><h2 class="grow">' + title + '</h2>' + (again && !RND.done ? again : '') + '</div>' + body;
   }
 
   // ---- 몰별 기준 설정 (전 직원 공용) ----
@@ -526,11 +676,13 @@
   }
 
   function run(){
-    CHK = S.analyze(ROWS, STK.state === 'ok' ? STK.data.items : null);
+    RND.split = R.split(ROWS, RND.state === 'ok' ? RND.used : []);
+    CHK = S.analyze(ROWS, STK.state === 'ok' ? STK.data.items : null, pendingRounds());
     BYLINE = {}; CHK.rows.forEach(function(o){ BYLINE[o.line] = o; });
     F.opts.jpyKrw = JPY;
     RES = C.check(ROWS, F.mults, F.tol, F.opts);
-    RES.forEach(function(r){ if (r.manual && MARKS[r.line]) r.status = MARKS[r.line]; });
+    var prevOf = {}; ROWS.forEach(function(r){ prevOf[r.line] = r.prev; });
+    RES.forEach(function(r){ r.prev = prevOf[r.line] || 0; if (r.manual && MARKS[r.line]) r.status = MARKS[r.line]; });
     $('result').hidden = false;
     render();
   }
@@ -548,10 +700,14 @@
     }).join('') + '</div>';
   }
 
+  // 이번 회차에서 확인하는 줄
+  function freshRes(){ return RES.filter(function(r){ return !r.prev; }); }
+
   function render(){
-    var s = C.summarize(RES);
+    var s = C.summarize(freshRes());
+    renderRound();
     $('stats').innerHTML =
-      '<div class="stat"><div class="lab">전체 주문</div><div class="n">' + s.total + '<small>건</small></div></div>' +
+      '<div class="stat"><div class="lab">' + (RND.split && RND.split.prev ? '이번 회차 주문' : '전체 주문') + '</div><div class="n">' + s.total + '<small>건</small></div></div>' +
       '<div class="stat ok"><div class="lab">가격 정상</div><div class="n">' + s.ok + '<small>건</small></div></div>' +
       '<div class="stat ' + (s.bad ? 'bad' : 'ok') + '"><div class="lab">가격 이상</div><div class="n">' + s.bad + '<small>건</small></div></div>' +
       '<div class="stat ' + (s.unmapped ? 'warn' : '') + '"><div class="lab">미매핑 (기준가 없음)</div><div class="n">' + s.unmapped + '<small>건</small></div></div>' +
@@ -593,6 +749,8 @@
     // 필터
     var segs = [['bad','가격 이상',s.bad],['smart','스마트스토어 미매칭',smartCount()],['unmapped','미매핑',s.unmapped],['nomult','검증 못 함',s.nomult + s.hold],['ok','정상',s.ok],['all','전체',s.total]];
     if (!smartCount()) segs.splice(1, 1);
+    if (RND.split && RND.split.prev) segs.push(['prev','앞 회차',RND.split.prev]);
+    else if (FILTER === 'prev') FILTER = 'bad';
     $('seg').innerHTML = segs.map(function(x){ return '<button type="button" data-f="' + x[0] + '" class="' + (FILTER === x[0] ? 'on' : '') + '">' + x[1] + '<b>' + x[2] + '</b></button>'; }).join('');
     renderChk();
     var rw = isDirty() ? '저장하지 않은 몰별 기준으로 검증 중입니다.' : (SH.state === 'error' || SH.state === 'login' ? '공용 몰별 기준을 불러오지 못해 이 PC에 있는 값으로 검증 중입니다. 가격 판정이 다른 직원과 다를 수 있습니다.' : (SH.state === 'empty' ? '아직 공용 몰별 기준이 없어 이 PC의 값으로 검증 중입니다.' : (SH.state === 'loading' ? '공용 몰별 기준을 불러오는 중입니다. 가격 판정이 곧 바뀔 수 있습니다.' : '')));
@@ -600,6 +758,7 @@
     if (MALL && !s.malls[MALL]) MALL = '';   // 설정을 고쳐 묶음 이름이 바뀌면 전체로
     var opts = '<option value="">모든 몰</option>' + malls.map(function(g){ return '<option value="' + esc(g) + '"' + (g === MALL ? ' selected' : '') + '>' + esc(g) + ' (' + s.malls[g].total + ')</option>'; }).join('');
     $('mallSel').innerHTML = opts;
+    $('mallSel').disabled = FILTER === 'prev';
     renderList();
   }
 
@@ -608,10 +767,12 @@
     return '<div>' + esc(r.group) + '</div>' + (r.group !== r.mall && r.ruleId ? '<div class="hint">' + esc(r.mall) + '</div>' : '');
   }
 
-  function smartCount(){ return RES.filter(function(r){ return r.manual; }).length; }
+  function smartCount(){ return freshRes().filter(function(r){ return r.manual; }).length; }
 
   function pass(r){
+    if (FILTER === 'prev') return !!r.prev;
     if (MALL && r.group !== MALL) return false;
+    if (r.prev) return false;
     if (FILTER === 'all') return true;
     if (isStockFilter(FILTER)) {
       var o = BYLINE[r.line], k = FILTER.slice(3);
@@ -638,9 +799,9 @@
     var h = '<tr><th>상태</th><th>몰</th><th>쇼핑몰 주문번호</th><th>주문자명</th><th>수취인명</th><th>상품코드</th><th>상품명</th><th>이카운트 현재고</th><th class="r">사방넷 기준가</th><th class="r">배수</th><th class="r">기대 판매가</th><th class="r">실제 판매가</th><th class="r">차이</th><th class="r">결제금액</th></tr>';
     list.forEach(function(r){
       var d = r.diff, dc = !r.expect ? 'dim' : (d === 0 || Math.abs(d) <= CFG.tol ? 'diff0' : (d < 0 ? 'diffneg' : 'diffpos'));
-      var o = BYLINE[r.line], rowCls = r.status === 'bad' || o.stock === 'none' ? 'bad' : (o.stock === 'short' || o.cust ? 'warnrow' : '');
+      var o = BYLINE[r.line], rowCls = r.prev ? '' : (r.status === 'bad' || o.stock === 'none' ? 'bad' : (o.stock === 'short' || o.cust ? 'warnrow' : ''));
       h += '<tr class="' + rowCls + '">' +
-        '<td>' + chip(r.status) + (r.manual ? markBtns(r) : '') + (r.note ? '<div class="hint">' + esc(r.note) + '</div>' : '') + '</td>' +
+        '<td>' + chip(r.status) + (r.prev ? '<div><span class="chip prev">' + r.prev + '차 확인</span></div>' : '') + (r.manual && !r.prev ? markBtns(r) : '') + (r.note ? '<div class="hint">' + esc(r.note) + '</div>' : '') + '</td>' +
         '<td class="mallc">' + who(r) + '</td><td class="nw">' + esc(r.mallOrd) + '</td><td class="person">' + esc(r.buyer) + '</td><td class="person">' + esc(r.rcv) + '</td><td class="nw">' + esc(r.code) + '</td>' +
         '<td class="nm"><div title="' + esc(r.name) + '">' + esc(r.name) + '</div><small>' + esc(r.opt) + (r.qty > 1 ? ' · 수량 ' + r.qty : '') + '</small></td>' + stockCell(r) +
         (r.manual ? '<td class="r"><b class="conv">' + won(r.conv) + '</b><div class="hint">환산가 · 사방넷 확인</div></td>' : '<td class="r' + (r.base ? '' : ' dim') + '">' + won(r.base) + '</td>') +
@@ -653,17 +814,41 @@
     $('tbl').innerHTML = h;
   }
 
+  // 화면을 열어 둔 사이 다른 직원이 완료·취소했으면 다시 나눈 뒤 받게 한다
+  var EXPORTING = false;
+  function exportClick(){
+    if (RND.state !== 'ok' || STK.state === 'loading') { exportXlsx(); return; }
+    if (EXPORTING || RND.busy) return;
+    var a = auth(), my = RND.req;
+    if (!a) { exportXlsx(); return; }
+    EXPORTING = true; $('btnXlsx').disabled = true;
+    var end = function(){ EXPORTING = false; $('btnXlsx').disabled = false; };
+    ask(ROUND_API, a, { action:'get' }, '회차 기록').then(function(d){
+      end(); if (my !== RND.req) return;
+      var list = d.rounds || [], n = RND.used.length;
+      // 이 화면이 뺀 회차가 그대로이고, 방금 내가 완료했다면 그 기록도 남아 있어야 한다
+      var same = d.day === RND.day && (RND.done ? ids(list.slice(0, n)) === ids(RND.used) && !!list[n] && list[n].id === RND.done.id : ids(list) === ids(RND.used));
+      if (same) { exportXlsx(); return; }
+      takeRounds(d); run();
+      alert('그 사이 회차 기록이 바뀌어 최신 기록으로 다시 나눴습니다.\n화면을 확인한 뒤 엑셀을 다시 받아 주세요.');
+    }, function(e){
+      end(); if (my !== RND.req) return;
+      if (confirm('회차 기록을 다시 확인하지 못했습니다 (' + e.message + ').\n화면에 보이는 내용 그대로 받을까요?')) exportXlsx();
+    });
+  }
   function exportXlsx(){
     // 스마트스토어 미매칭은 '맞음'으로 확인한 건도 기록으로 남긴다
     if (STK.state === 'loading') { showErr('재고를 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.'); return; }
+    if (RND.state === 'loading') { showErr('앞 회차 기록을 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.'); return; }
     var noStock = STK.state !== 'ok';
-    var list = RES.filter(function(r){ return r.status !== 'ok' || r.manual || S.needsCheck(BYLINE[r.line]); });
+    var list = todo();
     if (!list.length) { showErr(noStock ? '재고를 확인하지 못했습니다. 가격·중복에서 확인할 건은 없지만, 재고 없음 여부는 알 수 없습니다. "재고 다시 불러오기"를 눌러 주세요.' : '확인할 건이 없습니다.'); return; }
+    if (RND.state !== 'ok' && RND.state !== 'nokey' && !confirm('앞 회차 기록을 확인하지 못했습니다.\n앞 회차에서 확인한 주문도 엑셀에 섞입니다. 그래도 받을까요?')) return;
     if (noStock && !confirm('이카운트 재고를 확인하지 못한 상태입니다.\n재고 없음·부족 건이 엑셀에서 빠집니다. 그래도 받을까요?')) return;
     showErr('');
     var ruleAt = isDirty() ? '저장 안 한 값' : (SH.state === 'ok' ? '공용 ' + last() : '공용 설정 미확인');
     var stockAt = noStock ? '재고 미확인' : when(STK.data.as_of) + (Date.now() / 1000 - STK.data.as_of > 12 * 3600 ? ' (12시간 넘게 지남)' : '');
-    var head = ['상태','쇼핑몰','쇼핑몰ID','검증 구분','쇼핑몰 주문번호','주문자명','수취인명','상품코드','상품명','옵션','수량','이카운트 현재고','파일 주문 합계','출고 판정','품목 확인 사유','고객 중복','같은 상품','이카운트 품목(수량)','재고 기준','몰별 기준','사방넷 기준가','필웨이 환산가','직접 확인','기준 배수','기대 판매가','실제 판매가','차이','결제금액'];
+    var head = ['상태','쇼핑몰','쇼핑몰ID','검증 구분','쇼핑몰 주문번호','주문자명','수취인명','상품코드','상품명','옵션','수량','이카운트 현재고','주문 합계','출고 판정','품목 확인 사유','고객 중복','같은 상품','이카운트 품목(수량)','재고 기준','몰별 기준','사방넷 기준가','필웨이 환산가','직접 확인','기준 배수','기대 판매가','실제 판매가','차이','결제금액'];
     var aoa = [head];
     list.forEach(function(r){
       var mk = r.manual ? ({ ok:'맞음', bad:'틀림' }[MARKS[r.line]] || '미확인') : '';
@@ -679,7 +864,8 @@
     ws['!cols'] = [10,18,16,26,22,12,12,14,46,14,6,13,12,11,26,30,14,46,18,22,12,13,10,8,12,12,10,12].map(function(w){ return { wch:w }; });
     var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '확인할 건');
     var d = new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
-    XLSX.writeFile(wb, '판매가검증_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '.xlsx');
+    var no = RND.state !== 'ok' ? '' : '_' + (RND.done ? RND.done.no : roundNo()) + '차';
+    XLSX.writeFile(wb, '판매가검증_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + no + '.xlsx');
   }
 
   // 이벤트
@@ -691,6 +877,10 @@
   function pickFilter(e){ var b = e.target.closest('button[data-f]'); if (!b) return ''; FILTER = b.dataset.f; render(); return b.dataset.f; }
   $('seg').addEventListener('click', pickFilter);
   $('seg2').addEventListener('click', pickFilter);
+  $('rnd').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-rnd]'); if (!b) return;
+    if (b.dataset.rnd === 'done') doneRound(); else if (b.dataset.rnd === 'undo') undoRound(); else loadRounds();
+  });
   $('chk').addEventListener('click', function(e){
     if (e.target.closest('#btnStock')) { loadStock(); return; }
     var f = pickFilter(e); if (!f) return;
@@ -809,7 +999,7 @@
   $('savebar').addEventListener('click', sharedClick);
   $('ruleNews').addEventListener('click', sharedClick);
   window.addEventListener('beforeunload', function(e){ if (isDirty()) { e.preventDefault(); e.returnValue = ''; } });
-  $('btnXlsx').addEventListener('click', exportXlsx);
+  $('btnXlsx').addEventListener('click', exportClick);
   $('btnFx').addEventListener('click', fxFetch);
   $('jpy').addEventListener('change', function(e){
     var v = parseFloat(e.target.value);
