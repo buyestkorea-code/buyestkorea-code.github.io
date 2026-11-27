@@ -101,7 +101,8 @@
       qty: col('수량'), ea: col('EA'), price: col('판매가'), brand: col('브랜드명'), supply: col('공급단가'), pay: col('결제금액'),
       shopId: col('쇼핑몰ID'),
       // 재고·중복 확인용(없어도 가격 검증은 된다)
-      model: col('모델NO'), rcv: col('수취인명'), tel: col('수취인전화번호1'), tel2: col('수취인전화번호2'), addr: col('수취인주소')
+      model: col('모델NO'), rcv: col('수취인명'), tel: col('수취인전화번호1'), tel2: col('수취인전화번호2'), addr: col('수취인주소'),
+      buyer: col('주문자명')
     };
     // '상품명'·'옵션'이 두 번 나오면 뒤쪽이 사방넷 확정 상품명·옵션
     var sName = head.lastIndexOf('상품명'), sOpt = head.lastIndexOf('옵션');
@@ -123,7 +124,7 @@
         cost: num(r[c.cost]), price: num(r[c.price]), pay: c.pay > -1 ? num(r[c.pay]) : 0,
         brand: c.brand > -1 ? str(r[c.brand]) : '', supply: c.supply > -1 ? num(r[c.supply]) : 0,
         sName: text(r, sName), sOpt: text(r, sOpt), model: text(r, c.model),
-        rcv: text(r, c.rcv), tel: text(r, c.tel), tel2: text(r, c.tel2), addr: text(r, c.addr)
+        buyer: text(r, c.buyer), rcv: text(r, c.rcv), tel: text(r, c.tel), tel2: text(r, c.tel2), addr: text(r, c.addr)
       });
     }
     return rows;

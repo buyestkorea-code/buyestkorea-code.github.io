@@ -50,6 +50,9 @@
   table.l td{padding:8px 10px;border-bottom:1px solid #f0f0ec;vertical-align:middle;}
   table.l td.r,table.l th.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
   table.l td.dim{color:#9aa0a7;}
+  table.l td.person{min-width:64px;max-width:130px;word-break:keep-all;overflow-wrap:anywhere;}
+  table.l td.mallc{min-width:96px;word-break:keep-all;}
+  table.l td.nw{white-space:nowrap;}
   table.l td.nm{max-width:300px;}
   table.l td.nm div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   table.l td.nm small{color:var(--sub);font-size:11.5px;}
@@ -195,7 +198,7 @@
 </div>
 
 <script src="assets/libs/xlsx.full-0.20.2.min.js"></script>
-<script src="sale-price-core.js?v=20261126"></script>
+<script src="sale-price-core.js?v=20261127"></script>
 <script src="sale-stock-core.js?v=20261126"></script>
 <script src="sale-config-core.js?v=20261126"></script>
 <script>
@@ -632,13 +635,13 @@
       $('tbl').innerHTML = '<tr><td class="empty">' + (wait ? '재고를 불러오면 여기에 표시됩니다.' : (FILTER === 'bad' ? '가격 이상 건이 없습니다.' : '해당하는 건이 없습니다.')) + '</td></tr>';
       return;
     }
-    var h = '<tr><th>상태</th><th>몰</th><th>쇼핑몰 주문번호</th><th>상품코드</th><th>상품명</th><th>이카운트 현재고</th><th class="r">사방넷 기준가</th><th class="r">배수</th><th class="r">기대 판매가</th><th class="r">실제 판매가</th><th class="r">차이</th><th class="r">결제금액</th></tr>';
+    var h = '<tr><th>상태</th><th>몰</th><th>쇼핑몰 주문번호</th><th>주문자명</th><th>수취인명</th><th>상품코드</th><th>상품명</th><th>이카운트 현재고</th><th class="r">사방넷 기준가</th><th class="r">배수</th><th class="r">기대 판매가</th><th class="r">실제 판매가</th><th class="r">차이</th><th class="r">결제금액</th></tr>';
     list.forEach(function(r){
       var d = r.diff, dc = !r.expect ? 'dim' : (d === 0 || Math.abs(d) <= CFG.tol ? 'diff0' : (d < 0 ? 'diffneg' : 'diffpos'));
       var o = BYLINE[r.line], rowCls = r.status === 'bad' || o.stock === 'none' ? 'bad' : (o.stock === 'short' || o.cust ? 'warnrow' : '');
       h += '<tr class="' + rowCls + '">' +
         '<td>' + chip(r.status) + (r.manual ? markBtns(r) : '') + (r.note ? '<div class="hint">' + esc(r.note) + '</div>' : '') + '</td>' +
-        '<td>' + who(r) + '</td><td>' + esc(r.mallOrd) + '</td><td>' + esc(r.code) + '</td>' +
+        '<td class="mallc">' + who(r) + '</td><td class="nw">' + esc(r.mallOrd) + '</td><td class="person">' + esc(r.buyer) + '</td><td class="person">' + esc(r.rcv) + '</td><td class="nw">' + esc(r.code) + '</td>' +
         '<td class="nm"><div title="' + esc(r.name) + '">' + esc(r.name) + '</div><small>' + esc(r.opt) + (r.qty > 1 ? ' · 수량 ' + r.qty : '') + '</small></td>' + stockCell(r) +
         (r.manual ? '<td class="r"><b class="conv">' + won(r.conv) + '</b><div class="hint">환산가 · 사방넷 확인</div></td>' : '<td class="r' + (r.base ? '' : ' dim') + '">' + won(r.base) + '</td>') +
         '<td class="r' + (r.mult == null && !r.range ? ' dim' : '') + '">' + (r.range ? r.range[0] + '~' + r.range[1].toFixed(2) : (r.mult == null ? '-' : r.mult)) + '</td>' +
@@ -660,7 +663,7 @@
     showErr('');
     var ruleAt = isDirty() ? '저장 안 한 값' : (SH.state === 'ok' ? '공용 ' + last() : '공용 설정 미확인');
     var stockAt = noStock ? '재고 미확인' : when(STK.data.as_of) + (Date.now() / 1000 - STK.data.as_of > 12 * 3600 ? ' (12시간 넘게 지남)' : '');
-    var head = ['상태','쇼핑몰','쇼핑몰ID','검증 구분','쇼핑몰 주문번호','상품코드','상품명','옵션','수량','이카운트 현재고','파일 주문 합계','출고 판정','품목 확인 사유','고객 중복','같은 상품','이카운트 품목(수량)','재고 기준','몰별 기준','사방넷 기준가','필웨이 환산가','직접 확인','기준 배수','기대 판매가','실제 판매가','차이','결제금액'];
+    var head = ['상태','쇼핑몰','쇼핑몰ID','검증 구분','쇼핑몰 주문번호','주문자명','수취인명','상품코드','상품명','옵션','수량','이카운트 현재고','파일 주문 합계','출고 판정','품목 확인 사유','고객 중복','같은 상품','이카운트 품목(수량)','재고 기준','몰별 기준','사방넷 기준가','필웨이 환산가','직접 확인','기준 배수','기대 판매가','실제 판매가','차이','결제금액'];
     var aoa = [head];
     list.forEach(function(r){
       var mk = r.manual ? ({ ok:'맞음', bad:'틀림' }[MARKS[r.line]] || '미확인') : '';
@@ -670,10 +673,10 @@
         o.parts.map(function(p){ return p.name + ' (' + p.qty + ')'; }).join(' / '), stockAt, ruleAt];
       // 상품명·옵션은 주문서의 뒤쪽 열(K·L, 사방넷 확정 상품명·옵션)을 쓴다 (2026-11-26 사장님).
       // 상품코드 없는 주문처럼 K·L이 빈 칸이면 앞쪽 열(H·J, 쇼핑몰 상품명·옵션)로 채운다
-      aoa.push([STAT_LABEL[r.status], r.mall, r.shopId, r.group, r.mallOrd, r.code, r.sName || r.name, r.sOpt || r.opt, r.qty].concat(stk, [Math.round(r.base) || '', r.conv || '', mk, r.range ? (r.range[0] + '~' + r.range[1].toFixed(2)) : (r.mult == null ? '' : r.mult), r.range && r.expect ? (r.expect + ' ~ ' + r.expectHi) : (r.expect || ''), r.price + (r.range ? '엔' : ''), r.expect ? r.diff : '', r.pay]));
+      aoa.push([STAT_LABEL[r.status], r.mall, r.shopId, r.group, r.mallOrd, r.buyer, r.rcv, r.code, r.sName || r.name, r.sOpt || r.opt, r.qty].concat(stk, [Math.round(r.base) || '', r.conv || '', mk, r.range ? (r.range[0] + '~' + r.range[1].toFixed(2)) : (r.mult == null ? '' : r.mult), r.range && r.expect ? (r.expect + ' ~ ' + r.expectHi) : (r.expect || ''), r.price + (r.range ? '엔' : ''), r.expect ? r.diff : '', r.pay]));
     });
     var ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [10,18,16,26,22,14,46,14,6,13,12,11,26,30,14,46,18,22,12,13,10,8,12,12,10,12].map(function(w){ return { wch:w }; });
+    ws['!cols'] = [10,18,16,26,22,12,12,14,46,14,6,13,12,11,26,30,14,46,18,22,12,13,10,8,12,12,10,12].map(function(w){ return { wch:w }; });
     var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '확인할 건');
     var d = new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
     XLSX.writeFile(wb, '판매가검증_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '.xlsx');
