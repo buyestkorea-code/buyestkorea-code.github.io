@@ -127,7 +127,7 @@
 <p class="lead">사방넷 주문서(주문서확인처리) 엑셀을 올리면, 몰별 기준 가격과 실제 판매가를 비교해 다른 건만 골라 줍니다.<br>
 기준은 <b>필웨이 가격 = 현재 사방넷 가격</b>(주문서 원가 ÷ 0.87)이고, 몰마다 얼마를 곱한 값이 정상인지는 아래 <b>몰별 기준 설정</b>에서 직접 정합니다. 결제금액은 쿠폰·할인이 반영돼 있어 판정하지 않고 참고로만 보여 줍니다.<br>
 <b>SSG.COM은 계정이 두 개</b>라 주문서의 쇼핑몰ID로 나눠 <b>BUYEST11 (SSG바이스트)</b>와 <b>0024852987 (SSG신세계V)</b>를 따로 검증합니다.<br>
-상품코드가 없는 주문은 <b>스마트스토어 미매칭</b>으로 따로 모읍니다. <b>필웨이 환산가(판매가 ÷ 1.17)</b>를 사방넷 가격과 비교해 <b>맞음 / 틀림</b>을 직접 눌러 주세요.<br>
+상품코드가 없는 주문은 <b>스마트스토어 미매칭</b>으로 따로 모읍니다. <b>필웨이 환산가(판매가 ÷ 1.17)</b>를 사방넷 가격과 비교해 <b>맞음 / 틀림</b>을 직접 눌러 주세요. <b>가격 이상</b> 건도 확인한 뒤 <b>맞음 / 틀림</b>으로 표시합니다.<br>
 가격과 함께 <b>이카운트 현재고</b>(출고 가능 여부)와 <b>중복주문</b>도 확인합니다. 이카운트에서 <b>재고를 차감(판매입력)하기 전에</b> 돌려야 맞습니다.<br>
 하루에 여러 번 돌릴 때는 확인을 마치고 <b>N차 확인 완료</b>를 눌러 주세요. 다음에 올리는 누적 주문서에서 그 주문은 빠지고 새 주문만 검증합니다.</p>
 
@@ -172,9 +172,9 @@
   </div>
   <div class="tools"><span class="seglab">출고 · 중복</span><div class="seg" id="seg2"></div></div>
   <div class="lst"><table class="l" id="tbl"></table></div>
-  <p class="hint">배수가 다른 예외 상품은 직접 확인해 주세요. "확인할 건 엑셀"에는 가격 이상 · 미매핑 · 검증 못 한 건과 스마트스토어 미매칭(확인 결과 포함)이 들어갑니다. 재고 · 중복 확인이 필요한 건도 함께 들어갑니다.<br>
+  <p class="hint">배수가 다른 예외 상품은 직접 확인해 주세요. "확인할 건 엑셀"에는 가격 이상(맞음으로 확인한 건 포함) · 미매핑 · 검증 못 한 건과 스마트스토어 미매칭(확인 결과 포함)이 들어갑니다. 재고 · 중복 확인이 필요한 건도 함께 들어갑니다.<br>
 앞 회차에서 확인을 마친 주문은 건수와 엑셀에 넣지 않습니다. "앞 회차" 단추를 누르면 볼 수 있습니다.<br>
-직접 누른 맞음 / 틀림은 저장되지 않으니, 새로고침하거나 파일을 새로 올리기 전에 엑셀로 받아 두세요.</p>
+직접 누른 맞음 / 틀림은 저장되지 않으니, 새로고침하거나 파일을 새로 올리기 전에 엑셀로 받아 두세요. 기준 배수나 환율이 바뀌어 계산값이 달라진 줄은 표시가 해제됩니다.</p>
 </div>
 
 <details class="box" id="cfgBox" open>
@@ -231,7 +231,11 @@
   //     editRev = 지금 고치는 값이 출발한 번호, hist = 변경 기록, msg = 안내
   var SH = { state:'loading', first:null, base:null, rev:0, editRev:0, hist:[], msg:'', saving:false, req:0 };
   var ROWS = [], RES = [], CFG = null, F = null, FILTER = 'bad', MALL = '', FILENAME = '';
-  var MARKS = {};   // 스마트스토어 미매칭 직접 확인 결과: 엑셀 행 번호 → 'ok' | 'bad' (파일을 새로 올리면 비움)
+  var MARKS = {};   // 가격 이상·스마트스토어 미매칭 직접 확인 결과: 엑셀 행 번호 → { v:'ok'|'bad', sig:누를 때 계산값 }
+  //                   (파일을 새로 올리면 비우고, 계산값이 달라진 줄은 해제)
+  // 직원이 보고 누른 값. 기준 배수·원가율·환율이 바뀌면 달라진다
+  function markSig(r){ return [r.manual ? 'm' : 'p', r.price, r.base, r.mult, r.expect, r.expectHi, r.diff, r.conv].join('|'); }
+  function markOf(line){ return MARKS[line] ? MARKS[line].v : ''; }
   var FX_LS = 'buyest.salePrice.jpy.v1', JPY = 0, FX_MANUAL = false;
   (function(){
     var cache = null;
@@ -452,7 +456,7 @@
   }
   function dayLabel(){ var m = /^\d{4}-(\d\d)-(\d\d)$/.exec(RND.day); return m ? (+m[1]) + '/' + (+m[2]) : ''; }
   // 이번에 확인할 주문 중 아직 볼 것이 남은 줄 (엑셀에 들어가는 줄과 같다)
-  function todo(){ return RES.filter(function(r){ return !r.prev && (r.status !== 'ok' || r.manual || S.needsCheck(BYLINE[r.line])); }); }
+  function todo(){ return RES.filter(function(r){ return !r.prev && (r.status !== 'ok' || r.manual || r.priceOff || S.needsCheck(BYLINE[r.line])); }); }
 
   function ids(list){ return list.map(function(x){ return x.id; }).join(','); }
   function mineSaved(d, keys){
@@ -682,7 +686,15 @@
     F.opts.jpyKrw = JPY;
     RES = C.check(ROWS, F.mults, F.tol, F.opts);
     var prevOf = {}; ROWS.forEach(function(r){ prevOf[r.line] = r.prev; });
-    RES.forEach(function(r){ r.prev = prevOf[r.line] || 0; if (r.manual && MARKS[r.line]) r.status = MARKS[r.line]; });
+    RES.forEach(function(r){
+      r.prev = prevOf[r.line] || 0;
+      r.priceOff = !r.manual && r.status === 'bad';   // 계산상 가격 이상 (맞음을 눌러도 목록·엑셀에 남긴다)
+      var m = MARKS[r.line];
+      if (!m) return;
+      // 누른 뒤 계산값이 바뀌었거나 확인 대상이 아니게 된 줄은 표시를 지운다(다시 보고 눌러야 한다)
+      if (!(r.manual || r.priceOff) || m.sig !== markSig(r)) delete MARKS[r.line];
+      else r.status = m.v;
+    });
     $('result').hidden = false;
     render();
   }
@@ -692,9 +704,9 @@
     var cls = { ok:'ok', bad:'bad', unmapped:'gray', nomult:'warn', hold:'gray', manual:'warn' }[st];
     return '<span class="chip ' + cls + '">' + STAT_LABEL[st] + '</span>';
   }
-  // 직접 확인 단추. 눌린 단추를 다시 누르면 '확인 필요'로 돌아간다
+  // 직접 확인 단추. 눌린 단추를 다시 누르면 누르기 전 상태('확인 필요' / '가격 이상')로 돌아간다
   function markBtns(r){
-    var cur = MARKS[r.line] || '';
+    var cur = markOf(r.line);
     return '<div class="mark">' + [['ok','맞음'],['bad','틀림']].map(function(x){
       return '<button type="button" class="' + x[0] + (cur === x[0] ? ' on' : '') + '" data-line="' + r.line + '" data-mark="' + x[0] + '" aria-pressed="' + (cur === x[0]) + '">' + x[1] + '</button>';
     }).join('') + '</div>';
@@ -709,7 +721,7 @@
     $('stats').innerHTML =
       '<div class="stat"><div class="lab">' + (RND.split && RND.split.prev ? '이번 회차 주문' : '전체 주문') + '</div><div class="n">' + s.total + '<small>건</small></div></div>' +
       '<div class="stat ok"><div class="lab">가격 정상</div><div class="n">' + s.ok + '<small>건</small></div></div>' +
-      '<div class="stat ' + (s.bad ? 'bad' : 'ok') + '"><div class="lab">가격 이상</div><div class="n">' + s.bad + '<small>건</small></div></div>' +
+      '<div class="stat ' + (s.bad ? 'bad' : 'ok') + '"><div class="lab">가격 이상</div><div class="n">' + s.bad + '<small>건</small></div>' + (confirmedCount() ? '<div class="hint">맞음으로 확인 ' + confirmedCount() + '건</div>' : '') + '</div>' +
       '<div class="stat ' + (s.unmapped ? 'warn' : '') + '"><div class="lab">미매핑 (기준가 없음)</div><div class="n">' + s.unmapped + '<small>건</small></div></div>' +
       '<div class="stat ' + ((s.nomult + s.hold) ? 'warn' : '') + '"><div class="lab">검증 못 함</div><div class="n">' + (s.nomult + s.hold) + '<small>건</small></div></div>' +
       (smartCount() ? '<div class="stat ' + (s.manual ? 'warn' : 'ok') + '"><div class="lab">스마트스토어 미매칭 · 확인 필요</div><div class="n">' + s.manual + '<small>/ ' + smartCount() + '건</small></div></div>' : '');
@@ -747,7 +759,7 @@
     $('multSum').textContent = Object.keys(byMall).length + '개 몰 · 눌러서 펼치기';
 
     // 필터
-    var segs = [['bad','가격 이상',s.bad],['smart','스마트스토어 미매칭',smartCount()],['unmapped','미매핑',s.unmapped],['nomult','검증 못 함',s.nomult + s.hold],['ok','정상',s.ok],['all','전체',s.total]];
+    var segs = [['bad','가격 이상',freshRes().filter(isBadRow).length],['smart','스마트스토어 미매칭',smartCount()],['unmapped','미매핑',s.unmapped],['nomult','검증 못 함',s.nomult + s.hold],['ok','정상',s.ok],['all','전체',s.total]];
     if (!smartCount()) segs.splice(1, 1);
     if (RND.split && RND.split.prev) segs.push(['prev','앞 회차',RND.split.prev]);
     else if (FILTER === 'prev') FILTER = 'bad';
@@ -768,6 +780,8 @@
   }
 
   function smartCount(){ return freshRes().filter(function(r){ return r.manual; }).length; }
+  function isBadRow(r){ return r.status === 'bad' || r.priceOff; }
+  function confirmedCount(){ return freshRes().filter(function(r){ return r.priceOff && r.status === 'ok'; }).length; }
 
   function pass(r){
     if (FILTER === 'prev') return !!r.prev;
@@ -780,6 +794,7 @@
       return isDupFilter(FILTER) ? !!o[k] : o.stock === k;
     }
     if (FILTER === 'smart') return !!r.manual;   // 확인을 마친 건도 계속 보이게(누른 줄이 사라지지 않게)
+    if (FILTER === 'bad') return isBadRow(r);
     if (FILTER === 'nomult') return r.status === 'nomult' || r.status === 'hold';
     return r.status === FILTER;
   }
@@ -801,7 +816,7 @@
       var d = r.diff, dc = !r.expect ? 'dim' : (d === 0 || Math.abs(d) <= CFG.tol ? 'diff0' : (d < 0 ? 'diffneg' : 'diffpos'));
       var o = BYLINE[r.line], rowCls = r.prev ? '' : (r.status === 'bad' || o.stock === 'none' ? 'bad' : (o.stock === 'short' || o.cust ? 'warnrow' : ''));
       h += '<tr class="' + rowCls + '">' +
-        '<td>' + chip(r.status) + (r.prev ? '<div><span class="chip prev">' + r.prev + '차 확인</span></div>' : '') + (r.manual && !r.prev ? markBtns(r) : '') + (r.note ? '<div class="hint">' + esc(r.note) + '</div>' : '') + '</td>' +
+        '<td>' + chip(r.status) + (r.prev ? '<div><span class="chip prev">' + r.prev + '차 확인</span></div>' : '') + ((r.manual || r.priceOff) && !r.prev ? markBtns(r) : '') + (r.note ? '<div class="hint">' + esc(r.note) + '</div>' : '') + '</td>' +
         '<td class="mallc">' + who(r) + '</td><td class="nw">' + esc(r.mallOrd) + '</td><td class="person">' + esc(r.buyer) + '</td><td class="person">' + esc(r.rcv) + '</td><td class="nw">' + esc(r.code) + '</td>' +
         '<td class="nm"><div title="' + esc(r.name) + '">' + esc(r.name) + '</div><small>' + esc(r.opt) + (r.qty > 1 ? ' · 수량 ' + r.qty : '') + '</small></td>' + stockCell(r) +
         (r.manual ? '<td class="r"><b class="conv">' + won(r.conv) + '</b><div class="hint">환산가 · 사방넷 확인</div></td>' : '<td class="r' + (r.base ? '' : ' dim') + '">' + won(r.base) + '</td>') +
@@ -851,7 +866,7 @@
     var head = ['상태','쇼핑몰','쇼핑몰ID','검증 구분','쇼핑몰 주문번호','주문자명','수취인명','상품코드','상품명','옵션','수량','이카운트 현재고','주문 합계','출고 판정','품목 확인 사유','고객 중복','같은 상품','이카운트 품목(수량)','재고 기준','몰별 기준','사방넷 기준가','필웨이 환산가','직접 확인','기준 배수','기대 판매가','실제 판매가','차이','결제금액'];
     var aoa = [head];
     list.forEach(function(r){
-      var mk = r.manual ? ({ ok:'맞음', bad:'틀림' }[MARKS[r.line]] || '미확인') : '';
+      var mk = r.manual || r.priceOff ? ({ ok:'맞음', bad:'틀림' }[markOf(r.line)] || '미확인') : '';
       var o = BYLINE[r.line];
       var stk = [o.qty == null ? '' : o.qty, o.stock ? o.need : '', o.stock ? STOCK_LABEL[o.stock] : '재고 미확인', [o.why, o.warn, o.note].filter(Boolean).join(' / '),
         o.cust ? o.cust + ' (상대 주문 ' + o.custOrders.join(', ') + ')' : '', o.same ? o.same + ' (' + o.sameCount + '건)' : '',
@@ -891,7 +906,8 @@
   $('tbl').addEventListener('click', function(e){
     var b = e.target.closest('button[data-mark]'); if (!b) return;
     var line = b.dataset.line, v = b.dataset.mark, box = $('tbl').parentNode, y = box.scrollTop;
-    if (MARKS[line] === v) delete MARKS[line]; else MARKS[line] = v;
+    var row = RES.filter(function(r){ return String(r.line) === line; })[0]; if (!row) return;
+    if (markOf(line) === v) delete MARKS[line]; else MARKS[line] = { v:v, sig:markSig(row) };
     run(); box.scrollTop = y;
     var again = $('tbl').querySelector('button[data-line="' + line + '"][data-mark="' + v + '"]');
     if (again) again.focus({ preventScroll:true });
