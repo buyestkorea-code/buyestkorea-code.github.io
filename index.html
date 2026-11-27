@@ -941,6 +941,59 @@
   body:not(.me-in):not(.me-guest) .topbar-title{ margin-right:auto; }
 
   #meApp[hidden], #meGate[hidden], #meTopAuth[hidden], #meAdmin[hidden], #meCalAddPanel[hidden], #meNoticeAdd[hidden], #meOpts[hidden], #mePwForm[hidden], #meAdminSearch[hidden], #meSearch[hidden], #meTopDate[hidden], #meUser[hidden], #meUserMenu[hidden], #meCalDayPanel[hidden]{ display:none !important; }
+
+  /* ===== 내 즐겨찾기 (사이드바 맨 위, 계정별 저장) ===== */
+  .tk-fav{ display:none; margin:2px 0 4px; background:#252D28; border:1px solid #34413A; border-radius:10px; padding:4px; }
+  body.me-in .tk-fav{ display:flex; }
+  .tk-fav-head{ display:flex; align-items:center; gap:6px; padding:3px 4px 3px 6px; }
+  .tk-fav-toggle{ flex:1; display:flex; align-items:center; gap:6px; background:none; border:0; padding:3px 2px; cursor:pointer;
+    color:#F2D58A; font:inherit; font-size:12px; font-weight:700; text-align:left; }
+  .tk-fav-toggle .car{ margin-left:auto; color:#8E9C95; font-size:10px; transition:transform .15s ease; }
+  .tk-fav.closed .tk-fav-toggle .car{ transform:rotate(-90deg); }
+  .tk-fav-toggle .cnt{ color:#8E9C95; font-weight:500; }
+  .tk-fav-edit{ flex:none; background:none; border:1px solid #3D5A50; color:#9FD4C2; border-radius:6px; font:inherit; font-size:11px; padding:1px 7px; cursor:pointer; }
+  .tk-fav-edit.on{ background:#3D5A50; color:#fff; }
+  .tk-fav.closed .tk-fav-list, .tk-fav.closed .tk-fav-edit{ display:none; }
+  .tk-fav-list{ display:flex; flex-direction:column; }
+  .tk-fav-empty{ font-size:11.5px; color:#8E9C95; padding:4px 8px 6px; line-height:1.5; }
+  .tk-fav-list .nav-item .tk-x, .tk-fav-list .nav-item .tk-grip{ display:none; }
+  .tk-fav.editing .tk-fav-list .nav-item{ cursor:grab; }
+  .tk-fav.editing .tk-fav-list .nav-item .tk-grip{ display:inline; color:#6D7D75; font-size:11px; letter-spacing:-2px; flex:none; }
+  .tk-fav.editing .tk-fav-list .nav-item .tk-x{ display:inline-flex; margin-left:auto; width:18px; height:18px; align-items:center; justify-content:center;
+    border-radius:4px; color:#C9D2CD; font-size:12px; }
+  .tk-fav.editing .tk-fav-list .nav-item .tk-x:hover{ background:#B23B3B; color:#fff; }
+  .tk-fav.editing .tk-fav-list .nav-item .navst{ display:none; }
+  .tk-fav-list .nav-item.tk-drag{ opacity:.4; }
+  /* 메뉴마다 붙는 별: 평소엔 숨기고 마우스를 올리거나 즐겨찾기한 메뉴만 보인다 */
+  .nav-item .tk-star{ flex:none; width:18px; height:18px; display:none; align-items:center; justify-content:center; margin-left:4px;
+    color:#56645D; font-size:13px; line-height:1; border-radius:4px; cursor:pointer; }
+  .nav-item:not(:has(.navst)):not(:has(.chip)) .tk-star{ margin-left:auto; }
+  body.me-in .nav-item:hover .tk-star, body.me-in .nav-item .tk-star.on{ display:inline-flex; }
+  .nav-item .tk-star:hover{ color:#F2D58A; background:rgba(255,255,255,.08); }
+  .nav-item .tk-star.on{ color:#E0B04A; }
+  .nav-item.active .tk-star{ color:rgba(255,255,255,.75); }
+  .nav-item.active .tk-star.on{ color:#FFE08A; }
+
+  /* ===== 최근 연 화면 탭 (상단바 아래) ===== */
+  .tk-tabs{ display:none; align-items:flex-end; gap:3px; padding:6px 14px 0; background:#E9E5DB; border-bottom:1px solid var(--border);
+    overflow-x:auto; scrollbar-width:thin; flex:none; }
+  body.me-in .tk-tabs{ display:flex; }
+  .tk-tab{ flex:none; display:flex; align-items:center; gap:7px; height:32px; padding:0 8px 0 13px; max-width:220px;
+    background:#F6F4EE; border:1px solid var(--border); border-bottom:none; border-radius:8px 8px 0 0;
+    color:var(--ink-muted); font:inherit; font-size:12.5px; cursor:pointer; white-space:nowrap; }
+  .tk-tab .t{ overflow:hidden; text-overflow:ellipsis; }
+  .tk-tab:hover{ color:var(--ink); background:#fff; }
+  .tk-tab.home{ padding-right:13px; }
+  .tk-tab.on{ background:var(--surface); color:var(--ink); font-weight:700; height:34px; box-shadow:inset 0 3px 0 var(--accent); }
+  .tk-tab .x{ width:18px; height:18px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; color:#8B8F86; font-size:11px; }
+  .tk-tab .x:hover{ background:var(--danger-soft); color:var(--danger); }
+  .tk-tabs-all{ margin-left:auto; align-self:center; flex:none; margin-bottom:4px; font:inherit; font-size:11.5px; color:var(--ink-muted);
+    background:#F6F4EE; border:1px solid var(--border); border-radius:6px; padding:3px 9px; cursor:pointer; }
+  .tk-tabs-all:hover{ color:var(--danger); border-color:var(--danger); }
+  @media (max-width:860px){ body.me-in .tk-tabs{ display:none; } }
+  /* 탭 줄 높이만큼 도구 화면 높이를 줄여 페이지 전체 스크롤이 생기지 않게 */
+  body.me-in:not(.fullframe) .content iframe[style*="100vh - 140px"]{ height:calc(100vh - 178px) !important; }
+  @media (max-width:860px){ body.me-in .content iframe[style*="100vh - 140px"]{ height:calc(100vh - 140px) !important; } }
 </style>
 
 <div id="bootSplash" role="status" aria-live="polite">
@@ -2515,7 +2568,10 @@ window.__loadLib = (function(){
         memo:  typeof d.memo === 'string' ? d.memo : '',
         todos: Array.isArray(d.todos) ? d.todos : [],
         links: Array.isArray(d.links) ? d.links : [],
-        tools: Array.isArray(d.tools) ? d.tools : []
+        tools: Array.isArray(d.tools) ? d.tools : [],
+        // 사이드바 "내 즐겨찾기" — 계정별로 서버에 같이 저장된다(메뉴 data-nav 이름 목록 + 접힘 여부)
+        favs:  Array.isArray(d.favs) ? d.favs.filter(function(x){ return typeof x === 'string'; }) : [],
+        favOpen: d.favOpen !== false
       };
     }
     function nowT(){ return new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}); }
@@ -2937,7 +2993,14 @@ window.__loadLib = (function(){
       (mq.addEventListener ? mq.addEventListener.bind(mq) : mq.addListener.bind(mq))('change', place);
     })();
 
-    function renderPersonal(){ renderMemo(); renderTasks(); renderLinks(); renderPicks(); renderOpts(); }
+    function renderPersonal(){ renderMemo(); renderTasks(); renderLinks(); renderPicks(); renderOpts();
+      try{ document.dispatchEvent(new CustomEvent('toolkit:prefs')); }catch(e){} }
+    // 사이드바 즐겨찾기·최근 탭 모듈이 개인 설정을 읽고 저장할 때 쓰는 통로
+    window.__tkPrefs = {
+      get: function(){ return state; },
+      save: function(){ persist(); },
+      user: function(){ return AUTH ? AUTH.id : ''; }
+    };
 
     /* ---------------- 방문 로그 ---------------- */
     function logVisit(ev){
@@ -9354,3 +9417,4 @@ window.__loadLib = (function(){
   window.addEventListener('scroll',onScroll,{passive:true}); window.addEventListener('resize',onScroll);
 })();
 </script>
+<script src="assets/tk-favtabs.js?v=1"></script>
