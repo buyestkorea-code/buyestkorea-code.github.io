@@ -991,6 +991,15 @@
     background:#F6F4EE; border:1px solid var(--border); border-radius:6px; padding:3px 9px; cursor:pointer; }
   .tk-tabs-all:hover{ color:var(--danger); border-color:var(--danger); }
   @media (max-width:860px){ body.me-in .tk-tabs{ display:none; } }
+  /* ===== 왼쪽 메뉴 숨기기 (PC 화면, 이 PC에 기억) ===== */
+  .tk-side-btn{ display:inline-flex; width:34px; height:34px; border-radius:8px; border:1px solid var(--border); background:var(--surface);
+    color:var(--ink-muted); cursor:pointer; flex:none; align-items:center; justify-content:center; padding:0; }
+  .tk-side-btn:hover{ background:var(--surface-2); color:var(--ink); }
+  .tk-side-btn svg{ width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  @media (min-width:861px){ .sidebar{ transition:margin-left .18s ease; } }
+  body.tk-side-hidden .sidebar{ margin-left:calc(-1 * var(--sidebar-w)); visibility:hidden; transition:margin-left .18s ease, visibility 0s .18s; }
+  @media (max-width:860px){ .tk-side-btn{ display:none; } body.tk-side-hidden .sidebar{ margin-left:0; visibility:visible; } }
+  @media (prefers-reduced-motion: reduce){ .sidebar, body.tk-side-hidden .sidebar{ transition:none; } }
   /* 탭 줄 높이만큼 도구 화면 높이를 줄여 페이지 전체 스크롤이 생기지 않게 */
   body.me-in:not(.fullframe) .content iframe[style*="100vh - 140px"]{ height:calc(100vh - 178px) !important; }
   @media (max-width:860px){ body.me-in .content iframe[style*="100vh - 140px"]{ height:calc(100vh - 140px) !important; } }
@@ -9417,4 +9426,4 @@ window.__loadLib = (function(){
   window.addEventListener('scroll',onScroll,{passive:true}); window.addEventListener('resize',onScroll);
 })();
 </script>
-<script src="assets/tk-favtabs.js?v=1"></script>
+<script src="assets/tk-favtabs.js?v=2"></script>

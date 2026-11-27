@@ -171,6 +171,23 @@
   document.addEventListener('toolkit:prefs', function(){ tabs = loadTabs(); renderFav(); syncStars(); renderTabs(); });
   window.addEventListener('resize', fixTbh);
 
+  /* ---------- 왼쪽 메뉴 숨기기/보이기 (이 PC에 기억) ---------- */
+  var SIDE_KEY = 'buyest.sideHidden';
+  var sideBtn = el('button', 'tk-side-btn'); sideBtn.type = 'button'; sideBtn.id = 'tkSideToggle';
+  sideBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path class="ar" d="M15.5 9.5 13 12l2.5 2.5"/></svg>';
+  topbar.insertBefore(sideBtn, topbar.firstChild);
+  function setSide(hidden, save){
+    document.body.classList.toggle('tk-side-hidden', hidden);
+    sideBtn.title = hidden ? '왼쪽 메뉴 보이기' : '왼쪽 메뉴 숨기기';
+    sideBtn.setAttribute('aria-label', sideBtn.title);
+    sideBtn.querySelector('.ar').setAttribute('d', hidden ? 'M13 9.5 15.5 12 13 14.5' : 'M15.5 9.5 13 12l2.5 2.5');
+    if(save){ try{ localStorage.setItem(SIDE_KEY, hidden ? '1' : '0'); }catch(e){} }
+    setTimeout(function(){ fixTbh(); window.dispatchEvent(new Event('resize')); }, 200);
+  }
+  sideBtn.addEventListener('click', function(){ setSide(!document.body.classList.contains('tk-side-hidden'), true); });
+  var sideSaved = '0'; try{ sideSaved = localStorage.getItem(SIDE_KEY) || '0'; }catch(e){}
+  setSide(sideSaved === '1', false);
+
   var act = document.querySelector('main.content > section[data-view].active');
   if(act) current = act.getAttribute('data-view');
   addTab(current);
